@@ -1,0 +1,8 @@
+# OS / editor cruft
+.DS_Store
+*.log
+
+# Local-only Claude Code settings (not part of the published plugin)
+.claude/settings.local.json
+
+# NOTE: assets/mermaid/mermaid.min.js IS vendored on purpose — do not ignore it.

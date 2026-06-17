@@ -1,0 +1,27 @@
+{
+  "description": "gogo — config reminder on session start; pause-for-user ping on notifications.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/config-check.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/notify.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

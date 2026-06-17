@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "gogo",
+  "description": "The gogo development pipeline plugin.",
+  "owner": {
+    "name": "Bartłomiej Zawadzki",
+    "email": "zawadzkibartek@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "gogo",
+      "description": "Generic plan → implement → review → test → report pipeline with per-project knowledge config.",
+      "author": {
+        "name": "Bartłomiej Zawadzki"
+      },
+      "category": "development",
+      "source": "."
+    }
+  ]
+}

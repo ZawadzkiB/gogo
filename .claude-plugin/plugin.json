@@ -1,0 +1,22 @@
+{
+  "name": "gogo",
+  "version": "0.1.0",
+  "description": "Generic, knowledge-grounded dev pipeline: plan → implement → review → test → report. Configure per-project with /gogo:build.",
+  "author": {
+    "name": "Bartłomiej Zawadzki",
+    "email": "zawadzkibartek@gmail.com"
+  },
+  "homepage": "https://github.com/ZawadzkiB/gogo",
+  "repository": "https://github.com/ZawadzkiB/gogo.git",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "pipeline",
+    "planning",
+    "code-review",
+    "testing",
+    "orchestration",
+    "agent"
+  ],
+  "mcpServers": "./.mcp.json"
+}
