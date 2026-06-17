@@ -43,15 +43,24 @@ fixes back into implement, and either can **pause for your decision** at any poi
 ## Generic flow, your rules
 
 The five phases never change. What changes per project lives in **`.gogo/knowledge/`**
-— a set of small markdown files gogo reads at each phase:
+— small markdown files, one concern each, that gogo reads at the relevant phase.
+**These files are the configuration**: they're what make the generic flow behave
+like *your* project.
 
-| Phase | Reads from `.gogo/knowledge/` |
-|---|---|
-| ① Plan | `project-knowledge`, `tech-stack`, `non-functional-requirements`, `coding-rules` |
-| ② Implement | `coding-rules`, `tech-stack` |
-| ③ Review | `code-review-standards`, `coding-rules`, `non-functional-requirements` |
-| ④ Test | `testing-tools`, `test-strategy`, `non-functional-requirements`, `tech-stack` |
-| ⑤ Report | updates the above (your gogo-owned summaries) |
+| File | What it holds | Read in |
+|---|---|---|
+| `project-knowledge.md` | architecture, domains, glossary, key decisions | Plan |
+| `tech-stack.md` | languages, frameworks, and the build / run / test commands | Plan · Implement · Test |
+| `non-functional-requirements.md` | standing quality bars: performance, security, accessibility, reliability, limits | Plan · Review · Test |
+| `coding-rules.md` | conventions the implementation must follow | Implement · Review |
+| `code-review-standards.md` | what review checks for: correctness, security, performance, error handling, style | Review |
+| `testing-tools.md` | the test tools and exactly how to run them | Test |
+| `test-strategy.md` | how to test: user journeys, UI / design checks, e2e levels, deploy checks, the done-bar | Test |
+| `index.md` | a purpose-map of the folder + the proxy convention | — |
+| `_discovered.md` | what `/gogo:build` found and how each file was wired (regenerated each run) | build |
+
+On success, the **Report** phase writes anything it learned back into these files
+(your gogo-owned summaries), keeping them current.
 
 These files are **proxies**: they link to your project's real docs (an existing
 `CLAUDE.md`, `README`, `CONTRIBUTING`, Copilot / Cursor / Windsurf / Codex configs,
@@ -127,9 +136,9 @@ Resumes a feature that paused for your decision, folding your answer into
 gogo writes two top-level folders — both plain markdown you can read, edit, and
 commit.
 
-**`.gogo/knowledge/`** — your project's configuration (see the table above).
-`index.md` is a purpose-map of the folder; every file states its own purpose in
-its header.
+**`.gogo/knowledge/`** — your project's configuration: the nine files described in
+[**Generic flow, your rules**](#generic-flow-your-rules) above. Every file states
+its own purpose in its header, and `index.md` is the folder's purpose-map.
 
 **`.plans/feature-<slug>/`** — one folder per piece of work:
 
