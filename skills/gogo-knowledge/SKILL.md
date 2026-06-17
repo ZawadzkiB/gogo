@@ -13,7 +13,7 @@ Run after phase ④ is all-green. This is the diagram's "update plan and all
 knowledge docs" arrow back to the top.
 
 ## Steps
-1. **Finalize the plan.** Update `.plans/feature-<slug>/plan.md` to the as-built
+1. **Finalize the plan.** Update `.gogo/plans/feature-<slug>/plan.md` to the as-built
    state (what actually shipped vs the original). Set `state.md` phase=done,
    status=done, resume=none.
 2. **Update gogo-owned knowledge — never the originals.** Walk `.gogo/knowledge/*`
@@ -26,7 +26,7 @@ knowledge docs" arrow back to the top.
      project's CLAUDE.md, README, etc.). If a change really belongs upstream,
      don't rewrite it silently — add a note and **surface a suggestion** to the
      user: "Consider adding X to CLAUDE.md."
-   - The only files you may write are under `.gogo/` and `.plans/`.
+   - The only files you may write are under `.gogo/` (config in `.gogo/knowledge/`, work in `.gogo/plans/`).
 3. **Re-render charts** via `gogo-mermaid` if the design changed.
 4. **Summarise to the user:** what was planned, what was implemented, what review
    found and how it resolved, what was tested (UI/CLI/API), and which knowledge

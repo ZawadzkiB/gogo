@@ -56,7 +56,7 @@ relying on it.
 
 ## Feature workspace
 
-Everything for one piece of work lives in **`.plans/feature-<slug>/`** (kebab
+Everything for one piece of work lives in **`.gogo/plans/feature-<slug>/`** (kebab
 slug from the feature name). These files are the pipeline's memory + audit trail:
 
 - `plan.md` — the accepted plan (the contract), incl. the feature's *functional* requirements
@@ -101,7 +101,7 @@ in-context instead of delegating — the phase skills are written to run either 
 ## The phases
 
 ### ① Plan → skill `gogo-plan`
-Analyse the goal against the knowledge docs; create `.plans/feature-<slug>/`;
+Analyse the goal against the knowledge docs; create `.gogo/plans/feature-<slug>/`;
 write `plan.md` (Goal / Context / Functional requirements / Approach +
 alternatives / Changes checklist / Tests / Out-of-scope); draw the change/flow
 with `gogo-mermaid`; init `state.md`. **Present the plan and STOP for

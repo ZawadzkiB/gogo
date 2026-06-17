@@ -84,4 +84,4 @@ low-confidence and want a human glance, and the next step
 - Only ever write inside `.gogo/` — never edit a discovered upstream file.
 - Keep all writes inside `.gogo/knowledge/`.
 - Don't auto-edit `.gitignore`; instead print guidance (commit `knowledge/`;
-  the team's call on `.plans/`).
+  the team's call on `.gogo/plans/`).

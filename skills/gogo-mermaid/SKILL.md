@@ -22,19 +22,19 @@ For each diagram, produce all three so it renders in every context:
 1. **A fenced ` ```mermaid ` block** inside the relevant markdown (e.g. `plan.md`).
    This renders natively in GitHub, VS Code, and JetBrains previews — zero deps.
 2. **A standalone `.mmd` file** in the feature's `charts/` folder
-   (`.plans/feature-<slug>/charts/<name>.mmd`) holding the same source.
-3. **The offline viewer** `.plans/feature-<slug>/charts/diagrams.html` — a
+   (`.gogo/plans/feature-<slug>/charts/<name>.mmd`) holding the same source.
+3. **The offline viewer** `.gogo/plans/feature-<slug>/charts/diagrams.html` — a
    self-contained page that renders every `.mmd` in the folder. Open it in any
    browser; it needs only the vendored `mermaid.min.js`.
 
 ## Generating / refreshing `charts/diagrams.html`
 
 1. **Ensure the shared runtime exists** (one copy per project, not per feature):
-   if `.plans/.assets/mermaid.min.js` is missing, copy it from
+   if `.gogo/plans/.assets/mermaid.min.js` is missing, copy it from
    `${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js`.
    ```bash
-   mkdir -p .plans/.assets
-   [ -f .plans/.assets/mermaid.min.js ] || cp "${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js" .plans/.assets/mermaid.min.js
+   mkdir -p .gogo/plans/.assets
+   [ -f .gogo/plans/.assets/mermaid.min.js ] || cp "${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js" .gogo/plans/.assets/mermaid.min.js
    ```
 2. **Start from the template** `${CLAUDE_PLUGIN_ROOT}/assets/mermaid/viewer.template.html`
    and replace the three tokens:
@@ -50,9 +50,9 @@ For each diagram, produce all three so it renders in every context:
        A[user goal] --> B[plan]
      </pre></div>
      ```
-3. Write the result to `.plans/feature-<slug>/charts/diagrams.html`.
+3. Write the result to `.gogo/plans/feature-<slug>/charts/diagrams.html`.
 
-> Why a shared `.plans/.assets/` copy: it keeps the runtime out of every feature
+> Why a shared `.gogo/plans/.assets/` copy: it keeps the runtime out of every feature
 > folder (one ~3 MB file per project), the path is relative (so the repo stays
 > portable if moved or shared), and it works fully offline.
 

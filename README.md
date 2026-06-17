@@ -103,7 +103,7 @@ while preserving your edits. `--force` resets to fresh scaffolds.
 **`/gogo:plan "<goal>"`**
 
 Runs the plan phase only. Writes an accept-pending plan to
-`.plans/feature-<slug>/` (with the feature's functional requirements, a changes
+`.gogo/plans/feature-<slug>/` (with the feature's functional requirements, a changes
 checklist, and a mermaid chart) and **stops for your acceptance** — no code is
 written until you accept.
 
@@ -115,7 +115,7 @@ start until a plan is accepted.
 
 **`/gogo:status`**
 
-Lists every feature under `.plans/` with its phase, status, and iteration counts.
+Lists every feature under `.gogo/plans/` with its phase, status, and iteration counts.
 Read-only.
 
 **`/gogo:resume [feature-slug]`**
@@ -133,14 +133,14 @@ Resumes a feature that paused for your decision, folding your answer into
 
 ## What gets created in your project
 
-gogo writes two top-level folders — both plain markdown you can read, edit, and
-commit.
+gogo keeps everything under one **`.gogo/`** folder — plain markdown you can read,
+edit, and commit:
 
 **`.gogo/knowledge/`** — your project's configuration: the nine files described in
 [**Generic flow, your rules**](#generic-flow-your-rules) above. Every file states
 its own purpose in its header, and `index.md` is the folder's purpose-map.
 
-**`.plans/feature-<slug>/`** — one folder per piece of work:
+**`.gogo/plans/feature-<slug>/`** — one folder per piece of work:
 
 | File | Purpose |
 |---|---|

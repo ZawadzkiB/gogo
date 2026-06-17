@@ -1,6 +1,6 @@
 # State — feature `<slug>`
 
-<!-- Files in this folder (.plans/feature-<slug>/):
+<!-- Files in this folder (.gogo/plans/feature-<slug>/):
   - plan.md        — the accepted plan (the contract) + the feature's functional requirements
   - adjustments.md — log of changes / clarifications you asked for during planning
   - state.md       — THIS file: current phase / status / iterations; lets work resume
