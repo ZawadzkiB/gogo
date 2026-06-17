@@ -16,10 +16,12 @@ knowledge docs" arrow back to the top.
 1. **Finalize the plan.** Update `.gogo/plans/feature-<slug>/plan.md` to the as-built
    state (what actually shipped vs the original). Set `state.md` phase=done,
    status=done, resume=none.
-2. **Draw the as-built diagram set** via `gogo-mermaid`. Diagram *what actually
-   shipped*, not just the plan — produce the ones that carry signal (skip any that
-   would be trivial), each as a fenced block (in `report.md`), a `.mmd` in
-   `charts/`, and a refreshed `charts/diagrams.html`:
+2. **Draw the as-built diagram set** via `gogo-mermaid`. Diagram the *shipped code
+   and behaviour* — never the gogo phases or the plan's task checklist (FR1→FR2→…
+   is a to-do list, not a system diagram). Produce the ones that carry signal (skip
+   any that would be trivial; if the feature was pure process — docs / tests /
+   merge — draw nothing and note it), each as a fenced block (in `report.md`), a
+   `.mmd` in `charts/`, and a refreshed `charts/diagrams.html`:
    - **Flow** — `flowchart` of the implemented change / data flow / the
      architecture it touches.
    - **Sequence** — `sequenceDiagram` of the key runtime interaction(s) the change

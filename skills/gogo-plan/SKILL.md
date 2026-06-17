@@ -32,9 +32,13 @@ description: >-
    - `Status: awaiting acceptance`
 
    Design **within** the bars in `non-functional-requirements.md`.
-4. **Draw it.** Use the `gogo-mermaid` skill to add a `flowchart`/`stateDiagram`
-   of the change (and/or the pipeline) as a fenced block in `plan.md`, a `.mmd`
-   in `charts/`, and the offline viewer.
+4. **Draw the intended design** (not the task list). Use the `gogo-mermaid` skill
+   to diagram how the feature will *work* — the control/data flow, the runtime
+   interaction between real components, or the domain states it touches — as a
+   fenced block in `plan.md`, a `.mmd` in `charts/`, and the offline viewer.
+   Label nodes with real endpoints/modules/states, **never** with FR numbers,
+   build steps, or the gogo phases. If the change is pure process (docs/tests/
+   merge/config) with nothing structural to show, skip the diagram and say so.
 5. **Init state.** Copy `${CLAUDE_PLUGIN_ROOT}/templates/state.template.md` →
    `state.md` and `decisions.template.md` → `decisions.md`; create
    `adjustments.md` (header only). Set `state.md`: phase=plan,

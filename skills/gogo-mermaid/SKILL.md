@@ -67,19 +67,40 @@ fi
 If `mmdc` is absent, **skip silently** — the `.mmd` source + the offline viewer
 are the durable artifacts. Note the skip in the report rather than erroring.
 
+## What the diagram is about — read this first
+
+**The subject is always the PRODUCT: the code, its runtime behaviour, its data,
+its structure.** A reader should learn *how the feature works*, not *how gogo
+built it*.
+
+🚫 **Never draw, as a feature diagram:**
+- the **gogo pipeline** (plan→implement→review→test→report) — that lives in the README, not a feature folder;
+- the **plan's task checklist / work breakdown** — e.g. `FR1 commit → FR2 docs → FR3 tests → review → merge`. That's a to-do list as a flowchart, not a system diagram. This is the most common mistake — do not make it.
+- decision trees about *what to do* (process), as opposed to the system's own control flow.
+
+✅ **Do draw** the feature's actual flow of control/data, the runtime call
+sequence between real components, the domain's state machine, or the structure of
+the types/modules it adds or changes. Label nodes with **real things** — endpoints,
+functions, modules, screens, tables, states — not phase names or FR numbers.
+
+If the change is pure process (docs, test-only, a merge, config) with no
+meaningful behaviour or structure to show, **draw nothing** and say so — a missing
+diagram beats a misleading work-plan chart.
+
 ## Diagram conventions
 
-- **Pipeline / change flow / actions** → `flowchart TD` (or `LR`).
-- **Lifecycle / status transitions** → `stateDiagram-v2`.
-- **Interactions / call sequences** → `sequenceDiagram`.
+- **Control / data flow through the system** → `flowchart TD` (or `LR`).
+- **Domain lifecycle / status transitions** → `stateDiagram-v2`.
+- **Runtime interactions / call sequences between components** → `sequenceDiagram`.
 - **Structure / components / types** → `classDiagram`.
 - Keep node labels short; quote labels with punctuation. Prefer one focused
   diagram per concern over one giant chart.
 
 ## When phase ① (plan) vs phase ⑤ (report) draws
 
-- **Plan** draws the *intended* change: a `flowchart`/`stateDiagram` of the
-  approach, enough to review the design before code exists.
+- **Plan** draws the *intended design* — the architecture, data flow, or states
+  the feature will touch (inferred from the codebase), enough to review the design
+  before code exists. Not the build steps.
 - **Report** draws the *as-built* set — what actually shipped — typically a
   **flow**, a **sequence** of the key runtime interaction, an **actions/lifecycle**
   diagram for any new states, and a **structure** (`classDiagram`/component) view
