@@ -65,7 +65,8 @@ slug from the feature name). These files are the pipeline's memory + audit trail
 - `decisions.md` — open/closed forks that needed the user
 - `review-NN.md` — each review round's findings
 - `test-NN.md` — each test round's results
-- `charts/` — mermaid `.mmd` + offline `diagrams.html`
+- `report.md` — the as-built final report (written at ⑤): planned-vs-shipped, changes, review/test outcomes, diagram links
+- `charts/` — mermaid `.mmd` + offline `diagrams.html` (plan's intended design; ⑤ adds the as-built flow/sequence/actions/structure set)
 
 Create the folder in the plan phase (copy `state.md`/`decisions.md` from
 `${CLAUDE_PLUGIN_ROOT}/templates/`). **Keep `state.md` current at every phase
@@ -130,9 +131,12 @@ right?). Results → `test-NN.md`.
 - **All green** → ⑤.
 
 ### ⑤ Report → skill `gogo-knowledge`
-Update `plan.md` to as-built; update whatever `.gogo/knowledge/*` drifted
-(gogo-owned summaries only — never the proxied originals); re-render charts; set
-`state.md` to done; summarise to the user.
+Update `plan.md` to as-built; draw the as-built diagram set (flow / sequence /
+actions / structure) via `gogo-mermaid`; write the final `report.md` (planned-vs-
+shipped, changes, review/test outcomes, diagram + audit-trail links); update
+whatever `.gogo/knowledge/*` drifted (gogo-owned summaries only — never the
+proxied originals); set `state.md` to done; summarise to the user (point them at
+`report.md` and `charts/diagrams.html`).
 
 ## Loops & bounds
 

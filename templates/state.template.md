@@ -7,6 +7,7 @@
   - decisions.md   — forks that needed your call + gogo's recommendation + your answer
   - review-NN.md   — each code-review round's findings
   - test-NN.md     — each test round's results
+  - report.md      — the as-built final report (written at phase ⑤)
   - charts/        — mermaid diagrams (.mmd) + an offline diagrams.html viewer
 -->
 

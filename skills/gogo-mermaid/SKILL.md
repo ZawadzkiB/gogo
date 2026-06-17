@@ -69,11 +69,23 @@ are the durable artifacts. Note the skip in the report rather than erroring.
 
 ## Diagram conventions
 
-- **Pipeline / change flow** → `flowchart TD` (or `LR`).
-- **Lifecycle / status** → `stateDiagram-v2`.
-- **Interactions** → `sequenceDiagram`.
+- **Pipeline / change flow / actions** → `flowchart TD` (or `LR`).
+- **Lifecycle / status transitions** → `stateDiagram-v2`.
+- **Interactions / call sequences** → `sequenceDiagram`.
+- **Structure / components / types** → `classDiagram`.
 - Keep node labels short; quote labels with punctuation. Prefer one focused
   diagram per concern over one giant chart.
+
+## When phase ① (plan) vs phase ⑤ (report) draws
+
+- **Plan** draws the *intended* change: a `flowchart`/`stateDiagram` of the
+  approach, enough to review the design before code exists.
+- **Report** draws the *as-built* set — what actually shipped — typically a
+  **flow**, a **sequence** of the key runtime interaction, an **actions/lifecycle**
+  diagram for any new states, and a **structure** (`classDiagram`/component) view
+  when it adds clarity. Update the plan's diagrams where they still hold; name new
+  files per concern (e.g. `flow.mmd`, `sequence.mmd`, `actions.mmd`,
+  `structure.mmd`). Only draw what carries signal — skip trivial diagrams.
 
 ## Portability contract
 

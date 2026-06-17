@@ -37,7 +37,8 @@ flowchart LR
 
 *Plan waits for your acceptance before any code is written. Review and test loop
 fixes back into implement, and either can **pause for your decision** at any point
-— you answer and it resumes. On success, Report updates your knowledge docs.
+— you answer and it resumes. On success, Report writes an as-built `report.md` +
+diagrams and updates your knowledge docs.
 **Every phase is grounded in your `.gogo/knowledge/` config.***
 
 ## Generic flow, your rules
@@ -173,7 +174,8 @@ its own purpose in its header, and `index.md` is the folder's purpose-map.
 | `decisions.md` | Forks that needed your call, with gogo's recommendation + your answer |
 | `review-NN.md` | Each code-review round's findings |
 | `test-NN.md` | Each test round's results |
-| `charts/` | Mermaid diagrams (`.mmd`) + an offline `diagrams.html` viewer |
+| `report.md` | The as-built final report (written at report phase): planned-vs-shipped, changes, review/test outcomes, diagram links |
+| `charts/` | Mermaid diagrams (`.mmd`) + an offline `diagrams.html` viewer — the plan's intended design, plus the report phase's as-built flow / sequence / actions / structure set |
 
 ## Portability & prerequisites
 
