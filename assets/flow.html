@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(135deg, #f6f8fe 0%, #eceffb 100%);
+    padding: 44px;
+  }
+  .wrap { width: 1180px; margin: 0 auto; }
+  .title { font-size: 24px; font-weight: 800; color: #1c2030; letter-spacing: -0.02em; }
+  .title .g { color: #4f46e5; }
+  .subtitle { font-size: 14.5px; color: #6b7180; margin: 6px 0 30px; line-height: 1.5; }
+  .subtitle b { color: #1c2030; }
+
+  /* pipeline row */
+  .pipe { display: flex; align-items: center; gap: 8px; }
+  .pill {
+    background: #fff6e3; border: 1.5px solid #e7c878; color: #6f5316; font-weight: 700;
+    border-radius: 999px; padding: 11px 15px; font-size: 13.5px; white-space: nowrap; flex: 0 0 auto;
+  }
+  .arrow { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; width: 64px; }
+  .arrow .gly { color: #6366f1; font-size: 20px; font-weight: 800; line-height: 1; }
+  .arrow .lbl { font-size: 10.5px; color: #8990a3; font-weight: 700; margin-top: 4px; text-transform: uppercase; letter-spacing: .03em; }
+  .card {
+    flex: 1 1 0; min-width: 0; background: #ffffff; border: 1px solid #e6e8f2; border-radius: 16px;
+    padding: 15px 15px 14px; box-shadow: 0 6px 16px rgba(40, 50, 90, 0.07);
+  }
+  .card .num {
+    width: 27px; height: 27px; border-radius: 50%; background: #eceeff; color: #4f46e5;
+    font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center;
+  }
+  .card .name { font-weight: 800; color: #1c2030; font-size: 15.5px; margin-top: 9px; }
+  .card .role { font-size: 11.5px; color: #7a8194; margin-top: 4px; line-height: 1.4; }
+
+  /* note rows */
+  .notes { display: flex; gap: 14px; margin-top: 22px; }
+  .note {
+    flex: 1; border-radius: 14px; padding: 13px 16px; font-size: 13px; line-height: 1.45;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .note .ic { font-size: 16px; flex: 0 0 auto; }
+  .note b { font-weight: 800; }
+  .loop { background: #eef0ff; border: 1px dashed #aab0ee; color: #353a63; }
+  .gate { background: #f6edff; border: 1px dashed #c4a3e8; color: #4a3464; }
+
+  /* config band */
+  .cfg {
+    margin-top: 16px; background: linear-gradient(180deg, #eefaf0 0%, #e6f6ea 100%);
+    border: 1px solid #b9e2c2; border-radius: 18px; padding: 18px 20px;
+  }
+  .cfg .head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .cfg .head .h { font-size: 15px; font-weight: 800; color: #1d4a2c; }
+  .cfg .head .sub { font-size: 12.5px; color: #4b7457; }
+  .cfg .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+  .chip {
+    background: #ffffff; border: 1px solid #c4e3cc; color: #245b39; border-radius: 999px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .cfg .foot { font-size: 12px; color: #3f6b4d; margin-top: 13px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title"><span class="g">gogo</span> — the pipeline</div>
+    <div class="subtitle">
+      The flow is <b>generic and ships with the plugin</b>. The rules are <b>yours</b> —
+      configured in the knowledge files below. Same five phases everywhere; the behaviour is configuration.
+    </div>
+
+    <div class="pipe">
+      <div class="pill">goal</div>
+      <div class="arrow"><span class="gly">→</span></div>
+      <div class="card"><div class="num">1</div><div class="name">PLAN</div><div class="role">analyse &amp; write a plan you accept</div></div>
+      <div class="arrow"><span class="gly">→</span><span class="lbl">accepted</span></div>
+      <div class="card"><div class="num">2</div><div class="name">IMPLEMENT</div><div class="role">build the accepted plan</div></div>
+      <div class="arrow"><span class="gly">→</span></div>
+      <div class="card"><div class="num">3</div><div class="name">REVIEW</div><div class="role">fresh-eyes code review</div></div>
+      <div class="arrow"><span class="gly">→</span><span class="lbl">clean</span></div>
+      <div class="card"><div class="num">4</div><div class="name">TEST · e2e</div><div class="role">run suites + explore UI/CLI/API</div></div>
+      <div class="arrow"><span class="gly">→</span><span class="lbl">all green</span></div>
+      <div class="card"><div class="num">5</div><div class="name">REPORT</div><div class="role">update plan &amp; knowledge docs</div></div>
+      <div class="arrow"><span class="gly">→</span></div>
+      <div class="pill">done</div>
+    </div>
+
+    <div class="notes">
+      <div class="note loop"><span class="ic">↺</span><span><b>Review &amp; Test loop back into Implement</b> — issues&nbsp;→&nbsp;fix, then re-check. Plan revises on changes / clarify until you accept.</span></div>
+      <div class="note gate"><span class="ic">⏸</span><span><b>Pauses for your decision</b> — when review or test hits a real fork, gogo asks you, then resumes.</span></div>
+    </div>
+
+    <div class="cfg">
+      <div class="head">
+        <span class="h">⚙ .gogo/knowledge/ — your rules (configurable)</span>
+        <span class="sub">grounds every phase ↑ · Report writes learnings back here</span>
+      </div>
+      <div class="chips">
+        <span class="chip">project-knowledge</span>
+        <span class="chip">tech-stack</span>
+        <span class="chip">non-functional-requirements</span>
+        <span class="chip">coding-rules</span>
+        <span class="chip">code-review-standards</span>
+        <span class="chip">testing-tools</span>
+        <span class="chip">test-strategy</span>
+      </div>
+      <div class="foot">Proxies that link your real docs (CLAUDE.md, README, Copilot / Cursor / Windsurf / Codex…) — set once with <code>/gogo:build</code>, refresh anytime.</div>
+    </div>
+  </div>
+</body>
+</html>

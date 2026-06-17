@@ -2,30 +2,65 @@
 
 **A portable, knowledge-grounded development pipeline for Claude Code.**
 
-gogo drives any non-trivial change through five phases — **plan → implement →
-review → test → report** — grounded in your project's own docs, pausing for you
-only when a decision is genuinely yours.
-
-The *flow* is generic and ships with the plugin. Your *project's* knowledge
-(tech stack, conventions, review standards, testing strategy, non-functional
-requirements) lives in small markdown config files that gogo wires up for you.
-Everything the plugin needs travels with it — no global CLIs, no machine-specific
-setup.
+> **The flow is generic and ships with the plugin. The rules are yours.**
+> gogo runs every non-trivial change through five fixed phases — **plan →
+> implement → review → test → report** — but *what* it plans against, *how* it
+> writes code, *what* review flags, and *how* it tests are all driven by plain
+> markdown **knowledge files** that gogo wires up from your existing project docs.
+> Same pipeline everywhere; the behaviour is configuration.
 
 ## The flow
 
-```
-user goal ─▶ ① PLAN ──(you accept)──▶ ② IMPLEMENT ─▶ ③ REVIEW ─▶ ④ TEST ─▶ ⑤ REPORT ─▶ done
-              ▲  │                          ▲           │          │        (update plan +
-              │  └──(clarify / changes)──▶ wait         │          │         knowledge docs)
-              │                              └──issue────┘          │
-              │                                (fix → re-review)    │
-              └──── issue needs YOUR decision (from review or test) ┘
-```
+![gogo pipeline — goal → plan → implement → review → test → report, with review/test fix-loops back into implement, grounded in your .gogo/knowledge config](assets/flow.png)
 
-The **orchestrator** keeps the interactive bits — planning, the acceptance gate,
-decision gates, and the final report — in the chat with you, and delegates the
-heads-down work (implement, review, test) to specialist sub-agents.
+<details>
+<summary>Same flow as an editable Mermaid diagram</summary>
+
+```mermaid
+flowchart LR
+    G([goal]) --> P["① PLAN"]
+    P ==>|accepted| IMP["② IMPLEMENT"]
+    IMP ==> REV["③ REVIEW"]
+    REV ==>|clean| TEST["④ TEST · e2e"]
+    TEST ==>|all green| REP["⑤ REPORT"]
+    REP ==> DONE([done])
+    REV -->|"issues → fix"| IMP
+    TEST -->|"issues → fix"| IMP
+    P -. "changes / clarify" .-> P
+
+    classDef phase fill:#e8ecff,stroke:#7c8bd9,stroke-width:1.5px,color:#111
+    classDef io fill:#fff3d6,stroke:#caa54a,color:#111
+    class P,IMP,REV,TEST,REP phase
+    class G,DONE io
+```
+</details>
+
+*Plan waits for your acceptance before any code is written. Review and test loop
+fixes back into implement, and either can **pause for your decision** at any point
+— you answer and it resumes. On success, Report updates your knowledge docs.
+**Every phase is grounded in your `.gogo/knowledge/` config.***
+
+## Generic flow, your rules
+
+The five phases never change. What changes per project lives in **`.gogo/knowledge/`**
+— a set of small markdown files gogo reads at each phase:
+
+| Phase | Reads from `.gogo/knowledge/` |
+|---|---|
+| ① Plan | `project-knowledge`, `tech-stack`, `non-functional-requirements`, `coding-rules` |
+| ② Implement | `coding-rules`, `tech-stack` |
+| ③ Review | `code-review-standards`, `coding-rules`, `non-functional-requirements` |
+| ④ Test | `testing-tools`, `test-strategy`, `non-functional-requirements`, `tech-stack` |
+| ⑤ Report | updates the above (your gogo-owned summaries) |
+
+These files are **proxies**: they link to your project's real docs (an existing
+`CLAUDE.md`, `README`, `CONTRIBUTING`, Copilot / Cursor / Windsurf / Codex configs,
+manifests, test configs) and add a short gogo-specific summary — they don't
+duplicate them. Where a project has no doc for a topic, gogo authors that file
+from your codebase. You create them once with `/gogo:build` and refresh anytime;
+re-runs pick up new docs and **preserve your edits**.
+
+So adopting gogo in a new project is just `/gogo:build` — no flow to rewrite.
 
 ## Quickstart
 
@@ -33,21 +68,51 @@ heads-down work (implement, review, test) to specialist sub-agents.
 /plugin marketplace add ZawadzkiB/gogo
 /plugin install gogo@gogo
 
-/gogo:build               # wire gogo to this project's docs (run once; re-run anytime)
+/gogo:build                 # wire gogo to this project's docs (run once; re-run anytime)
 /gogo:plan "add CSV export to the reports page"
 # review the plan, accept it, then:
 /gogo:go
 ```
 
+> Hacking on gogo itself? Add your local clone as the marketplace instead of the
+> GitHub one (they share the name `gogo`, so use one or the other):
+> `/plugin marketplace add /path/to/gogo`.
+
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `/gogo:build [--force]` | Initialize **or refresh** the knowledge config — discover your project's docs and wire them as proxies. Re-run anytime to pick up new docs; `--force` resets to fresh scaffolds. |
-| `/gogo:plan "<goal>"` | Run the plan phase; writes an accept-pending plan to `.plans/feature-<slug>/`. Stops for your acceptance — no code is written. |
-| `/gogo:go [slug]` | Implement the accepted plan through the review→test loop, pausing only at real decisions. |
-| `/gogo:status` | List all features and their phase/status/iterations. |
-| `/gogo:resume [slug]` | Resume a feature that paused for your decision, folding in your answer. |
+Each command is an ultra-thin entry point to the orchestrator — no flow logic
+lives in the commands themselves.
+
+**`/gogo:build [--force]`**
+
+Set up or refresh the project's knowledge config. Discovers your existing docs
+(`CLAUDE.md`, Copilot / Cursor / Windsurf / Codex configs, README, manifests,
+test/CI configs) and wires each knowledge file as a proxy — or synthesizes it from
+the codebase when none exists. Idempotent: re-run anytime to pick up new docs
+while preserving your edits. `--force` resets to fresh scaffolds.
+
+**`/gogo:plan "<goal>"`**
+
+Runs the plan phase only. Writes an accept-pending plan to
+`.plans/feature-<slug>/` (with the feature's functional requirements, a changes
+checklist, and a mermaid chart) and **stops for your acceptance** — no code is
+written until you accept.
+
+**`/gogo:go [feature-slug]`**
+
+Implements the accepted plan through the implement → review → test → report loop,
+delegating to the specialist agents and pausing only at real decisions. Refuses to
+start until a plan is accepted.
+
+**`/gogo:status`**
+
+Lists every feature under `.plans/` with its phase, status, and iteration counts.
+Read-only.
+
+**`/gogo:resume [feature-slug]`**
+
+Resumes a feature that paused for your decision, folding your answer into
+`decisions.md` and continuing the loop.
 
 ## Agents
 
@@ -62,19 +127,9 @@ heads-down work (implement, review, test) to specialist sub-agents.
 gogo writes two top-level folders — both plain markdown you can read, edit, and
 commit.
 
-**`.gogo/knowledge/`** — your project's configuration (the pipeline reads these):
-
-| File | Purpose |
-|---|---|
-| `index.md` | Purpose-map of this folder + the proxy convention |
-| `project-knowledge.md` | Architecture, domains, glossary, key decisions |
-| `tech-stack.md` | Languages, frameworks, build/run/test commands |
-| `non-functional-requirements.md` | Standing bars: performance, security, accessibility, reliability, limits |
-| `coding-rules.md` | Conventions the implementation must follow |
-| `code-review-standards.md` | What the review phase checks for |
-| `testing-tools.md` | The test tools and how to run them |
-| `test-strategy.md` | How to test: journeys, UI checks, e2e levels, deploy checks |
-| `_discovered.md` | What `/gogo:build` found (regenerated each run) |
+**`.gogo/knowledge/`** — your project's configuration (see the table above).
+`index.md` is a purpose-map of the folder; every file states its own purpose in
+its header.
 
 **`.plans/feature-<slug>/`** — one folder per piece of work:
 
@@ -88,24 +143,6 @@ commit.
 | `test-NN.md` | Each test round's results |
 | `charts/` | Mermaid diagrams (`.mmd`) + an offline `diagrams.html` viewer |
 
-## Configuration: the knowledge proxies
-
-`.gogo/knowledge/*` files are **proxies** — they link to your project's real docs
-(README, CONTRIBUTING, an existing `CLAUDE.md`, `.github/copilot-instructions.md`,
-Cursor/Windsurf rules, etc.) and add a short gogo-specific summary, rather than
-duplicating them. When a project has no doc for a topic, the file becomes the
-home for it (gogo authors it from your code).
-
-Re-running `/gogo:build` **reconciles**: it picks up newly-added docs, refreshes
-summaries from the current upstream, and **preserves your edits** — anything
-under a `## gogo overrides` section and any gogo-owned file is never clobbered.
-Use `--force` for a full reset.
-
-A feature's **functional** requirements (what *this* change must do) live in its
-`plan.md`. The project's **standing non-functional** requirements (performance,
-security, accessibility, …) live in config at
-`.gogo/knowledge/non-functional-requirements.md`.
-
 ## Portability & prerequisites
 
 gogo is built to run anywhere it's installed:
@@ -116,8 +153,8 @@ gogo is built to run anywhere it's installed:
   fenced ` ```mermaid ` blocks; the bundled offline viewer needs only a browser
   (mermaid is vendored — no network, no CLI).
 - **Browser / UI testing** uses the bundled **Playwright MCP**, which boots via
-  `npx` on first use (needs **Node.js**). Without it, the test phase falls back
-  to API/CLI tests plus written manual steps.
+  `npx` on first use (needs **Node.js**). Without it, the test phase falls back to
+  API/CLI tests plus written manual steps.
 
 Optional: set `GOGO_NTFY_TOPIC` in your shell to get a phone push (via
 [ntfy.sh](https://ntfy.sh)) when gogo pauses for your input. Without it you still
