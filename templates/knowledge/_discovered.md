@@ -12,10 +12,16 @@ Generated-by: /gogo:build (scaffold)
 _Run `/gogo:build` to populate this file._
 
 ## Assistant configs found
-<Claude (CLAUDE.md, .claude/, AGENTS.md) / Copilot / Cursor / Windsurf / Codex — ✓ or ✗ per path>
+<Claude (CLAUDE.md, .claude/, AGENTS.md) / Copilot / Cursor / Windsurf / Codex — ✓ or ✗ per full path, incl. nested monorepo packages e.g. frontend/.github/…>
 
 ## General docs & manifests found
 <README, CONTRIBUTING, ARCHITECTURE, docs/, package.json + lockfile, test / CI configs>
+
+## Other docs (markdown sweep)
+<knowledge-bearing **/*.md(x) outside the known filenames — ADRs, runbooks, design notes, per-module READMEs>
+
+## In-code documentation
+<package/module doc comments that describe how the code is built/structured — file:line per hit, or ✗ none>
 
 ## Knowledge file wiring
 | Knowledge file | Mode | Sources linked / synthesized-from |

@@ -87,6 +87,27 @@ So adopting gogo in a new project is just `/gogo:build` — no flow to rewrite.
 > GitHub one (they share the name `gogo`, so use one or the other):
 > `/plugin marketplace add /path/to/gogo`.
 
+## Updating
+
+`/plugin install` reads a **local copy** of the marketplace, so installing on its
+own never pulls a newer version. Refresh the marketplace first, then reinstall:
+
+```
+/plugin marketplace update gogo   # fetch the latest gogo from GitHub
+/plugin install gogo@gogo         # install the bumped version
+/reload-plugins                   # apply it to the running session
+```
+
+To confirm which version is active, run `/plugin` and check gogo's version, or
+inspect the install cache:
+
+```
+ls ~/.claude/plugins/cache/gogo/gogo/   # newest dir = active version
+```
+
+> Using a local clone as the marketplace? A plain `git pull` in the clone is
+> enough — no `marketplace update` needed — followed by `/reload-plugins`.
+
 ## Commands
 
 Each command is an ultra-thin entry point to the orchestrator — no flow logic
@@ -96,8 +117,10 @@ lives in the commands themselves.
 
 Set up or refresh the project's knowledge config. Discovers your existing docs
 (`CLAUDE.md`, Copilot / Cursor / Windsurf / Codex configs, README, manifests,
-test/CI configs) and wires each knowledge file as a proxy — or synthesizes it from
-the codebase when none exists. Idempotent: re-run anytime to pick up new docs
+test/CI configs) **at any depth** — including nested monorepo packages like
+`frontend/.github/` — plus a sweep of all project markdown and a light pass over
+in-code doc comments, then wires each knowledge file as a proxy, or synthesizes it
+from the codebase when none exists. Idempotent: re-run anytime to pick up new docs
 while preserving your edits. `--force` resets to fresh scaffolds.
 
 **`/gogo:plan "<goal>"`**

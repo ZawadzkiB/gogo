@@ -3,9 +3,11 @@ name: gogo-build
 description: >-
   Initialize or refresh gogo's per-project knowledge config. Discovers the
   project's existing docs (Claude/Copilot/Cursor/Windsurf/Codex configs, README,
-  manifests, test/CI configs) and wires the .gogo/knowledge/* files as proxies
-  that link them — or synthesizes them from the codebase when none exist. Run on
-  /gogo:build; idempotent and re-runnable (picks up new docs, preserves edits).
+  manifests, test/CI configs) — searching every depth including nested monorepo
+  packages, sweeping all project markdown, and reading in-code doc comments — and
+  wires the .gogo/knowledge/* files as proxies that link them, or synthesizes them
+  from the codebase when none exist. Run on /gogo:build; idempotent and
+  re-runnable (picks up new docs, preserves edits).
 ---
 
 # gogo-build — wire (or re-wire) the knowledge config
@@ -26,32 +28,73 @@ Copy `${CLAUDE_PLUGIN_ROOT}/templates/knowledge/*` → `.gogo/knowledge/` for an
 file that doesn't exist yet. In default mode, never overwrite an existing file.
 
 ## Step 2 — discover (read-only scan)
-Glob from the repo root, skipping `node_modules`, `.git`, `dist`, `build`, and
-vendored dirs. Record every hit.
+Glob from the repo root, **recursively**, skipping `node_modules`, `.git`,
+`.gogo`, `dist`, `build`, `out`, `.next`, `target`, `vendor`, `coverage`,
+`__pycache__`, `.venv`, and other build/output/vendor dirs. Record every hit with
+its **full relative path** (a nested hit like `frontend/.github/…` is a distinct
+source from a root one — keep both). Three passes:
 
-- **Claude**: `CLAUDE.md`, `**/CLAUDE.md`, `.claude/`, `AGENTS.md`
-- **Copilot**: `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`
-- **Codex / generic**: `AGENTS.md`, `.codex/`, `codex.md`
-- **Cursor**: `.cursorrules`, `.cursor/rules/*.mdc`
-- **Windsurf**: `.windsurfrules`, `.windsurf/`
-- **Docs**: `README*`, `CONTRIBUTING*`, `ARCHITECTURE*`, `docs/**`
-- **Manifests / stack**: `package.json`, `pnpm-workspace.yaml`, `deno.json`,
-  `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, `pom.xml`,
-  `build.gradle`, `Gemfile`, `composer.json` + lockfiles
-- **Test / lint / CI**: `vitest|jest|playwright|cypress` configs,
-  `pytest.ini`/`tox.ini`, `*_test.go`, `.eslintrc*`/`eslint.config.*`,
-  `ruff.toml`, `tsconfig.json`, `mypy.ini`, `.github/workflows/*`, `.gitlab-ci.yml`
+### 2a — assistant configs & known files (search every depth, not just root)
+Each pattern matches at any depth — a monorepo keeps per-package configs under
+`frontend/`, `services/api/`, etc., so never anchor these to the root.
+
+- **Claude**: `**/CLAUDE.md`, `**/.claude/`, `**/AGENTS.md`
+- **Copilot**: `**/.github/copilot-instructions.md`, `**/.github/instructions/*.instructions.md`
+- **Codex / generic**: `**/AGENTS.md`, `**/.codex/`, `**/codex.md`
+- **Cursor**: `**/.cursorrules`, `**/.cursor/rules/*.mdc`
+- **Windsurf**: `**/.windsurfrules`, `**/.windsurf/`
+- **Editor / repo config**: `**/.editorconfig`, `**/.github/PULL_REQUEST_TEMPLATE*`
+- **Docs**: `**/README*`, `**/CONTRIBUTING*`, `**/ARCHITECTURE*`, `**/docs/**`
+- **Manifests / stack**: `**/package.json`, `**/pnpm-workspace.yaml`, `**/deno.json`,
+  `**/pyproject.toml`, `**/requirements.txt`, `**/go.mod`, `**/Cargo.toml`,
+  `**/pom.xml`, `**/build.gradle`, `**/Gemfile`, `**/composer.json` + lockfiles
+- **Test / lint / CI**: `**/{vitest,jest,playwright,cypress}*` configs,
+  `**/pytest.ini`/`**/tox.ini`, `**/*_test.go`, `**/.eslintrc*`/`**/eslint.config.*`,
+  `**/ruff.toml`, `**/tsconfig.json`, `**/mypy.ini`, `.github/workflows/*`,
+  `**/.gitlab-ci.yml`
+
+### 2b — full markdown sweep
+Glob `**/*.{md,mdx}` (minus the skip dirs and `.gogo/` itself) to catch knowledge
+that lives outside the well-known filenames — design notes, runbooks, ADRs,
+per-module `README`s, `docs/` pages, wiki dumps. Skip pure noise:
+`CHANGELOG*`, `LICENSE*`, issue/PR templates, and auto-generated API dumps.
+For anything that reads like rules / architecture / conventions / how-to-run,
+read its headings + top section and link it; don't slurp huge files.
+
+### 2c — in-code documentation (light, high-signal only)
+Many projects document conventions and architecture in **doc comments**, not
+markdown. Do a *targeted* pass — module/package entry points and obvious
+"conventions/architecture" blocks, **not** every inline comment:
+
+- **JS/TS**: top-of-file JSDoc/TSDoc on entry points / index files (`@module`, `@packageDocumentation`)
+- **Python**: module & package `__init__.py` docstrings
+- **Go**: package doc comments (`// Package x …`) and `doc.go`
+- **Java/Kotlin**: package-level Javadoc (`package-info.java`), class-level docs on core types
+- **Rust**: crate/module docs (`//!`) and item docs (`///`) at module roots
+- **C#**: XML doc comments (`///`) on public types in entry assemblies
+
+Grep for these markers near package roots; capture the few that describe *how the
+code is meant to be built/structured*, and link the file + line.
 
 Read the small/authoritative hits (assistant configs, manifests, test/CI configs,
-README top). Don't slurp giant generated files — link them, summarize headings.
+README/doc tops, doc-comment blocks). Don't slurp giant or generated files — link
+them and summarize headings. De-dup: a file found in an earlier pass isn't a new
+source in a later one.
 
 ## Step 3 — classify each hit to knowledge topics
+Classify by **content signal**, regardless of which pass found it — a nested
+`frontend/.github/copilot-instructions.md`, a `docs/conventions.md`, and a
+package-level Javadoc can all feed `coding-rules`/`code-review-standards` just as
+a root config would.
+
 - rules-ish → `coding-rules`, `code-review-standards`
 - stack-ish → `tech-stack` (manifests/lockfiles), `testing-tools` (test/lint configs)
 - product-ish → `project-knowledge`, `non-functional-requirements` (README/ARCHITECTURE/docs)
 - test-ish → `testing-tools`, `test-strategy` (test configs, e2e dirs, CI)
 
 One file can feed several topics (e.g. `CLAUDE.md` → rules + project-knowledge).
+When sources for one topic disagree (e.g. a frontend config vs a backend one),
+keep both in `Source:` and note the scope each applies to in the summary.
 
 ## Step 4 — wire each knowledge file
 For each of the 8 content files (everything except `_discovered.md`):
