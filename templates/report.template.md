@@ -36,7 +36,7 @@ Note anything skipped and why (e.g. browser tooling absent).>
 
 ## Diagrams
 <As-built diagrams of the work — open [charts/diagrams.html](./charts/diagrams.html).
-List each with one line: flow, sequence, actions/state, structure.>
+List each with one line: flow, sequence, activity (lifecycle / state), class (structure).>
 
 ## Knowledge updates
 <Which `.gogo/knowledge/*` files were updated (gogo-owned summaries only). List any

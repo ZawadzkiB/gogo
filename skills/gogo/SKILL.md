@@ -63,10 +63,15 @@ slug from the feature name). These files are the pipeline's memory + audit trail
 - `adjustments.md` — running log of user-requested changes/clarifications during planning
 - `state.md` — current phase / status / iteration counters / resume info
 - `decisions.md` — open/closed forks that needed the user
-- `review-NN.md` — each review round's findings
-- `test-NN.md` — each test round's results
+- `review/issues.json` — the living, typed review findings (the contract); `review-NN.md` renders each round's snapshot
+- `test/issues.json` — the living, typed test findings (same contract); `test-NN.md` renders each round's snapshot
 - `report.md` — the as-built final report (written at ⑤): planned-vs-shipped, changes, review/test outcomes, diagram links
-- `charts/` — mermaid `.mmd` + offline `diagrams.html` (plan's intended design; ⑤ adds the as-built flow/sequence/actions/structure set)
+- `charts/` — mermaid `.mmd` + `manifest.json` + offline `diagrams.html` (plan's intended design; ② emits the as-built flow/sequence/class/activity set, ⑤ refreshes it)
+
+The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
+`result.json`, the feature `pipeline.json`) follow JSON Schemas in
+`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`; each phase validates them in/out via
+the `gogo-contracts` skill (portable: `jq`/schema if present, else agent-checks).
 
 Create the folder in the plan phase (copy `state.md`/`decisions.md` from
 `${CLAUDE_PLUGIN_ROOT}/templates/`). **Keep `state.md` current at every phase
@@ -115,7 +120,8 @@ keep build/typecheck/unit green. Re-enter here to apply review/test fixes.
 
 ### ③ Review → skill `gogo-review` (delegate to `gogo-reviewer`)
 Review the diff against `code-review-standards.md` + `non-functional-requirements.md`.
-Findings → `review-NN.md`.
+Findings → `review/issues.json` (the living, typed contract) + a `review-NN.md`
+rendered snapshot per round.
 - **Fixable** → back to ② (fix), then re-review. Bound: if the same issue resists
   ~3 rounds, treat it as a decision and stop.
 - **Needs a user decision** → decision gate (below).
@@ -124,7 +130,8 @@ Findings → `review-NN.md`.
 ### ④ Test → skill `gogo-test` (delegate to `gogo-tester`)
 e2e at every relevant level per `test-strategy.md`/`testing-tools.md` — UI
 (bundled Playwright MCP), CLI, API — plus exploration (does it work? does it look
-right?). Results → `test-NN.md`.
+right?). Results → `test/issues.json` (the living, typed contract) + a
+`test-NN.md` rendered snapshot per round.
 - **Issue (fixable)** → back to ② → ③ → ④.
 - **Issue needing a user decision** → back to ① (re-plan how to handle it,
   re-accept), via a decision gate.
@@ -132,7 +139,7 @@ right?). Results → `test-NN.md`.
 
 ### ⑤ Report → skill `gogo-knowledge`
 Update `plan.md` to as-built; draw the as-built diagram set (flow / sequence /
-actions / structure) via `gogo-mermaid`; write the final `report.md` (planned-vs-
+class / activity) via `gogo-mermaid`; write the final `report.md` (planned-vs-
 shipped, changes, review/test outcomes, diagram + audit-trail links); update
 whatever `.gogo/knowledge/*` drifted (gogo-owned summaries only — never the
 proxied originals); set `state.md` to done; summarise to the user (point them at

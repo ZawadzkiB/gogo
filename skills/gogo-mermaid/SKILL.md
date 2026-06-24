@@ -102,11 +102,13 @@ diagram beats a misleading work-plan chart.
   the feature will touch (inferred from the codebase), enough to review the design
   before code exists. Not the build steps.
 - **Report** draws the *as-built* set — what actually shipped — typically a
-  **flow**, a **sequence** of the key runtime interaction, an **actions/lifecycle**
-  diagram for any new states, and a **structure** (`classDiagram`/component) view
-  when it adds clarity. Update the plan's diagrams where they still hold; name new
-  files per concern (e.g. `flow.mmd`, `sequence.mmd`, `actions.mmd`,
-  `structure.mmd`). Only draw what carries signal — skip trivial diagrams.
+  **flow**, a **sequence** of the key runtime interaction, an **activity**
+  (lifecycle / state / action flow) diagram for any new states, and a **class**
+  (structure / types) view when it adds clarity. Update the plan's diagrams where
+  they still hold; name new files per concern (e.g. `flow.mmd`, `sequence.mmd`,
+  `activity.mmd`, `class.mmd`). The manifest `kind` for each must be one of
+  `{flow, sequence, class, activity}` (the `charts-manifest.schema.json` enum).
+  Only draw what carries signal — skip trivial diagrams.
 
 ## Portability contract
 

@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ZawadzkiB/gogo/contracts/charts-manifest.schema.json",
+  "title": "gogo charts manifest",
+  "description": "An index of the as-built diagram set implement (②) emitted into charts/, so review (③) and test (④) can find and reason about the diagrams that carry signal. Only diagrams that carry signal are listed (per the diagram-subject rules in gogo-mermaid); a feature with nothing meaningful to draw has an empty diagrams array and a note.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "diagrams"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "description": "Feature slug these charts belong to (kebab-case, without the feature- prefix).",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "updated": {
+      "type": "string",
+      "description": "ISO date (YYYY-MM-DD) the manifest was last written."
+    },
+    "note": {
+      "type": "string",
+      "description": "Optional explanation, e.g. why a kind was skipped or why diagrams is empty (pure-process change)."
+    },
+    "diagrams": {
+      "type": "array",
+      "description": "The diagrams produced for this feature. Empty when the change carries no meaningful structure/behaviour to draw.",
+      "items": { "$ref": "#/definitions/diagram" }
+    }
+  },
+  "definitions": {
+    "diagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "file", "title"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Diagram kind, per gogo-mermaid conventions. flow=control/data flow; sequence=runtime call sequence; class=structure/types; activity=action/lifecycle/state machine.",
+          "enum": ["flow", "sequence", "class", "activity"]
+        },
+        "file": {
+          "type": "string",
+          "description": "Repo-relative path to the .mmd source (under the feature's charts/ folder).",
+          "pattern": "\\.mmd$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short human title for the diagram (what it shows about the product).",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ZawadzkiB/gogo/contracts/phase-result.schema.json",
+  "title": "gogo phase result",
+  "description": "A small per-run record each standalone command writes after it finishes: which phase ran, its inputs/outputs, whether the validate-in and validate-out gates passed, and a one-line summary. Stage A emits this as an output artifact; the orchestrator consuming it to chain phases is Stage B. state.md remains the human-facing phase/status file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "slug",
+    "phase",
+    "status",
+    "inputs",
+    "outputs",
+    "validated_in",
+    "validated_out",
+    "summary"
+  ],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "description": "Feature slug this run belongs to (kebab-case, without the feature- prefix).",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "phase": {
+      "type": "string",
+      "description": "Which pipeline phase produced this result.",
+      "enum": ["plan", "implement", "review", "test", "report"]
+    },
+    "status": {
+      "type": "string",
+      "description": "Outcome: ok (gates passed, work done) / blocked (a gate failed and could not be repaired) / waiting-for-user (stopped at a decision gate).",
+      "enum": ["ok", "blocked", "waiting-for-user"]
+    },
+    "round": {
+      "type": "integer",
+      "description": "Round number for looping phases (implement / review / test); omit or 1 for single-shot phases.",
+      "minimum": 1
+    },
+    "inputs": {
+      "type": "array",
+      "description": "Repo-relative paths this run read as required/optional inputs.",
+      "items": { "type": "string" }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Repo-relative paths this run produced or updated.",
+      "items": { "type": "string" }
+    },
+    "validated_in": {
+      "type": "boolean",
+      "description": "Whether the validate-in gate passed (all required inputs existed, parsed, and conformed)."
+    },
+    "validated_out": {
+      "type": "boolean",
+      "description": "Whether the validate-out gate passed (every produced artifact conformed to its contract)."
+    },
+    "open_issues": {
+      "type": "integer",
+      "description": "Count of issues left in status open/new in the track this phase touched (review/test). Lets a chainer decide whether to loop. Omit for phases with no issues list.",
+      "minimum": 0
+    },
+    "summary": {
+      "type": "string",
+      "description": "One-line human summary of what this run did.",
+      "minLength": 1
+    }
+  }
+}

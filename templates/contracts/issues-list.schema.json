@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ZawadzkiB/gogo/contracts/issues-list.schema.json",
+  "title": "gogo issues list",
+  "description": "The living, typed list of findings emitted by review (③) and test (④) and consumed by implement (②). One file per track: review/issues.json and test/issues.json, updated in place across rounds (statuses move open -> fixed -> verified, new findings are appended). The matching review-NN.md / test-NN.md is the rendered human snapshot of one round.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "track", "round", "issues"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "description": "Feature slug this list belongs to (kebab-case, without the feature- prefix).",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "track": {
+      "type": "string",
+      "description": "Which producer owns this list.",
+      "enum": ["review", "test"]
+    },
+    "round": {
+      "type": "integer",
+      "description": "The latest round number that touched this living list (matches the highest review-NN.md / test-NN.md snapshot).",
+      "minimum": 1
+    },
+    "updated": {
+      "type": "string",
+      "description": "ISO date (YYYY-MM-DD) the list was last written."
+    },
+    "issues": {
+      "type": "array",
+      "description": "Every finding raised across all rounds for this track; resolved ones stay (status fixed/verified/wontfix) for the audit trail.",
+      "items": { "$ref": "#/definitions/issue" }
+    }
+  },
+  "definitions": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "description",
+        "proposed_solution",
+        "severity",
+        "priority",
+        "status",
+        "origin",
+        "found_in_round"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable, unique id within this list (e.g. REV-001, TEST-003). Never reused; never renumbered across rounds.",
+          "pattern": "^[A-Z]+-[0-9]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "One-line summary of the finding.",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "description": "What is wrong and why it matters, with a concrete pointer (file:line / behaviour).",
+          "minLength": 1
+        },
+        "proposed_solution": {
+          "type": "string",
+          "description": "How implement (②) should fix it. Concrete enough to act on.",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "description": "How bad it is, per code-review-standards.md.",
+          "enum": ["blocker", "major", "minor", "nit"]
+        },
+        "priority": {
+          "type": "string",
+          "description": "How soon it must be fixed.",
+          "enum": ["P0", "P1", "P2", "P3"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Lifecycle: new (just raised this round) / open (awaiting a fix) / fixed (implement applied a fix, not yet re-verified) / verified (a later review/test confirmed the fix) / wontfix (intentionally not fixed).",
+          "enum": ["open", "fixed", "verified", "wontfix", "new"]
+        },
+        "origin": {
+          "type": "string",
+          "description": "Which phase raised it.",
+          "enum": ["review", "test"]
+        },
+        "found_in_round": {
+          "type": "integer",
+          "description": "Round number this issue was first raised.",
+          "minimum": 1
+        },
+        "fixed_in_round": {
+          "type": "integer",
+          "description": "Round number implement (②) wrote a fix back. Set together with fix_summary when status becomes fixed.",
+          "minimum": 1
+        },
+        "fix_summary": {
+          "type": "string",
+          "description": "What implement (②) changed to address this issue (set when status becomes fixed)."
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "A fixed issue must record when and how it was fixed.",
+          "if": { "properties": { "status": { "const": "fixed" } } },
+          "then": { "required": ["fixed_in_round", "fix_summary"] }
+        }
+      ]
+    }
+  }
+}

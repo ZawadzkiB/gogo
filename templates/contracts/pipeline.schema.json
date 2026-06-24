@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ZawadzkiB/gogo/contracts/pipeline.schema.json",
+  "title": "gogo pipeline index",
+  "description": "A feature-level index of the current artifacts and their validity, so a chainer can see at a glance what each phase last produced and whether it is contract-valid. Stage A may emit this as an output artifact; the orchestrator consuming it to drive the loop is Stage B. state.md remains the human-facing phase/status file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "phases"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "description": "Feature slug this index belongs to (kebab-case, without the feature- prefix).",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "updated": {
+      "type": "string",
+      "description": "ISO date (YYYY-MM-DD) the index was last written."
+    },
+    "phases": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Latest state per phase. A phase key is present once that phase has run at least once.",
+      "properties": {
+        "plan": { "$ref": "#/definitions/phaseEntry" },
+        "implement": { "$ref": "#/definitions/phaseEntry" },
+        "review": { "$ref": "#/definitions/phaseEntry" },
+        "test": { "$ref": "#/definitions/phaseEntry" },
+        "report": { "$ref": "#/definitions/phaseEntry" }
+      }
+    }
+  },
+  "definitions": {
+    "phaseEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "valid", "artifacts"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Last outcome of this phase (mirrors phase-result.status).",
+          "enum": ["ok", "blocked", "waiting-for-user"]
+        },
+        "valid": {
+          "type": "boolean",
+          "description": "Whether this phase's latest outputs passed validate-out."
+        },
+        "round": {
+          "type": "integer",
+          "description": "Latest round number for looping phases (implement / review / test).",
+          "minimum": 1
+        },
+        "open_issues": {
+          "type": "integer",
+          "description": "Count of open/new issues in this phase's track (review / test), so the loop knows whether to re-enter implement.",
+          "minimum": 0
+        },
+        "artifacts": {
+          "type": "array",
+          "description": "Repo-relative paths to this phase's current artifacts (e.g. review/issues.json, review-02.md).",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

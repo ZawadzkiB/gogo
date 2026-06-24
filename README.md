@@ -137,6 +137,36 @@ Implements the accepted plan through the implement → review → test → repor
 delegating to the specialist agents and pausing only at real decisions. Refuses to
 start until a plan is accepted.
 
+The implement → review → test → report phases are **also runnable on their own**
+— each is a thin, idempotent entry point to its phase skill that **validates its
+inputs** before working and **validates its outputs** before hand-off (the
+contract layer, below). `/gogo:go` chains these same commands.
+
+**`/gogo:implement [feature-slug] [--issues <path>]`**
+
+Phase ② standalone. Plain, it builds the accepted plan from scratch and emits the
+as-built diagram set. With `--issues <path>` (a `review/issues.json` or
+`test/issues.json`) it fixes the **open** issues and writes back what was fixed
+(`status: fixed`, `fix_summary`, `fixed_in_round`).
+
+**`/gogo:review [feature-slug]`**
+
+Phase ③ standalone. Fresh-eyes review against your standards; emits the living,
+typed `review/issues.json` (the contract) and renders a `review-NN.md` snapshot.
+Re-run it after fixes — it updates the same list in place (open → fixed/verified,
+adds new).
+
+**`/gogo:test [feature-slug]`**
+
+Phase ④ standalone. e2e/UI/CLI/API testing per your strategy; emits the living
+`test/issues.json` + a `test-NN.md` snapshot, looping issues back to implement.
+
+**`/gogo:report [feature-slug]`**
+
+Phase ⑤ standalone. For an all-green feature: finalizes the plan to as-built,
+writes `report.md` + the as-built diagrams, and updates your gogo-owned knowledge
+docs.
+
 **`/gogo:status`**
 
 Lists every feature under `.gogo/plans/` with its phase, status, and iteration counts.
@@ -172,10 +202,19 @@ its own purpose in its header, and `index.md` is the folder's purpose-map.
 | `adjustments.md` | Log of changes/clarifications you asked for during planning |
 | `state.md` | Current phase/status/iterations — lets work resume across sessions |
 | `decisions.md` | Forks that needed your call, with gogo's recommendation + your answer |
-| `review-NN.md` | Each code-review round's findings |
-| `test-NN.md` | Each test round's results |
+| `review/issues.json` | The living, typed review findings — the **contract** review hands to implement (one list, updated in place across rounds) |
+| `review-NN.md` | Each code-review round's rendered snapshot of `issues.json` |
+| `test/issues.json` | The living, typed test findings (same contract) |
+| `test-NN.md` | Each test round's rendered snapshot |
 | `report.md` | The as-built final report (written at report phase): planned-vs-shipped, changes, review/test outcomes, diagram links |
-| `charts/` | Mermaid diagrams (`.mmd`) + an offline `diagrams.html` viewer — the plan's intended design, plus the report phase's as-built flow / sequence / actions / structure set |
+| `charts/` | Mermaid diagrams (`.mmd`) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement/report as-built flow / sequence / class / activity set |
+
+The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
+`result.json`, the feature `pipeline.json`) follow JSON Schemas shipped in the
+plugin (`templates/contracts/`). Each phase command validates its inputs and
+outputs against them so a bad LLM hand-off is caught, not propagated — the
+validation is portable (`jq`/schema if present, else the agent checks against the
+schema; no new required dependency).
 
 ## Portability & prerequisites
 
