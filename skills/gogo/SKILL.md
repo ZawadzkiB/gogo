@@ -62,7 +62,7 @@ the detail on demand. `.gogo/skills/index.md` lists what exists.
 
 ## Feature workspace
 
-Everything for one piece of work lives in **`.gogo/plans/feature-<slug>/`** (kebab
+Everything for one piece of work lives in **`.gogo/work/feature-<slug>/`** (kebab
 slug from the feature name). These files are the pipeline's memory + audit trail:
 
 - `plan.md` — the accepted plan (the contract), incl. the feature's *functional* requirements
@@ -71,8 +71,10 @@ slug from the feature name). These files are the pipeline's memory + audit trail
 - `decisions.md` — open/closed forks that needed the user
 - `review/issues.json` — the living, typed review findings (the contract); `review-NN.md` renders each round's snapshot
 - `test/issues.json` — the living, typed test findings (same contract); `test-NN.md` renders each round's snapshot
-- `report.md` — the as-built final report (written at ⑤): planned-vs-shipped, changes, review/test outcomes, diagram links
-- `charts/` — mermaid `.mmd` + `manifest.json` + offline `diagrams.html` (plan's intended design; ② emits the as-built flow/sequence/class/activity set, ⑤ refreshes it)
+- `report/` — the as-built bundle (written at ⑤): `report/report.md` (planned-vs-shipped, implementation, decisions+reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `diagrams.html`, `manifest.json`, `result.json`. `/gogo:done` copies this bundle to `.gogo/changelog/`.
+- `charts/` — mermaid `.mmd` + `manifest.json` + offline `diagrams.html` (plan's intended design; ② emits the as-built flow/sequence/class/activity set for review/test)
+
+The shipped bundle is also archived (chronologically) under `.gogo/changelog/<YYYY-MM-DD>-<slug>/` once the user runs `/gogo:done`.
 
 The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
 `result.json`, the feature `pipeline.json`) follow JSON Schemas in
@@ -87,9 +89,9 @@ exactly where it left off.
 ## The flow
 
 ```
-user goal ─▶ ① PLAN ──(user accepts)──▶ ② IMPLEMENT ─▶ ③ REVIEW ─▶ ④ TEST ─▶ ⑤ REPORT ─▶ done
-              ▲  │                            ▲            │           │       (update plan +
-              │  └──(clarify / changes)──▶ wait            │           │        knowledge docs)
+user goal ─▶ ① PLAN ──(user accepts)──▶ ② IMPLEMENT ─▶ ③ REVIEW ─▶ ④ TEST ─▶ ⑤ REPORT ─▶ /gogo:done ─▶ shipped
+              ▲  │                            ▲            │           │       (update plan +   (copy bundle →
+              │  └──(clarify / changes)──▶ wait            │           │        knowledge docs)  .gogo/changelog/)
               │                                └──issue─────┘           │
               │                                  (fix → re-review, ≤3)  │
               └──── issue needs a USER DECISION (from review or test) ──┘
@@ -113,7 +115,7 @@ in-context instead of delegating — the phase skills are written to run either 
 ## The phases
 
 ### ① Plan → skill `gogo-plan`
-Analyse the goal against the knowledge docs; create `.gogo/plans/feature-<slug>/`;
+Analyse the goal against the knowledge docs; create `.gogo/work/feature-<slug>/`;
 write `plan.md` (Goal / Context / Functional requirements / Approach +
 alternatives / Changes checklist / Tests / Out-of-scope); draw the change/flow
 with `gogo-mermaid`; init `state.md`. **Present the plan and STOP for
@@ -144,12 +146,32 @@ right?). Results → `test/issues.json` (the living, typed contract) + a
 - **All green** → ⑤.
 
 ### ⑤ Report → skill `gogo-knowledge`
-Update `plan.md` to as-built; draw the as-built diagram set (flow / sequence /
-class / activity) via `gogo-mermaid`; write the final `report.md` (planned-vs-
-shipped, changes, review/test outcomes, diagram + audit-trail links); update
-whatever `.gogo/knowledge/*` drifted (gogo-owned summaries only — never the
-proxied originals); set `state.md` to done; summarise to the user (point them at
-`report.md` and `charts/diagrams.html`).
+Update `plan.md` to as-built; draw the as-built UML set (chosen by what changed —
+class / sequence / activity / use-case / flow) via `gogo-mermaid` into the
+feature's `report/` folder; write the final `report/report.md` (planned-vs-shipped,
+**implementation**, **decisions + reasons**, review/test outcomes, diagram + audit
+links); update whatever `.gogo/knowledge/*` drifted (gogo-owned summaries only —
+never the proxied originals); set `state.md` to done; summarise to the user (point
+them at `report/report.md` and `report/diagrams.html`).
+
+The in-pipeline ⑤ keeps a strict gate (green ④ required). Run **standalone via
+`/gogo:report <feature>`, it is lenient** — it also reports on a past/broken/
+incomplete run, synthesizing a best-effort `report/report.md` from whatever exists
+and marking which phases ran and what's still open (`plan.md` is the one
+prerequisite).
+
+### Ship → command `/gogo:done` (skill `gogo-done`)
+The explicit post-report gate: when the user declares the feature shipped, copy the
+`report/` bundle (report.md + diagrams) into the append-only
+`.gogo/changelog/<YYYY-MM-DD>-<slug>/` and set `state.md` to a terminal `shipped`
+status. Copy-not-move (the work folder stays the source); idempotent. If no report
+exists it STOPs with "run `/gogo:report <feature>` first".
+
+### View → command `/gogo:view` (skill `gogo-view`)
+Read any report as a self-contained, offline interactive webpage (the `report.md`
+summary as HTML + its mermaid diagrams in a pan/zoom/drag canvas). Lists reports
+from `.gogo/changelog/` and `.gogo/work/*/report/`, builds the page from the
+vendored `.gogo/resources/` assets, and opens it.
 
 ## Loops & bounds
 

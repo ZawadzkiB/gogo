@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo report diagrams — workspace-changelog-viewer</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo report diagrams — <code>workspace-changelog-viewer</code> (as-built)</h1>
+    <p class="hint">Offline viewer · mermaid vendored at .gogo/resources · for the interactive pan/zoom/drag view run <code>/gogo:view</code>.</p>
+  </header>
+
+  <h2>Artifact flow</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  WORK["work/feature-&lt;slug&gt;/ (plan · state · decisions · review · test)"]:::art
+  WORK --> REPORT["report ⑤ — gogo-knowledge (strict | lenient)"]:::proc
+  REPORT --> RDIR[/"work/feature-&lt;slug&gt;/report/\nreport.md + UML (.mmd) + diagrams.html + manifest.json"/]:::art
+  RBROKEN["/gogo:report &lt;feature&gt; (past/broken run)"]:::proc --> REPORT
+  RDIR --> DONE{"/gogo:done\n(report present?)"}:::gate
+  DONE -->|"missing → STOP: run /gogo:report first"| STOP([stop]):::io
+  DONE -->|"present → copy"| CL[/".gogo/changelog/&lt;date&gt;-&lt;slug&gt;/"/]:::art
+  RES["resources/ — mermaid.min.js + viewer/ (pan·zoom·drag)"]:::out
+  CL --> VIEW["/gogo:view (gogo-view)"]:::proc
+  RDIR --> VIEW
+  RES --> VIEW
+  VIEW --> PAGE([offline page: readable summary + interactive diagrams]):::io
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111
+  </pre></div>
+
+  <h2>/gogo:view runtime (sequence)</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor U as user
+  participant V as /gogo:view (gogo-view)
+  participant CL as .gogo/changelog/ + work/*/report/
+  participant RES as .gogo/resources/ (mermaid + viewer/)
+  participant P as page (.gogo/resources/view/&lt;name&gt;.html)
+  participant B as browser
+  U->>V: /gogo:view  (or a slug/entry)
+  V->>CL: enumerate selectable reports
+  CL-->>V: changelog entries + in-progress work reports
+  V-->>U: list → pick one
+  U->>V: choose report
+  V->>RES: ensure mermaid.min.js + viewer/{interactive.js,viewer.css}
+  V->>V: pre-render report.md → HTML; inline each .mmd verbatim
+  V->>P: write self-contained page (relative ../mermaid.min.js, ../viewer/*)
+  V->>B: open (best-effort) — else print file:// path
+  B->>B: render diagrams → wrap each in pan/zoom/drag canvas
+  B-->>U: readable summary + interactive diagrams
+  </pre></div>
+
+  <h2>New capabilities (use-case)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  U(("user")):::actor
+  subgraph GOGO["gogo (new/changed capabilities)"]
+    direction TB
+    UC1(["report a feature\n(incl. past/broken runs)"]):::uc
+    UC2(["ship a feature →\nchangelog archive"]):::uc
+    UC3(["view a report +\ninteractive diagrams"]):::uc
+    UC4(["adopt the new layout\n(build auto-migrates)"]):::uc
+  end
+  U --- UC1
+  U --- UC2
+  U --- UC3
+  U --- UC4
+  classDef actor fill:#d9f2f2,stroke:#3aa0a0,color:#111
+  classDef uc fill:#fff3d6,stroke:#caa54a,color:#111
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

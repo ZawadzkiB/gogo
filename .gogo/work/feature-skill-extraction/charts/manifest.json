@@ -1,0 +1,17 @@
+{
+  "slug": "skill-extraction",
+  "updated": "2026-06-29",
+  "note": "As-built diagram set for /gogo:skills. The flow (audit/directed → classify → approval gate → kind-routed extract) held from phase ① and ships as-built; phase ⑤ adds the runtime sequence of the propose→STOP→extract hand-off. No new types or state machine warranted class/activity diagrams.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "charts/skills-flow.mmd",
+      "title": "/gogo:skills runtime flow: scan/measure/discover or directed, classify, gate, kind-routed extract"
+    },
+    {
+      "kind": "sequence",
+      "file": "charts/sequence.mmd",
+      "title": "Propose → STOP → per-candidate approve → kind-routed extract, with parent pointer + registry update"
+    }
+  ]
+}

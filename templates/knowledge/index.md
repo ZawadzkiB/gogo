@@ -37,5 +37,5 @@ yours/gogo's and is **preserved** across `/gogo:build` re-runs.
 ## Requirements: two kinds
 
 - **Functional** (what a specific change must do) → live in that feature's
-  `.gogo/plans/feature-<slug>/plan.md`, **not** here.
+  `.gogo/work/feature-<slug>/plan.md`, **not** here.
 - **Non-functional** (standing project bars) → `non-functional-requirements.md`.

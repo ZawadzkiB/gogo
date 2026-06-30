@@ -3,7 +3,7 @@ name: gogo-plan
 description: >-
   Phase ① of the gogo pipeline — analyse a goal against the project's knowledge
   docs and write a plan the user must accept before any code is written. Creates
-  .gogo/plans/feature-<slug>/. Invoked by the gogo orchestrator or on /gogo:plan.
+  .gogo/work/feature-<slug>/. Invoked by the gogo orchestrator or on /gogo:plan.
   Hard gate: never implement an unaccepted plan.
 ---
 
@@ -16,7 +16,7 @@ description: >-
 
 ## Steps
 1. **Slug + folder.** Derive a kebab-case slug from the goal. Create
-   `.gogo/plans/feature-<slug>/`. If it already exists, you are **revising** — read the
+   `.gogo/work/feature-<slug>/`. If it already exists, you are **revising** — read the
    existing `plan.md`/`adjustments.md`/`state.md`; don't overwrite blindly.
 2. **Analyse** the goal against the knowledge + the actual codebase (Glob/Grep/
    Read the relevant code paths). Identify reuse, affected files, and edge cases.

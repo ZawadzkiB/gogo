@@ -8,7 +8,7 @@ model: opus
 Run **phase ② (implement)** standalone for a feature, via the `gogo-implement`
 skill, with **validate-in → work → validate-out** (using `gogo-contracts`).
 
-Target: $ARGUMENTS  (if no slug, pick the most recent `.gogo/plans/feature-*/`
+Target: $ARGUMENTS  (if no slug, pick the most recent `.gogo/work/feature-*/`
 whose `state.md` is `plan-accepted` or mid-loop; if several, ask which.)
 
 Arguments:

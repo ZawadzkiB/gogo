@@ -1,0 +1,21 @@
+{
+  "slug": "docs-and-verified-discovery",
+  "track": "test",
+  "round": 2,
+  "updated": "2026-06-30",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "discovery.md mermaid drops the checkmark from 'verified' label vs the plan's intended design",
+      "description": "The plan's intended-design diagram (plan.md) renders the 'code confirms' outcome node as `mark verified \\u2713 \\u00b7 raise Confidence` (with a Unicode checkmark \\u2713). The shipped `docs/discovery.md` mermaid (line 21) reads `mark verified \\u00b7 raise Confidence` — the checkmark was dropped. The diagram still renders and is functionally correct; this is a cosmetic deviation from the intended design. The checkmark makes the 'verified' outcome visually distinct from 'corrected' and 'unverifiable' at a glance.",
+      "proposed_solution": "In docs/discovery.md line 21, change `OK[\"mark verified \\u00b7 raise Confidence\"]` to `OK[\"mark verified \\u2713 \\u00b7 raise Confidence\"]` to match the plan's intended visual design. (AGENT-FIXABLE — if the checkmark causes rendering issues in just-the-docs/mermaid 10.9.1, mark wontfix instead.)",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Restored the Unicode checkmark in docs/discovery.md line 21: now 'mark verified ✓ · raise Confidence', matching the plan's intended-design diagram and the charts .mmd/viewer. Renders fine in mermaid."
+    }
+  ]
+}

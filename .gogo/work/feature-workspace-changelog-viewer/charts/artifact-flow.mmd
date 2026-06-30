@@ -1,0 +1,16 @@
+flowchart TD
+  WORK["work/feature-&lt;slug&gt;/ (plan · state · decisions · review · test)"]:::art
+  WORK --> REPORT["report ⑤ (gogo-knowledge)"]:::proc
+  REPORT --> RDIR[/"work/feature-&lt;slug&gt;/report/\nreport.md + UML (class·sequence·activity·use-case) + diagrams.html"/]:::art
+  RDIR --> DONE{"/gogo:done\n(user: this is shipped)"}:::gate
+  DONE -->|"copy"| CL[/".gogo/changelog/&lt;date&gt;-&lt;slug&gt;/\nreport.md + diagrams"/]:::art
+  RES["resources/mermaid.min.js + interactive viewer (pan/zoom/drag)"]:::out
+  CL --> VIEW["/gogo:view (gogo-view)"]:::proc
+  RDIR --> VIEW
+  RES --> VIEW
+  VIEW --> PAGE([self-contained webpage: readable summary + interactive diagrams]):::io
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111

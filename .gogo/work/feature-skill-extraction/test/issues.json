@@ -1,0 +1,60 @@
+{
+  "slug": "skill-extraction",
+  "track": "test",
+  "round": 2,
+  "updated": "2026-06-29",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "architecture.md file tree missing implement/ directory and per-run result artifacts",
+      "description": "docs/architecture.md §3 project-side file tree shows feature-<slug>/ children as: plan.md, adjustments.md, state.md, decisions.md, review/issues.json, review-NN.md, test/issues.json, test-NN.md, report.md, charts/. The tree omits the implement/ directory (which gogo-developer writes implement/result.json into — confirmed present in the real feature-skill-extraction folder). It also omits test/result.json and review/result.json (per-run phase-result.schema.json artifacts) and pipeline.json (pipeline.schema.json artifact), all of which are referenced in the 'Who reads/writes what' text and have schemas in templates/contracts/. A user reading the file tree to understand the project structure would miss these artifacts.",
+      "proposed_solution": "Add implement/ → result.json to the file tree in docs/architecture.md (under feature-<slug>/). Optionally note test/result.json, review/result.json, and pipeline.json as Stage A/B optional artifacts (they may not exist on every feature, depending on whether standalone commands vs in-chat orchestration are used). Cross-check the tree against what a complete /gogo:go run produces.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Added two rows to the project-side feature folder tree in docs/architecture.md: '<phase>/result.json # per-run phase result (implement/review/test/report) [each phase writes]' and 'pipeline.json # feature-level index of current artifacts + validity [every phase]', so the tree matches the typed artifacts already described in the doc's 'Who reads/writes what' text. Verified present on disk."
+    },
+    {
+      "id": "TEST-002",
+      "title": "architecture.md .gogo/skills/ tree comment says 'KNOWLEDGE skills' but index.md tracks both kinds",
+      "description": "docs/architecture.md §3 project-side file tree shows: '├── skills/ # extracted KNOWLEDGE skills (on-demand)'. The comment 'KNOWLEDGE skills' is misleading: the .gogo/skills/ directory does hold only knowledge-kind SKILL.md files, but the index.md inside it (which is the registry) tracks BOTH knowledge and standalone extracted skills (standalone files live in .claude/skills/ but their registry entries appear in .gogo/skills/index.md). A user reading 'extracted KNOWLEDGE skills' would not realize index.md is also the registry for standalone skills. Confirmed by reading skills-index.template.md which shows both kind values in the table.",
+      "proposed_solution": "Change the comment to something like '# extracted on-demand skills (knowledge kind; index.md registry tracks both kinds)' or 'on-demand knowledge skills + extraction registry (index.md lists all kinds)'.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Reworded the .gogo/skills/ tree comments in docs/architecture.md to 'knowledge-kind skills live here; index.md registers ALL extractions' and made the index.md row read 'the registry of every extraction', so it's clear the registry covers both knowledge and standalone kinds while the dir itself holds only knowledge-kind SKILL.md files."
+    },
+    {
+      "id": "TEST-003",
+      "title": "gogo-skills SKILL.md Modes section '(unless trivially unambiguous)' ambiguous — could be misread as allowing approval gate to be skipped in directed mode",
+      "description": "skills/gogo-skills/SKILL.md Modes section says: 'still classify + propose + confirm (unless trivially unambiguous)'. The intended reading is: the disambiguation step (which section to target) is trivially unambiguous when the user names it — so the agent skips asking 'which section did you mean?' but still asks for approval. However, '(unless trivially unambiguous)' modifies 'confirm', which an agent could misread as: if the section match is clear, skip the confirmation entirely. This would allow an autonomous write (including a possible .claude/skills/ standalone write) without AskUserQuestion — violating FR5 ('Write nothing until the user approves') and FR10's safety requirement. Step 4 in the same file correctly states the gate is unconditional ('Write nothing until the user approves — per candidate. Use AskUserQuestion for the approve / override-kind / decline gate.'), which mitigates the risk, but the Modes description creates a surface-level conflict an agent might exploit.",
+      "proposed_solution": "In the Modes section, clarify what 'trivially unambiguous' means: 'still classify + propose + confirm per candidate (in directed mode, the target section is already named — no need to ask which section was meant; the Step 4 approval gate always runs regardless)'. This removes the ambiguity without losing the useful distinction that directed mode skips the target-disambiguation step.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Rewrote the Directed-mode bullet in gogo-skills/SKILL.md Modes: '\"Trivially unambiguous\" only lets you skip asking which section is meant — the propose-then-STOP approval gate (Step 4) always runs before any write.' Removes the surface-level conflict with Step 4's unconditional gate (FR5/FR10)."
+    },
+    {
+      "id": "TEST-004",
+      "title": "Step 2 discovery heuristic 'big enough to matter' has no concrete minimum line threshold",
+      "description": "skills/gogo-skills/SKILL.md Step 2 lists four criteria for proposing a section as a candidate: cohesive, context-local, standalone-able, and 'big enough to matter'. The first three have clear prose descriptions; 'big enough to matter' is left entirely to agent judgment with no minimum line count given. In practice this means: (a) an agent might propose a 3-line section as a candidate (false positive), requiring the user to decline trivially small extractions; or (b) an agent might miss a 30-line section that would genuinely benefit from extraction (false negative). Verified hands-on: the ops-runbook fixture has sections ranging from 6 to 130 lines; only the 130-line migration runbook and the 51-57-line backup/health sections are clearly worth extracting, but there's no explicit floor to guide agent behavior.",
+      "proposed_solution": "Add a concrete minimum heuristic in Step 2, e.g.: 'big enough to matter (at minimum ~20 lines, so the extraction savings justify the overhead of a new skill file)'. The exact threshold can remain approximate; the point is giving the agent a concrete anchor below which it does not propose candidates.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Added a concrete anchor to Step 2 of gogo-skills/SKILL.md: 'big enough to matter — roughly >=20 lines saved; smaller sections aren't worth their own skill (leave them inline).' Gives discovery a floor to curb false positives/negatives."
+    }
+  ]
+}

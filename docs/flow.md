@@ -28,12 +28,12 @@ flowchart LR
     class G,DONE io
 ```
 
-## The five phases
+## The phases
 
 ### ① Plan — skill `gogo-plan` (orchestrator, in chat)
 
 Analyse the goal against the knowledge docs; create
-`.gogo/plans/feature-<slug>/`; write `plan.md` (Goal / Context / Functional
+`.gogo/work/feature-<slug>/`; write `plan.md` (Goal / Context / Functional
 requirements / Approach + alternatives / Changes checklist / Tests /
 Out-of-scope); draw the intended design with `gogo-mermaid`; init `state.md`.
 **Present the plan and STOP for acceptance.** Changes or clarifications are logged
@@ -61,10 +61,36 @@ per round.
 
 ### ⑤ Report — skill `gogo-knowledge` (orchestrator)
 
-Finalize `plan.md` to as-built; draw the as-built diagram set; write `report.md`
-(planned-vs-shipped, changes, review/test outcomes, diagram + audit links);
-update whatever `.gogo/knowledge/*` drifted (gogo-owned summaries only — never the
-proxied originals); set `state.md` to done.
+Finalize `plan.md` to as-built; draw the as-built UML set (chosen by what changed:
+class / sequence / activity / use-case / flow) into the feature's `report/` folder;
+write `report/report.md` (planned-vs-shipped, implementation, decisions + reasons,
+review/test outcomes, diagram + audit links); update whatever `.gogo/knowledge/*`
+drifted (gogo-owned summaries only — never the proxied originals); set `state.md`
+to done.
+
+Run **standalone via `/gogo:report <feature>`, this phase also reports on a past or
+broken run**: instead of refusing a non-green feature it synthesizes a best-effort
+`report/report.md` from whatever artifacts exist and marks which phases ran and
+what's still open (a "Run status / gaps" section). `plan.md` is the one
+prerequisite. The in-pipeline ⑤ call (right after a green ④) keeps its strict gate.
+
+### Ship — command `/gogo:done` (skill `gogo-done`)
+
+The explicit post-report gate. When you declare the feature shipped, `/gogo:done`
+**copies** the `report/` bundle (`report.md` + the `.mmd` UML set + `diagrams.html`)
+into the append-only `.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive and sets
+`state.md` to a terminal `shipped` status. Copy-not-move (the work folder stays the
+source) and idempotent — re-running overwrites the same dated entry. If no report
+exists yet it STOPs and tells you to run `/gogo:report <feature>` first.
+
+### View — command `/gogo:view` (skill `gogo-view`)
+
+Read any report as a self-contained, offline **interactive webpage** — the
+`report.md` summary as readable HTML plus its mermaid diagrams in a pan/zoom/drag
+canvas. `/gogo:view` lists the reports under `.gogo/changelog/` and
+`.gogo/work/*/report/`, builds the page from the vendored `.gogo/resources/` assets
+(no network, no build), and opens it (printing the `file://` path if it can't
+auto-open).
 
 ## The loops
 

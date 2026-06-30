@@ -1,0 +1,31 @@
+{
+  "slug": "workspace-changelog-viewer",
+  "phase": "test",
+  "status": "ok",
+  "round": 7,
+  "inputs": [
+    ".gogo/work/feature-workspace-changelog-viewer/plan.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    "skills/gogo-knowledge/SKILL.md",
+    "skills/gogo-done/SKILL.md",
+    "skills/gogo/SKILL.md",
+    "commands/done.md",
+    "commands/view.md",
+    "commands/*.md",
+    "docs/commands.md",
+    "docs/architecture.md",
+    "docs/flow.md",
+    "README.md",
+    "templates/knowledge/index.md",
+    ".claude-plugin/plugin.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-workspace-changelog-viewer/test/issues.json",
+    ".gogo/work/feature-workspace-changelog-viewer/test/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 1,
+  "summary": "FR12+FR11 final pass (round 7): all structural and behavioral checks pass. 12 commands in commands/, all docs (README, docs/commands.md, docs/architecture.md, docs/flow.md, skills/gogo/SKILL.md) updated and consistent, no stale '10 commands'/'11 commands', plugin.json 0.5.0, docs/flow.md H2 is 'The phases' (REV-009 fix confirmed). FR12 lenient/strict gate verified by dogfood fixture (feature-broken): lenient mode produces report with Run status/gaps section listing open REV-001+TEST-001, marked best-effort, state.md stays status=reviewing (not done); strict mode unchanged in gogo-knowledge SKILL.md; plan.md STOP gate present for both modes; gogo-done exact stop message verified in SKILL.md and commands/done.md; auto-pick requires status=done. One nit finding (TEST-004): lenient mode state.md status field is underspecified — guidance says not to use 'done' but prescribes no positive value, resulting in phase=done/status=reviewing misalignment. Behavioral gate works correctly regardless."
+}

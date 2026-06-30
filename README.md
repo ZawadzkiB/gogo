@@ -1,4 +1,10 @@
-# gogo
+<p align="center">
+  <img src="docs/assets/logo.png" alt="gogo — make your flow more agentic" width="360" />
+</p>
+
+<h1 align="center">gogo</h1>
+
+<p align="center"><em>make your flow more agentic</em></p>
 
 **A portable, knowledge-grounded development pipeline for Claude Code.**
 
@@ -42,8 +48,8 @@ flowchart LR
 
 *Plan waits for your acceptance before any code is written. Review and test loop
 fixes back into implement, and either can **pause for your decision** at any point
-— you answer and it resumes. On success, Report writes an as-built `report.md` +
-diagrams and updates your knowledge docs.
+— you answer and it resumes. On success, Report writes an as-built `report/` bundle
+(`report/report.md` + diagrams) and updates your knowledge docs.
 **Every phase is grounded in your `.gogo/knowledge/` config.***
 
 ## Generic flow, your rules
@@ -162,7 +168,7 @@ Idempotent; re-run anytime. Knowledge-maintenance sibling of `/gogo:build`.
 **`/gogo:plan "<goal>"`**
 
 Runs the plan phase only. Writes an accept-pending plan to
-`.gogo/plans/feature-<slug>/` (with the feature's functional requirements, a changes
+`.gogo/work/feature-<slug>/` (with the feature's functional requirements, a changes
 checklist, and a mermaid chart) and **stops for your acceptance** — no code is
 written until you accept.
 
@@ -199,12 +205,32 @@ Phase ④ standalone. e2e/UI/CLI/API testing per your strategy; emits the living
 **`/gogo:report [feature-slug]`**
 
 Phase ⑤ standalone. For an all-green feature: finalizes the plan to as-built,
-writes `report.md` + the as-built diagrams, and updates your gogo-owned knowledge
-docs.
+writes the `report/` bundle (`report/report.md` + the as-built UML diagrams), and
+updates your gogo-owned knowledge docs. Run standalone, it **also (re)generates a
+report for a past or broken run** — synthesizing a best-effort `report/report.md`
+from whatever artifacts exist (plan, decisions, review/test issues, state, charts)
+and clearly marking which phases ran and what's still open. `plan.md` is the one
+prerequisite. (The in-pipeline ⑤, right after a green test, keeps its strict gate.)
+
+**`/gogo:done [feature-slug]`**
+
+Ship a report-complete feature. Copies its `report/` bundle (`report.md` + the UML
+diagrams) into the append-only `.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive and
+sets `state.md` to a terminal `shipped` status. Copy-not-move (the work folder
+stays the source); idempotent. If no report exists yet it stops and tells you to
+run `/gogo:report <feature>` first.
+
+**`/gogo:view [changelog-entry | feature-slug]`**
+
+Open a gogo report as a self-contained, offline **interactive webpage** — the
+`report.md` summary rendered as readable HTML plus its mermaid diagrams in a
+pan/zoom/drag canvas (vendored runtime, no network, no build). Lists the available
+reports (from `.gogo/changelog/` and `.gogo/work/*/report/`) and opens your pick;
+falls back to printing the `file://` path if it can't auto-open.
 
 **`/gogo:status`**
 
-Lists every feature under `.gogo/plans/` with its phase, status, and iteration counts.
+Lists every feature under `.gogo/work/` with its phase, status, and iteration counts.
 Read-only.
 
 **`/gogo:resume [feature-slug]`**
@@ -237,7 +263,11 @@ classifies as **standalone** (a reusable, self-contained capability) instead lan
 in **`.claude/skills/<slug>/`** so Claude Code auto-discovers it — written only
 when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
-**`.gogo/plans/feature-<slug>/`** — one folder per piece of work:
+**`.gogo/resources/`** — one vendored mermaid runtime per project
+(`mermaid.min.js`, shared by every feature) plus the interactive viewer assets
+(`viewer/`) `/gogo:view` builds pages from. Offline, no network, no build.
+
+**`.gogo/work/feature-<slug>/`** — one folder per piece of work:
 
 | File | Purpose |
 |---|---|
@@ -249,8 +279,12 @@ when you approve that candidate (the one sanctioned write outside `.gogo/`).
 | `review-NN.md` | Each code-review round's rendered snapshot of `issues.json` |
 | `test/issues.json` | The living, typed test findings (same contract) |
 | `test-NN.md` | Each test round's rendered snapshot |
-| `report.md` | The as-built final report (written at report phase): planned-vs-shipped, changes, review/test outcomes, diagram links |
-| `charts/` | Mermaid diagrams (`.mmd`) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement/report as-built flow / sequence / class / activity set |
+| `report/` | The as-built bundle (written at report phase): `report/report.md` (planned-vs-shipped, implementation, decisions + reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `diagrams.html`, `manifest.json`. `/gogo:done` copies it to `.gogo/changelog/<date>-<slug>/` |
+| `charts/` | Mermaid diagrams (`.mmd`) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement as-built flow / sequence / class / activity set |
+
+**`.gogo/changelog/`** — the append-only shipped archive. When you run
+`/gogo:done`, the feature's `report/` bundle (report.md + diagrams) is copied to
+`.gogo/changelog/<YYYY-MM-DD>-<slug>/`. `/gogo:view` reads from here too.
 
 The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
 `result.json`, the feature `pipeline.json`) follow JSON Schemas shipped in the

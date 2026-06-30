@@ -1,0 +1,28 @@
+{
+  "slug": "docs-and-verified-discovery",
+  "phase": "implement",
+  "status": "ok",
+  "round": 3,
+  "inputs": [
+    ".gogo/plans/feature-docs-and-verified-discovery/plan.md",
+    ".gogo/plans/feature-docs-and-verified-discovery/review/issues.json",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md",
+    "templates/contracts/issues-list.schema.json",
+    "templates/contracts/README.md",
+    "skills/gogo-contracts/SKILL.md",
+    "skills/gogo-review/SKILL.md",
+    "skills/gogo-implement/SKILL.md",
+    "docs/agents.md"
+  ],
+  "outputs": [
+    "agents/gogo-developer.md",
+    "agents/gogo-reviewer.md",
+    ".gogo/plans/feature-docs-and-verified-discovery/review/issues.json",
+    ".gogo/plans/feature-docs-and-verified-discovery/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Round 3 (--issues): fixed REV-003 — synced the two stale agent role files (gogo-developer.md, gogo-reviewer.md) to the live issues.json contract (developer reads/writes review|test/issues.json via --issues; reviewer produces the living issues.json plus the review-NN.md snapshot). Doc-accuracy only; no product behavior changed. issues.json validates; REV-001/002 untouched."
+}

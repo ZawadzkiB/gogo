@@ -17,7 +17,7 @@ before working and **validates its outputs** before hand-off. Source of truth:
 
 ## The typed artifacts
 
-All live in the feature folder `.gogo/plans/feature-<slug>/`.
+All live in the feature folder `.gogo/work/feature-<slug>/`.
 
 | Schema | Artifact | Produced by | Consumed by |
 |---|---|---|---|
@@ -53,10 +53,12 @@ the `open`/`new` issues and writes back `status: fixed`, `fix_summary`,
 ### `charts-manifest.schema.json` — the as-built diagram index
 
 `{ slug, updated?, note?, diagrams[] }`, each diagram `{ kind ∈ {flow, sequence,
-class, activity}, file (a .mmd under charts/), title }`. Implement ② emits the
-as-built set; only the kinds that carry signal appear (diagram the **product**,
-never the task list). A pure-process change has an empty `diagrams` array and a
-`note`. Review ③ and test ④ consume it to reason about the change.
+class, activity, use-case}, file (a .mmd under charts/, or report/ for the ⑤
+as-built report bundle), title }`. Implement ② emits the as-built set into
+`charts/`; report ⑤ emits a `report/manifest.json` (same schema) for the report
+bundle. Only the kinds that carry signal appear (diagram the **product**, never
+the task list). A pure-process change has an empty `diagrams` array and a `note`.
+Review ③ and test ④ consume it to reason about the change.
 
 ### `phase-result.schema.json` — the per-run record
 

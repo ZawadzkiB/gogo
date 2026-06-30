@@ -23,6 +23,60 @@ compiled tool — so it works in any language ecosystem.
 - **`--force`**: reset all knowledge files to fresh scaffolds (warn first; suggest
   committing). Always regenerate `_discovered.md`.
 
+## Step 0 — migrate a legacy workspace layout (idempotent)
+Before anything else, bring an older project up to the current layout. gogo's
+workspace was renamed `.gogo/plans/` → `.gogo/work/`, and the vendored mermaid
+runtime moved up one level to `.gogo/resources/` (so other skills can share it).
+**Move, never delete; skip if already migrated.** This only ever writes under
+`.gogo/`, so it stays in-bounds.
+
+1. **Workspace.** If `.gogo/plans/` exists and `.gogo/work/` does **not**, move
+   `.gogo/plans/` → `.gogo/work/`. If both already exist (a partial migration),
+   don't clobber — leave `.gogo/plans/` in place and flag it in the report for a
+   human to merge.
+2. **Vendored runtime.** If a legacy `.gogo/plans/.assets/` (or, after step 1,
+   `.gogo/work/.assets/`) exists and `.gogo/resources/` does not, move it to
+   `.gogo/resources/`.
+3. **Viewer paths.** In every moved `charts/diagrams.html`, rewrite the
+   `<script src>` from the old `../../.assets/mermaid.min.js` to the new
+   `../../../resources/mermaid.min.js` — charts now sit one level deeper
+   (`.gogo/work/feature-<slug>/charts/`, three levels under `.gogo/`).
+4. **Log** exactly what moved — both in the Step 7 report and in `_discovered.md`.
+
+```bash
+set -euo pipefail
+moved=""
+# 1) workspace rename (never clobber an existing .gogo/work)
+if [ -d .gogo/plans ] && [ ! -e .gogo/work ]; then
+  mv .gogo/plans .gogo/work && moved="${moved}.gogo/plans->.gogo/work "
+fi
+# 2) vendored runtime up to .gogo/resources/
+for legacy in .gogo/work/.assets .gogo/plans/.assets; do
+  if [ -d "$legacy" ] && [ ! -e .gogo/resources ]; then
+    mv "$legacy" .gogo/resources && moved="${moved}${legacy}->.gogo/resources "
+    break
+  fi
+done
+# 3) fix the offline viewer's runtime path in any moved charts (portable sed)
+if [ -d .gogo/work ]; then
+  find .gogo/work -name diagrams.html -exec \
+    sed -i.bak 's#\.\./\.\./\.assets/mermaid\.min\.js#../../../resources/mermaid.min.js#g' {} \; 2>/dev/null || true
+  find .gogo/work -name 'diagrams.html.bak' -delete 2>/dev/null || true
+fi
+# Report independently: what moved, any unresolved conflict, or a clean no-op.
+[ -n "$moved" ] && echo "migrated: $moved"
+if [ -d .gogo/plans ] && [ -e .gogo/work ]; then
+  # both layouts present — a partial migration we won't clobber (even if .assets moved)
+  echo "WARN: legacy .gogo/plans/ remains alongside .gogo/work/ — not moved (no clobber); merge by hand, then re-run"
+elif [ -z "$moved" ]; then
+  echo "migration: already current (no-op)"
+fi
+```
+
+If `.gogo/plans/` is absent (or `.gogo/work/` already present), this is a no-op —
+re-runs are safe. Where `sed` is unavailable, do step 3 via Grep/Read/Write
+(same substitution) — never install a tool.
+
 ## Step 1 — scaffold (if absent)
 Copy `${CLAUDE_PLUGIN_ROOT}/templates/knowledge/*` → `.gogo/knowledge/` for any
 file that doesn't exist yet. In default mode, never overwrite an existing file.
@@ -139,14 +193,17 @@ as-is and flag it). On a re-run, re-verify and reconcile — don't churn unchang
 claims. The principle: **code is the source of truth; docs may be outdated.**
 
 ## Step 6 — write `_discovered.md`
-Regenerate it every run: the assistant configs + general docs found, the per-file
+Regenerate it every run: any **legacy-layout migration performed in Step 0**
+(`.gogo/plans`→`.gogo/work`, `.assets`→`.gogo/resources`, viewer paths rewritten —
+or "already current"), the assistant configs + general docs found, the per-file
 wiring table (file → mode → sources), a **verification table** (per high-signal
 claim → **verified** / **corrected** *(doc said X → code shows Y)* /
 **unverifiable**) headed by the principle *"code is the source of truth; docs may
 be outdated,"* and a "Needs review (low confidence)" list.
 
 ## Step 7 — report to the user
-Summarize: what was found, which files are proxies vs synthesized, **which claims
+Summarize: **any legacy-layout migration from Step 0** (what moved, or that the
+layout was already current), what was found, which files are proxies vs synthesized, **which claims
 were verified / corrected (code overrode a stale doc, with the suggested upstream
 fix) / unverifiable**, which files are low-confidence and want a human glance, and
 the next step (`review .gogo/knowledge/, then run /gogo:plan "<goal>"`).
@@ -160,4 +217,4 @@ deterministic).
 - Only ever write inside `.gogo/` — never edit a discovered upstream file.
 - Keep all writes inside `.gogo/knowledge/`.
 - Don't auto-edit `.gitignore`; instead print guidance (commit `knowledge/`;
-  the team's call on `.gogo/plans/`).
+  the team's call on `.gogo/work/`).

@@ -1,0 +1,22 @@
+{
+  "slug": "skill-extraction",
+  "phase": "implement",
+  "status": "ok",
+  "round": 2,
+  "inputs": [
+    ".gogo/plans/feature-skill-extraction/review/issues.json",
+    ".gogo/plans/feature-skill-extraction/plan.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/non-functional-requirements.md"
+  ],
+  "outputs": [
+    ".gogo/knowledge/coding-rules.md",
+    "skills/gogo-skills/SKILL.md",
+    ".gogo/plans/feature-skill-extraction/review/issues.json",
+    ".gogo/plans/feature-skill-extraction/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Round-2 --issues fix pass: REV-001 (mirrored NFR's user-gated-exception parenthetical onto the coding-rules.md hard-invariant bullet) and REV-002 (wired --include report-only targets into the gogo-skills Step 1 audit); both marked fixed in issues.json. Budgets hold."
+}

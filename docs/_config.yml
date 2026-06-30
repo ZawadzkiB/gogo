@@ -20,6 +20,9 @@ baseurl: "/gogo"
 # Remote theme — GitHub Pages builds it; nothing is vendored.
 remote_theme: just-the-docs/just-the-docs
 
+# Brand logo shown in the site header (just-the-docs resolves it against baseurl).
+logo: "/assets/logo.png"
+
 plugins:
   - jekyll-remote-theme
   - jekyll-include-cache

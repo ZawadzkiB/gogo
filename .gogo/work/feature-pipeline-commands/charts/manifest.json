@@ -1,0 +1,22 @@
+{
+  "slug": "pipeline-commands",
+  "updated": "2026-06-24",
+  "note": "Intended-design diagrams from phase ①; they hold as-built for Stage A (the command pipeline + validated hand-offs). Stage B (orchestrator chaining on result.json/pipeline.json) is not yet drawn.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "charts/pipeline.mmd",
+      "title": "Command pipeline: typed artifacts through validate-in/out, looping on issues"
+    },
+    {
+      "kind": "activity",
+      "file": "charts/issue-lifecycle.mmd",
+      "title": "Issue lifecycle in the living issues.json (open/fixed/verified/new/wontfix)"
+    },
+    {
+      "kind": "sequence",
+      "file": "charts/handoff.mmd",
+      "title": "Validated review to implement hand-off via gogo-contracts"
+    }
+  ]
+}

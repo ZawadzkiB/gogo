@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — pipeline-commands</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>pipeline-commands</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Command pipeline (intended design)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  PLAN[/"plan.md (accepted)"/]:::art --> IMP
+  CR[/"coding-rules"/]:::art --> IMP
+  ISS -. "--issues" .-> IMP
+  IMP["gogo:implement (validate in/out)"]:::cmd
+  IMP --> CODE["code"]:::out
+  IMP --> CHARTS[/"charts: flow · sequence · class · activity"/]:::art
+  CODE --> REV
+  CHARTS --> REV
+  CRS[/"code-review-standards"/]:::art --> REV
+  PLAN --> REV
+  REV["gogo:review (validate in/out)"]:::cmd
+  REV --> ISS[/"issues.json (living, typed)"/]:::art
+  ISS --> G1{"open issues?"}:::gate
+  G1 -->|"yes - fix"| IMP
+  G1 -->|"clean"| TEST
+  TS[/"test-strategy"/]:::art --> TEST
+  PLAN --> TEST
+  CHARTS --> TEST
+  TEST["gogo:test (validate in/out)"]:::cmd
+  TEST --> TISS[/"test issues.json"/]:::art
+  TISS --> G2{"open issues?"}:::gate
+  G2 -->|"yes - fix"| IMP
+  G2 -->|"clean"| REP["gogo:report (report.md + knowledge)"]:::cmd
+  REP --> DONE([done]):::io
+  classDef cmd fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111
+  </pre></div>
+
+  <h2>Issue lifecycle (the living issues.json)</h2>
+  <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  [*] --> open: review / test finds it
+  open --> fixed: implement --issues (sets fix_summary)
+  fixed --> verified: re-review confirms
+  fixed --> open: re-review still fails
+  open --> wontfix: user decision
+  open --> new: surfaced this round
+  verified --> [*]
+  wontfix --> [*]
+  </pre></div>
+
+  <h2>Validated hand-off (review → implement)</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor U as user / go
+  participant R as gogo:review
+  participant C as gogo-contracts
+  participant I as gogo:implement
+  U->>R: review(slug)
+  R->>C: validate-in(plan, standards, charts)
+  C-->>R: ok
+  R->>R: review the diff
+  R->>C: validate-out(issues.json)
+  C-->>R: schema ok (ids unique, enums valid)
+  R-->>U: issues.json (3 open)
+  U->>I: implement --issues issues.json
+  I->>C: validate-in(plan, coding-rules, issues.json)
+  C-->>I: ok
+  I->>I: fix open issues
+  I->>C: validate-out(issues.json + charts)
+  C-->>I: ok (status=fixed, fix_summary set)
+  I-->>U: updated issues.json + as-built charts
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

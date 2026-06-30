@@ -99,9 +99,9 @@ pointer, and `.gogo/skills/index.md` registers every extraction.
 
 ```
 gogo/
-├── commands/                 # ultra-thin entry points (one per slash command)
-│   ├── build.md  go.md  plan.md  implement.md  review.md
-│   ├── test.md   report.md  status.md  resume.md  skills.md
+├── commands/                 # ultra-thin entry points — 12 slash commands
+│   ├── build.md  plan.md  go.md  implement.md  review.md  test.md
+│   ├── report.md  done.md  view.md  status.md  resume.md  skills.md
 ├── skills/                   # the operating manuals (all the logic)
 │   ├── gogo/                 #   orchestrator: phases, loops, decision gates
 │   ├── gogo-build/           #   wire/refresh .gogo/knowledge config
@@ -109,7 +109,9 @@ gogo/
 │   ├── gogo-implement/       #   ② implement
 │   ├── gogo-review/          #   ③ review
 │   ├── gogo-test/            #   ④ test
-│   ├── gogo-knowledge/       #   ⑤ report + knowledge update
+│   ├── gogo-knowledge/       #   ⑤ report + knowledge update (strict + lenient)
+│   ├── gogo-done/            #   ship: copy report bundle → .gogo/changelog/
+│   ├── gogo-view/            #   interactive viewer (pan/zoom/drag) for reports
 │   ├── gogo-skills/          #   audit knowledge budget + extract on-demand skills
 │   ├── gogo-contracts/       #   validate-in / validate-out at every hand-off
 │   └── gogo-mermaid/         #   diagram generation + offline viewer
@@ -137,8 +139,9 @@ your-project/
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
-│   └── plans/
-│       ├── .assets/          # one vendored mermaid runtime per project (not per feature)
+│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ assets + view/ built pages  [gogo-mermaid, /gogo:view write]
+│   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<slug>/ (report.md + diagrams)  [/gogo:done writes]
+│   └── work/
 │       └── feature-<slug>/   # one folder per piece of work:
 │           ├── plan.md            # the accepted plan (the contract) + functional requirements   [① writes]
 │           ├── adjustments.md     # log of changes/clarifications during planning                 [① writes]
@@ -148,10 +151,10 @@ your-project/
 │           ├── review-NN.md        # each review round's rendered snapshot                          [③ writes]
 │           ├── test/issues.json    # living, typed test findings (same contract)                   [④ writes, ② reads]
 │           ├── test-NN.md          # each test round's rendered snapshot                            [④ writes]
-│           ├── report.md           # the as-built final report                                     [⑤ writes]
+│           ├── report/             # as-built bundle: report.md + UML .mmd set + diagrams.html + manifest.json  [⑤ writes]
 │           ├── <phase>/result.json # per-run phase result (implement/review/test/report)           [each phase writes]
 │           ├── pipeline.json       # feature-level index of current artifacts + validity           [every phase]
-│           └── charts/             # mermaid .mmd + manifest.json + offline diagrams.html          [①/②/⑤ write]
+│           └── charts/             # mermaid .mmd + manifest.json + offline diagrams.html          [①/② write]
 └── .claude/
     └── skills/<slug>/SKILL.md  # approved STANDALONE skills (harness auto-discovers)  [/gogo:skills, user-gated]
 ```
@@ -168,8 +171,10 @@ your-project/
   `non-functional-requirements`; writes `review/issues.json` + `review-NN.md`.
 - **④ Test** (`gogo-tester`) — reads `testing-tools`, `test-strategy`,
   `tech-stack`; writes `test/issues.json` + `test-NN.md`.
-- **⑤ Report** (orchestrator) — finalizes `plan.md`, writes `report.md` + as-built
-  `charts/`, updates the gogo-owned knowledge summaries that drifted.
+- **⑤ Report** (orchestrator) — finalizes `plan.md`, writes the `report/` bundle
+  (`report/report.md` + the as-built UML set + `diagrams.html`), updates the
+  gogo-owned knowledge summaries that drifted. `/gogo:done` then copies the bundle
+  to `.gogo/changelog/<date>-<slug>/`.
 
 The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
 `result.json`, the feature `pipeline.json`) follow the JSON Schemas in

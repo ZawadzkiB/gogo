@@ -23,7 +23,7 @@ always run. No new required dependency.
 | `phase-result.schema.json` | `<phase>/result.json` (per run) | every standalone command | orchestrator `go` (Stage B) |
 | `pipeline.schema.json` | `pipeline.json` (feature-level index) | every standalone command | orchestrator `go` (Stage B) |
 
-> The feature folder is `.gogo/plans/feature-<slug>/`. Paths in the table are
+> The feature folder is `.gogo/work/feature-<slug>/`. Paths in the table are
 > relative to it.
 
 ### `issues-list.schema.json` — the living issues list
@@ -53,8 +53,10 @@ fixed_in_round?, fix_summary?    (required once status = fixed)
 ### `charts-manifest.schema.json` — the as-built diagram index
 
 `{ slug, updated?, note?, diagrams[] }`, each diagram `{ kind ∈ {flow, sequence,
-class, activity}, file (a .mmd under charts/), title }`. Implement ② emits the
-as-built set; only the kinds that carry signal appear (per the diagram-subject
+class, activity, use-case}, file (a .mmd under charts/, or report/ for the ⑤
+as-built report bundle), title }`. Implement ② emits the as-built set into
+`charts/`; report ⑤ also emits a `report/manifest.json` (same schema) indexing the
+report bundle. Only the kinds that carry signal appear (per the diagram-subject
 rules in `gogo-mermaid` — diagram the **product**, never the task list). A
 pure-process change has an empty `diagrams` array and a `note`. Review ③ and test
 ④ consume it to reason about the change.

@@ -9,7 +9,7 @@ Run **phase ④ (test)** standalone for a feature, via the `gogo-test` skill, wi
 **validate-in → work → validate-out** (using `gogo-contracts`). Re-running it
 after fixes updates the same living `test/issues.json` in place.
 
-Target: $ARGUMENTS  (if no slug, pick the most recent `.gogo/plans/feature-*/`
+Target: $ARGUMENTS  (if no slug, pick the most recent `.gogo/work/feature-*/`
 that has passed review; if several, ask which.)
 
 Documents it accepts: `plan.md` (required, its Tests section), `testing-tools.md` /

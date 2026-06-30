@@ -1,0 +1,30 @@
+flowchart TD
+  PLAN[/"plan.md (accepted)"/]:::art --> IMP
+  CR[/"coding-rules"/]:::art --> IMP
+  ISS -. "--issues" .-> IMP
+  IMP["gogo:implement (validate in/out)"]:::cmd
+  IMP --> CODE["code"]:::out
+  IMP --> CHARTS[/"charts: flow · sequence · class · activity"/]:::art
+  CODE --> REV
+  CHARTS --> REV
+  CRS[/"code-review-standards"/]:::art --> REV
+  PLAN --> REV
+  REV["gogo:review (validate in/out)"]:::cmd
+  REV --> ISS[/"issues.json (living, typed)"/]:::art
+  ISS --> G1{"open issues?"}:::gate
+  G1 -->|"yes - fix"| IMP
+  G1 -->|"clean"| TEST
+  TS[/"test-strategy"/]:::art --> TEST
+  PLAN --> TEST
+  CHARTS --> TEST
+  TEST["gogo:test (validate in/out)"]:::cmd
+  TEST --> TISS[/"test issues.json"/]:::art
+  TISS --> G2{"open issues?"}:::gate
+  G2 -->|"yes - fix"| IMP
+  G2 -->|"clean"| REP["gogo:report (report.md + knowledge)"]:::cmd
+  REP --> DONE([done]):::io
+  classDef cmd fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111

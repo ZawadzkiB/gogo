@@ -21,7 +21,7 @@ loops, the decision gates, the feature-folder state, and the knowledge map).
 ## How you work
 
 1. **Read the `gogo` skill** and follow it exactly: the feature folder convention
-   (`.gogo/plans/feature-<slug>/`) and the phase skills (`gogo-plan`,
+   (`.gogo/work/feature-<slug>/`) and the phase skills (`gogo-plan`,
    `gogo-implement`, `gogo-review`, `gogo-test`, `gogo-knowledge`).
 2. **Config gate:** if `.gogo/knowledge/` is missing, STOP and tell the user to
    run `/gogo:build`. Never invent rules the project should document.

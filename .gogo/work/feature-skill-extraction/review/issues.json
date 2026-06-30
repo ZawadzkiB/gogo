@@ -1,0 +1,34 @@
+{
+  "slug": "skill-extraction",
+  "track": "review",
+  "round": 3,
+  "updated": "2026-06-29",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "coding-rules.md hard-invariant 'only write under .gogo/' omits the user-gated exception that NFR.md now carries",
+      "description": ".gogo/knowledge/non-functional-requirements.md:22 now reads 'Writes are confined to .gogo/ (one user-gated exception — see gogo overrides)'. The sibling .gogo/knowledge/coding-rules.md:29-31 still states the rule absolutely ('Only ever write under .gogo/.') with no pointer to the new exception. The exception IS documented lower in the same file (gogo overrides, lines 57-60), but a reader of the 'Hard invariants (never violate)' list takes the absolute statement at face value — an internal inconsistency between the two knowledge files that FR10 explicitly wanted reconciled ('documented as such in coding-rules.md').",
+      "proposed_solution": "Mirror NFR's parenthetical: change the coding-rules.md hard-invariant bullet to 'Only ever write under .gogo/ (one user-gated exception — approved standalone skills; see gogo overrides). Never edit a proxied upstream file ...'. Apply only to .gogo/knowledge/coding-rules.md; the template scaffold has no such hard-invariant line so it needs no change.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Mirrored NFR's parenthetical on the coding-rules.md hard-invariant bullet: 'Only ever write under .gogo/ (one user-gated exception — approved standalone skills; see ## gogo overrides)', so the two knowledge files agree and FR10's 'documented as such in coding-rules' is met. The ## gogo overrides 'Write rule + its one exception' bullet carries the full detail."
+    },
+    {
+      "id": "REV-002",
+      "title": "gogo-skills SKILL.md never wires --include into the audit flow — flag is documented but unreachable by step-following",
+      "description": "commands/skills.md and FR10 promise '--include <path> → also audit a path outside .gogo/ (report-only)'. In skills/gogo-skills/SKILL.md the only mention is the Safety bullet (line 110) stating it is report-only; Step 1 (audit) instructs only 'Glob .gogo/knowledge/*.md'. An agent executing the numbered steps literally would glob just .gogo/knowledge and never measure the --include path, so the feature does not actually run despite being advertised in the command and the plan.",
+      "proposed_solution": "Add the --include path to the audit step: in Step 1, after globbing .gogo/knowledge/*.md, also measure each --include <path> (read-only) and show it in the table flagged 'report-only — not a candidate'. Keep the Safety bullet as the guardrail. One sentence in Step 1 closes the gap.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Wired --include into Step 1 of skills/gogo-skills/SKILL.md: the audit now also measures each --include <path> target read-only and adds its row flagged 'report-only (never extracted) — never a candidate, never written (see Safety)', consistent with the Safety bullet and the command's argument-hint."
+    }
+  ]
+}

@@ -6,3 +6,12 @@
 .claude/settings.local.json
 
 # NOTE: assets/mermaid/mermaid.min.js IS vendored on purpose — do not ignore it.
+
+# JetBrains IDE project files (local only)
+.idea/
+*.iml
+
+# Regenerable per-project gogo runtime: the vendored mermaid COPY, the viewer
+# asset copies, and generated /gogo:view pages. Source of truth is assets/mermaid/
+# + assets/viewer/ (committed); these are reproduced on demand by gogo commands.
+.gogo/resources/

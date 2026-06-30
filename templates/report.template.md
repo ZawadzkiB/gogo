@@ -1,14 +1,24 @@
 # Report — feature `<slug>`
 
-<!-- Written by phase ⑤ (gogo-knowledge) once the feature is all-green. The
-durable, as-built summary of what shipped — the companion to plan.md (the
-contract). Fill every section from the ACTUAL work; link the audit-trail files
-(decisions / review-NN / test-NN) rather than repeating them. -->
+<!-- Written by phase ⑤ (gogo-knowledge): for a clean green run, or — standalone
+via /gogo:report <slug> — as a best-effort report for a PAST/BROKEN run. Rendered
+to .gogo/work/feature-<slug>/report/report.md (NOT the feature root). The durable,
+as-built summary of what shipped — the companion to plan.md (the contract), and
+the bundle /gogo:done archives to .gogo/changelog/. Fill every section from the
+ACTUAL work; link the audit-trail files (../decisions.md, ../review-NN.md,
+../test-NN.md) rather than repeating them. -->
 
 - **feature:** <one-line title>
-- **status:** done
+- **status:** done   <!-- a past/broken run: "report-only (incomplete run)" -->
 - **completed:** <YYYY-MM-DD>
 - **branch / commits:** <branch | commit range | n/a>
+
+## Run status / gaps
+<Which phases ran (plan / implement / review / test / report) and which didn't,
+plus any still-open or unverified issues. Clean green run → one line ("all phases
+completed; no open issues"). A past/broken run (lenient /gogo:report) → REQUIRED:
+be honest about what's missing/incomplete and list every open review/test finding
+so the reader knows this is best-effort, not a clean release.>
 
 ## Summary
 <2–4 sentences: what was built and why, in plain terms.>
@@ -17,26 +27,40 @@ contract). Fill every section from the ACTUAL work; link the audit-trail files
 <What matched the accepted plan, and every deviation (added / dropped / changed)
 with the reason. If it shipped exactly as planned, say so in one line.>
 
-## Changes (as-built)
+## Implementation
+<What was ACTUALLY built — the as-built behaviour and the approach taken (not the
+plan's intentions). The reader should understand how the shipped feature works.>
+
+### Changes (as-built)
 <The files actually touched, grouped by area — the real changes checklist.>
 
 | File | Change | Note |
 |---|---|---|
 | `<path>` | added / modified / removed | <what & why> |
 
-## Decisions
-<Key forks resolved this feature — one line each. See [decisions.md](./decisions.md).>
+## Decisions & rationale
+<Every fork resolved this feature, reconciled from decisions.md + the implement
+rounds. For EACH decision give both the choice AND the reason for it.
+See [decisions.md](../decisions.md).>
+
+| Decision | Choice | Reason |
+|---|---|---|
+| `<D# / topic>` | <what was chosen> | <why> |
 
 ## Review outcome
-<Rounds run; notable findings and how they resolved. See the [review-NN.md](./review-01.md) files.>
+<Rounds run; notable findings and how they resolved. See the
+[review-NN.md](../review-01.md) files / [review/issues.json](../review/issues.json).>
 
 ## Test outcome
-<Levels exercised (UI / CLI / API) and results. See the [test-NN.md](./test-01.md) files.
+<Levels exercised (UI / CLI / API) and results. See the
+[test-NN.md](../test-01.md) files / [test/issues.json](../test/issues.json).
 Note anything skipped and why (e.g. browser tooling absent).>
 
 ## Diagrams
-<As-built diagrams of the work — open [charts/diagrams.html](./charts/diagrams.html).
-List each with one line: flow, sequence, activity (lifecycle / state), class (structure).>
+<The as-built UML set, chosen by what changed — open [diagrams.html](./diagrams.html)
+(same folder). List each `.mmd` with one line: flow, sequence, activity
+(lifecycle / state), class (structure / types), use-case (a new user capability).
+If the change was pure process, say so — no diagram.>
 
 ## Knowledge updates
 <Which `.gogo/knowledge/*` files were updated (gogo-owned summaries only). List any

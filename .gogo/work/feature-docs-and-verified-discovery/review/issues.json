@@ -1,0 +1,47 @@
+{
+  "slug": "docs-and-verified-discovery",
+  "track": "review",
+  "round": 4,
+  "updated": "2026-06-30",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "gogo self-knowledge still says _config.yml is at the repo root (contradicts the D4 layout reconciliation)",
+      "description": "`.gogo/knowledge/project-knowledge.md:80-81` states the docs site \"lives under `docs/` with `_config.yml` at the repo root\". After the D4 layout reconciliation (decisions.md), Pages deploys from branch `main` folder `/docs`, so the config is at `docs/_config.yml` and there is NO root `_config.yml` (confirmed: no root `_config.yml` on disk). This is gogo's own knowledge file describing the very layout this feature reconciled, so the note is now factually wrong. The shipped docs (`docs/_config.yml` header) are correct; only this self-knowledge note drifted. Content accuracy is the explicit goal of this feature.",
+      "proposed_solution": "Edit project-knowledge.md to read \"...lives under `docs/` with `docs/_config.yml` (Pages deploys from branch main, folder /docs)...\" so the self-knowledge matches the reconciled layout and the real repo. (AGENT-FIXABLE)",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Corrected project-knowledge.md's 0.4.0 override bullet: now reads 'lives under docs/ and deploys from branch main folder /docs (config at docs/_config.yml)'. Matches the reconciled layout + the real repo (no root _config.yml)."
+    },
+    {
+      "id": "REV-002",
+      "title": "agents.md mermaid draws the issues-list -> developer edge twice (dotted fix-mode + solid), contradicting its own legend",
+      "description": "In `docs/agents.md` the diagram declares `RISS -.->|fix mode| DEV` and `TISS -.->|fix mode| DEV` (lines 50-51) AND also `RISS ==> DEV` / `TISS ==> DEV` (lines 69-70). These represent the same relationship (the developer consumes the issues list in fix mode), so mermaid renders two parallel edges between review/test issues.json and gogo-developer. The caption (lines 80-81) says a solid arrow INTO an agent = consumes while the dotted arrows = the issues list fed back in fix mode, so the solid `==>` pair and the dotted pair are redundant/contradictory for the same edge.",
+      "proposed_solution": "Drop the solid `RISS ==> DEV` and `TISS ==> DEV` lines (69-70) and keep only the dotted `-.->|fix mode|` edges (50-51) which carry the correct semantics; or, conversely, keep one representation only. Re-render so each relationship is a single edge. (AGENT-FIXABLE)",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Removed the duplicate solid `RISS ==> DEV` / `TISS ==> DEV` edges (lines 69-70) from docs/agents.md; the labeled dotted `-.->|fix mode|` edges (50-51) remain as the single correct representation of the developer consuming the issues list in fix mode."
+    },
+    {
+      "id": "REV-003",
+      "title": "agents.md cites agents/*.md as authoritative but diverges from them (NN.md vs issues.json contract)",
+      "description": "`docs/agents.md` lists `agents/*.md` as a source of truth (line 11) and states the developer consumes `review/issues.json`/`test/issues.json` and the reviewer produces the living `review/issues.json`. That matches the contract layer (templates/contracts + gogo-contracts + the phase skills), but the cited agent role files still describe the older snapshot flow: `agents/gogo-developer.md:22` says it reads \"the latest review-NN.md / test-NN.md\", and `agents/gogo-reviewer.md:35-42` says it writes `review-NN.md` and \"uses Write solely for review-NN.md\" (no issues.json). The new docs are accurate to the live contract; the agent files lag (pre-existing drift from when the contract layer landed). A reader following the cited source-of-truth would hit a contradiction.",
+      "proposed_solution": "Sync the agent role files to the issues.json contract (gogo-developer reads/writes `*/issues.json` via `--issues`; gogo-reviewer produces the living `review/issues.json` plus the `review-NN.md` snapshot), OR consciously defer that to a follow-up since `agents/*.md` are outside this feature's stated file scope. Needs a scope call on whether to fix here vs. track separately. (NEEDS-USER-DECISION)",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 3,
+      "fix_summary": "Synced the two stale agent role files to the live issues.json contract. agents/gogo-developer.md step 1 now reads the typed review/issues.json|test/issues.json (the living contract, not the review-NN.md|test-NN.md snapshots) via --issues and writes each fix back as status: fixed + fix_summary + fixed_in_round. agents/gogo-reviewer.md step 4 + Rules now produce the living review/issues.json (the contract handed to implement) AND render the per-round review-NN.md snapshot, with Write covering both. Doc-accuracy only; no product behavior changed."
+    }
+  ]
+}

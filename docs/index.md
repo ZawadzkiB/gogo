@@ -4,10 +4,17 @@ nav_order: 1
 permalink: /
 ---
 
+<p align="center">
+  <img src="{{ '/assets/logo.png' | relative_url }}" alt="gogo — make your flow more agentic" width="360" />
+</p>
+
 # gogo
 
 A portable, knowledge-grounded development pipeline for Claude Code.
 {: .fs-6 .fw-300 }
+
+*make your flow more agentic.*
+{: .fs-4 .fw-300 }
 
 > **The flow is generic and ships with the plugin. The rules are yours.**
 

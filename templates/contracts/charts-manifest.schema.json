@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/ZawadzkiB/gogo/contracts/charts-manifest.schema.json",
   "title": "gogo charts manifest",
-  "description": "An index of the as-built diagram set implement (②) emitted into charts/, so review (③) and test (④) can find and reason about the diagrams that carry signal. Only diagrams that carry signal are listed (per the diagram-subject rules in gogo-mermaid); a feature with nothing meaningful to draw has an empty diagrams array and a note.",
+  "description": "An index of an as-built diagram set: implement (②) emits one into charts/ so review (③) and test (④) can reason about the diagrams, and report (⑤) emits one as report/manifest.json indexing the as-built report bundle (which /gogo:done archives to the changelog). Only diagrams that carry signal are listed (per the diagram-subject rules in gogo-mermaid); a feature with nothing meaningful to draw has an empty diagrams array and a note.",
   "type": "object",
   "additionalProperties": false,
   "required": ["slug", "diagrams"],
@@ -34,12 +34,12 @@
       "properties": {
         "kind": {
           "type": "string",
-          "description": "Diagram kind, per gogo-mermaid conventions. flow=control/data flow; sequence=runtime call sequence; class=structure/types; activity=action/lifecycle/state machine.",
-          "enum": ["flow", "sequence", "class", "activity"]
+          "description": "Diagram kind, per gogo-mermaid conventions. flow=control/data flow; sequence=runtime call sequence; class=structure/types; activity=action/lifecycle/state machine; use-case=user-facing capability (an actor<->use-case graph, rendered as a flowchart since mermaid has no native use-case type).",
+          "enum": ["flow", "sequence", "class", "activity", "use-case"]
         },
         "file": {
           "type": "string",
-          "description": "Repo-relative path to the .mmd source (under the feature's charts/ folder).",
+          "description": "Repo-relative path to the .mmd source (under the feature's charts/ folder, or report/ for the as-built report bundle).",
           "pattern": "\\.mmd$"
         },
         "title": {

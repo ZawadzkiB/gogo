@@ -8,7 +8,7 @@ model: opus
 Act as the **gogo orchestrator** (in this chat, so you can pause for the user at
 gates) and run **phases ② → ③ → ④ → ⑤** for the target feature.
 
-Target: $ARGUMENTS  (if empty, pick the most recent `.gogo/plans/feature-*/` whose
+Target: $ARGUMENTS  (if empty, pick the most recent `.gogo/work/feature-*/` whose
 `state.md` is `plan-accepted` or mid-loop; if several are candidates, ask which.)
 
 Load the `gogo` skill and follow it:

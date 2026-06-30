@@ -10,10 +10,11 @@ just invokes a skill and passes arguments. The logic lives in the skills (the
 "operating manuals"). Source of truth: `commands/*.md` and the `skills/*/SKILL.md`
 they invoke.
 
-There are three groups: **orchestration** (`build`, `plan`, `go`, `status`,
-`resume`), the **standalone phase commands** (`implement`, `review`, `test`,
-`report` — each a typed function with validate-in / validate-out), and
-**knowledge maintenance** (`skills`).
+There are **12** commands in four groups: **orchestration** (`build`, `plan`,
+`go`, `status`, `resume`), the **standalone phase commands** (`implement`,
+`review`, `test`, `report` — each a typed function with validate-in /
+validate-out), **ship & view** (`done`, `view`), and **knowledge maintenance**
+(`skills`).
 
 ## Orchestration
 
@@ -40,7 +41,7 @@ Runs **phase ① (plan) only**. Acts as the orchestrator via the `gogo` + `gogo-
 skills.
 
 - **Reads:** `.gogo/knowledge/*` (config gate — stops if missing) and the codebase.
-- **Writes:** `.gogo/plans/feature-<slug>/` with `plan.md` (incl. the feature's
+- **Writes:** `.gogo/work/feature-<slug>/` with `plan.md` (incl. the feature's
   functional requirements), `adjustments.md`, `state.md`, and an intended-design
   mermaid chart.
 - **Stops for acceptance** — no code is written until you accept. Hard gate.
@@ -60,7 +61,7 @@ in chat, so it can pause at gates.
 
 ### `/gogo:status`
 
-Lists every `.gogo/plans/feature-*/` with slug, title, phase, status, iteration
+Lists every `.gogo/work/feature-*/` with slug, title, phase, status, iteration
 counts, and resume hint; flags any `waiting-for-user` feature with its open
 decision. Read-only.
 
@@ -112,13 +113,47 @@ Phase ④ via `gogo-test` (delegates to `gogo-tester`).
 
 ### `/gogo:report [feature-slug]`
 
-Phase ⑤ via `gogo-knowledge`. For an all-green feature.
+Phase ⑤ via `gogo-knowledge`. For an all-green feature — **and** for a past or
+broken run.
 
 - **Reads:** `plan.md`, `state.md`, `review/issues.json`, `test/issues.json`,
   `charts/manifest.json`, the gogo-owned `.gogo/knowledge/*` summaries.
-- **Writes:** the finalized as-built `plan.md`, `report.md`, the as-built diagram
-  set, updated gogo-owned knowledge docs (never the proxied originals),
-  `report/result.json`, and sets `state.md` to done.
+- **Writes:** the finalized as-built `plan.md`, the `report/` bundle
+  (`report/report.md` + the as-built UML set + `report/diagrams.html` +
+  `report/manifest.json`), updated gogo-owned knowledge docs (never the proxied
+  originals), `report/result.json`, and sets `state.md` to done.
+- **Strict vs lenient:** in-pipeline (right after a green ④) it keeps a strict
+  validate-in gate. Run **standalone on a past/broken/incomplete run** it does
+  **not** refuse — it synthesizes a best-effort `report/report.md` from whatever
+  artifacts exist and clearly marks which phases ran and what's still open (a "Run
+  status / gaps" section). `plan.md` is the one true prerequisite; without it, STOP.
+
+## Ship & view
+
+### `/gogo:done [feature-slug]`
+
+Ship a report-complete feature, via `gogo-done`. The explicit post-report
+"this is the end" gate.
+
+- **Reads:** `.gogo/work/feature-<slug>/report/report.md` (required) + the rest of
+  the `report/` bundle.
+- **Writes:** a copy of the bundle to `.gogo/changelog/<YYYY-MM-DD>-<slug>/`
+  (append-only; copy-not-move; idempotent) and sets `state.md` to a terminal
+  `shipped` status.
+- **Validate-in:** if no report exists it STOPs with "No report found for
+  `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`."
+
+### `/gogo:view [changelog-entry | feature-slug]`
+
+Open a gogo report as a self-contained, offline **interactive webpage**, via
+`gogo-view`.
+
+- **Reads:** the report bundles under `.gogo/changelog/*/` and
+  `.gogo/work/feature-*/report/`; the vendored `.gogo/resources/` viewer assets.
+- **Writes:** a built page under `.gogo/resources/view/` (the `report.md` summary
+  as readable HTML + its mermaid diagrams in a pan/zoom/drag canvas; no network, no
+  build) and opens it (`open`/`xdg-open`, best-effort; prints the `file://` path on
+  failure).
 
 ## Knowledge maintenance
 

@@ -36,7 +36,7 @@ flowchart LR
     CHARTS[/charts + manifest.json/]:::art
     RISS[/review issues.json/]:::art
     TISS[/test issues.json/]:::art
-    REPORT[/report.md/]:::art
+    REPORT[/"report/report.md"/]:::art
 
     PK --> ORCH
     TS --> ORCH
@@ -86,7 +86,7 @@ write product code — it coordinates and surfaces genuine decisions.
 | Direction | Artifacts |
 |---|---|
 | Consumes | `.gogo/knowledge/*` (esp. `project-knowledge`, `tech-stack`, `non-functional-requirements`); `state.md`; `decisions.md`; each specialist's `result.json` / issues list |
-| Produces | the feature folder; `plan.md`; `adjustments.md`; `state.md` (kept current); `decisions.md` entries; intended-design `charts/`; at ⑤ `report.md`, the as-built `charts/`, and updated gogo-owned knowledge summaries |
+| Produces | the feature folder; `plan.md`; `adjustments.md`; `state.md` (kept current); `decisions.md` entries; intended-design `charts/`; at ⑤ the `report/` bundle (`report/report.md` + the as-built UML set + `diagrams.html`), and updated gogo-owned knowledge summaries |
 
 ## `gogo-developer` — phase ② implement
 

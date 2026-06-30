@@ -1,0 +1,60 @@
+{
+  "slug": "workspace-changelog-viewer",
+  "track": "test",
+  "round": 8,
+  "updated": "2026-06-30",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "Step 0 WARN for partial migration is swallowed when .gogo/plans/.assets is also present and moveable",
+      "description": "skills/gogo-build/SKILL.md Step 0 — the partial-migration WARN (\"legacy .gogo/plans/ remains alongside .gogo/work/\") is only emitted via the `elif [ -d .gogo/plans ]` branch, which is only reached when `moved` is empty. When `.gogo/plans/.assets/` is also present (a common real-world state where the workspace was hand-moved but assets were not), the assets move succeeds and fills `moved`, so the `if [ -n \"$moved\" ]` branch fires and prints \"migrated: .gogo/plans/.assets->.gogo/resources\" — without ever warning that `.gogo/plans/feature-*/` still sits alongside `.gogo/work/` and needs a manual merge. Dogfooded against a fixture with `.gogo/plans/feature-old/`, `.gogo/plans/.assets/`, and `.gogo/work/feature-new/` all present; output was \"migrated: .gogo/plans/.assets->.gogo/resources\" with no WARN. An operator reading that output could believe the migration was complete and skip the manual merge step. REV-002 was marked verified after the if/elif/else restructure, but this sub-case was not covered by that fix.",
+      "proposed_solution": "In Step 0, separate the 'something moved' log from the 'plans still exists' check so both can fire in the same run. Replace the final if/elif/else with: (1) if `moved` non-empty, print 'migrated: $moved'; (2) then independently: if `.gogo/plans/` AND `.gogo/work/` both exist, print the WARN; elif `moved` is empty (nothing moved and no conflict), print 'already current (no-op)'. Concrete replacement:\n\n```bash\nif [ -n \"$moved\" ]; then\n  echo \"migrated: $moved\"\nfi\nif [ -d .gogo/plans ] && [ -d .gogo/work ]; then\n  echo \"WARN: legacy .gogo/plans/ remains alongside .gogo/work/ — not moved (no clobber); merge by hand, then re-run\"\nelif [ -z \"$moved\" ]; then\n  echo \"migration: already current (no-op)\"\nfi\n```",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Made the Step 0 final log independent: '[ -n \"$moved\" ] && echo migrated' fires on its own; then a separate check prints the WARN whenever both .gogo/plans/ and .gogo/work/ exist (even if .assets moved), and 'already current (no-op)' only when nothing moved and no conflict. Re-ran the exact TC-3d fixture (both layouts + .assets present): output now shows BOTH 'migrated: .gogo/plans/.assets->.gogo/resources' AND the WARN, with .gogo/plans/ content preserved."
+    },
+    {
+      "id": "TEST-002",
+      "title": "gogo-done SKILL.md does not specify a bash extraction pattern for the markdown-bolded `completed:` field, risking `**YYYY-MM-DD` as the dir name",
+      "description": "The report template writes `- **completed:** <YYYY-MM-DD>` where `**completed:**` is markdown bold. The gogo-done SKILL.md says to \"prefer the report's `- **completed:** <YYYY-MM-DD>` field\" for the changelog dir date but provides no bash extraction pattern — only the placeholder `date=\"<derived-date>\"` in the code block (implying the LLM pre-resolves it by reading the file). A naive `grep 'completed:' | sed 's/.*completed:[ ]*//'` captures `**2026-06-30` (the `**` closing the bold tag comes after the colon, before the date) rather than `2026-06-30`, producing a dir named `**2026-06-30-<slug>/` rather than `2026-06-30-<slug>/`. Demonstrated in the dogfood bash test: the bad directory `**2026-06-30-demo/` was created. An LLM executing gogo-done via Read + reasoning correctly extracts the ISO date; the risk only materialises if a future implementer uses a mechanical grep without `grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}'`.",
+      "proposed_solution": "Add a one-line bash note in the gogo-done SKILL.md Step 2 showing the safe extraction pattern:\n```bash\ndate=$(grep 'completed:' \"${src}/report.md\" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)\n```\nAlternatively, change the report template's `completed:` field to a plain (non-bolded) format (e.g., a YAML comment or a non-bold list item) so naive extractors work. The LLM path is already safe; this only hardens mechanical implementations.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 3,
+      "fixed_in_round": 4,
+      "fix_summary": "Added the safe ISO-date extraction to gogo-done Step 2: `date=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' .../report.md | head -1)` with an explicit warning against a naive sed that would capture the bold `**`. Hardens mechanical reimplementations against the `**YYYY-MM-DD` dir-name bug."
+    },
+    {
+      "id": "TEST-003",
+      "title": ".gogo/resources/viewer/interactive.js was a stale pre-fix copy at stage-3 test start, missing both REV-005 (suppressErrors) and REV-007 (.controls bail)",
+      "description": "At the start of stage-3 testing, `.gogo/resources/viewer/interactive.js` was a pre-patch snapshot that lacked two fixes applied to the plugin source (`assets/viewer/interactive.js`): (1) REV-005 — `suppressErrors: true` was absent from the `mermaid.run()` call (the resource had `window.mermaid.run({ querySelector: \"pre.mermaid\" })` without suppressErrors); (2) REV-007 — the `if (e.target.closest(\".controls\")) return;` guard was absent from the `pointerdown` handler. The plugin source correctly has both fixes; the deployed resource copy lagged because no `/gogo:view` run occurred in this project after the patches were applied. Any page generated before the patches (e.g., `docs-and-verified-discovery.html`) would load the old interactive.js via its `<script src=\"../viewer/interactive.js\">` reference: a bad diagram without suppressErrors could blank the whole batch, and clicks on control buttons would also trigger a drag-start. The SKILL.md design (unconditional `cp` of JS/CSS every run) correctly handles this — the resource self-heals on next `/gogo:view` invocation. The idempotency step in this test run re-copied the file; the resource now matches the source.",
+      "proposed_solution": "After applying patches to `assets/viewer/interactive.js` (or any viewer asset), refresh the project's resource copy by re-running `/gogo:view` (or manually running the two `cp` lines from SKILL.md Step 2). Consider adding a developer-workflow note in SKILL.md or the feature's contributing guide: 'after editing assets/viewer/, re-run /gogo:view on this repo to update .gogo/resources/viewer/'.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 5,
+      "fixed_in_round": 6,
+      "fix_summary": "Confirmed the deployed .gogo/resources/viewer/interactive.js is now byte-identical to the patched source (both REV-005 suppressErrors + REV-007 .controls guard present). Not a shipped-plugin defect: gogo-view Step 2 copies the viewer JS/CSS unconditionally every run, so any project self-heals on the next /gogo:view; the lag was transient dogfood state, now resynced."
+    },
+    {
+      "id": "TEST-004",
+      "title": "gogo-knowledge lenient mode state.md status field left underspecified — phase/status pair becomes inconsistent",
+      "description": "After a lenient /gogo:report run, the SKILL.md Step 1 sets phase=done and a resume: gap note, but for the status field only gives negative guidance: 'only use status: done if the run actually finished clean.' No positive value is prescribed. The state.md status enum (awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | shipped | aborted) contains no entry for 'report written in lenient mode, gaps remain.' The natural implementer move — leave status unchanged from its pre-report value — produces a confusing phase=done / status=reviewing misalignment. Dogfooded in the feature-broken fixture: the produced state.md has phase=done and status=reviewing, which reads as 'the done phase ran but the feature is currently in review', an oxymoronic state. The /gogo:done auto-pick gate still works correctly (it requires status=done, which 'reviewing' is not), so there is no behavioral breakage — but the unclear state.md is misleading to a human reading it and introduces divergence across agent implementations.",
+      "proposed_solution": "In gogo-knowledge SKILL.md Step 1 lenient mode block, add one explicit sentence: 'Leave the status field unchanged from its pre-report value (e.g. reviewing or testing); only phase and resume are updated in lenient mode.' This removes the ambiguity, documents the intended behavior positively, and makes it deterministic that a broken run's state.md will never accidentally read as done.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 7,
+      "fixed_in_round": 8,
+      "fix_summary": "Lenient mode in gogo-knowledge no longer stamps phase=done for a broken run — it now leaves both phase and status at their real pre-report values and updates only resume: with a report-only + gaps note. Removes the phase=done/status=reviewing mismatch and any false-done; /gogo:done auto-pick (needs status=done) still won't archive a broken run."
+    }
+  ]
+}

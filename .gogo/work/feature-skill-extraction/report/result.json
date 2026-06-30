@@ -1,0 +1,24 @@
+{
+  "slug": "skill-extraction",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/plans/feature-skill-extraction/plan.md",
+    ".gogo/plans/feature-skill-extraction/state.md",
+    ".gogo/plans/feature-skill-extraction/review/issues.json",
+    ".gogo/plans/feature-skill-extraction/test/issues.json",
+    ".gogo/plans/feature-skill-extraction/charts/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/plans/feature-skill-extraction/plan.md",
+    ".gogo/plans/feature-skill-extraction/report.md",
+    ".gogo/plans/feature-skill-extraction/charts/sequence.mmd",
+    ".gogo/plans/feature-skill-extraction/charts/manifest.json",
+    ".gogo/plans/feature-skill-extraction/charts/diagrams.html",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/plans/feature-skill-extraction/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Report phase: finalized plan.md to as-built, wrote report.md, added the as-built sequence diagram (+ refreshed manifest/viewer), and reconciled project-knowledge.md with the /gogo:skills command + knowledge-vs-on-demand-skills split. Review + test both clean (REV-001/002, TEST-001-004 all verified). Feature done; version 0.3.0."
+}

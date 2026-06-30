@@ -1,0 +1,19 @@
+sequenceDiagram
+  actor U as user / go
+  participant R as gogo:review
+  participant C as gogo-contracts
+  participant I as gogo:implement
+  U->>R: review(slug)
+  R->>C: validate-in(plan, standards, charts)
+  C-->>R: ok
+  R->>R: review the diff
+  R->>C: validate-out(issues.json)
+  C-->>R: schema ok (ids unique, enums valid)
+  R-->>U: issues.json (3 open)
+  U->>I: implement --issues issues.json
+  I->>C: validate-in(plan, coding-rules, issues.json)
+  C-->>I: ok
+  I->>I: fix open issues
+  I->>C: validate-out(issues.json + charts)
+  C-->>I: ok (status=fixed, fix_summary set)
+  I-->>U: updated issues.json + as-built charts

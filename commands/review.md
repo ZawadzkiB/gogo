@@ -10,7 +10,7 @@ with **validate-in → work → validate-out** (using `gogo-contracts`).
 Re-running it after fixes updates the same living `issues.json` in place
 ("review after fixes" = just re-run this).
 
-Target: $ARGUMENTS  (if no slug, pick the most recent `.gogo/plans/feature-*/`
+Target: $ARGUMENTS  (if no slug, pick the most recent `.gogo/work/feature-*/`
 that has been implemented; if several, ask which.)
 
 Documents it accepts: `plan.md` (required, accepted), `code-review-standards.md` /

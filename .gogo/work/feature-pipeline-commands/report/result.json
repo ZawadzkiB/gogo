@@ -1,0 +1,23 @@
+{
+  "slug": "pipeline-commands",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    "plan.md",
+    "decisions.md",
+    "review-01.md",
+    "review-02.md",
+    "test-01.md",
+    "charts/manifest.json"
+  ],
+  "outputs": [
+    "report.md",
+    "charts/manifest.json",
+    "report/result.json",
+    "../../knowledge/project-knowledge.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Stage A report: finalized plan to as-built, wrote report.md + charts manifest, updated project-knowledge; review APPROVE (round 2), test GREEN."
+}

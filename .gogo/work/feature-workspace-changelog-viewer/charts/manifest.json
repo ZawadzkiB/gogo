@@ -1,0 +1,12 @@
+{
+  "slug": "workspace-changelog-viewer",
+  "updated": "2026-06-30",
+  "note": "Intended-design diagram from phase ①: the new artifact flow — work/<feature> → report (report/) → /gogo:done → .gogo/changelog, with /gogo:view building the interactive page from the vendored .gogo/resources. Report ⑤ will draw the as-built UML set.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "charts/artifact-flow.mmd",
+      "title": "Artifact flow: work -> report/ -> gogo:done -> changelog; gogo:view renders interactive diagrams from resources"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 ---
-description: Set up or refresh gogo for this project — discover docs, wire the knowledge config, and verify it against the code (idempotent; re-run anytime).
+description: Set up or refresh gogo for this project — migrate any legacy workspace layout (.gogo/plans→.gogo/work, .assets→.gogo/resources), discover docs, wire the knowledge config, and verify it against the code (idempotent; re-run anytime).
 argument-hint: "[--force]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Skill
 ---
@@ -8,7 +8,9 @@ Run the `gogo-build` skill for this project.
 
 Arguments: $ARGUMENTS  (may contain `--force` to reset the knowledge files to fresh scaffolds).
 
-Follow the skill: scaffold `.gogo/knowledge/` from the plugin templates if absent,
+Follow the skill: first migrate any legacy workspace layout (move
+`.gogo/plans`→`.gogo/work` and `.assets`→`.gogo/resources`; idempotent, no-op if
+already current), then scaffold `.gogo/knowledge/` from the plugin templates if absent,
 discover the project's existing docs (Claude / Copilot / Cursor / Windsurf / Codex
 configs, README, manifests, test/CI configs) at every depth — including nested
 monorepo packages — plus a sweep of all project markdown and in-code doc comments,

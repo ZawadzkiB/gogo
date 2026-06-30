@@ -1,0 +1,19 @@
+flowchart LR
+  U(("user")):::actor
+  subgraph GOGO["gogo (new/changed capabilities)"]
+    direction TB
+    UC1(["report a feature\n(incl. past/broken runs)"]):::uc
+    UC2(["ship a feature →\nchangelog archive"]):::uc
+    UC3(["view a report +\ninteractive diagrams"]):::uc
+    UC4(["adopt the new layout\n(build auto-migrates)"]):::uc
+  end
+  U --- UC1
+  U --- UC2
+  U --- UC3
+  U --- UC4
+  UC1 -. "/gogo:report &lt;feature&gt;" .-> UC1
+  UC2 -. "/gogo:done &lt;feature&gt; (needs a report)" .-> UC2
+  UC3 -. "/gogo:view" .-> UC3
+  UC4 -. "/gogo:build (.gogo/plans→work, .assets→resources)" .-> UC4
+  classDef actor fill:#d9f2f2,stroke:#3aa0a0,color:#111
+  classDef uc fill:#fff3d6,stroke:#caa54a,color:#111

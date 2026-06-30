@@ -21,7 +21,7 @@ skill is **not a phase**; it's the shared procedure the phase skills
 All schemas live in the plugin at `${CLAUDE_PLUGIN_ROOT}/templates/contracts/`.
 The human contract doc (shapes + producers/consumers) is the `README.md` there.
 
-| Artifact (per feature folder `.gogo/plans/feature-<slug>/`) | Schema | Produced by | Consumed by |
+| Artifact (per feature folder `.gogo/work/feature-<slug>/`) | Schema | Produced by | Consumed by |
 |---|---|---|---|
 | `review/issues.json`, `test/issues.json` | `issues-list.schema.json` | review ③, test ④ | implement ② |
 | `charts/manifest.json` | `charts-manifest.schema.json` | implement ② | review ③, test ④ |

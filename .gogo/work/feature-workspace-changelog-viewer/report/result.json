@@ -1,0 +1,26 @@
+{
+  "slug": "workspace-changelog-viewer",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-workspace-changelog-viewer/plan.md",
+    ".gogo/work/feature-workspace-changelog-viewer/state.md",
+    ".gogo/work/feature-workspace-changelog-viewer/decisions.md",
+    ".gogo/work/feature-workspace-changelog-viewer/review/issues.json",
+    ".gogo/work/feature-workspace-changelog-viewer/test/issues.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-workspace-changelog-viewer/plan.md",
+    ".gogo/work/feature-workspace-changelog-viewer/report/report.md",
+    ".gogo/work/feature-workspace-changelog-viewer/report/flow.mmd",
+    ".gogo/work/feature-workspace-changelog-viewer/report/sequence.mmd",
+    ".gogo/work/feature-workspace-changelog-viewer/report/use-case.mmd",
+    ".gogo/work/feature-workspace-changelog-viewer/report/manifest.json",
+    ".gogo/work/feature-workspace-changelog-viewer/report/diagrams.html",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/work/feature-workspace-changelog-viewer/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Strict report ⑤ for the workspace/changelog/viewer feature (clean green run). Wrote the new report/ bundle: report.md (Implementation + Decisions-and-rationale) + flow/sequence/use-case UML + diagrams.html + manifest.json. Review APPROVE (REV-001..009 verified), test GREEN (TEST-001..004 verified). Version 0.5.0; 12 commands. Pending: logo + 0.5.0 release."
+}
