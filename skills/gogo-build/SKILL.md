@@ -114,14 +114,42 @@ On **re-run**: only refresh the summary sections and the `Source:`/`Confidence`
 of proxy files; **never touch** any `## gogo overrides` section or any owned
 body. Append newly-found sources to the `Source:` list.
 
-## Step 5 — write `_discovered.md`
-Regenerate it every run: the assistant configs + general docs found, the per-file
-wiring table (file → mode → sources), and a "Needs review (low confidence)" list.
+## Step 5 — verify against code (code is the source of truth)
+Docs go stale; code does not. After wiring, cross-check each **high-signal**
+distilled claim against the actual code — pure Glob/Grep/Read, no execution, only
+`.gogo/` ever written. Verify the mechanically-checkable claims:
 
-## Step 6 — report to the user
-Summarize: what was found, which files are proxies vs synthesized, which are
-low-confidence and want a human glance, and the next step
-(`review .gogo/knowledge/, then run /gogo:plan "<goal>"`).
+- **tech stack** (languages/frameworks) — vs manifests + lockfiles
+- **build / run / test commands** — vs `package.json` scripts, Makefile/taskfile,
+  CI workflows
+- **test framework** — vs the installed deps + test configs
+- **entry points** — vs the real entry files / `main`/`bin`/module fields
+- **key manifest scripts** — vs the actual script names
+
+For each claim, on a conflict **code wins**:
+- Correct the **gogo-owned summary** to match the code, and set `Confidence`
+  accordingly.
+- Record the change as *doc said X → code shows Y*.
+- **Never edit the upstream `Source:` file** — instead surface an "upstream looks
+  stale" suggestion to the user.
+
+Mark each claim **verified** (code confirms — raise `Confidence`), **corrected**
+(conflict, code won), or **unverifiable** (not mechanically checkable — leave
+as-is and flag it). On a re-run, re-verify and reconcile — don't churn unchanged
+claims. The principle: **code is the source of truth; docs may be outdated.**
+
+## Step 6 — write `_discovered.md`
+Regenerate it every run: the assistant configs + general docs found, the per-file
+wiring table (file → mode → sources), a **verification table** (per high-signal
+claim → **verified** / **corrected** *(doc said X → code shows Y)* /
+**unverifiable**) headed by the principle *"code is the source of truth; docs may
+be outdated,"* and a "Needs review (low confidence)" list.
+
+## Step 7 — report to the user
+Summarize: what was found, which files are proxies vs synthesized, **which claims
+were verified / corrected (code overrode a stale doc, with the suggested upstream
+fix) / unverifiable**, which files are low-confidence and want a human glance, and
+the next step (`review .gogo/knowledge/, then run /gogo:plan "<goal>"`).
 
 **Over-budget nudge:** for any knowledge file whose gogo-owned body exceeds the
 warn threshold (200 lines), print `<file> is NNN lines — consider /gogo:skills`,

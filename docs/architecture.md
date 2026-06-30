@@ -1,8 +1,14 @@
+---
+title: Architecture
+nav_order: 7
+---
+
 # How gogo works
 
 Reference for the gogo architecture: the two splits that make it portable and
 deterministic, and a complete map of what is stored where. For the quick pitch and
-the command list, see the [README](../README.md).
+the command list, see the [Home](index.md) page (or the
+[README](https://github.com/ZawadzkiB/gogo) on GitHub).
 
 ## 1. The flow-vs-knowledge split
 
@@ -172,7 +178,9 @@ so a bad LLM hand-off is caught, not propagated.
 
 ## See also
 
-- [README](../README.md) — the pitch, the command list, install/update.
+- [Home](index.md) — the pitch, install/update, and the documentation map.
+- [Commands](commands.md), [Flow](flow.md), [Agents](agents.md),
+  [Discovery](discovery.md), [Contracts](contracts.md).
 - `.gogo/knowledge/index.md` (in a wired project) — the live purpose-map.
 - `skills/gogo/SKILL.md` — the orchestrator's operating manual (the authoritative
   description of the flow, the loops, and the decision gates).

@@ -2,6 +2,11 @@
 
 **A portable, knowledge-grounded development pipeline for Claude Code.**
 
+📖 **Documentation: <https://zawadzkib.github.io/gogo/>** — commands, the flow,
+the per-agent I/O reference, discovery, and the contracts, with rendered diagrams.
+The site is **generated from** this repo's `commands/`, `agents/`, `skills/`, and
+`templates/`; the **code and skills are authoritative** and the site may lag them.
+
 > **The flow is generic and ships with the plugin. The rules are yours.**
 > gogo runs every non-trivial change through five fixed phases — **plan →
 > implement → review → test → report** — but *what* it plans against, *how* it
@@ -135,8 +140,12 @@ Set up or refresh the project's knowledge config. Discovers your existing docs
 test/CI configs) **at any depth** — including nested monorepo packages like
 `frontend/.github/` — plus a sweep of all project markdown and a light pass over
 in-code doc comments, then wires each knowledge file as a proxy, or synthesizes it
-from the codebase when none exists. Idempotent: re-run anytime to pick up new docs
-while preserving your edits. `--force` resets to fresh scaffolds.
+from the codebase when none exists. It then **verifies the high-signal facts
+against your actual code** (tech stack, build/run/test commands, test framework,
+entry points) — on a conflict **code wins**, so a stale doc can't quietly poison
+the config (gogo corrects its own summary, never your upstream file). Idempotent:
+re-run anytime to pick up new docs while preserving your edits. `--force` resets to
+fresh scaffolds.
 
 **`/gogo:skills ["<prompt>"] [--warn N] [--max N] [--include <path>]`**
 

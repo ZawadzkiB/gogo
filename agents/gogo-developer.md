@@ -18,9 +18,11 @@ operating manual. You are *only* the code-writer — coordination and user
 decisions belong to the orchestrator.
 
 ## What you do
-1. Read `plan.md` (the contract). If you were invoked to fix issues, read the
-   latest `review-NN.md` / `test-NN.md` and address exactly those findings. Read
-   `.gogo/knowledge/coding-rules.md` and `tech-stack.md`.
+1. Read `plan.md` (the contract). If invoked to fix issues (`--issues`), read the
+   typed `review/issues.json` / `test/issues.json` — the living contract, not the
+   rendered `review-NN.md` / `test-NN.md` snapshots — fix exactly the `open`/`new`
+   findings, and write each back as `status: fixed` + `fix_summary` +
+   `fixed_in_round`. Read `.gogo/knowledge/coding-rules.md` and `tech-stack.md`.
 2. Work the plan's **Changes checklist** in order, scoped to the plan. Match the
    surrounding code; smallest correct change; no refactors outside the plan.
 3. Keep the tree green: run build / typecheck / unit (commands from

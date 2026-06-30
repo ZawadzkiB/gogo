@@ -34,5 +34,15 @@ _Run `/gogo:build` to populate this file._
 | testing-tools.md | — | — |
 | test-strategy.md | — | — |
 
+## Code verification
+**Code is the source of truth; docs may be outdated.** After wiring, `/gogo:build`
+cross-checks each high-signal distilled claim against the actual code — on a
+conflict **code wins**: the gogo-owned summary is corrected (never the upstream
+`Source:` file; that gets a "looks stale" suggestion instead).
+
+| Claim (file › topic) | Result | Detail |
+|---|---|---|
+| <e.g. tech-stack › test framework> | verified / corrected / unverifiable | <code confirms · doc said X → code shows Y · not mechanically checkable> |
+
 ## Needs review (low confidence)
 <files where gogo guessed — please confirm>

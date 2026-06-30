@@ -1,0 +1,42 @@
+# GitHub Pages config for the gogo documentation site.
+# GitHub builds this with Jekyll + a remote theme — nothing is committed, there is
+# no local build step, and no CI. Honors gogo's no-build / zero-local-dep value.
+#
+# Pages is configured to deploy from branch `main`, folder `/docs` — so Jekyll's
+# site source IS this docs/ folder. The plugin source (the authoritative
+# code/skills, one level up) is never seen by the build, so no exclude list is
+# needed.
+
+title: gogo
+description: >-
+  A portable, knowledge-grounded development pipeline for Claude Code —
+  plan, implement, review, test, report. The flow ships with the plugin;
+  the rules are your project's markdown knowledge files.
+
+# Project site served at https://zawadzkib.github.io/gogo/
+url: "https://zawadzkib.github.io"
+baseurl: "/gogo"
+
+# Remote theme — GitHub Pages builds it; nothing is vendored.
+remote_theme: just-the-docs/just-the-docs
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-include-cache
+
+# Mermaid diagrams render on the site via just-the-docs' built-in support.
+# Author diagrams as ```mermaid fenced code blocks in the pages.
+mermaid:
+  version: "10.9.1"
+
+# Link out to the source of truth.
+aux_links:
+  "gogo on GitHub":
+    - "https://github.com/ZawadzkiB/gogo"
+aux_links_new_tab: true
+
+# Theme niceties (all optional, all theme defaults otherwise).
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"

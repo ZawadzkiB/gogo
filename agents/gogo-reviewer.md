@@ -32,12 +32,16 @@ this code — be adversarial, and verify each finding is real before reporting i
    - Conventions — matches `coding-rules.md`; no dead or mocked-out code.
    - Performance — no needless re-fetch/render; hot paths sane (per the bars).
    - Plan fidelity — nothing unplanned crept in; nothing planned is missing.
-4. **Write `review-NN.md`** (the path the orchestrator gives you): a findings
-   table — `{ severity (blocker/major/minor/nit), file:line, finding, suggested fix }`
-   — and tag each finding **AGENT-FIXABLE** or **NEEDS-USER-DECISION**. End with a
-   one-line **verdict**: `APPROVE` (no blockers/majors) or `CHANGES`.
+4. **Write the living `review/issues.json`** (the typed contract handed to
+   implement — see `templates/contracts/issues-list.schema.json`): per finding an
+   issue with a stable `id`, `severity` (blocker/major/minor/nit), `priority`,
+   `status`, `origin`, `found_in_round`, and a `proposed_solution` tagged
+   **AGENT-FIXABLE** or **NEEDS-USER-DECISION** — append new findings, update prior
+   ones in place (ids never change). Then **render `review-NN.md`**, this round's
+   human snapshot of those issues, ending with a one-line **verdict**: `APPROVE`
+   (no open blockers/majors) or `CHANGES`.
 
 ## Rules
 - Report only — **never edit product code** (you have no Edit tool by design; use
-  Write solely for `review-NN.md`).
+  Write only for `review/issues.json` and its rendered `review-NN.md` snapshot).
 - Don't pad the list — only real, verified issues. Prefer precision over volume.
