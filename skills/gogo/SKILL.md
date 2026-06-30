@@ -54,6 +54,12 @@ project's real docs — follow the links, don't assume). Read what's relevant:
 (`Confidence: low`, empty `Source:`), wire it (or run `/gogo:build`) before
 relying on it.
 
+A knowledge file may point to an **on-demand skill** under `.gogo/skills/` via a
+`**Load when:** <trigger> → <path>` pointer (extracted by `/gogo:skills` to keep
+the always-read file lean). **Load a pointed skill only when the task actually
+touches it** — that's the whole point: keep always-read context small and pull in
+the detail on demand. `.gogo/skills/index.md` lists what exists.
+
 ## Feature workspace
 
 Everything for one piece of work lives in **`.gogo/plans/feature-<slug>/`** (kebab

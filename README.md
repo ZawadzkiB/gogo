@@ -72,6 +72,20 @@ re-runs pick up new docs and **preserve your edits**.
 
 So adopting gogo in a new project is just `/gogo:build` — no flow to rewrite.
 
+## How it works
+
+Want the full picture — the flow-vs-knowledge split, *why* knowledge is split
+again into always-read config vs on-demand skills, and exactly what gets stored
+where (plugin side vs your project's `.gogo/`)? See
+[**docs/architecture.md**](docs/architecture.md).
+
+In short: the **flow ships with the plugin** (`commands/`, `skills/`, `agents/`),
+the **rules live in your project** (`.gogo/knowledge/`), and situational detail
+that would bloat the always-read config is extracted into **on-demand skills**
+(`.gogo/skills/`, or `.claude/skills/` for reusable ones) that load only when a
+task needs them — keeping each phase's context small and the LLM workers
+deterministic.
+
 ## Quickstart
 
 ```
@@ -123,6 +137,18 @@ test/CI configs) **at any depth** — including nested monorepo packages like
 in-code doc comments, then wires each knowledge file as a proxy, or synthesizes it
 from the codebase when none exists. Idempotent: re-run anytime to pick up new docs
 while preserving your edits. `--force` resets to fresh scaffolds.
+
+**`/gogo:skills ["<prompt>"] [--warn N] [--max N] [--include <path>]`**
+
+Keep your knowledge config lean so the pipeline stays deterministic. Audits every
+`.gogo/knowledge/*.md` against a line budget (OK `<200` · WARN `200-400` · OVER
+`>400`), auto-discovers cohesive sections worth pulling out, classifies each as a
+`knowledge` skill (→ `.gogo/skills/`) or a `standalone` skill (→ `.claude/skills/`),
+and **proposes them, then stops for your per-candidate approval** before writing
+anything. On approval it extracts each into a `SKILL.md` (+ optional `scripts/` /
+`.env.example`) and leaves a `**Load when:**` pointer in the parent. Directed mode
+— `/gogo:skills "extract the deploy runbook"` — pulls out exactly what you name.
+Idempotent; re-run anytime. Knowledge-maintenance sibling of `/gogo:build`.
 
 **`/gogo:plan "<goal>"`**
 
@@ -193,6 +219,14 @@ edit, and commit:
 **`.gogo/knowledge/`** — your project's configuration: the nine files described in
 [**Generic flow, your rules**](#generic-flow-your-rules) above. Every file states
 its own purpose in its header, and `index.md` is the folder's purpose-map.
+
+**`.gogo/skills/`** — on-demand skills `/gogo:skills` has extracted from your
+knowledge files: cohesive, situational detail moved out of the always-read config
+into skills that load **only when relevant**, keeping the pipeline lean and
+deterministic. `.gogo/skills/index.md` is the registry. A candidate the command
+classifies as **standalone** (a reusable, self-contained capability) instead lands
+in **`.claude/skills/<slug>/`** so Claude Code auto-discovers it — written only
+when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
 **`.gogo/plans/feature-<slug>/`** — one folder per piece of work:
 

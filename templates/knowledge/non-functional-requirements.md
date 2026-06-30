@@ -27,3 +27,16 @@ Generated-by: /gogo:build (scaffold)
 
 ## Compliance & limits
 <regulatory constraints, rate limits, size / scale limits>
+
+## gogo overrides
+<!-- Preserved across re-runs. -->
+
+### Knowledge determinism budget
+- Knowledge files are **always-read context**; oversized always-read context makes
+  the LLM pipeline workers wander and err. Hold each `.gogo/knowledge/*.md` body to
+  OK `<200` · WARN `200-400` · OVER `>400` lines (measure the gogo-owned body
+  only). Extract over-budget situational detail into **on-demand skills** with
+  `/gogo:skills` so it loads only when relevant — that is the determinism win.
+- **Safety exception (user-gated).** Writes stay confined to `.gogo/`; the single
+  sanctioned write outside it is an **approved standalone** skill's
+  `.claude/skills/<slug>/` dir — per-candidate, never automatic.

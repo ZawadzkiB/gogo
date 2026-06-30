@@ -123,6 +123,11 @@ Summarize: what was found, which files are proxies vs synthesized, which are
 low-confidence and want a human glance, and the next step
 (`review .gogo/knowledge/, then run /gogo:plan "<goal>"`).
 
+**Over-budget nudge:** for any knowledge file whose gogo-owned body exceeds the
+warn threshold (200 lines), print `<file> is NNN lines — consider /gogo:skills`,
+so big always-read files get trimmed into on-demand skills (keeps the pipeline
+deterministic).
+
 ## Guardrails
 - Only ever write inside `.gogo/` — never edit a discovered upstream file.
 - Keep all writes inside `.gogo/knowledge/`.

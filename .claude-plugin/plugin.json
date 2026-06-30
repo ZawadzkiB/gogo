@@ -1,6 +1,6 @@
 {
   "name": "gogo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Generic, knowledge-grounded dev pipeline: plan → implement → review → test → report. Configure per-project with /gogo:build.",
   "author": {
     "name": "Bartłomiej Zawadzki",
