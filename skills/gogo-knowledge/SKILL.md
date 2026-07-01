@@ -137,6 +137,19 @@ Phase ⑤ has two gates; they differ **only here**, in what they require to run.
    Link the audit-trail files (`../decisions.md`, `../review-NN.md`/`../review/issues.json`,
    `../test-NN.md`/`../test/issues.json`) rather than repeating them. This is the
    durable companion to `plan.md`, and the bundle `/gogo:done` archives to the changelog.
+
+   **Write it like a readable article (FR3 — legibility, keep the sections above).**
+   `report.md` is what `/gogo:view` and the changelog surface to a human, so author
+   it to be *read*, not just recorded — phrasing/emphasis only, **not** new sections
+   (D4=A):
+   - **Lead each section with a 1-2 sentence summary** (open the report with a crisp
+     "what shipped and why") before the detail.
+   - **Short, scannable sections** — tight paragraphs, lists, and tables over walls
+     of text.
+   - **Bold the decisions, outcomes, and key terms** so a skim surfaces them.
+   - Plain language; define a term once, then reuse it.
+   The viewer renders this with article typography (readable measure, styled
+   headings, a lead paragraph, visible emphasis).
 4. **Update gogo-owned knowledge — never the originals.** Walk `.gogo/knowledge/*`
    and apply drift learned this feature, respecting each file's `Mode`:
    - `Mode: owned` → edit freely (e.g. add a verified gotcha to

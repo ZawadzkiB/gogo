@@ -15,10 +15,10 @@
 
 - **feature:** Knowledge skill-extraction command (`/gogo:skills`)
 - **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** done            <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
+- **status:** shipped            <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
 - **created:** 2026-06-29
 - **completed:** 2026-06-29
 - **branch:** main
 - **iterations:** plan=1 · implement=3 · review=2 · test=2
-- **resume:** none
+- **resume:** none — shipped to .gogo/changelog/2026-06-29-skill-extraction/ via /gogo:done (2026-06-29)
 - **open-decision:** none

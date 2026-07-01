@@ -1,0 +1,26 @@
+{
+  "slug": "viewer-bundles-and-done-board",
+  "phase": "implement",
+  "status": "ok",
+  "round": 4,
+  "inputs": [
+    ".gogo/work/feature-viewer-bundles-and-done-board/plan.md",
+    ".gogo/work/feature-viewer-bundles-and-done-board/review/issues.json",
+    ".gogo/work/feature-viewer-bundles-and-done-board/charts/done-board-flow.mmd",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    "skills/gogo-done/SKILL.md",
+    "assets/kanban/board.py"
+  ],
+  "outputs": [
+    "assets/kanban/board.py",
+    "skills/gogo-done/SKILL.md",
+    ".gogo/work/feature-viewer-bundles-and-done-board/review/issues.json",
+    ".gogo/work/feature-viewer-bundles-and-done-board/implement/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Stage B fix round 4: REV-006 + REV-007 fixed. board.py now guards load_index (try/except OSError+ValueError -> one-line stderr + exit 2) and documents the exit-code contract (0 confirm / 1 cancel / 2 error); py_compile + --selftest green, missing/garbage --index/stdin exit 2 with no traceback, normal --headless --ship still exit 0. gogo-done Board mode launches nesting-safe (new-window inside tmux via wait-for; unique new-session -A -s gogo-done-$$ outside) and captures the board's own exit code, routing the three outcomes: result present -> ship each; code==1 no result -> real cancel (stop); missing code / exit 2 / other -> status-table + AskUserQuestion fallback (never a silent no-op). Version unchanged (0.7.0)."
+}

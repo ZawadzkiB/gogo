@@ -18,3 +18,11 @@
 
 # Playwright MCP working dir (test tooling scratch — page snapshots, layout)
 .playwright-mcp/
+
+# Python bytecode cache — assets/kanban/board.py is vendored source; the .pyc
+# it compiles to on run is regenerable and must never be committed.
+__pycache__/
+*.pyc
+
+# Internal roadmap — local backlog, not part of the published plugin
+roadmap.md

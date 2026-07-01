@@ -1,0 +1,18 @@
+flowchart TD
+  WORK["work/feature-&lt;slug&gt;/ (plan · state · decisions · review · test)"]:::art
+  WORK --> REPORT["report ⑤ — gogo-knowledge (strict | lenient)"]:::proc
+  REPORT --> RDIR[/"work/feature-&lt;slug&gt;/report/\nreport.md + UML (.mmd) + diagrams.html + manifest.json"/]:::art
+  RBROKEN["/gogo:report &lt;feature&gt; (past/broken run)"]:::proc --> REPORT
+  RDIR --> DONE{"/gogo:done\n(report present?)"}:::gate
+  DONE -->|"missing → STOP: run /gogo:report first"| STOP([stop]):::io
+  DONE -->|"present → copy"| CL[/".gogo/changelog/&lt;date&gt;-&lt;slug&gt;/"/]:::art
+  RES["resources/ — mermaid.min.js + viewer/ (pan·zoom·drag)"]:::out
+  CL --> VIEW["/gogo:view (gogo-view)"]:::proc
+  RDIR --> VIEW
+  RES --> VIEW
+  VIEW --> PAGE([offline page: readable summary + interactive diagrams]):::io
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111

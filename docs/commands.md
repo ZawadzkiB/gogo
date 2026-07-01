@@ -63,7 +63,10 @@ in chat, so it can pause at gates.
 
 Lists every `.gogo/work/feature-*/` with slug, title, phase, status, iteration
 counts, and resume hint; flags any `waiting-for-user` feature with its open
-decision. Read-only.
+decision. Read-only. It is also the home of the shared **work-index classifier**
+(Step A) that labels each feature **shipped · ready-to-ship · in-progress ·
+unfinished** — the same classifier the `/gogo:done` work board reuses to decide what
+is shippable.
 
 ### `/gogo:resume [feature-slug]`
 
@@ -132,32 +135,46 @@ broken run.
 
 ### `/gogo:done [feature-slug]`
 
-Ship a report-complete feature, via `gogo-done`. The explicit post-report
-"this is the end" gate.
+Ship report-complete features, via `gogo-done`. The explicit post-report
+"this is the end" gate. A **slug** ships that one; **no slug opens the work board**.
 
-- **Reads:** `.gogo/work/feature-<slug>/report/report.md` (required) + the rest of
-  the `report/` bundle (incl. the `before/` set).
-- **Writes:** a copy of the bundle — incl. the `before/` set — to
+- **Work board (no slug):** classifies every `.gogo/work/feature-*` via the shared
+  `gogo-status` Step A classifier (shipped · ready-to-ship · in-progress ·
+  unfinished) and lets you pick which ready-to-ship features to ship — an
+  **interactive terminal kanban** (`assets/kanban/board.py` in a tmux pane; `python3`
+  + `tmux` are soft deps) when the tooling and a tty are present, otherwise a
+  **status table + `AskUserQuestion` multi-select** fallback. The board only
+  *selects*; shipping is the single flow below, looped over the picks (never fails
+  over the board).
+- **Reads:** for each shipped slug, `.gogo/work/feature-<slug>/report/report.md`
+  (required) + the rest of the `report/` bundle (incl. the `before/` set).
+- **Writes:** a copy of each bundle — incl. the `before/` set — to
   `.gogo/changelog/<YYYY-MM-DD>-<slug>/` (append-only; copy-not-move; idempotent);
   builds the interactive viewer page for the entry under `.gogo/resources/view/`
   (best-effort, reusing the `gogo-view` build); and sets `state.md` to a terminal
-  `shipped` status.
-- **Prints:** the `file://` link to the built interactive viewer page (with the
+  `shipped` status. Board mode also writes runtime scratch under
+  `.gogo/resources/kanban/` (`board.py`, `work-index.json`, `ship-result.json`).
+- **Prints:** the `file://` link to each built interactive viewer page (with the
   static `diagrams.html` path as a fallback — it never fails the command over the
   link).
-- **Validate-in:** if no report exists it STOPs with "No report found for
-  `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`."
+- **Validate-in:** a missing report for a named slug STOPs with "No report found for
+  `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`."; board mode
+  with nothing ready-to-ship says so and stops without opening an empty board.
 
-### `/gogo:view [changelog-entry | feature-slug]`
+### `/gogo:view [changelog-entry | feature-slug[:plan|:report]]`
 
-Open a gogo report as a self-contained, offline **interactive webpage**, via
-`gogo-view`.
+Open a gogo **plan or report** as a self-contained, offline **interactive webpage**,
+via `gogo-view`.
 
-- **Reads:** the report bundles under `.gogo/changelog/*/` and
+- **Reads:** the **plan** bundles (`.gogo/work/feature-*/plan.md` + `charts/`,
+  viewed in place — D1=A) and the **report** bundles under `.gogo/changelog/*/` and
   `.gogo/work/feature-*/report/` (incl. a `before/` set, which triggers compare
-  mode); the vendored `.gogo/resources/` viewer assets.
-- **Writes:** a built page under `.gogo/resources/view/` (the `report.md` summary
-  as readable HTML + its mermaid diagrams made **interactive**; no network, no
+  mode); the vendored `.gogo/resources/` viewer assets. With no resolvable arg it
+  presents a grouped **Work** (each feature's plan + report) / **Changelog** (shipped
+  reports) picker; an explicit `<slug>`, `<slug>:plan`, `<slug>:report`, or changelog
+  entry resolves directly.
+- **Writes:** a built page under `.gogo/resources/view/` (the `plan.md` / `report.md`
+  summary as readable HTML + its mermaid diagrams made **interactive**; no network, no
   build) and opens it (`open`/`xdg-open`, best-effort; prints the `file://` path on
   failure).
 - **Interactive rendering:** flowchart-family diagrams (`flow` + `use-case`) get an

@@ -32,6 +32,17 @@ description: >-
    - `Status: awaiting acceptance`
 
    Design **within** the bars in `non-functional-requirements.md`.
+
+   **Write it like a readable article (FR3 — legibility, keep the sections above).**
+   `plan.md` is viewable in `/gogo:view` (see Step 4), so author it for a human
+   reader — this is phrasing/emphasis only, **not** new sections (D4=A):
+   - **Lead with a 1-2 sentence summary** of the goal/approach before the detail.
+   - **Short, scannable sections** — a few tight paragraphs, never walls of text.
+   - **Bold the decisions, outcomes, and key terms** so a skim surfaces them.
+   - Prefer **lists and tables** over long prose runs; plain language; define a
+     term once, then reuse it.
+   The viewer renders this with article typography (readable measure, styled
+   headings, a lead paragraph, visible emphasis).
 4. **Draw the intended design** (not the task list). Use the `gogo-mermaid` skill
    to diagram how the feature will *work* — the control/data flow, the runtime
    interaction between real components, or the domain states it touches — as a
@@ -49,6 +60,14 @@ description: >-
    intended-design diagram). Report ⑤ later draws the *after* set and compares the
    two. If the existing flow has nothing structural to show (a brand-new area, or a
    pure-process change), skip `charts/before/` and say so.
+
+   **The plan is a viewable bundle (FR2 / D1=A — nothing to move).** `plan.md` (at
+   the feature root) + its `charts/*.mmd` (intended design) + `charts/before/*.mmd`
+   (as-is baseline) are already a coherent, viewer-ready set: `/gogo:view <slug>:plan`
+   renders `plan.md` as an article plus these diagrams as interactive figures (rich
+   flowchart cards + before/after compare), using the same renderer as reports. Keep
+   the diagram set clean and per-kind so the plan page reads well; do **not** move
+   `plan.md` into a `plan/` folder — its path is the contract every phase reads.
 5. **Init state.** Copy `${CLAUDE_PLUGIN_ROOT}/templates/state.template.md` →
    `state.md` and `decisions.template.md` → `decisions.md`; create
    `adjustments.md` (header only). Set `state.md`: phase=plan,

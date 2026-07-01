@@ -110,8 +110,9 @@ gogo/
 │   ├── gogo-review/          #   ③ review
 │   ├── gogo-test/            #   ④ test
 │   ├── gogo-knowledge/       #   ⑤ report + knowledge update (strict + lenient)
-│   ├── gogo-done/            #   ship: copy report bundle → .gogo/changelog/ + build/print viewer link
-│   ├── gogo-view/            #   interactive viewer for reports (rich draggable nodes + before/after compare)
+│   ├── gogo-done/            #   ship: copy report bundle → .gogo/changelog/ + build/print viewer link; no-slug work board
+│   ├── gogo-view/            #   interactive viewer for plans + reports (rich draggable nodes + before/after compare)
+│   ├── gogo-status/          #   read-only overview + the shared work-index classifier (shipped/ready/in-progress/unfinished)
 │   ├── gogo-skills/          #   audit knowledge budget + extract on-demand skills
 │   ├── gogo-contracts/       #   validate-in / validate-out at every hand-off
 │   └── gogo-mermaid/         #   diagram generation + offline viewer
@@ -125,9 +126,10 @@ gogo/
 ├── hooks/                    # config-check.sh, notify.sh, hooks.json (best-effort)
 ├── assets/
 │   ├── mermaid/              #   vendored mermaid.min.js + viewer.template.html
-│   └── viewer/               #   the interactive viewer (modular, vanilla, no build):
-│       │                     #   geometry.js · viewport.js · mermaid-parse.js ·
-│       │                     #   render.js · interactive.js · viewer.css · viewer.template.html
+│   ├── viewer/               #   the interactive viewer (modular, vanilla, no build):
+│   │   │                     #   geometry.js · viewport.js · mermaid-parse.js ·
+│   │   │                     #   render.js · interactive.js · viewer.css · viewer.template.html
+│   └── kanban/              #   board.py — vendored python3 curses TUI for the /gogo:done work board (soft dep; --selftest headless)
 ├── .mcp.json                 # Playwright MCP (optional; UI testing)
 └── .claude-plugin/
     ├── plugin.json           # manifest + version (bump on any behaviour change)
@@ -143,7 +145,7 @@ your-project/
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
-│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages  [gogo-mermaid, /gogo:view, /gogo:done write]
+│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages + kanban/ (work board scratch: board.py, work-index.json, ship-result.json)  [gogo-mermaid, /gogo:view, /gogo:done write]
 │   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<slug>/ (report.md + diagrams + before/ set)  [/gogo:done writes]
 │   └── work/
 │       └── feature-<slug>/   # one folder per piece of work:

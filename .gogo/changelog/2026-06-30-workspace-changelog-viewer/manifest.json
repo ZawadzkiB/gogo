@@ -1,0 +1,10 @@
+{
+  "slug": "workspace-changelog-viewer",
+  "updated": "2026-06-30",
+  "note": "As-built report bundle for the workspace/changelog/viewer feature. flow = the work→report→done→changelog→view artifact flow; sequence = the /gogo:view runtime; use-case = the new user-facing capabilities (report/done/view + auto-migrate). No class diagram — the change adds commands/skills/assets, not new types.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "Artifact flow: work → report/ → /gogo:done → changelog; /gogo:view renders interactive diagrams from resources" },
+    { "kind": "sequence", "file": "report/sequence.mmd", "title": "/gogo:view runtime: enumerate → pick → ensure resources → build self-contained page → open" },
+    { "kind": "use-case", "file": "report/use-case.mmd", "title": "New user capabilities: report (incl. broken runs), ship→changelog, view, auto-migrate" }
+  ]
+}

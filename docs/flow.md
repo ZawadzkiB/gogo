@@ -76,28 +76,38 @@ prerequisite. The in-pipeline ⑤ call (right after a green ④) keeps its stric
 
 ### Ship — command `/gogo:done` (skill `gogo-done`)
 
-The explicit post-report gate. When you declare the feature shipped, `/gogo:done`
-**copies** the `report/` bundle (`report.md` + the `.mmd` UML set + the `before/`
-set + `diagrams.html`) into the append-only `.gogo/changelog/<YYYY-MM-DD>-<slug>/`
-archive, **builds the interactive viewer page for the entry and prints its `file://`
-link** (best-effort, reusing the `/gogo:view` build; falls back to the static
-`diagrams.html` path — never failing the command over the link), and sets `state.md`
-to a terminal `shipped` status. Copy-not-move (the work folder stays the source) and
-idempotent — re-running overwrites the same dated entry. If no report exists yet it
-STOPs and tells you to run `/gogo:report <feature>` first.
+The explicit post-report gate. A **slug** ships that one feature; with **no slug**
+`/gogo:done` opens a **work board** over every `.gogo/work/feature-*` — the shared
+`gogo-status` classifier labels each **shipped · ready-to-ship · in-progress ·
+unfinished** and you pick which ready-to-ship features to ship. The board is an
+**interactive terminal kanban** (`assets/kanban/board.py` in a tmux pane; `python3` +
+`tmux` are soft deps) when the tooling and a tty are present, otherwise a **status
+table + `AskUserQuestion` multi-select** fallback — it never fails over the board. The
+board only *selects*; shipping is the one flow below, looped over the picks.
+
+When you ship, `/gogo:done` **copies** each `report/` bundle (`report.md` + the `.mmd`
+UML set + the `before/` set + `diagrams.html`) into the append-only
+`.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive, **builds the interactive viewer page
+for the entry and prints its `file://` link** (best-effort, reusing the `/gogo:view`
+build; falls back to the static `diagrams.html` path — never failing the command over
+the link), and sets `state.md` to a terminal `shipped` status. Copy-not-move (the work
+folder stays the source) and idempotent — re-running overwrites the same dated entry.
+A named slug with no report STOPs and tells you to run `/gogo:report <feature>` first;
+board mode with nothing ready-to-ship says so instead of opening an empty board.
 
 ### View — command `/gogo:view` (skill `gogo-view`)
 
-Read any report as a self-contained, offline **interactive webpage** — the
-`report.md` summary as readable HTML plus its mermaid diagrams made **interactive**.
-Flowchart-family diagrams (`flow` + `use-case`) get an xplan-style rich renderer:
-custom-styled node cards you **drag** with edges that **re-route live**, plus
-**zoom / fit / minimap** and a **persisted layout**; other kinds fall back to a
-pan / zoom / drag canvas. A report carrying a `before/` set renders **before / after
-side by side** (compare mode). `/gogo:view` lists the reports under
-`.gogo/changelog/` and `.gogo/work/*/report/`, builds the page from the vendored
-`.gogo/resources/` assets (no network, no build), and opens it (printing the
-`file://` path if it can't auto-open).
+Read any **plan or report** as a self-contained, offline **interactive webpage** —
+the `plan.md` / `report.md` summary as readable HTML plus its mermaid diagrams made
+**interactive**. Flowchart-family diagrams (`flow` + `use-case`) get an xplan-style
+rich renderer: custom-styled node cards you **drag** with edges that **re-route
+live**, plus **zoom / fit / minimap** and a **persisted layout**; other kinds fall
+back to a pan / zoom / drag canvas. A bundle carrying a `before/` set renders
+**before / after side by side** (compare mode). With no resolvable arg `/gogo:view`
+presents a grouped **Work** (each feature's plan + report) / **Changelog** (shipped
+reports) picker — plans render in place from `plan.md` + `charts/` (D1=A) — builds the
+page from the vendored `.gogo/resources/` assets (no network, no build), and opens it
+(printing the `file://` path if it can't auto-open).
 
 ## The loops
 

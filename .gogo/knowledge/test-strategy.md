@@ -37,3 +37,17 @@ Generated-by: /gogo:build
 
 ## gogo overrides
 <!-- Preserved across re-runs. -->
+
+### Soft-dep interactive surfaces (e.g. the /gogo:done curses TUI) — since 0.7.0
+An interactive terminal surface (curses/tmux) can't be driven by Playwright and
+often isn't runnable on the dev host (no tmux). Treat the **graceful-fallback path
+as the tested path**, and verify the interactive path by other means:
+- **Run the fallback for real** — the status table + `AskUserQuestion` multi-select
+  is the live path when the soft dep is absent; dogfood it on a fixture with every
+  work-index class (add a plan-only `unfinished` exemplar).
+- **Exercise the vendored tool headlessly** — `python3 assets/kanban/board.py
+  --selftest` and `--headless --ship a,b` assert the exit-code contract
+  (0 confirm / 1 cancel / 2 error) and the ready-only guard without a terminal.
+- **Code-read the interactive routing** — confirm launch is nesting-safe and that
+  launch-failure vs. cancel vs. confirm route to the right outcome; record manual
+  steps for a tmux-capable host rather than claiming the TUI was run.

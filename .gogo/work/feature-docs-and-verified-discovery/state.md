@@ -15,10 +15,10 @@
 
 - **feature:** Hosted docs site + code-verified discovery
 - **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** done            <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
+- **status:** shipped            <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
 - **created:** 2026-06-30
 - **completed:** 2026-06-30
 - **branch:** main
 - **iterations:** plan=1 · implement=3 · review=3 · test=2
-- **resume:** none (release 0.4.0 + enable Pages via gh pending — orchestrator follow-up)
+- **resume:** none — shipped to .gogo/changelog/2026-06-30-docs-and-verified-discovery/ via /gogo:done (2026-06-30)
 - **open-decision:** none

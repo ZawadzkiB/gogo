@@ -16,11 +16,11 @@
 
 - **feature:** Workspace rename, richer report, changelog + interactive viewer
 - **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** done            <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
+- **status:** shipped            <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
 - **created:** 2026-06-30
 - **completed:** 2026-06-30
 - **branch:** main
 - **iterations:** plan=1 · implement=7 · review=8 · test=8
-- **resume:** none (pending follow-ups: gogo logo + 0.5.0 release — both await user input)
+- **resume:** none — shipped to .gogo/changelog/2026-06-30-workspace-changelog-viewer/ via /gogo:done (2026-06-30)
 - **open-decision:** none
 - **stage:** done (Stages 1-3 ✓ · FR11 ✓ · FR12 ✓ · report ⑤ ✓)

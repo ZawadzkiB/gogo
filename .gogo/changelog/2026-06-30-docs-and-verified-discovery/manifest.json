@@ -1,0 +1,12 @@
+{
+  "slug": "docs-and-verified-discovery",
+  "updated": "2026-06-30",
+  "note": "As-built (== intended design): the code-verified discovery flow (Part B) — the genuinely new system behaviour (scan → wire → verify each claim against code, code wins → record). The diagram held from phase ① and ships unchanged. Part A (the docs site) is static structure with nothing meaningful to draw beyond its nav; the site renders this same flow inline.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "charts/verified-discovery.mmd",
+      "title": "Code-verified discovery: wire knowledge, then verify each claim against code (code wins)"
+    }
+  ]
+}

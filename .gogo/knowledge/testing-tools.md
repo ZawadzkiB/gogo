@@ -29,6 +29,10 @@ artifacts it produces.
   → fall back to CLI/API checks + written manual steps.
 - **mermaid offline viewer** — open `.gogo/work/feature-<slug>/charts/diagrams.html`
   in a browser to confirm diagrams render.
+- **Vendored Python tools ship a `--selftest`** (since 0.7.0) — run
+  `python3 assets/kanban/board.py --selftest` (and `--headless --ship a,b`) to
+  exercise the `/gogo:done` board logic live without a terminal/tmux. `python3` is
+  a soft dep; absent → skip and rely on code-read + the table fallback.
 
 ## gogo overrides
 <!-- Preserved across re-runs. -->

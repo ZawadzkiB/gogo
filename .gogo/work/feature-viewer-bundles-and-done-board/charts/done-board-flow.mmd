@@ -1,0 +1,27 @@
+sequenceDiagram
+  actor U as User
+  participant D as /gogo:done (gogo-done)
+  participant C as gogo-status classifier
+  participant B as board.py (tmux curses TUI)
+  participant F as table + AskUserQuestion
+  participant S as Ship one feature
+  participant CL as .gogo/changelog
+
+  U->>D: /gogo:done (no slug)
+  D->>C: classify .gogo/work/feature-*
+  C-->>D: work-index (shipped / ready-to-ship / in-progress / unfinished)
+  alt python3 + tmux + tty present
+    D->>B: launch (work-index.json, result path)
+    U->>B: move cursor, select ready-to-ship, press s
+    B-->>D: ship-result.json {"ship":[...]} (exit 0) or cancel (exit 1)
+  else no tmux / no python3 / no tty / board error
+    D->>F: render status table by class
+    U->>F: multi-select ready-to-ship items
+    F-->>D: chosen slugs (same ready-only guard)
+  end
+  loop each selected slug (single-sourced flow)
+    D->>S: ship(slug)
+    S->>CL: copy report bundle -> <date>-<slug>/
+    S-->>D: built viewer page + file:// link
+  end
+  D-->>U: shipped confirmations + viewer links

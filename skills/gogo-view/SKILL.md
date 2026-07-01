@@ -1,22 +1,22 @@
 ---
 name: gogo-view
 description: >-
-  Build and open a self-contained, offline interactive webpage for a gogo report
-  — the report.md summary pre-rendered to readable HTML plus its mermaid diagrams
-  made interactive: flowchart-family kinds get an xplan-style rich renderer
-  (draggable, token-styled node cards with a live-re-routing edge layer + minimap),
-  other kinds fall back to a pan / zoom / drag canvas (vendored runtime, no
-  network, no build). A report that carries a before/ set renders before | after
-  side by side (compare mode). Use when the user runs /gogo:view or asks to view / browse a
-  changelog entry or a feature's report. Lists reports from .gogo/changelog/ and
-  .gogo/work/*/report/, lets the user pick, builds the page under
-  .gogo/resources/view/, and opens it.
+  Build and open a self-contained, offline interactive webpage for a gogo plan or
+  report — the plan.md / report.md summary pre-rendered to readable HTML plus its
+  mermaid diagrams made interactive: flowchart-family kinds get an xplan-style rich
+  renderer (draggable, token-styled node cards with a live-re-routing edge layer +
+  minimap), other kinds fall back to a pan / zoom / drag canvas (vendored runtime,
+  no network, no build). A bundle that carries a before/ set renders before | after
+  side by side (compare mode). Use when the user runs /gogo:view or asks to view /
+  browse a plan, a changelog entry, or a feature's report. Enumerates both plans and
+  reports grouped Work (each feature's plan + report) / Changelog (shipped reports),
+  lets the user pick, builds the page under .gogo/resources/view/, and opens it.
 ---
 
-# gogo-view — interactive viewer for gogo reports (FR8 / FR9 / FR10)
+# gogo-view — interactive viewer for gogo plans & reports (FR8 / FR9 / FR10)
 
-Turns a report bundle (`report.md` + its `.mmd` diagrams) into one self-contained
-HTML page: the summary rendered as a clean centered article, and each diagram made
+Turns a plan or report bundle (`plan.md` / `report.md` + its `.mmd` diagrams) into
+one self-contained HTML page: the summary rendered as a clean centered article, and each diagram made
 interactive. **Flowchart-family** diagrams (`flow` + `use-case`) get an
 **xplan-style rich renderer** — mermaid lays them out, the viewer parses that SVG
 into a `{nodes,edges}` model and owns interaction: token-styled node **cards you
@@ -29,47 +29,81 @@ client-side from the **vendored** `.gogo/resources/mermaid.min.js` — opens ove
 `file://` with **no network, no build, no runtime deps**. Pure
 Glob / Grep / Read / Write / Bash; only ever writes under `.gogo/`.
 
+**Plans view in place too (D1=A).** A feature's **plan** is a first-class viewable
+bundle: `plan.md` (its summary) + its `charts/*.mmd` (its intended-design diagrams,
+plus `charts/before/*` as the as-is baseline) render with the *same* interactive
+renderer, from the feature root — `plan.md` is **not** moved (it stays the contract
+path every phase reads). Reports still live in `report/`.
+
 ## Inputs (declared) and outputs
 
 | Direction | Artifact | Contract |
 |---|---|---|
-| in (required) | a chosen `report.md` (+ its sibling `*.mmd`) | the report bundle |
-| in (optional) | a `before/` set beside the report (`report/before/*.mmd`, FR8) | triggers compare mode (FR9) |
+| in (one required) | a chosen `report.md` (+ its sibling `*.mmd`) | the report bundle |
+| in (one required) | a feature's `plan.md` (+ its `charts/*.mmd`) | the plan bundle (D1=A, in place) |
+| in (optional) | a `before/` set beside the report (`report/before/*.mmd`, FR8) or a plan's `charts/before/*.mmd` | triggers compare mode (FR9) |
 | in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/viewer/{viewer.template.html,viewer.css}` + all `assets/viewer/*.js` | vendored renderer (modular) |
 | in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js` | vendored mermaid |
 | in (optional) | `.gogo/resources/view/<name>.layout.json` | saved node positions (sidecar, D6) |
 | out | `.gogo/resources/{mermaid.min.js, viewer/*.js, viewer/viewer.css}` | shared, idempotent copies |
-| out | `.gogo/resources/view/<date-or-slug>.html` | the self-contained page |
+| out | `.gogo/resources/view/<date-or-slug>.html` (report) or `<slug>-plan.html` (plan) | the self-contained page |
 
 ## ① validate-in (gate)
 
-At least one report bundle must exist (a `report.md` under `.gogo/changelog/*/`
-or `.gogo/work/feature-*/report/`). None found → **STOP** and tell the user to
-run `/gogo:report` (and `/gogo:done`) first. An explicit slug/path arg that
-resolves to no `report.md` → STOP with the path tried.
+At least one **viewable item** must exist — a feature `plan.md` (a plan bundle), a
+`report.md` under `.gogo/changelog/*/` or `.gogo/work/feature-*/report/`, or a
+legacy root `report.md` (report bundles). None of any → **STOP** and tell the user
+to run `/gogo:plan` first (then `/gogo:report`, `/gogo:done`). An explicit slug/path
+arg that resolves to nothing (e.g. `<slug>:report` when no report exists, or
+`<slug>` with neither a plan nor a report) → STOP with the path(s) tried.
 
 ## ② Steps
 
-### 1. Enumerate + pick
+### 1. Enumerate + pick (grouped Work / Changelog — plans AND reports)
 
-Gather every selectable report:
+Gather every selectable item, in **two groups**, newest first:
+
+- **Work** — for each `.gogo/work/feature-*/`:
+  - its **plan** — whenever `plan.md` exists (bundle = `plan.md` + its `charts/`);
+    label `<slug> — plan`.
+  - its **report** — when `report/report.md` exists (or a legacy root `report.md`);
+    label `<slug> — report`.
+- **Changelog** — each `.gogo/changelog/<date>-<slug>/` that contains a `report.md`;
+  label `<date>-<slug> — changelog`.
+
 ```bash
-ls -d .gogo/changelog/*/ 2>/dev/null            # shipped entries (report.md inside)
-ls -d .gogo/work/feature-*/report/ 2>/dev/null  # in-progress work reports
-# older features keep report.md at the feature root — include those too:
-ls .gogo/work/feature-*/report.md 2>/dev/null
+ls -d .gogo/work/feature-*/          2>/dev/null  # each feature → plan (plan.md + charts/) + report if present
+ls    .gogo/work/feature-*/plan.md   2>/dev/null  # the plan bundles (viewable in place, D1=A)
+ls -d .gogo/work/feature-*/report/   2>/dev/null  # in-progress work reports (report/report.md)
+ls    .gogo/work/feature-*/report.md 2>/dev/null  # legacy root-layout reports
+ls -d .gogo/changelog/*/             2>/dev/null  # shipped entries (report.md inside)
 ```
-Keep only paths that actually contain a `report.md`. Label each (changelog entries
-by `<date>-<slug>`; work reports by slug + "in progress"). Present the list.
+Keep only entries that actually resolve — a `plan.md` for a plan, a `report.md` for
+a report. Sort each group newest-first (by dir/file mtime, or the changelog date).
 
-- If `$ARGUMENTS` names a changelog entry, a feature slug, or a path, resolve it
-  directly (no prompt).
-- Otherwise, when interactive and the choice is unclear, ask with
-  `AskUserQuestion` (one row per report). Default to the most recent changelog
-  entry, else the newest work report.
+**Explicit arg (`$ARGUMENTS`) — resolve directly, no menu.** Arg grammar:
 
-Record the chosen `report.md`, its bundle dir, and a short **name** for the output
-file: the changelog `<date>-<slug>`, else the feature `<slug>`.
+| Arg | Resolves to |
+|---|---|
+| `<slug>` | that feature's **report if it exists, else its plan** |
+| `<slug>:plan` | that feature's **plan** bundle (`plan.md` + `charts/`) |
+| `<slug>:report` | that feature's **report** bundle (`report/`, else legacy root `report.md`) |
+| `<date>-<slug>` (a changelog entry) | that changelog **report** |
+| a path | the `plan.md` / `report.md` it names |
+
+A `<slug>:report` (or bare `<slug>`) that resolves to no report, or a `<slug>:plan`
+with no `plan.md`, → STOP with the path tried (validate-in).
+
+**No resolvable arg** → present the **grouped picker** via `AskUserQuestion`: the
+Work items (each plan / report) and the Changelog items as options, each labeled
+`<slug> — plan` / `<slug> — report` / `<date>-<slug> — changelog`, newest first.
+The pick builds + opens its page. Default highlight: the most recent changelog
+entry, else the newest work item.
+
+Record the chosen **kind** (`plan` | `report`), the source markdown (`plan.md` or
+`report.md`), its bundle dir, and a short **name** for the output file:
+`<slug>-plan` for a plan; the changelog `<date>-<slug>`, else the feature `<slug>`,
+for a report.
 
 ### 2. Ensure shared resources (idempotent)
 
@@ -93,13 +127,25 @@ minimap), and `interactive.js` (the orchestrator + fallback).
 
 ### 3. Build the page (D7 — pre-render, no JS markdown lib)
 
+**Bundle kind — same page, two sources (FR2).** The build path is identical for a
+**report** and a **plan**; only the source files differ:
+
+| Bundle | Summary source | Diagrams source | Output page |
+|---|---|---|---|
+| report | the chosen `report.md` | the `*.mmd` beside it (or legacy `charts/*.mmd`) | `<date-or-slug>.html` |
+| plan (D1=A, in place) | the feature's `plan.md` (at the feature root — **never moved**) | the feature's `charts/*.mmd` (+ `charts/before/*.mmd`) | `<slug>-plan.html` |
+
+A plan bundle reuses the **exact same renderer** as a report (rich flowchart-family
+cards + pan/zoom fallback, compare mode, layout sidecar) — it is only a different
+markdown + diagram source rendered into the same template.
+
 Start from `${CLAUDE_PLUGIN_ROOT}/assets/viewer/viewer.template.html` and replace
 its tokens:
 
 | Token | Value |
 |---|---|
-| `GOGO_VIEW_TITLE` | a clean plain-text tab title `gogo — <name>` (the changelog `<date>-<slug>` or feature `<slug>`); strip markdown — no backticks/`#`/`**`, and don't duplicate the word "report" |
-| `GOGO_VIEW_SUMMARY` | the **report.md, converted to HTML by you** (see below) |
+| `GOGO_VIEW_TITLE` | a clean plain-text tab title — `gogo — <name>` for a report, `gogo — <slug> (plan)` for a plan; strip markdown (no backticks/`#`/`**`), don't duplicate "report" |
+| `GOGO_VIEW_SUMMARY` | the source markdown **converted to HTML by you** — `report.md` for a report, the feature's `plan.md` for a plan (see below) |
 | `GOGO_VIEW_DIAGRAMS` | one `<figure>` per diagram (see below) |
 | `GOGO_VIEW_LAYOUT` | saved node positions as an inline JSON object (see "Layout sidecar" below); use `{}` when there is none |
 | `GOGO_MERMAID_SRC` | `../mermaid.min.js` |
@@ -126,18 +172,33 @@ re-routes live, a minimap, and fit/zoom/reset-layout. **Other kinds**
 runtime still degrades to an inline error per diagram with the summary readable.
 
 **Summary → HTML (you pre-render it; no runtime markdown dependency).** Convert the
-chosen `report.md` to clean, semantic HTML yourself: `#/##/###` → `<h1..3>`,
+chosen source markdown — `report.md` for a report, `plan.md` for a plan — to clean,
+semantic HTML yourself: `#/##/###` → `<h1..3>`,
 paragraphs → `<p>`, `-`/`1.` → `<ul>/<ol><li>`, GFM tables → `<table>`, fenced
 code → `<pre><code>`, inline `` `code` `` → `<code>`, `[text](url)` → `<a>`, `---`
 → `<hr>`, `> ` → `<blockquote>`. **Escape** `&`, `<`, `>` in text so the page is
 well-formed. Strip HTML-comment blocks. Do **not** include any `report.md` mermaid
 fences in the summary — diagrams are rendered separately (next).
 
-**Diagrams.** Gather the `.mmd` sources for the chosen report, **by layout**:
+**Coalesce soft-wrapped continuation lines first (before emitting).** The source
+markdown is soft-wrapped, so one list item or paragraph often spans several lines.
+Join each continuation line into the block it belongs to: a non-blank line that is
+**not** a line-leading list marker (`-` / `1.`), heading (`#`), table row (`|`),
+fence (` ``` `), or blank line **continues the current `<li>`/`<p>`** — append it
+with a single space and collapse runs of whitespace to one. Only a **blank line**
+starts a new block; only a **line-leading marker** starts a new list item — so
+consecutive `1.`/`-` lines stay in **one** `<ol>`/`<ul>` (ordered numbering never
+restarts) and a wrapped line never leaks out as a stray `<p>` carrying the source's
+literal indentation/double-spaces. Plain-text pass, offline — no JS markdown lib.
+
+**Diagrams.** Gather the `.mmd` sources for the chosen bundle, **by layout** (always
+skip the non-diagram files `diagrams.html` and `manifest.json`):
 - new `report/` bundle (or a `<date>-<slug>/` changelog entry) → the `*.mmd`
-  beside `report.md` (skip `diagrams.html`);
+  beside `report.md`;
 - legacy root-layout report (`.gogo/work/feature-<slug>/report.md`) → the
-  feature's `charts/*.mmd` (older features keep diagrams under `charts/`).
+  feature's `charts/*.mmd` (older features keep diagrams under `charts/`);
+- **plan** bundle → the feature's `charts/*.mmd` (the plan's intended-design set),
+  with `charts/before/*.mmd` as the **before** set for compare mode (see below).
 
 For each, emit one block, **inlining the source verbatim** (do **not** `fetch()` —
 `file://` forbids it). Caption from `manifest.json` `title` if present, else the
@@ -157,9 +218,14 @@ the user "no diagrams found for <name> — showing the summary only" (so a missi
 diagram set is never silent). A genuine pure-process report legitimately has none.
 
 **Compare mode (before / after — FR9).** When the chosen bundle carries a `before/`
-set alongside the after `.mmd` (i.e. a `before/*.mmd` sub-folder beside `report.md`,
-copied there by phase ⑤), build the diagrams as **side-by-side pairs** instead of a
-single column:
+set alongside the after `.mmd`, build the diagrams as **side-by-side pairs** instead
+of a single column. The before/after sources depend on the bundle:
+- **report** → after = the `*.mmd` beside `report.md`; before = its `before/*.mmd`
+  sub-folder (copied in by phase ⑤).
+- **plan** → after = the feature's `charts/*.mmd` (the intended design); before =
+  `charts/before/*.mmd` (the as-is baseline plan ① drew). Same pairing rules below.
+
+Then:
 
 - **Pair by kind.** Match each `before/<kind>.mmd` to the after `<kind>.mmd`. For a
   kind present in **both**, emit a `<div class="compare">` wrapping **two**
@@ -225,7 +291,8 @@ because a browser couldn't be launched.
 
 ## ③ Return
 
-One line: which report was viewed, the generated page path, and the `file://` URL.
+One line: which plan or report was viewed, the generated page path, and the
+`file://` URL.
 
 ## Degradation
 

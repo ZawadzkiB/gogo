@@ -69,8 +69,21 @@
   }
 
   function nodeLabel(g) {
-    var el = g.querySelector(".nodeLabel, foreignObject, .label, text");
-    var txt = (el ? el.textContent : g.textContent) || "";
+    var el = g.querySelector(".nodeLabel, foreignObject, .label, text") || g;
+    // Mermaid renders a multi-line label as separate <tspan>s (or <br>-split
+    // spans) with NO whitespace between them, so a naive textContent glues the
+    // lines ("with"+"interactive" -> "withinteractive"). Collect each descendant
+    // text run and join with a space so line/word boundaries survive.
+    var parts = [];
+    try {
+      var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+      var n;
+      while ((n = w.nextNode())) {
+        var v = (n.nodeValue || "").trim();
+        if (v) parts.push(v);
+      }
+    } catch (e) { /* fall through to textContent */ }
+    var txt = parts.length ? parts.join(" ") : (el.textContent || "");
     return txt.replace(/\s+/g, " ").trim();
   }
 

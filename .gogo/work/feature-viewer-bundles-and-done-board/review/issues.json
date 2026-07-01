@@ -1,0 +1,99 @@
+{
+  "slug": "viewer-bundles-and-done-board",
+  "track": "review",
+  "round": 4,
+  "updated": "2026-07-01",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "commands/view.md is out of sync with the new gogo-view behavior (reports-only description, no plans / :plan|:report grammar)",
+      "description": "skills/gogo-view/SKILL.md now enumerates a grouped Work/Changelog menu that includes plans, and adds the arg grammar `<slug>[:plan|:report]`. But the command wrapper commands/view.md was not updated: its `description` says \"a gogo report\", its `argument-hint` is \"[changelog-entry | feature-slug]\" (no `:plan`/`:report`, no mention of plans), and it embeds a stale 4-step flow that describes reports-only enumeration (`.gogo/changelog/*/ + .gogo/work/feature-*/report/`). This is the user-facing surface for FR1: a user sees an argument-hint that hides plan-viewing entirely, and the wrapper contradicts the skill it delegates to. It also re-introduces flow logic into a command (coding-rules: commands stay ultra-thin, no flow logic). The sibling commands/status.md WAS updated in this same stage (rewritten thin + delegating to the new gogo-status skill), so leaving commands/view.md stale reads as an oversight, not a deliberate FR5 deferral. Per code-review-standards this is an enumeration left out of sync (Major). Note: FR5 covers docs/* + README + version, which are correctly deferred; commands/view.md is the FR1 command surface, not a doc.",
+      "proposed_solution": "AGENT-FIXABLE. Update commands/view.md to match the skill: broaden the `description` to \"a gogo plan or report\"; change `argument-hint` to something like \"[feature-slug[:plan|:report] | changelog-entry | path]\"; and slim the body to a thin delegation (mirror the new commands/status.md pattern) that says: load `gogo-view` and follow it — enumerate grouped Work (each feature's plan + report) / Changelog (reports) newest-first, resolve an explicit arg per the skill's grammar (`<slug>` = report-else-plan, `<slug>:plan`, `<slug>:report`, `<date>-<slug>`, or a path), else present the AskUserQuestion grouped picker; build + open the page. Do not restate the enumeration logic in prose.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Rewrote commands/view.md thin to match the gogo-view skill: description now covers a gogo plan OR report; argument-hint is \"[feature-slug[:plan|:report] | changelog-entry | path]\"; body delegates to gogo-view (grouped Work plans+reports / Changelog picker, arg grammar <slug>=report-else-plan / :plan / :report / <date>-<slug> / path, build+open best-effort) with no restated enumeration/flow logic (mirrors commands/status.md)."
+    },
+    {
+      "id": "REV-002",
+      "title": "skills/gogo/SKILL.md \"View\" section still describes reports-only enumeration (no plans, no grouped menu)",
+      "description": "The orchestrator skill's `### View -> command /gogo:view` section (skills/gogo/SKILL.md ~line 172) still reads \"Read any report ...\" and \"Lists reports from .gogo/changelog/ and .gogo/work/*/report/\" with no mention of plan bundles or the grouped Work/Changelog picker. coding-rules explicitly lists skills/gogo/SKILL.md as a mandatory enumeration-sync target (separate from README/docs, which are the FR5-deferred surfaces). After Stage A this blurb misdescribes the shipped capability. Lower impact than REV-001 (it is internal narrative, not the user-facing arg surface), hence Minor.",
+      "proposed_solution": "AGENT-FIXABLE. Update the View section to note that /gogo:view now surfaces both plans and reports via a grouped Work (each feature's plan + report) / Changelog (reports) picker, plans rendered in place from plan.md + charts/ (D1=A). One or two sentences; keep it terse.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Updated the View section in skills/gogo/SKILL.md: it now reads \"any plan or report\", describes the grouped Work (each feature's plan + report) / Changelog (shipped reports) picker, and notes plans render in place from plan.md + charts/ (D1=A) — no longer reports-only."
+    },
+    {
+      "id": "REV-003",
+      "title": "Generated plan page renders multi-line list items as broken lists (restarted numbering + stray leading-space paragraphs), undercutting FR3",
+      "description": "In the evidence artifact .gogo/resources/view/viewer-bundles-and-done-board-plan.html, every soft-wrapped Markdown list item from plan.md is split during the summary->HTML pre-render: each list item becomes its own single-item `<ol>`/`<ul>` (so ordered-list numbering resets to 1 on each item), and the wrapped continuation line becomes a separate `<p>` with the source's literal leading indentation/double-spaces preserved (e.g. \"...ships exactly those...\" and \"...The   commenter...\"). This visibly degrades legibility on the flagship page for FR3, whose entire purpose is a readable article. Root cause: gogo-view Step 3 \"Summary -> HTML\" guidance maps `-`/`1.` to list items and blank-line-separated blocks to `<p>`, but says nothing about coalescing soft-wrapped continuation lines that belong to the same list item/paragraph. The viewer.css typography itself is sound; the defect is in the pre-render step's handling.",
+      "proposed_solution": "AGENT-FIXABLE. Add a line to gogo-view Step 3 \"Summary -> HTML\": before emitting, join soft-wrapped continuation lines (a non-blank line that continues the previous list item or paragraph, i.e. indented under a list marker or immediately following prose with no blank line) into that same `<li>`/`<p>`, collapsing runs of whitespace to a single space; only a blank line starts a new block and only a line-leading marker starts a new list item (keep consecutive `1.`/`-` items inside one `<ol>`/`<ul>`). Then regenerate the sample plan page so the evidence reflects the fix.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Added explicit coalescing guidance to gogo-view Step 3 (\"Summary -> HTML\"): before emitting, join each soft-wrapped continuation line (a non-blank line that isn't a line-leading -/1./#/table/fence/blank) into the current <li>/<p> with a single space; only a blank line starts a new block and only a line-leading marker starts a new list item, so consecutive 1./- stay in one <ol>/<ul>. Regenerated .gogo/resources/view/viewer-bundles-and-done-board-plan.html — ordered lists now render 4/3/7 items with no restarted numbering and no stray continuation <p> (still offline, no http(s)://)."
+    },
+    {
+      "id": "REV-004",
+      "title": "Unplanned .gitignore change (ignore roadmap.md) is unrelated to Stage A",
+      "description": ".gitignore adds `roadmap.md` (\"Internal roadmap - local backlog\"). This is repo housekeeping with no tie to FR1/FR2/FR3 or the work-index classifier, and it is not in the plan's changes checklist. It brushes the NFR/coding-rules bar \"don't auto-edit .gitignore; print guidance instead\" (that bar targets gogo mutating a user project rather than gogo's own repo, so this is not a hard violation), but as an unrelated change riding along in the feature diff it hurts plan fidelity and diff hygiene. Low severity, non-blocking.",
+      "proposed_solution": "AGENT-FIXABLE. Either drop this hunk from the feature diff and land it as a separate housekeeping commit, or confirm it is intentional and note it in the plan/report so the change is accounted for. No functional change required.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "wontfix",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "WONTFIX (intentional). The .gitignore roadmap.md entry is a deliberate change the user requested (gitignore the internal local-backlog roadmap); it is correct to keep and is not part of this feature. Left in place, unchanged."
+    },
+    {
+      "id": "REV-005",
+      "title": "gogo-view SKILL.md H1 and opening line still say \"reports\" only after adding plan support",
+      "description": "The gogo-view skill's frontmatter description was updated for plans, but within the same file the H1 (line 16, \"gogo-view - interactive viewer for gogo reports (FR8 / FR9 / FR10)\") and the opening sentence (line 18, \"Turns a report bundle (report.md + its .mmd diagrams) into one self-contained HTML page ...\") still frame the skill as report-only. Minor in-file drift after a large edit; purely cosmetic but a fresh reader hits a contradiction between the intro and the new \"Plans view in place too (D1=A)\" paragraph two lines below.",
+      "proposed_solution": "AGENT-FIXABLE. Reword the H1 to \"interactive viewer for gogo plans & reports\" and generalize the opening sentence to \"a plan or report bundle (plan.md / report.md + its diagrams)\". Cosmetic only.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Reworded the gogo-view skill H1 to \"interactive viewer for gogo plans & reports\" and generalized the opening sentence to \"a plan or report bundle (plan.md / report.md + its .mmd diagrams)\" — the intro no longer says reports-only, consistent with the \"Plans view in place too (D1=A)\" paragraph below."
+    },
+    {
+      "id": "REV-006",
+      "title": "gogo-done TUI launch is fragile inside tmux / on a stale session, and a launch failure is silently treated as user-cancel instead of falling back to the table",
+      "description": "skills/gogo-done/SKILL.md \"Board mode\" Step 2 launches the kanban with `tmux new-session -s gogo-done \"python3 ... board.py ...\"` (lines ~167-168) and then, on exit, instructs (lines ~176-178): \"Exit non-zero / no $res -> the user cancelled; ship nothing.\" This conflates two very different outcomes because board.py returns exit 1 both on a genuine user cancel (run_board returns 1 when the user presses q/ESC) AND on any crash/launch failure. Two concrete, verified launch failures are common: (1) when /gogo:done is run from inside an existing tmux session ($TMUX set) — the typical environment for tmux users — `tmux new-session` refuses to nest (\"sessions should be nested with care, unset $TMUX to force\") and returns non-zero WITHOUT ever running the board; (2) a leftover/duplicate session named `gogo-done` makes `tmux new-session -s gogo-done` fail (\"duplicate session\"). In both cases the board never renders, no $res is written, and the skill's rule interprets that as \"user cancelled; ship nothing\" — so the user is given neither the board nor the guaranteed status-table + AskUserQuestion fallback. That contradicts the skill's own Step 3 and Degradation sections (\"no tmux / no python3 / no tty / **board error** -> the status table + AskUserQuestion multi-select ... never fail over the board\") and the as-built sequence diagram (charts/done-board-flow.mmd line 17: \"else no tmux / no python3 / no tty / board error\" routes to the fallback), and it brushes the mandatory NFR portability/graceful-degradation bar. Note the dev host has no tmux, so this interactive path is essentially unexercised and the fragility went unnoticed; in practice the no-tty fallback (the common path, e.g. under Claude Code's non-tty Bash) is solid and fully specified. Non-blocking (it never hard-crashes /gogo:done and the far more common no-tmux/no-tty route degrades correctly), but it is a real robustness/UX gap in the interactive path for a scenario -- already being inside tmux -- that tmux users hit routinely.",
+      "proposed_solution": "AGENT-FIXABLE. In gogo-done Step 2 make the launch nesting-safe and distinguish launch failure from cancel: (a) when `$TMUX` is set, use `tmux new-window` (or `tmux display-popup -E`, or prefix with `TMUX= tmux new-session`) instead of a bare `new-session`, and use a unique or `-A`/`kill-session`-guarded session name so a stale `gogo-done` session can't block the launch; (b) capture the tmux launch exit status separately from the board's own exit -- if the tmux command itself fails to start the pane (the board never ran), do NOT treat it as a cancel: fall through to the Step 3 status-table + AskUserQuestion fallback (which enforces the same ready-only guard). Only a clean board run that returns non-zero with no result file should be read as an explicit user cancel. This keeps the promise that any board error degrades to the table rather than silently shipping nothing.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 4,
+      "fixed_in_round": 4,
+      "fix_summary": "Made the gogo-done Board-mode TUI launch nesting-safe and split the three outcomes. Launch now branches on $TMUX: inside tmux -> `tmux new-window` (new-session refuses to nest) blocked via `tmux wait-for`; outside tmux -> `tmux new-session -A -s gogo-done-$$` (unique name so a stale/duplicate session can't collide). The board records its OWN exit code to `board-exit.code` (a tmux client's status is unreliable). Result handling now distinguishes: result file present -> confirmed, ship each slug; no result + code==1 -> the board ran and the user cancelled (stop, ship nothing); missing code / code==2 / any other value -> board error or launch failure -> the Step 3 status-table + AskUserQuestion fallback (never a silent no-op). Step 3 header + Degradation updated to route a tmux launch failure / exit 2 to the fallback; matches charts/done-board-flow.mmd. `git grep` shows no remaining bare new-session-only assumption."
+    },
+    {
+      "id": "REV-007",
+      "title": "board.py raises an uncaught traceback on a missing or malformed --index instead of a clean error + distinct exit code",
+      "description": "assets/kanban/board.py load_index() opens the index path directly (line 49) and calls json.loads() on its contents (line 51) with no guard; both are reached from main() (line 328) before any curses setup. Verified by direct invocation: `--index does-not-exist.json` prints a full Python FileNotFoundError traceback and exits 1; a malformed index file prints a json.decoder.JSONDecodeError traceback and exits 1. This is defensive-only in the happy path (the gogo-done skill writes the work-index JSON itself with the Write tool immediately before launch, so it is well-formed), which is why it is low severity -- but two things make it worth tidying: a vendored user-facing tool dumping a stack trace is untidy, and (compounding REV-006) a non-zero exit from a load error is indistinguishable from a user cancel, so a malformed index would be silently read as \"ship nothing\" with no fallback. Empty/whitespace index is already handled correctly (returns [] -> an empty board), and the interactive no-tty case fails via curses with a non-zero exit and no result file, so no partial/garbage result is ever written.",
+      "proposed_solution": "AGENT-FIXABLE. In board.py main(), wrap the `normalize_records(load_index(args.index))` call (or load_index itself) in a try/except for OSError and ValueError (json.JSONDecodeError subclasses ValueError); on failure print a one-line `board: cannot read work-index <path>: <reason>` to stderr and `return 2` (a distinct code the skill can tell apart from a cancel's 1). Optionally document the exit codes (0 ship / 1 cancel / 2 load-error) in the module docstring so gogo-done can branch on them per REV-006.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 4,
+      "fixed_in_round": 4,
+      "fix_summary": "Guarded board.py's index load: main() now wraps `normalize_records(load_index(args.index))` in try/except (OSError, ValueError) -- covering FileNotFoundError + json.JSONDecodeError -- printing a one-line `board: cannot read work-index <path>: <reason>` to stderr and `return 2` (a distinct code from a cancel's 1). Documented the exit-code contract in the module docstring (0=confirmed/result written, possibly {\"ship\":[]}; 1=cancel/no result; 2=error/bad-or-missing index or cannot start). Verified: missing --index, garbage --index, garbage stdin, and headless-with-garbage all exit 2 with one line and no traceback; empty/whitespace index still exits 0 (empty board); a normal --headless --ship a,b still emits {\"ship\":[...]} exit 0; py_compile + --selftest still green."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "slug": "viewer-bundles-and-done-board",
+  "updated": "2026-07-01",
+  "note": "As-built set for roadmap 1-4. flow = the shipped /gogo:view grouped menu (plans + reports) + /gogo:done status board data flow (the intended design held as built); sequence = the as-built Stage B /gogo:done work board — classify work, open the terminal-TUI kanban (board.py in tmux) or the table + AskUserQuestion fallback, then ship each pick via the single archive+link flow. The plan-time as-is baseline is copied into report/before/ for the before/after comparison.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/view-done-flow.mmd", "title": "As-built: view selection menu (plans + reports) + /gogo:done status board" },
+    { "kind": "sequence", "file": "report/done-board-flow.mmd", "title": "As-built: /gogo:done work board (TUI or table fallback) -> single-sourced ship" }
+  ]
+}

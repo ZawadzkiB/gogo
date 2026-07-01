@@ -161,23 +161,30 @@ and marking which phases ran and what's still open (`plan.md` is the one
 prerequisite).
 
 ### Ship → command `/gogo:done` (skill `gogo-done`)
-The explicit post-report gate: when the user declares the feature shipped, copy the
-`report/` bundle (report.md + diagrams + the `before/` set) into the append-only
+The explicit post-report gate. A **slug** ships that one feature; with **no slug**
+`/gogo:done` opens a **work board** — the shared `gogo-status` classifier labels every
+`.gogo/work/feature-*` (shipped · ready-to-ship · in-progress · unfinished) and the
+user picks which ready-to-ship features to ship (an interactive terminal-TUI kanban,
+`assets/kanban/board.py`, when `python3` + `tmux` + a tty are present; otherwise a
+status table + `AskUserQuestion` multi-select — never failing over the board; D5=A).
+Shipping is a single flow looped over the picks: copy each `report/` bundle (report.md
++ diagrams + the `before/` set) into the append-only
 `.gogo/changelog/<YYYY-MM-DD>-<slug>/`, **build the interactive viewer page for the
 entry and print its `file://` link** (best-effort, reusing the `gogo-view` build;
 falls back to the static `diagrams.html` path), and set `state.md` to a terminal
-`shipped` status. Copy-not-move (the work folder stays the source); idempotent. If
-no report exists it STOPs with "run `/gogo:report <feature>` first".
+`shipped` status. Copy-not-move (the work folder stays the source); idempotent. A
+named slug with no report STOPs with "run `/gogo:report <feature>` first".
 
 ### View → command `/gogo:view` (skill `gogo-view`)
-Read any report as a self-contained, offline interactive webpage (the `report.md`
-summary as HTML + its mermaid diagrams made **interactive**: flowchart-family kinds
-get an xplan-style rich renderer — draggable token-styled node cards with a
-live-re-routing edge layer, minimap, zoom/fit, and a persisted layout — other kinds
-fall back to a pan/zoom/drag canvas; a report carrying a `before/` set renders
-**before / after side by side**). Lists reports from `.gogo/changelog/` and
-`.gogo/work/*/report/`, builds the page from the vendored `.gogo/resources/` assets,
-and opens it.
+Read any **plan or report** as a self-contained, offline interactive webpage (the
+`plan.md` / `report.md` summary as HTML + its mermaid diagrams made **interactive**:
+flowchart-family kinds get an xplan-style rich renderer — draggable token-styled node
+cards with a live-re-routing edge layer, minimap, zoom/fit, and a persisted layout —
+other kinds fall back to a pan/zoom/drag canvas; a bundle carrying a `before/` set
+renders **before / after side by side**). Surfaces both **plans and reports** via a
+grouped **Work** (each feature's plan + report) / **Changelog** (shipped reports)
+picker — plans rendered in place from `plan.md` + `charts/` (D1=A) — builds the page
+from the vendored `.gogo/resources/` assets, and opens it.
 
 ## Loops & bounds
 

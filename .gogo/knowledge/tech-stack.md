@@ -15,7 +15,11 @@ Generated-by: /gogo:build
 - **Bash** — hooks (`hooks/*.sh`): `config-check.sh`, `notify.sh`. POSIX-ish,
   `set -euo pipefail`, best-effort (never hard-fail the session).
 - **JavaScript (vendored, not authored)** — `assets/mermaid/mermaid.min.js` (UMD
-  build, works over `file://`). Do not edit; it's a dependency snapshot.
+  build, works over `file://`). Do not edit; it's a dependency snapshot. The
+  `/gogo:view` renderer modules (`assets/viewer/*.js`) ARE authored.
+- **Python (vendored, authored) — since 0.7.0** — `assets/kanban/board.py`, the
+  `/gogo:done` work-board curses TUI. **Pure stdlib** (no pip), pure ASCII, ships a
+  `--selftest`; a soft dep (see below).
 - **JSON** — `.claude-plugin/plugin.json` (manifest + version), `marketplace.json`,
   `.mcp.json` (Playwright MCP server).
 
@@ -42,3 +46,6 @@ uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 - `mmdc` (mermaid CLI) — only used for SVG/PNG export if already present.
 - `jq` — handy for validating/reading JSON artifacts when present.
 - Node.js — only for the Playwright MCP.
+- `python3` + `tmux` (since 0.7.0) — soft deps for the `/gogo:done` interactive
+  work board (`board.py` curses TUI in a tmux pane). Detected at use (`command -v`
+  + tty check); absent → the status-table + `AskUserQuestion` multi-select fallback.

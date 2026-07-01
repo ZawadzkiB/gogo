@@ -1,0 +1,19 @@
+sequenceDiagram
+  actor U as user
+  participant V as /gogo:view (gogo-view)
+  participant CL as .gogo/changelog/ + work/*/report/
+  participant RES as .gogo/resources/ (mermaid + viewer/)
+  participant P as page (.gogo/resources/view/&lt;name&gt;.html)
+  participant B as browser
+  U->>V: /gogo:view  (or a slug/entry)
+  V->>CL: enumerate selectable reports
+  CL-->>V: changelog entries + in-progress work reports
+  V-->>U: list → pick one
+  U->>V: choose report
+  V->>RES: ensure mermaid.min.js + viewer/{interactive.js,viewer.css} (copy if missing)
+  V->>V: pre-render report.md → HTML; inline each .mmd verbatim
+  V->>P: write self-contained page (relative ../mermaid.min.js, ../viewer/*)
+  V->>B: open (best-effort) — else print file:// path
+  B->>RES: load vendored mermaid + interactive.js (offline)
+  B->>B: render diagrams → wrap each in pan/zoom/drag canvas
+  B-->>U: readable summary + interactive diagrams

@@ -1,0 +1,24 @@
+sequenceDiagram
+  actor U as user
+  participant S as /gogo:skills
+  participant K as .gogo/knowledge/*.md
+  participant GS as .gogo/skills/ (+ index.md)
+  participant CS as .claude/skills/
+  U->>S: /gogo:skills  (or "extract X")
+  S->>K: audit body lines (OK/WARN/OVER) · classify candidates
+  K-->>S: sections + kind (knowledge | standalone)
+  S-->>U: proposals (slug · kind · destination · lines saved) — STOP
+  U->>S: approve / override kind / decline (per candidate)
+  alt approved knowledge
+    S->>GS: write .gogo/skills/<slug>/SKILL.md (+ scripts/.env)
+    S->>K: replace section with "Load when:" pointer
+    S->>GS: update index.md registry
+  else approved standalone
+    S->>CS: write .claude/skills/<slug>/SKILL.md (only sanctioned write outside .gogo/)
+    S->>K: replace section with "Load when:" pointer
+    S->>GS: update index.md registry
+  else declined
+    S-->>U: nothing written
+  end
+  S->>K: re-measure parents (confirm under budget)
+  S-->>U: report (lines saved · skills created)

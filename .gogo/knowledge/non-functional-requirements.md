@@ -14,8 +14,10 @@ Generated-by: /gogo:build
 - The **core plan→implement→review→test loop needs zero external dependencies.**
 - **Mermaid is vendored** and renders offline over `file://` (no `mmdc`, no
   Chromium, no network).
-- Anything else (Playwright MCP, `mmdc`, `jq`, ntfy) is **optional** and must be
-  detected at use; absence → graceful fallback, never a failure.
+- Anything else (Playwright MCP, `mmdc`, `jq`, ntfy, and — since 0.7.0 — `python3`
+  + `tmux` for the `/gogo:done` work board) is **optional** and must be detected at
+  use; absence → graceful fallback, never a failure. The interactive terminal TUI
+  (`board.py`) degrades to the status table + `AskUserQuestion` multi-select.
 
 ## Safety
 - **Writes are confined to `.gogo/`** (one user-gated exception — see gogo
@@ -35,7 +37,10 @@ Generated-by: /gogo:build
 - One vendored mermaid runtime per project at `.gogo/resources/mermaid.min.js`
   (shared by all features), not per feature.
 - Keep the published plugin lean; no build artifacts committed except the
-  intentional vendored `mermaid.min.js`.
+  intentional vendored `mermaid.min.js` (and authored source like `board.py`).
+- **Vendored Python must never ship compiled bytecode** — `__pycache__/` and
+  `*.pyc` are gitignored so a vendored tool (e.g. `assets/kanban/board.py`) never
+  drags platform-specific bytecode into the bundle.
 
 ## gogo overrides
 <!-- Preserved across re-runs. -->

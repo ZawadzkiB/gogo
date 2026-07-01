@@ -1,0 +1,18 @@
+flowchart TD
+  SCAN["scan project docs + configs (read-only)"]:::proc
+  SCAN --> CLASSIFY["classify hits → knowledge topics"]:::proc
+  CLASSIFY --> WIRE["wire .gogo/knowledge/* (proxy / owned)\ndistil a summary per file"]:::proc
+  WIRE --> VERIFY{"verify each high-signal claim\nagainst the actual code?"}:::gate
+  VERIFY -->|"code confirms"| OK["mark verified ✓ · raise Confidence"]:::out
+  VERIFY -->|"code conflicts"| FIX["correct gogo summary to match code\n(code wins) · set Confidence · note stale upstream"]:::out
+  VERIFY -->|"not checkable"| UNV["mark unverifiable"]:::out
+  OK --> DISC
+  FIX --> DISC
+  UNV --> DISC
+  DISC["write _discovered.md\n(verified / corrected / unverifiable + principle)"]:::art
+  DISC --> REPORT([report: wired · corrected · low-confidence to review]):::io
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111

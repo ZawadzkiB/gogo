@@ -214,31 +214,39 @@ prerequisite. (The in-pipeline ⑤, right after a green test, keeps its strict g
 
 **`/gogo:done [feature-slug]`**
 
-Ship a report-complete feature. Copies its `report/` bundle (`report.md` + the UML
+Ship report-complete features. A **slug** ships that one; **no slug opens a work
+board** over every `.gogo/work/feature-*` — the shared `/gogo:status` classifier
+labels each **shipped · ready-to-ship · in-progress · unfinished** and you pick which
+ready-to-ship features to ship (an interactive terminal kanban when `python3` +
+`tmux` + a tty are present, otherwise a status table + multi-select — never failing
+over the board). Each ship copies its `report/` bundle (`report.md` + the UML
 diagrams + the `before/` set) into the append-only
 `.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive, **builds the interactive viewer page
 for the entry and prints its `file://` link** (best-effort, reusing the `/gogo:view`
 build; falls back to the static `diagrams.html` path — never failing over the link),
 and sets `state.md` to a terminal `shipped` status. Copy-not-move (the work folder
-stays the source); idempotent. If no report exists yet it stops and tells you to
+stays the source); idempotent. A named slug with no report stops and tells you to
 run `/gogo:report <feature>` first.
 
-**`/gogo:view [changelog-entry | feature-slug]`**
+**`/gogo:view [changelog-entry | feature-slug[:plan|:report]]`**
 
-Open a gogo report as a self-contained, offline **interactive webpage** — the
-`report.md` summary rendered as readable HTML plus its mermaid diagrams made
-**interactive** (vendored runtime, no network, no build). Flowchart-family diagrams
+Open a gogo **plan or report** as a self-contained, offline **interactive webpage** —
+the `plan.md` / `report.md` summary rendered as readable HTML plus its mermaid diagrams
+made **interactive** (vendored runtime, no network, no build). Flowchart-family diagrams
 get an xplan-style rich renderer: custom-styled node cards you **drag** with edges
 that **re-route live**, plus **zoom / fit / minimap** and a **persisted layout**;
-other kinds fall back to a pan/zoom/drag canvas. A report carrying a `before/` set
-renders **before / after side by side** (compare mode). Lists the available reports
-(from `.gogo/changelog/` and `.gogo/work/*/report/`) and opens your pick; falls back
-to printing the `file://` path if it can't auto-open.
+other kinds fall back to a pan/zoom/drag canvas. A bundle carrying a `before/` set
+renders **before / after side by side** (compare mode). With no arg it presents a
+grouped **Work** (each feature's plan + report) / **Changelog** (shipped reports)
+picker — plans render in place from `plan.md` + `charts/` — and opens your pick; falls
+back to printing the `file://` path if it can't auto-open.
 
 **`/gogo:status`**
 
 Lists every feature under `.gogo/work/` with its phase, status, and iteration counts.
-Read-only.
+Read-only. It also hosts the shared **work-index classifier** (shipped · ready-to-ship
+· in-progress · unfinished) that the `/gogo:done` work board reuses to decide what is
+shippable.
 
 **`/gogo:resume [feature-slug]`**
 
@@ -272,8 +280,9 @@ when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
 **`.gogo/resources/`** — one vendored mermaid runtime per project
 (`mermaid.min.js`, shared by every feature) plus the interactive viewer module set
-(`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`).
-Offline, no network, no build.
+(`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`), and
+`kanban/` (the `/gogo:done` work-board scratch — the vendored `board.py`, the
+work-index, and the ship-result). Offline, no network, no build.
 
 **`.gogo/work/feature-<slug>/`** — one folder per piece of work:
 

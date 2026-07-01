@@ -1,0 +1,11 @@
+flowchart TD
+  V["/gogo:view (no arg)"]:::proc --> EN["enumerate reports only\n(changelog/* + work/*/report/)"]:::proc
+  EN --> PICK{"one match?"}:::gate
+  PICK -->|"yes / newest"| BLD["build .gogo/resources/view/&lt;name&gt;.html → open"]:::out
+  PICK -->|"ambiguous"| ASK["AskUserQuestion (tie-break only)"]:::proc
+  ASK --> BLD
+  D["/gogo:done"]:::proc --> RES["resolve slug (arg, else newest report-complete)"]:::proc
+  RES --> ARCH["archive report/ → changelog + build link → shipped"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

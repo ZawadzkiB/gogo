@@ -1,0 +1,14 @@
+flowchart TD
+  V["/gogo:view (no arg)"]:::proc --> ENUM["enumerate work (plans + reports)\n+ changelog (reports)"]:::proc
+  ENUM --> MENU{"grouped menu\nWork | Changelog"}:::gate
+  MENU -->|"pick plan"| PB[/"plan bundle (plan.md + diagrams)"/]:::art
+  MENU -->|"pick report"| RB[/"report bundle (report/)"/]:::art
+  PB --> PAGE["build + open interactive page\n(article summary + diagrams)"]:::out
+  RB --> PAGE
+  D["/gogo:done (no slug)"]:::proc --> IDX["classify .gogo/work/*\nshipped · ready · in-progress · unfinished"]:::proc
+  IDX --> BOARD{"status board (table)\nselect ready-to-ship"}:::gate
+  BOARD -->|"ship selected"| SHIP["archive → changelog + build viewer link"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

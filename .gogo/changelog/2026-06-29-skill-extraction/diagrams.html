@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — skill-extraction</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>skill-extraction</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>/gogo:skills runtime flow (as-built)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  ARGS{"invocation"}:::gate
+  ARGS -->|"&quot;extract X&quot; (directed)"| TARGET["resolve the named section"]:::proc
+  ARGS -->|"no prompt (audit)"| SCAN["scan .gogo/knowledge/*.md"]:::proc
+  SCAN --> MEASURE["measure body lines\nOK&lt;200 · WARN 200-400 · OVER&gt;400"]:::proc
+  MEASURE --> ANALYZE["analyze sections in WARN/OVER\n(cohesion · context-locality · standalone-able)"]:::proc
+  ANALYZE --> CLASSIFY
+  TARGET --> CLASSIFY["classify kind\nknowledge | standalone"]:::proc
+  CLASSIFY --> PROPOSE[/"proposals: slug · kind · destination · description · lines saved · scripts/env · stub"/]:::art
+  PROPOSE --> GATE{"user approves\n(per candidate)?"}:::gate
+  GATE -->|"no / edit"| STOP([stop — nothing written]):::io
+  GATE -->|"knowledge"| WK["write .gogo/skills/&lt;slug&gt;/SKILL.md\n+ scripts/ + .env.example"]:::out
+  GATE -->|"standalone"| WC["write .claude/skills/&lt;slug&gt;/SKILL.md\n(harness auto-discovers)"]:::out
+  WK --> STUB
+  WC --> STUB["replace parent section\nwith summary + Load-when pointer"]:::out
+  STUB --> INDEX["update .gogo/skills/index.md\n(kind · destination · trigger)"]:::out
+  INDEX --> REMEASURE["re-measure parents\n(confirm under budget)"]:::proc
+  REMEASURE --> REPORT([report: lines saved · skills created]):::io
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111
+  </pre></div>
+
+  <h2>Propose → approve → extract hand-off (as-built)</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor U as user
+  participant S as /gogo:skills
+  participant K as .gogo/knowledge/*.md
+  participant GS as .gogo/skills/ (+ index.md)
+  participant CS as .claude/skills/
+  U->>S: /gogo:skills  (or "extract X")
+  S->>K: audit body lines (OK/WARN/OVER) · classify candidates
+  K-->>S: sections + kind (knowledge | standalone)
+  S-->>U: proposals (slug · kind · destination · lines saved) — STOP
+  U->>S: approve / override kind / decline (per candidate)
+  alt approved knowledge
+    S->>GS: write .gogo/skills/&lt;slug&gt;/SKILL.md (+ scripts/.env)
+    S->>K: replace section with "Load when:" pointer
+    S->>GS: update index.md registry
+  else approved standalone
+    S->>CS: write .claude/skills/&lt;slug&gt;/SKILL.md (only sanctioned write outside .gogo/)
+    S->>K: replace section with "Load when:" pointer
+    S->>GS: update index.md registry
+  else declined
+    S-->>U: nothing written
+  end
+  S->>K: re-measure parents (confirm under budget)
+  S-->>U: report (lines saved · skills created)
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

@@ -103,3 +103,14 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   a **before/after** side-by-side comparison; `/gogo:done` **prints a `file://`
   viewer link**. Renderer modules: `assets/viewer/{geometry,viewport,mermaid-parse,
   render,interactive}.js`.
+- **View menu + plan bundles + `/gogo:done` work board (since 0.7.0):**
+  `/gogo:view` (no arg) now shows a grouped **Work** (each feature's plan + report)
+  / **Changelog** (shipped reports) `AskUserQuestion` picker; **plans are viewable
+  bundles** rendered **in place** from `plan.md` + `charts/` (D1=A), and plans/
+  reports are authored **article-style** (lead summary, bold key parts). `/gogo:done`
+  (no slug) classifies all `.gogo/work/*` via the shared **`gogo-status`** work-index
+  (shipped / ready-to-ship / in-progress / unfinished) and opens an **interactive
+  terminal kanban** — vendored `python3` curses `assets/kanban/board.py` in a tmux
+  pane that ships on drop — or, when `python3`/`tmux`/tty are absent (**soft deps**),
+  the status-table + `AskUserQuestion` multi-select fallback; shipping stays
+  single-sourced. Command set still **12**; version **0.7.0**.

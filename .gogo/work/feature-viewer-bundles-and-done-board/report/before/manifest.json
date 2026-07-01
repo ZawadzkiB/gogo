@@ -1,0 +1,8 @@
+{
+  "slug": "viewer-bundles-and-done-board",
+  "updated": "2026-07-01",
+  "note": "As-is baseline (before) of the flows this change touched: /gogo:view (reports only, newest-by-default; menu is a tie-break) and /gogo:done (ships one, by slug or newest). Copied into the report bundle from charts/before/ so the archive is self-contained; file path rewritten to the report/before/ location.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/before/current-view-done.mmd", "title": "Before: /gogo:view (reports only, default newest) + /gogo:done (ships one)" }
+  ]
+}

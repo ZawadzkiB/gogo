@@ -1,0 +1,9 @@
+{
+  "slug": "viewer-bundles-and-done-board",
+  "updated": "2026-07-01",
+  "note": "Intended-design flow for roadmap 1-4 (view grouped menu + done status board), plus the as-built Stage B done-board sequence: /gogo:done (no slug) classifies work, opens the terminal-TUI kanban (board.py in tmux) or the table + multi-select fallback, then ships each pick via the single archive+link flow. The as-is baseline is in charts/before/.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/view-done-flow.mmd", "title": "Intended: view selection menu (plans + reports) + /gogo:done status board" },
+    { "kind": "sequence", "file": "charts/done-board-flow.mmd", "title": "As-built: /gogo:done work board (TUI or table fallback) -> single-sourced ship" }
+  ]
+}

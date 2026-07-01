@@ -1,0 +1,32 @@
+{
+  "slug": "viewer-bundles-and-done-board",
+  "track": "test",
+  "round": 3,
+  "updated": "2026-07-01",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "Work-index 'unfinished' class has no live exemplar in the current repo",
+      "description": "TC4 verified three of the four work-index classes against real feature dirs: shipped (diagram-viewer-and-uml-diff — state.md status=shipped + changelog entry), ready-to-ship (docs-and-verified-discovery / pipeline-commands / skill-extraction / workspace-changelog-viewer — all have reports, no changelog), in-progress (viewer-bundles-and-done-board — phase=test, no report). No feature currently exists that is 'plan-only, not mid-pipeline' (the 'unfinished' class). The classifier rule set in gogo-status SKILL.md is structurally correct (last-match fallback: anything else → unfinished), but the live-execution path for that branch was not exercised against a real fixture.",
+      "proposed_solution": "Informational — no code change needed. If future regression coverage is desired, add a fixture feature dir with only a plan.md (no report, early phase) to the test harness. Not blocking.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "wontfix",
+      "origin": "test",
+      "found_in_round": 1,
+      "fix_summary": "Informational, not a defect: the 'unfinished' classifier rule is correct by inspection; there simply is no plan-only feature in the live tree right now to exemplify it. No product change; a fixture could exercise it later."
+    },
+    {
+      "id": "TEST-002",
+      "title": "assets/kanban/__pycache__/ is untracked with no .gitignore exclusion",
+      "description": "assets/kanban/ is a new untracked directory (Stage B). Python's compile step produces assets/kanban/__pycache__/board.cpython-314.pyc. The root .gitignore excludes .DS_Store, *.log, .idea/, .gogo/resources/ and a few others — but has no *.pyc or __pycache__ exclusion. When a contributor runs `git add assets/kanban/` to commit the new vendored board.py, the __pycache__ directory will be staged and committed, polluting the plugin bundle with platform-specific bytecode.",
+      "proposed_solution": "Add `__pycache__/` and `*.pyc` to the root .gitignore (or add a assets/kanban/.gitignore with those entries). Fixable in one line.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 3,
+      "fix_summary": "Added `__pycache__/` and `*.pyc` to the root .gitignore (below the .playwright-mcp/ block) and removed the stray assets/kanban/__pycache__/. Verified via `git check-ignore assets/kanban/__pycache__/board.cpython-314.pyc` (matched) and a clean `git status` — the vendored board.py stages without dragging in compiled bytecode."
+    }
+  ]
+}

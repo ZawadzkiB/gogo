@@ -37,6 +37,14 @@ Generated-by: /gogo:build
 - **`${CLAUDE_PLUGIN_ROOT}`** for all in-plugin asset/template paths — never
   hard-code absolute paths.
 
+## Vendored executable assets (since 0.7.0)
+- An **authored** vendored executable (e.g. `assets/kanban/board.py`, distinct from
+  the third-party `mermaid.min.js` snapshot) must be **pure standard library** (no
+  pip/network), **pure ASCII**, ship a **`--selftest`**, and expose a **documented
+  exit-code contract** the calling skill branches on. It stays a **soft dep**
+  (detected at use; graceful fallback) and **never commits compiled bytecode**
+  (`__pycache__/`, `*.pyc` are gitignored).
+
 ## Style
 - Plain ASCII where practical; the phase glyphs `①②③④⑤` are an intentional exception.
 - Bash hooks: `set -euo pipefail`, best-effort (`|| true`), silent no-op when a

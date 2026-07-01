@@ -1,0 +1,23 @@
+flowchart TD
+  ARGS{"invocation"}:::gate
+  ARGS -->|"\"extract X\" (directed)"| TARGET["resolve the named section"]:::proc
+  ARGS -->|"no prompt (audit)"| SCAN["scan .gogo/knowledge/*.md"]:::proc
+  SCAN --> MEASURE["measure body lines\nOK<200 · WARN 200-400 · OVER>400"]:::proc
+  MEASURE --> ANALYZE["analyze sections in WARN/OVER\n(cohesion · context-locality · standalone-able)"]:::proc
+  ANALYZE --> CLASSIFY
+  TARGET --> CLASSIFY["classify kind\nknowledge | standalone"]:::proc
+  CLASSIFY --> PROPOSE[/"proposals: slug · kind · destination · description · lines saved · scripts/env · stub"/]:::art
+  PROPOSE --> GATE{"user approves\n(per candidate)?"}:::gate
+  GATE -->|"no / edit"| STOP([stop — nothing written]):::io
+  GATE -->|"knowledge"| WK["write .gogo/skills/&lt;slug&gt;/SKILL.md\n+ scripts/ + .env.example"]:::out
+  GATE -->|"standalone"| WC["write .claude/skills/&lt;slug&gt;/SKILL.md\n(harness auto-discovers)"]:::out
+  WK --> STUB
+  WC --> STUB["replace parent section\nwith summary + Load-when pointer"]:::out
+  STUB --> INDEX["update .gogo/skills/index.md\n(kind · destination · trigger)"]:::out
+  INDEX --> REMEASURE["re-measure parents\n(confirm under budget)"]:::proc
+  REMEASURE --> REPORT([report: lines saved · skills created]):::io
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  classDef io fill:#eeeeee,stroke:#999999,color:#111
