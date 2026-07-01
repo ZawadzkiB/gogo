@@ -66,17 +66,27 @@ enough — no `marketplace update` — followed by `/reload-plugins`.
 
 ## Quick start
 
+The whole lifecycle is four commands:
+
 ```
-/gogo:build                 # wire gogo to this project's docs (run once; re-run anytime)
-/gogo:plan "add CSV export to the reports page"
-# review the plan, accept it, then:
-/gogo:go
+/gogo:build                                       # wire gogo to this project (once; re-run anytime)
+/gogo:plan "add CSV export to the reports page"   # plan it — stops for your acceptance
+/gogo:go                                          # implement -> review -> test -> report
+/gogo:done                                        # ship it -> changelog + interactive report link
 ```
 
-`/gogo:build` discovers your existing docs and wires the `.gogo/knowledge/`
-config (and now **verifies the distilled facts against your actual code**).
-`/gogo:plan` writes an accept-pending plan and stops for you. `/gogo:go` runs
-implement -> review -> test -> report, pausing only at real decisions.
+| Step | What it runs | What it produces |
+|---|---|---|
+| **`/gogo:build`** | Discovers your existing docs, wires the `.gogo/knowledge/` config, and **verifies the distilled facts against your actual code** (code wins on conflict). | the `.gogo/knowledge/*` config — see [Discovery](discovery.md) |
+| **`/gogo:plan "…"`** | Analyses the goal against your knowledge + code; writes an accept-pending plan and **stops** for you (a hard gate — no code until you accept). | `.gogo/work/feature-<slug>/plan.md` + the intended-design and as-is `before/` diagrams — see [Flow ①](flow.md) |
+| **`/gogo:go`** | Runs **② implement → ③ review → ④ test → ⑤ report**, looping fixes back into implement and **pausing only at real decisions**. | the code, the living `review/` + `test/` issues, and the as-built `report/` bundle (`report.md` + UML) — see [Flow](flow.md) · [Agents](agents.md) |
+| **`/gogo:done`** | The explicit "this is shipped" gate for a report-complete feature. | copies the bundle to `.gogo/changelog/<date>-<slug>/` and **builds an interactive viewer page, printing its `file://` link** — see [Commands](commands.md) |
+
+Review and test issues loop back into implement automatically; any genuine fork
+**pauses for your decision**, then resumes. Open any finished report as an
+interactive, offline page with **`/gogo:view`** (draggable diagrams, before/after
+compare). Full per-command detail: [Commands](commands.md); the phase mechanics:
+[Flow](flow.md).
 
 ## Documentation map
 

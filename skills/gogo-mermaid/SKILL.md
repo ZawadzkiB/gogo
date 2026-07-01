@@ -154,6 +154,31 @@ change is pure process, draw nothing and note it.
     `report/` sits at the same depth as `charts/` (three levels under `.gogo/`), so
     the `GOGO_MERMAID_SRC` path math is **identical**: `../../../resources/mermaid.min.js`.
 
+## The "before" (as-is) baseline set — `charts/before/` (FR7)
+
+Plan ① captures the UML of the **existing** flow the change will touch — the
+*before* baseline, drawn before any code changes — as its **own** set under
+`charts/before/`, kept distinct from the plan's intended-design diagram:
+
+- **`charts/before/<kind>.mmd`** — the as-is diagram(s), same kinds and conventions
+  as above (flow / sequence / class / activity / use-case). Keep it to **what the
+  change actually touches** — the existing flow being modified, not the whole system.
+- **`charts/before/manifest.json`** — an ordinary charts manifest (same
+  `charts-manifest.schema.json`, `slug` = the feature slug) listing the before set.
+  The before-set reuses the schema **unchanged** via this **separate** manifest
+  (decision D5) — there is no `role`/`before` field added to the manifest.
+- **`charts/before/diagrams.html`** (optional offline viewer) — built exactly like
+  the main one, **except** `charts/before/` sits **one level deeper** than `charts/`,
+  so `GOGO_MERMAID_SRC` is **`../../../../resources/mermaid.min.js`** — **four** `../`,
+  not three. Get the depth right or the vendored runtime won't resolve from
+  `charts/before/`.
+
+Report ⑤ later draws the **after** set into `report/`, **copies this before set**
+into the report bundle (`report/before/`) so the archive is self-contained, and adds
+a before↔after comparison to `report.md` (see gogo-knowledge). If the existing flow
+has nothing structural to show (a brand-new area, or a pure-process change), skip
+`charts/before/` and say so — the comparison then just shows the after set.
+
 ## Portability contract
 
 - Never depend on a globally-installed mermaid skill or CLI.

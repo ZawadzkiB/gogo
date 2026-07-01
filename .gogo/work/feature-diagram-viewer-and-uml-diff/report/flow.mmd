@@ -1,0 +1,13 @@
+flowchart TD
+  MMD[/".mmd (flowchart-family)"/]:::art --> MER["mermaid (vendored) → SVG layout"]:::proc
+  MER --> KIND{"flowchart-family?"}:::gate
+  KIND -->|"no"| FALL["fallback: pan/zoom-drag canvas (0.5.0)"]:::out
+  KIND -->|"yes"| PARSE["mermaid-parse.js → model\n{nodes: id,x,y,w,h · edges: from,to}"]:::proc
+  PARSE --> RENDER["render.js — token-styled node cards\n+ owned SVG edge layer (geometry.routeEdge)\n+ minimap"]:::proc
+  SEED[/"seed order: GOGO_LAYOUT sidecar → localStorage → mermaid"/]:::art -.-> RENDER
+  RENDER --> VP["viewport.js — pan · zoom-to-cursor · fit\nper-node drag → edges re-route live"]:::proc
+  VP -->|"drag-end (debounced)"| PERSIST["localStorage + Export layout.json"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

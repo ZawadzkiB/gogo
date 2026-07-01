@@ -136,10 +136,15 @@ Ship a report-complete feature, via `gogo-done`. The explicit post-report
 "this is the end" gate.
 
 - **Reads:** `.gogo/work/feature-<slug>/report/report.md` (required) + the rest of
-  the `report/` bundle.
-- **Writes:** a copy of the bundle to `.gogo/changelog/<YYYY-MM-DD>-<slug>/`
-  (append-only; copy-not-move; idempotent) and sets `state.md` to a terminal
+  the `report/` bundle (incl. the `before/` set).
+- **Writes:** a copy of the bundle — incl. the `before/` set — to
+  `.gogo/changelog/<YYYY-MM-DD>-<slug>/` (append-only; copy-not-move; idempotent);
+  builds the interactive viewer page for the entry under `.gogo/resources/view/`
+  (best-effort, reusing the `gogo-view` build); and sets `state.md` to a terminal
   `shipped` status.
+- **Prints:** the `file://` link to the built interactive viewer page (with the
+  static `diagrams.html` path as a fallback — it never fails the command over the
+  link).
 - **Validate-in:** if no report exists it STOPs with "No report found for
   `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`."
 
@@ -149,11 +154,20 @@ Open a gogo report as a self-contained, offline **interactive webpage**, via
 `gogo-view`.
 
 - **Reads:** the report bundles under `.gogo/changelog/*/` and
-  `.gogo/work/feature-*/report/`; the vendored `.gogo/resources/` viewer assets.
+  `.gogo/work/feature-*/report/` (incl. a `before/` set, which triggers compare
+  mode); the vendored `.gogo/resources/` viewer assets.
 - **Writes:** a built page under `.gogo/resources/view/` (the `report.md` summary
-  as readable HTML + its mermaid diagrams in a pan/zoom/drag canvas; no network, no
+  as readable HTML + its mermaid diagrams made **interactive**; no network, no
   build) and opens it (`open`/`xdg-open`, best-effort; prints the `file://` path on
   failure).
+- **Interactive rendering:** flowchart-family diagrams (`flow` + `use-case`) get an
+  xplan-style **rich renderer** — custom token-styled node cards you can **drag**
+  with edges that **re-route live**, plus **zoom / fit / minimap** and a persisted
+  layout (dragged positions auto-save to `localStorage`; an **export** control
+  downloads the portable `<name>.layout.json` sidecar). Other kinds
+  (`sequence` / `class` / `stateDiagram`) fall back to a **pan / zoom / drag**
+  canvas. A bundle carrying a `before/` set renders **before | after side by side**
+  (compare mode).
 
 ## Knowledge maintenance
 

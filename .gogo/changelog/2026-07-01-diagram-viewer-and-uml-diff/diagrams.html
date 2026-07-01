@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo report diagrams — diagram-viewer-and-uml-diff</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo report diagrams — <code>diagram-viewer-and-uml-diff</code> (as-built)</h1>
+    <p class="hint">Static offline viewer · for the full interactive experience (drag / re-route / compare) run <code>/gogo:view</code>.</p>
+  </header>
+
+  <h2>Interactive viewer pipeline (flow)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  MMD[/".mmd (flowchart-family)"/]:::art --> MER["mermaid (vendored) → SVG layout"]:::proc
+  MER --> KIND{"flowchart-family?"}:::gate
+  KIND -->|"no"| FALL["fallback: pan/zoom-drag canvas (0.5.0)"]:::out
+  KIND -->|"yes"| PARSE["mermaid-parse.js → model\n{nodes: id,x,y,w,h · edges: from,to}"]:::proc
+  PARSE --> RENDER["render.js — token-styled node cards\n+ owned SVG edge layer (geometry.routeEdge)\n+ minimap"]:::proc
+  SEED[/"seed order: GOGO_LAYOUT sidecar → localStorage → mermaid"/]:::art -.-> RENDER
+  RENDER --> VP["viewport.js — pan · zoom-to-cursor · fit\nper-node drag → edges re-route live"]:::proc
+  VP -->|"drag-end (debounced)"| PERSIST["localStorage + Export layout.json"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  </pre></div>
+
+  <h2>/gogo:done → viewer link (sequence)</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor U as user
+  participant D as /gogo:done
+  participant V as gogo-view build
+  participant RES as .gogo/resources/ (mermaid + viewer/*.js)
+  participant P as page (view/&lt;name&gt;.html)
+  participant B as browser
+  U->>D: /gogo:done &lt;feature&gt;
+  D->>D: copy report bundle (+ before/) → .gogo/changelog/&lt;date&gt;-&lt;slug&gt;/
+  D->>V: reuse gogo-view build (skip auto-open)
+  V->>RES: ensure mermaid + viewer/*.js (copy if missing)
+  V->>P: assemble self-contained page (compare panes if before/ present)
+  D-->>U: print file:// link (+ static diagrams.html fallback)
+  U->>B: open page
+  B->>B: mermaid layout → parse → render cards + own edges → interact
+  Note over B: drag node → routeEdge re-computes edges live; positions → localStorage
+  B-->>U: readable summary + interactive (before | after) diagrams
+  </pre></div>
+
+  <h2>New capabilities (use-case)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  U(("user")):::actor
+  subgraph GOGO["gogo diagrams/report (new capabilities)"]
+    direction TB
+    UC1(["view a report with\ninteractive diagrams"]):::uc
+    UC2(["drag nodes · edges\nre-route live"]):::uc
+    UC3(["persist layout\n(localStorage + export)"]):::uc
+    UC4(["compare before / after\n(side by side)"]):::uc
+    UC5(["ship → get a\nviewer link (/gogo:done)"]):::uc
+  end
+  U --- UC1
+  U --- UC2
+  U --- UC3
+  U --- UC4
+  U --- UC5
+  classDef actor fill:#d9f2f2,stroke:#3aa0a0,color:#111
+  classDef uc fill:#fff3d6,stroke:#caa54a,color:#111
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

@@ -20,8 +20,17 @@ GOGO_VIEW_DIAGRAMS
     </section>
   </main>
 
-  <!-- vendored mermaid runtime, then the interactive pan/zoom/drag layer -->
+  <!-- saved node positions (from <name>.layout.json); empty object when none -->
+  <script>window.GOGO_LAYOUT = GOGO_VIEW_LAYOUT;</script>
+
+  <!-- vendored mermaid, then the viewer modules as ORDERED plain script tags
+       (ES modules and fetch are both blocked over file://; each module attaches
+       to the shared window.gogoViewer namespace). -->
   <script src="GOGO_MERMAID_SRC"></script>
+  <script src="GOGO_GEOMETRY_SRC"></script>
+  <script src="GOGO_VIEWPORT_SRC"></script>
+  <script src="GOGO_MERMAID_PARSE_SRC"></script>
+  <script src="GOGO_RENDER_SRC"></script>
   <script src="GOGO_VIEWER_SRC"></script>
 </body>
 </html>

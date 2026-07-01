@@ -15,3 +15,6 @@
 # asset copies, and generated /gogo:view pages. Source of truth is assets/mermaid/
 # + assets/viewer/ (committed); these are reproduced on demand by gogo commands.
 .gogo/resources/
+
+# Playwright MCP working dir (test tooling scratch — page snapshots, layout)
+.playwright-mcp/

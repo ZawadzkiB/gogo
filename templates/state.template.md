@@ -9,8 +9,8 @@
   - review-NN.md   — each code-review round's rendered snapshot of issues.json
   - test/issues.json   — living, typed test findings (same contract)
   - test-NN.md     — each test round's rendered snapshot
-  - report/        — the as-built bundle (written at phase ⑤): report.md + the UML set (.mmd) + diagrams.html + result.json
-  - charts/        — mermaid diagrams (.mmd) + manifest.json + an offline diagrams.html viewer
+  - report/        — the as-built bundle (written at phase ⑤): report.md + the UML set (.mmd) + report/before/ (the plan-time "before" set, copied in for before/after compare) + diagrams.html + result.json
+  - charts/        — mermaid diagrams (.mmd) + charts/before/ (the plan-time as-is baseline) + manifest.json + an offline diagrams.html viewer
   (and at the .gogo/ level: .gogo/changelog/<YYYY-MM-DD>-<slug>/ — the shipped report bundle archived by /gogo:done)
 -->
 

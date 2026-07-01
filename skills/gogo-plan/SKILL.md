@@ -39,6 +39,16 @@ description: >-
    Label nodes with real endpoints/modules/states, **never** with FR numbers,
    build steps, or the gogo phases. If the change is pure process (docs/tests/
    merge/config) with nothing structural to show, skip the diagram and say so.
+
+   **Also draw the "before" (as-is) baseline** (FR7). In addition to the
+   intended-design diagram above, use `gogo-mermaid` to draw the UML of the
+   *existing* flow the change will touch — captured now, before any code changes —
+   into `charts/before/` (`charts/before/<kind>.mmd` + `charts/before/manifest.json`;
+   same kinds/schema — see gogo-mermaid's "before" set). Keep it scoped to **what the
+   change actually touches**, clearly the *before* baseline (separate from the
+   intended-design diagram). Report ⑤ later draws the *after* set and compares the
+   two. If the existing flow has nothing structural to show (a brand-new area, or a
+   pure-process change), skip `charts/before/` and say so.
 5. **Init state.** Copy `${CLAUDE_PLUGIN_ROOT}/templates/state.template.md` →
    `state.md` and `decisions.template.md` → `decisions.md`; create
    `adjustments.md` (header only). Set `state.md`: phase=plan,

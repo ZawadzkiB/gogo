@@ -1,0 +1,26 @@
+{
+  "slug": "diagram-viewer-and-uml-diff",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/plan.md",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/state.md",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/decisions.md",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/review/issues.json",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/test/issues.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/plan.md",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/report/report.md",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/report/flow.mmd",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/report/sequence.mmd",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/report/use-case.mmd",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/report/manifest.json",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/report/diagrams.html",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/work/feature-diagram-viewer-and-uml-diff/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Strict report ⑤ (clean green run) for the xplan-style interactive viewer + before/after compare. Wrote the report/ bundle: report.md + flow/sequence/use-case UML + diagrams.html + manifest.json. Review APPROVE (REV-001..007 verified), test GREEN (Stage 1 live in Chromium). Version 0.6.0; no before/ set for this feature (introduces the convention). Pending: 0.6.0 release."
+}

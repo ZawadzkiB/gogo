@@ -1,0 +1,12 @@
+{
+  "slug": "diagram-viewer-and-uml-diff",
+  "updated": "2026-07-01",
+  "note": "Intended-design diagram from phase ①: the upgraded /gogo:view renderer pipeline — mermaid lays out, we parse its SVG into a {nodes,edges} model and own interaction (token-styled nodes, owned edge layer with live re-routing, drag, minimap, persisted layout), with a graceful fallback for non-flowchart kinds.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "charts/viewer-pipeline.mmd",
+      "title": "Interactive viewer pipeline: mermaid layout → parse to model → custom render + interact (xplan-style, seeded from mermaid)"
+    }
+  ]
+}

@@ -93,3 +93,13 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   **`/gogo:view`** opens an offline page with the summary + custom pan/zoom/drag
   diagrams (renderer vendored at `.gogo/resources/viewer/`). `/gogo:report` has a
   **lenient mode** to document past/broken runs. Command set is now **12**.
+- **Interactive diagrams + before/after compare (since 0.6.0):** `/gogo:view`'s
+  renderer is now **xplan-style** — mermaid lays out, its SVG is parsed into a
+  `{nodes,edges}` model and re-rendered as custom node cards with an owned edge
+  layer; **drag a node and its edges re-route live**, plus zoom/fit/minimap and a
+  **persisted layout** (localStorage + an Export button → `<name>.layout.json`).
+  Non-flowchart kinds fall back to the pan/zoom canvas. Plan ① now draws an as-is
+  **`charts/before/`** baseline; report ⑤ copies it to **`report/before/`** and adds
+  a **before/after** side-by-side comparison; `/gogo:done` **prints a `file://`
+  viewer link**. Renderer modules: `assets/viewer/{geometry,viewport,mermaid-parse,
+  render,interactive}.js`.

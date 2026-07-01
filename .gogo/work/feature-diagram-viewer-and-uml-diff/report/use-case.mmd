@@ -1,0 +1,19 @@
+flowchart LR
+  U(("user")):::actor
+  subgraph GOGO["gogo diagrams/report (new capabilities)"]
+    direction TB
+    UC1(["view a report with\ninteractive diagrams"]):::uc
+    UC2(["drag nodes · edges\nre-route live"]):::uc
+    UC3(["persist layout\n(localStorage + export)"]):::uc
+    UC4(["compare before / after\n(side by side)"]):::uc
+    UC5(["ship → get a\nviewer link (/gogo:done)"]):::uc
+  end
+  U --- UC1
+  U --- UC2
+  U --- UC3
+  U --- UC4
+  U --- UC5
+  UC1 --> UC2
+  UC2 --> UC3
+  classDef actor fill:#d9f2f2,stroke:#3aa0a0,color:#111
+  classDef uc fill:#fff3d6,stroke:#caa54a,color:#111

@@ -1,0 +1,18 @@
+sequenceDiagram
+  actor U as user
+  participant D as /gogo:done
+  participant V as gogo-view build
+  participant RES as .gogo/resources/ (mermaid + viewer/*.js)
+  participant P as page (view/&lt;name&gt;.html)
+  participant B as browser
+  U->>D: /gogo:done &lt;feature&gt;
+  D->>D: copy report bundle (+ before/) → .gogo/changelog/&lt;date&gt;-&lt;slug&gt;/
+  D->>V: reuse gogo-view build (skip auto-open)
+  V->>RES: ensure mermaid + viewer/*.js (copy if missing)
+  V->>P: assemble self-contained page (compare panes if before/ present)
+  D-->>U: print file:// link (+ static diagrams.html fallback)
+  U->>B: open page
+  B->>RES: load vendored mermaid + geometry/viewport/parse/render/interactive (offline)
+  B->>B: mermaid layout → parse → render cards + own edges → interact
+  Note over B: drag node → routeEdge re-computes edges live; positions → localStorage
+  B-->>U: readable summary + interactive (before | after) diagrams

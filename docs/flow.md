@@ -77,20 +77,27 @@ prerequisite. The in-pipeline ⑤ call (right after a green ④) keeps its stric
 ### Ship — command `/gogo:done` (skill `gogo-done`)
 
 The explicit post-report gate. When you declare the feature shipped, `/gogo:done`
-**copies** the `report/` bundle (`report.md` + the `.mmd` UML set + `diagrams.html`)
-into the append-only `.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive and sets
-`state.md` to a terminal `shipped` status. Copy-not-move (the work folder stays the
-source) and idempotent — re-running overwrites the same dated entry. If no report
-exists yet it STOPs and tells you to run `/gogo:report <feature>` first.
+**copies** the `report/` bundle (`report.md` + the `.mmd` UML set + the `before/`
+set + `diagrams.html`) into the append-only `.gogo/changelog/<YYYY-MM-DD>-<slug>/`
+archive, **builds the interactive viewer page for the entry and prints its `file://`
+link** (best-effort, reusing the `/gogo:view` build; falls back to the static
+`diagrams.html` path — never failing the command over the link), and sets `state.md`
+to a terminal `shipped` status. Copy-not-move (the work folder stays the source) and
+idempotent — re-running overwrites the same dated entry. If no report exists yet it
+STOPs and tells you to run `/gogo:report <feature>` first.
 
 ### View — command `/gogo:view` (skill `gogo-view`)
 
 Read any report as a self-contained, offline **interactive webpage** — the
-`report.md` summary as readable HTML plus its mermaid diagrams in a pan/zoom/drag
-canvas. `/gogo:view` lists the reports under `.gogo/changelog/` and
-`.gogo/work/*/report/`, builds the page from the vendored `.gogo/resources/` assets
-(no network, no build), and opens it (printing the `file://` path if it can't
-auto-open).
+`report.md` summary as readable HTML plus its mermaid diagrams made **interactive**.
+Flowchart-family diagrams (`flow` + `use-case`) get an xplan-style rich renderer:
+custom-styled node cards you **drag** with edges that **re-route live**, plus
+**zoom / fit / minimap** and a **persisted layout**; other kinds fall back to a
+pan / zoom / drag canvas. A report carrying a `before/` set renders **before / after
+side by side** (compare mode). `/gogo:view` lists the reports under
+`.gogo/changelog/` and `.gogo/work/*/report/`, builds the page from the vendored
+`.gogo/resources/` assets (no network, no build), and opens it (printing the
+`file://` path if it can't auto-open).
 
 ## The loops
 

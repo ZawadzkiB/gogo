@@ -23,9 +23,11 @@ broken, or incomplete run** — see the lenient mode in validate-in below.
 | in (required) | `plan.md`, `state.md` | prose / human state |
 | in (optional) | `review/issues.json`, `test/issues.json` | `issues-list.schema.json` |
 | in (optional) | `charts/manifest.json` | `charts-manifest.schema.json` |
+| in (optional) | `charts/before/*.mmd` + `charts/before/manifest.json` (the plan-time "before" set, FR7) | `charts-manifest.schema.json` |
 | in (optional) | `decisions.md` + the implement rounds | prose audit trail |
 | out | `report/report.md`, the as-built UML set + `report/diagrams.html`, updated `.gogo/knowledge/*` | prose / diagrams |
 | out | `report/manifest.json` (the as-built set index) | `charts-manifest.schema.json` |
+| out (optional) | `report/before/*.mmd` + `report/before/manifest.json` (the before set copied in, FR8) | `charts-manifest.schema.json` |
 | out | `report/result.json` (per run) | `phase-result.schema.json` |
 
 ## ① validate-in (gate — FR2) — strict (pipeline) vs lenient (standalone)
@@ -88,7 +90,22 @@ Phase ⑤ has two gates; they differ **only here**, in what they require to run.
    loads the shared runtime at `../../../resources/mermaid.min.js` (`report/` is the
    same depth as `charts/`). **Write `report/manifest.json`** so its `diagrams[]`
    (kind/file/title) match the `.mmd` set on disk (empty `diagrams` + a `note` if you
-   drew nothing). **In lenient mode** draw only what the *available* artifacts
+   drew nothing).
+
+   **Copy the plan-time "before" set into the bundle (FR8).** If `charts/before/`
+   exists (the as-is baseline plan ① drew), copy its `*.mmd` **and** `manifest.json`
+   into **`report/before/`** so the report bundle is **self-contained** — the archive
+   `/gogo:done` ships and `/gogo:view` compare mode both read the before set locally,
+   with no dependency on the `charts/` folder. In the copied
+   `report/before/manifest.json`, **rewrite each `file` to point at the copied
+   location** — `report/before/<kind>.mmd` (or the bare `<kind>.mmd` basename) —
+   so the archived manifest doesn't dangle back into `charts/`. This is a
+   path-string update only; the schema shape is unchanged (D5 forbids a *schema*
+   change, not correcting a path). If there is **no** `charts/before/` (the feature
+   predates this, or the plan drew none), note that and produce only the after set —
+   the comparison below then just shows the after diagrams.
+
+   **In lenient mode** draw only what the *available* artifacts
    support (e.g. reuse the plan's `charts/` and whatever shipped) and **skip any kind
    you can't derive** from a partial run — an empty/partial set is fine; note it.
 3. **Write the final report.** Copy `${CLAUDE_PLUGIN_ROOT}/templates/report.template.md`
@@ -109,6 +126,13 @@ Phase ⑤ has two gates; they differ **only here**, in what they require to run.
      **reason** it was made.
    - **Review outcome**, **test outcome**, the **diagrams** (link `./diagrams.html`,
      same folder), **knowledge updates**, and **follow-ups**.
+   - **Before / after comparison** (FR8) — if a `report/before/` set exists, add a
+     comparison section: for each kind present in **both** the before and after sets,
+     show the two diagrams **side by side** (fenced mermaid blocks — before then
+     after) with a short prose **"what changed"**; call out any kind that was
+     **added** (after only) or **removed** (before only). If there is no before set,
+     say so in one line and show only the after set. This is **side-by-side + prose
+     only** — do **not** compute a structural node-diff (decision D4=A).
 
    Link the audit-trail files (`../decisions.md`, `../review-NN.md`/`../review/issues.json`,
    `../test-NN.md`/`../test/issues.json`) rather than repeating them. This is the
@@ -134,7 +158,9 @@ Phase ⑤ has two gates; they differ **only here**, in what they require to run.
 
 Via `gogo-contracts`: validate the written `report/manifest.json` against
 `charts-manifest.schema.json` (it IS schema-governed; the `.mmd`/`.html` viewer
-are the unschematized prose/visual artifacts). Then write `report/result.json`
+are the unschematized prose/visual artifacts). If a before set was copied in,
+validate `report/before/manifest.json` against the **same** schema too (it was
+carried over verbatim — decision D5, no schema change). Then write `report/result.json`
 (`phase: report`, `status: ok`, `inputs`, `outputs`, `validated_in: true`,
 `validated_out: true`, `summary`). `report/report.md` is a prose artifact; the
 result record is the machine state for chaining. Set `state.md` per Step 1: a

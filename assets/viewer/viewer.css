@@ -1,8 +1,26 @@
 /* gogo interactive viewer — readable summary typography + pan/zoom/drag diagram
  * canvas + floating controls. Offline, zero deps. Dark-friendly, matching the
- * gogo offline diagrams viewer (assets/mermaid/viewer.template.html). */
+ * gogo offline diagrams viewer (assets/mermaid/viewer.template.html).
+ *
+ * Adds the xplan-style RICH renderer skin: a token palette (CSS vars) driving
+ * custom node cards colored by their classDef role, an owned SVG edge layer, and
+ * a minimap. Non-flowchart kinds keep the pan/zoom .canvas fallback below. */
 
-:root { color-scheme: light dark; }
+:root {
+  color-scheme: light dark;
+  /* ---- token palette (rich node cards, colored by classDef role) ---- */
+  --gogo-card-bg: #eef1f8;
+  --gogo-card-border: #b9c2d9;
+  --gogo-card-text: #14171f;
+  --gogo-edge: #6b7590;
+  --gogo-edge-label: #3a4152;
+  /* role tones — mirror gogo's mermaid classDefs (proc/art/gate/out/io) */
+  --gogo-proc-bg: #e8ecff;  --gogo-proc-border: #7c8bd9;
+  --gogo-art-bg:  #fff3d6;  --gogo-art-border:  #caa54a;
+  --gogo-gate-bg: #ffe0e6;  --gogo-gate-border: #d98aa0;
+  --gogo-out-bg:  #e6f5e6;  --gogo-out-border:  #86b886;
+  --gogo-io-bg:   #eeeeee;  --gogo-io-border:   #999999;
+}
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -42,6 +60,20 @@ body {
 .diagram { margin: 0 0 2.5rem; }
 .diagram > figcaption { font-size: 1.05rem; font-weight: 600; margin: 0 0 .5rem; opacity: .9; }
 
+/* ---- before / after compare mode: labeled two-column pairs (FR9) ----
+ * Each kind is a row of two independent interactive figures (Before | After);
+ * a kind that exists on only one side is a full-width .compare-solo figure.
+ * Falls back to stacked (single column) on narrow widths — no node-diff (D4=A). */
+.compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+  margin: 0 0 2.5rem; align-items: start;
+}
+.compare > .diagram { margin: 0; }
+.compare > .diagram.compare-solo { grid-column: 1 / -1; }
+.compare .compare-before > figcaption { color: var(--gogo-art-border); }
+.compare .compare-after  > figcaption { color: var(--gogo-out-border); }
+@media (max-width: 720px) { .compare { grid-template-columns: 1fr; } }
+
 .viewport {
   position: relative; width: 100%; height: 70vh; min-height: 380px;
   background: #ffffff; border-radius: 10px; overflow: hidden;
@@ -60,6 +92,53 @@ body {
   border-radius: 6px; cursor: pointer; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
 }
 .controls button:hover { background: rgba(40,48,66,.95); }
+
+/* ---- rich renderer: transformed "world" holding cards + owned edge svg ---- */
+.viewport.gogo-rich { background: #f6f7fb; }
+.gogo-world { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+.gogo-edges { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.gogo-edge { fill: none; stroke: var(--gogo-edge); stroke-width: 1.6; }
+.gogo-arrow-head { fill: var(--gogo-edge); stroke: none; }
+.gogo-edge-label {
+  fill: var(--gogo-edge-label); font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  paint-order: stroke; stroke: #f6f7fb; stroke-width: 3px;
+}
+
+/* node cards — absolutely positioned in the world, colored by role, draggable */
+.gogo-node {
+  position: absolute;
+  max-width: 260px;
+  padding: 8px 12px;
+  background: var(--gogo-card-bg); color: var(--gogo-card-text);
+  border: 1.5px solid var(--gogo-card-border); border-radius: 8px;
+  font: 600 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  text-align: center; white-space: pre-wrap; word-break: break-word;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  cursor: grab; user-select: none; touch-action: none;
+}
+.gogo-node:active { cursor: grabbing; }
+.gogo-node.role-proc { background: var(--gogo-proc-bg); border-color: var(--gogo-proc-border); }
+.gogo-node.role-art  { background: var(--gogo-art-bg);  border-color: var(--gogo-art-border); }
+.gogo-node.role-gate { background: var(--gogo-gate-bg); border-color: var(--gogo-gate-border); border-radius: 4px; }
+.gogo-node.role-out  { background: var(--gogo-out-bg);  border-color: var(--gogo-out-border); }
+.gogo-node.role-io   { background: var(--gogo-io-bg);   border-color: var(--gogo-io-border); border-radius: 999px; }
+
+/* ---- minimap (inverse-transform; click / drag to recenter) ---- */
+.gogo-minimap {
+  position: absolute; bottom: 12px; right: 12px; width: 168px; height: 104px;
+  border: 1px solid #39435a; border-radius: 4px; background: rgba(17,21,30,.9);
+  overflow: hidden; cursor: pointer; z-index: 2;
+}
+.gogo-mm-node { position: absolute; background: var(--gogo-card-border); opacity: .75; border-radius: 1px; }
+.gogo-mm-node.role-proc { background: var(--gogo-proc-border); }
+.gogo-mm-node.role-art  { background: var(--gogo-art-border); }
+.gogo-mm-node.role-gate { background: var(--gogo-gate-border); }
+.gogo-mm-node.role-out  { background: var(--gogo-out-border); }
+.gogo-mm-node.role-io   { background: var(--gogo-io-border); }
+.gogo-mm-view {
+  position: absolute; border: 1.5px solid #7aa8ff; background: rgba(122,168,255,.14);
+  pointer-events: none;
+}
 
 /* ---- graceful failure (mermaid runtime missing / render error) ---- */
 .err {

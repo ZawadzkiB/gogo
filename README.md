@@ -215,18 +215,25 @@ prerequisite. (The in-pipeline ⑤, right after a green test, keeps its strict g
 **`/gogo:done [feature-slug]`**
 
 Ship a report-complete feature. Copies its `report/` bundle (`report.md` + the UML
-diagrams) into the append-only `.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive and
-sets `state.md` to a terminal `shipped` status. Copy-not-move (the work folder
+diagrams + the `before/` set) into the append-only
+`.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive, **builds the interactive viewer page
+for the entry and prints its `file://` link** (best-effort, reusing the `/gogo:view`
+build; falls back to the static `diagrams.html` path — never failing over the link),
+and sets `state.md` to a terminal `shipped` status. Copy-not-move (the work folder
 stays the source); idempotent. If no report exists yet it stops and tells you to
 run `/gogo:report <feature>` first.
 
 **`/gogo:view [changelog-entry | feature-slug]`**
 
 Open a gogo report as a self-contained, offline **interactive webpage** — the
-`report.md` summary rendered as readable HTML plus its mermaid diagrams in a
-pan/zoom/drag canvas (vendored runtime, no network, no build). Lists the available
-reports (from `.gogo/changelog/` and `.gogo/work/*/report/`) and opens your pick;
-falls back to printing the `file://` path if it can't auto-open.
+`report.md` summary rendered as readable HTML plus its mermaid diagrams made
+**interactive** (vendored runtime, no network, no build). Flowchart-family diagrams
+get an xplan-style rich renderer: custom-styled node cards you **drag** with edges
+that **re-route live**, plus **zoom / fit / minimap** and a **persisted layout**;
+other kinds fall back to a pan/zoom/drag canvas. A report carrying a `before/` set
+renders **before / after side by side** (compare mode). Lists the available reports
+(from `.gogo/changelog/` and `.gogo/work/*/report/`) and opens your pick; falls back
+to printing the `file://` path if it can't auto-open.
 
 **`/gogo:status`**
 
@@ -264,8 +271,9 @@ in **`.claude/skills/<slug>/`** so Claude Code auto-discovers it — written onl
 when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
 **`.gogo/resources/`** — one vendored mermaid runtime per project
-(`mermaid.min.js`, shared by every feature) plus the interactive viewer assets
-(`viewer/`) `/gogo:view` builds pages from. Offline, no network, no build.
+(`mermaid.min.js`, shared by every feature) plus the interactive viewer module set
+(`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`).
+Offline, no network, no build.
 
 **`.gogo/work/feature-<slug>/`** — one folder per piece of work:
 
@@ -279,11 +287,11 @@ when you approve that candidate (the one sanctioned write outside `.gogo/`).
 | `review-NN.md` | Each code-review round's rendered snapshot of `issues.json` |
 | `test/issues.json` | The living, typed test findings (same contract) |
 | `test-NN.md` | Each test round's rendered snapshot |
-| `report/` | The as-built bundle (written at report phase): `report/report.md` (planned-vs-shipped, implementation, decisions + reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `diagrams.html`, `manifest.json`. `/gogo:done` copies it to `.gogo/changelog/<date>-<slug>/` |
-| `charts/` | Mermaid diagrams (`.mmd`) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement as-built flow / sequence / class / activity set |
+| `report/` | The as-built bundle (written at report phase): `report/report.md` (planned-vs-shipped, implementation, decisions + reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`. `/gogo:done` copies it to `.gogo/changelog/<date>-<slug>/` |
+| `charts/` | Mermaid diagrams (`.mmd`) + `charts/before/` (the plan-time as-is baseline) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement as-built flow / sequence / class / activity set |
 
 **`.gogo/changelog/`** — the append-only shipped archive. When you run
-`/gogo:done`, the feature's `report/` bundle (report.md + diagrams) is copied to
+`/gogo:done`, the feature's `report/` bundle (report.md + diagrams + the before/ set) is copied to
 `.gogo/changelog/<YYYY-MM-DD>-<slug>/`. `/gogo:view` reads from here too.
 
 The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run

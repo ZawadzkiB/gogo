@@ -1,0 +1,99 @@
+{
+  "slug": "diagram-viewer-and-uml-diff",
+  "track": "review",
+  "round": 7,
+  "updated": "2026-07-01",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "Fallback (and rich) path leaves the emptied <pre class=\"mermaid\"> in the DOM — not byte-for-byte with 0.5.0",
+      "description": "In 0.5.0 setupViewport ended with `if (pre) pre.replaceWith(viewport)`, which removed the now-empty <pre> after the SVG was moved into the canvas. The new fallbackViewport (assets/viewer/interactive.js:42-123) takes the svg as a param and finishes with `figure.appendChild(viewport)` — it never removes the emptied <pre>. After mermaid.run (v10.9.1) the <pre class=\"mermaid\"> still exists in the figure with its svg child; the fallback moves that svg into .canvas, leaving an empty <pre> before the viewport. The rich path (render.js:51) only hides the svg (display:none) and appends the viewport, likewise leaving the <pre> (now holding a hidden svg) in place. A default-styled <pre> carries ~1em top/bottom margin, so each diagram gets a small stray vertical gap above it. Not a functional break, but it contradicts the 'fallback path is byte-for-byte the prior behaviour' intent.",
+      "proposed_solution": "After extracting the svg (both paths), remove or hide the leftover container. Simplest: in the orchestrator, capture `var pre = figure.querySelector('pre.mermaid')` and, after render/fallback, `if (pre) pre.style.display = 'none'` (or `pre.remove()` in the fallback path where the svg has been moved out). Keeps the DOM tidy and restores the 0.5.0 spacing.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "interactive.js now captures `var pre = figure.querySelector('pre.mermaid')` before the SVG takeover and removes it after render/fallback (`if (pre && pre.parentNode) pre.parentNode.removeChild(pre)`), matching 0.5.0's pre.replaceWith. The emptied <pre> (rich path: holding the hidden svg; fallback: svg moved into the canvas) no longer leaves a default top/bottom-margin gap above each diagram; the svg reference is used before removal so it stays valid."
+    },
+    {
+      "id": "REV-002",
+      "title": "Layout persistence is in-memory only — onPersist is never wired and file:// can't write the sidecar, so FR4 'reload keeps the arrangement' only works via manual sidecar editing",
+      "description": "render.js implements a debounced persist() that writes positions to window.gogoViewer.layouts[name] and, if provided, calls opts.onPersist(name, positions) (render.js:236-250). But the orchestrator calls ns.render(figure, svg, model, { name, layout }) with NO onPersist (interactive.js:165) — so the onPersist branch is dead code, and nothing writes back to `.gogo/resources/view/<name>.layout.json`. A page opened over file:// cannot write to the local filesystem from JS, so auto-save to the sidecar is infeasible by design. Seeding works (window.GOGO_LAYOUT is read at render), so a manually-saved sidecar IS honoured on reload — but a user who drags nodes and simply reopens the page loses the arrangement. This is documented as best-effort v1 in skills/gogo-view/SKILL.md and follows from D6 (sidecar over localStorage), yet it leaves FR4 and the Stage-1 test 'positions persist to <name>.layout.json and reload' only half-delivered (read-half only).",
+      "proposed_solution": "Confirm the intended v1 bar for FR4. Options: (a) accept manual/in-memory persistence for v1 as already documented (then remove the unused onPersist hook, or keep it but note it as a Stage-3 seam and add a one-line UI hint to export window.gogoViewer.layouts); (b) add a localStorage write/seed fallback alongside the sidecar so reopening the same file keeps positions with zero manual steps (localStorage works on file://); (c) have gogo-view offer a copy-to-clipboard/export of the layout JSON so writing the sidecar is a one-paste step. Pick one and align plan.md/test-strategy wording so the 'persist and reload' test is actually satisfiable.",
+      "severity": "minor",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Implemented D7=A real persistence in render.js. Drag-end auto-saves positions to localStorage under `gogo-view:layout:<name>` (debounced, wrapped in try/catch so a browser that blocks file:// storage degrades to in-memory). Seed order on load is now injected window.GOGO_LAYOUT[name] (committed sidecar) -> localStorage -> mermaid's parsed positions. Added a per-diagram 'export' control that downloads the portable <name>.layout.json — the full window.gogoViewer.layouts map in the D6 shape {\"<name>\":{\"<id>\":{x,y}}} — via an offline Blob + URL.createObjectURL + a.download (no network/fetch). Reset-layout now clears that diagram's localStorage entry. The previously-dead opts.onPersist hook (interactive.js call site) is now fired on persist/reset via mirror(). gogo-view SKILL.md documents localStorage auto-persist + the Export button + that the skill seeds window.GOGO_LAYOUT from the sidecar."
+    },
+    {
+      "id": "REV-003",
+      "title": "Rich renderer window drag listeners omit pointercancel — a cancelled touch/pen pointer leaves node-drag stuck",
+      "description": "render.js adds window-level 'pointermove'/'pointerup' listeners once per rich diagram (render.js:266-275) to run node/pan drags. There is no 'pointercancel' handler, so if the browser cancels the pointer mid-drag (common on touch/pen when a scroll/gesture takes over), vp.endDrag() is never called and drag stays non-null. Because onMove is gated on vp.isDragging() (not on a held button), the next pointermove — even a bare hover — will keep moving the node. The 0.5.0 fallback path DOES handle pointercancel (interactive.js:101), so this is an interaction regression for the rich path specifically. Faithful to xplan (which also only listens for pointerup), but xplan runs in an SPA, not a static offline page.",
+      "proposed_solution": "In render.js, register the same handler for 'pointercancel' as for 'pointerup' (end the drag, drop the 'grabbing' class, persist if a node actually moved), e.g. add `window.addEventListener('pointercancel', <the pointerup handler>)`.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "render.js rich path: extracted the pointerup handler into endPointer() and registered it for both 'pointerup' and 'pointercancel' (window level). A cancelled touch/pen pointer now ends the drag (drops 'grabbing', persists if the node moved), mirroring the fallback path, so a subsequent bare pointermove no longer keeps a node stuck to the cursor. Verified via the fake-DOM harness: after pointercancel a later hover does not move the node."
+    },
+    {
+      "id": "REV-004",
+      "title": "Edge-label index can desync when an edge is dropped during parse",
+      "description": "In mermaid-parse.js:143-157 edge labels are read into labelEls in document order and matched to edges by a running index `idx` that only advances for accepted edges. When an edge path is dropped (endpoint not in the known-node set, mermaid-parse.js:153 `continue`), idx is NOT advanced, so the dropped edge's label is inherited by the next accepted edge and every subsequent label shifts by one. Labels are best-effort/optional to the model and well-formed gogo flowcharts shouldn't drop edges, so impact is low — but the alignment is silently wrong when it does happen.",
+      "proposed_solution": "Advance the label cursor per source edge, not per accepted edge: iterate paths with the loop counter and index labelEls by the edge's own position (e.g. track a separate edge-ordinal that increments for every path examined), or resolve labels via the edge path's own id/DOM sibling rather than a shared running index.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "mermaid-parse.js: edge labels are now keyed to each edge's own ordinal among the source paths — a separate edgeOrd cursor increments for every unique path examined (including a dropped one) and indexes labelEls[slot], instead of a running index that only advanced for accepted edges. A dropped edge consumes its own label slot, so subsequent labels stay aligned. Verified via the fake-DOM harness: with a dropped middle edge (A->X), A->B keeps 'yes' and B->C keeps 'maybe' (never inherits the dropped 'no')."
+    },
+    {
+      "id": "REV-005",
+      "title": "gogo-knowledge copies before/manifest.json verbatim ('do not rewrite'), so report/before/manifest.json keeps charts/before/*.mmd file paths — the copied manifest points outside the report bundle (defeats FR8 self-containment; dangling refs once /gogo:done archives only report/)",
+      "description": "skills/gogo-knowledge/SKILL.md:95-103 tells report ⑤ to copy charts/before/ into report/before/ so the bundle is 'self-contained ... with no dependency on the charts/ folder', but then says: 'Do not rewrite the copied before/manifest.json (it already validates against charts-manifest.schema.json — decision D5, no schema change).' The manifest `file` field is a folder-prefixed path by established convention (charts-manifest.schema.json describes it as a path 'under the feature's charts/ folder, or report/'; every manifest on disk follows this — e.g. feature-workspace-changelog-viewer/report/manifest.json uses \"file\":\"report/flow.mmd\", charts manifests use \"file\":\"charts/<name>.mmd\"). So an 'ordinary' before manifest at charts/before/ (per gogo-mermaid SKILL.md:166-169) carries \"file\":\"charts/before/<kind>.mmd\". Copying it VERBATIM leaves report/before/manifest.json still pointing at charts/before/<kind>.mmd — i.e. (a) it points OUTSIDE the report bundle, contradicting the same sentence's 'no dependency on the charts/ folder' promise, and (b) once /gogo:done archives only the report/ bundle to .gogo/changelog/<date>-<slug>/, those file paths are dangling (they reference files not present in the archive). The instruction's rationale conflates D5 ('no schema change' = don't add a role/before field / don't alter the shape) with 'don't touch the content at all' — but adjusting the location-relative `file` paths is NOT a schema change. Note the gate does NOT catch this: validate-out (gogo-knowledge SKILL.md:155-159) only checks report/before/manifest.json against the schema, whose `file` pattern is just `\\.mmd$`, so a wrong-but-.mmd path passes silently. Consumer impact is limited because gogo-view compare mode globs before/*.mmd by filename rather than reading the manifest `file` paths (gogo-view SKILL.md:159-176), so rendering still works — but the copied/archived manifest is itself an inaccurate, non-self-contained contract artifact.",
+      "proposed_solution": "AGENT-FIXABLE. In skills/gogo-knowledge/SKILL.md, change 'Do not rewrite the copied before/manifest.json' to: copy the before manifest and REWRITE its `file` entries to the new location — either report/before/<kind>.mmd (matching the after set's report/-prefixed convention) or bare basenames <kind>.mmd — keeping slug/kind/title and the schema shape unchanged (D5 forbids a schema change, not a path-string update). State explicitly that only the location-relative `file` paths are adjusted so the bundle is genuinely self-contained and the /gogo:done archive has no dangling references. Optionally strengthen validate-out to confirm each report/before/manifest.json `file` resolves to a sibling under report/before/ (semantic check beyond the schema's `\\.mmd$` pattern).",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 4,
+      "fixed_in_round": 4,
+      "fix_summary": "gogo-knowledge FR8 step now rewrites each `file` in the copied report/before/manifest.json to report/before/<kind>.mmd (or bare basename) so the archived manifest points at the copied location instead of dangling into charts/. Path-string update only; schema shape unchanged (D5)."
+    },
+    {
+      "id": "REV-006",
+      "title": "docs/architecture.md skills-tree one-liner for gogo-done still says only 'ship: copy report bundle → .gogo/changelog/' — omits FR10's new build + print viewer link behaviour (sibling gogo-view line was refreshed, this one wasn't)",
+      "description": "FR10 gives /gogo:done a materially new behaviour: after archiving it builds the interactive viewer page for the entry and prints its file:// link (best-effort, reusing the gogo-view build; falls back to the static diagrams.html). Every other FR11-scope surface reflects this — commands/done.md, docs/commands.md (+ a 'Prints:' bullet), docs/flow.md, README.md, and skills/gogo/SKILL.md's Ship section all now describe the build+link. But the skills-tree comment in docs/architecture.md (line ~114) still reads `gogo-done/  #  ship: copy report bundle → .gogo/changelog/` and was NOT updated, even though the adjacent gogo-view line in the same tree WAS refreshed this pass (`interactive viewer for reports (rich draggable nodes + before/after compare)`). Per code-review-standards.md #1 (cross-file consistency — 'No place still describes the old behaviour') and coding-rules.md 'keep enumerations in sync', this leaves the architecture map describing gogo-done's pre-FR10 behaviour. Low impact (a terse tree comment), but it is a real doc-sync gap in an FR11-scope file and inconsistent with its own sibling line.",
+      "proposed_solution": "AGENT-FIXABLE. In docs/architecture.md, extend the gogo-done skills-tree comment to note the FR10 behaviour, e.g. `gogo-done/  #  ship: copy report bundle → .gogo/changelog/ + build/print viewer link` (keep it one line, matching the refreshed gogo-view sibling's tone).",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 6,
+      "fixed_in_round": 6,
+      "fix_summary": "docs/architecture.md gogo-done skills-tree comment now reads 'ship: copy report bundle → .gogo/changelog/ + build/print viewer link' (FR10)."
+    },
+    {
+      "id": "REV-007",
+      "title": "Changelog one-liners still say '(report.md + diagrams)' — don't mention the newly-copied before/ set that /gogo:done now archives",
+      "description": "FR8+FR10 make /gogo:done copy the report/before/ set into the changelog entry so the archive is self-contained and the viewer's before/after compare works from the entry alone (implemented in skills/gogo-done/SKILL.md step 3; the report/ enumeration rows in skills/gogo/SKILL.md, templates/state.template.md, docs/architecture.md and README.md were all updated to add report/before/). But the two changelog description one-liners were not updated to match: docs/architecture.md:147 `changelog/  # append-only shipped archive: <YYYY-MM-DD>-<slug>/ (report.md + diagrams)` and README.md:294 `the feature's report/ bundle (report.md + diagrams) is copied to ...` still enumerate the archived contents as just 'report.md + diagrams'. Within README.md this is internally inconsistent: the report/ row one line up (line 290) now explicitly lists report/before/, while the changelog line just below still uses the pre-before phrasing. Low impact — 'diagrams' loosely subsumes the before/ .mmd set — but it is a real enumeration-sync miss per coding-rules.md ('keep enumerations in sync ... grep before you finish').",
+      "proposed_solution": "AGENT-FIXABLE. Update both changelog one-liners to mention the before/ set, mirroring the report/ rows — e.g. '(report.md + diagrams + the before/ set)' in docs/architecture.md:147 and 'the feature's report/ bundle (report.md + diagrams + the before/ set)' in README.md:294. Optional: keep phrasing identical to skills/gogo/SKILL.md's Ship section ('report.md + diagrams + the before/ set') for consistency.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 6,
+      "fixed_in_round": 6,
+      "fix_summary": "Appended '+ before/ set' to the changelog one-liners in docs/architecture.md and README.md so they match the report/ row and the actually-archived bundle."
+    }
+  ]
+}

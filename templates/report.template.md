@@ -62,6 +62,15 @@ Note anything skipped and why (e.g. browser tooling absent).>
 (lifecycle / state), class (structure / types), use-case (a new user capability).
 If the change was pure process, say so — no diagram.>
 
+## Before / after comparison
+<If plan ① captured a before (as-is) set — copied into this bundle as
+report/before/*.mmd — compare it to the as-built after set. For each kind present in
+BOTH, show the before and after diagrams side by side (fenced mermaid blocks, before
+then after) with a short prose "what changed"; note any kind added (after only) or
+removed (before only). No before set (feature predates this, or none drawn) → say so
+in one line and show only the after set above. Side-by-side + prose only — no
+computed node-diff (decision D4).>
+
 ## Knowledge updates
 <Which `.gogo/knowledge/*` files were updated (gogo-owned summaries only). List any
 "consider upstreaming to CLAUDE.md / README" suggestions for the user.>

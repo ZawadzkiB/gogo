@@ -1,0 +1,10 @@
+{
+  "slug": "diagram-viewer-and-uml-diff",
+  "updated": "2026-07-01",
+  "note": "As-built report bundle for the xplan-style interactive viewer + before/after compare. flow = the renderer pipeline (mermaid layout → parse → custom render/interact); sequence = the /gogo:done → gogo-view build → browser interaction runtime; use-case = the new user capabilities. No before/ set for this feature (the before/after convention it introduces did not exist at its own plan phase) — the comparison shows the after set only, per the graceful path.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "Interactive viewer pipeline: mermaid layout → parse → token-styled render + owned edges + drag/persist (fallback for non-flowchart kinds)" },
+    { "kind": "sequence", "file": "report/sequence.mmd", "title": "/gogo:done reuses the gogo-view build → self-contained page → offline browser interaction" },
+    { "kind": "use-case", "file": "report/use-case.mmd", "title": "New capabilities: interactive view, drag+re-route, persisted layout, before/after compare, done→viewer link" }
+  ]
+}

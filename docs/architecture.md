@@ -110,8 +110,8 @@ gogo/
 │   ├── gogo-review/          #   ③ review
 │   ├── gogo-test/            #   ④ test
 │   ├── gogo-knowledge/       #   ⑤ report + knowledge update (strict + lenient)
-│   ├── gogo-done/            #   ship: copy report bundle → .gogo/changelog/
-│   ├── gogo-view/            #   interactive viewer (pan/zoom/drag) for reports
+│   ├── gogo-done/            #   ship: copy report bundle → .gogo/changelog/ + build/print viewer link
+│   ├── gogo-view/            #   interactive viewer for reports (rich draggable nodes + before/after compare)
 │   ├── gogo-skills/          #   audit knowledge budget + extract on-demand skills
 │   ├── gogo-contracts/       #   validate-in / validate-out at every hand-off
 │   └── gogo-mermaid/         #   diagram generation + offline viewer
@@ -123,7 +123,11 @@ gogo/
 │   ├── skills-index.template.md  # scaffold for .gogo/skills/index.md
 │   ├── state.template.md  decisions.template.md  report.template.md
 ├── hooks/                    # config-check.sh, notify.sh, hooks.json (best-effort)
-├── assets/mermaid/           # vendored mermaid.min.js + viewer.template.html
+├── assets/
+│   ├── mermaid/              #   vendored mermaid.min.js + viewer.template.html
+│   └── viewer/               #   the interactive viewer (modular, vanilla, no build):
+│       │                     #   geometry.js · viewport.js · mermaid-parse.js ·
+│       │                     #   render.js · interactive.js · viewer.css · viewer.template.html
 ├── .mcp.json                 # Playwright MCP (optional; UI testing)
 └── .claude-plugin/
     ├── plugin.json           # manifest + version (bump on any behaviour change)
@@ -139,8 +143,8 @@ your-project/
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
-│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ assets + view/ built pages  [gogo-mermaid, /gogo:view write]
-│   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<slug>/ (report.md + diagrams)  [/gogo:done writes]
+│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages  [gogo-mermaid, /gogo:view, /gogo:done write]
+│   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<slug>/ (report.md + diagrams + before/ set)  [/gogo:done writes]
 │   └── work/
 │       └── feature-<slug>/   # one folder per piece of work:
 │           ├── plan.md            # the accepted plan (the contract) + functional requirements   [① writes]
@@ -151,10 +155,10 @@ your-project/
 │           ├── review-NN.md        # each review round's rendered snapshot                          [③ writes]
 │           ├── test/issues.json    # living, typed test findings (same contract)                   [④ writes, ② reads]
 │           ├── test-NN.md          # each test round's rendered snapshot                            [④ writes]
-│           ├── report/             # as-built bundle: report.md + UML .mmd set + diagrams.html + manifest.json  [⑤ writes]
+│           ├── report/             # as-built bundle: report.md + UML .mmd set + report/before/ (plan-time "before" set, copied in) + diagrams.html + manifest.json  [⑤ writes]
 │           ├── <phase>/result.json # per-run phase result (implement/review/test/report)           [each phase writes]
 │           ├── pipeline.json       # feature-level index of current artifacts + validity           [every phase]
-│           └── charts/             # mermaid .mmd + manifest.json + offline diagrams.html          [①/② write]
+│           └── charts/             # mermaid .mmd + charts/before/ (plan-time as-is baseline) + manifest.json + offline diagrams.html  [①/② write]
 └── .claude/
     └── skills/<slug>/SKILL.md  # approved STANDALONE skills (harness auto-discovers)  [/gogo:skills, user-gated]
 ```

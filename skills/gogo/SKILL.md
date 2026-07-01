@@ -71,8 +71,8 @@ slug from the feature name). These files are the pipeline's memory + audit trail
 - `decisions.md` — open/closed forks that needed the user
 - `review/issues.json` — the living, typed review findings (the contract); `review-NN.md` renders each round's snapshot
 - `test/issues.json` — the living, typed test findings (same contract); `test-NN.md` renders each round's snapshot
-- `report/` — the as-built bundle (written at ⑤): `report/report.md` (planned-vs-shipped, implementation, decisions+reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `diagrams.html`, `manifest.json`, `result.json`. `/gogo:done` copies this bundle to `.gogo/changelog/`.
-- `charts/` — mermaid `.mmd` + `manifest.json` + offline `diagrams.html` (plan's intended design; ② emits the as-built flow/sequence/class/activity set for review/test)
+- `report/` — the as-built bundle (written at ⑤): `report/report.md` (planned-vs-shipped, implementation, decisions+reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`, `result.json`. `/gogo:done` copies this bundle to `.gogo/changelog/`.
+- `charts/` — mermaid `.mmd` + `manifest.json` + offline `diagrams.html` (plan's intended design + `charts/before/` the plan-time as-is baseline; ② emits the as-built flow/sequence/class/activity set for review/test)
 
 The shipped bundle is also archived (chronologically) under `.gogo/changelog/<YYYY-MM-DD>-<slug>/` once the user runs `/gogo:done`.
 
@@ -162,16 +162,22 @@ prerequisite).
 
 ### Ship → command `/gogo:done` (skill `gogo-done`)
 The explicit post-report gate: when the user declares the feature shipped, copy the
-`report/` bundle (report.md + diagrams) into the append-only
-`.gogo/changelog/<YYYY-MM-DD>-<slug>/` and set `state.md` to a terminal `shipped`
-status. Copy-not-move (the work folder stays the source); idempotent. If no report
-exists it STOPs with "run `/gogo:report <feature>` first".
+`report/` bundle (report.md + diagrams + the `before/` set) into the append-only
+`.gogo/changelog/<YYYY-MM-DD>-<slug>/`, **build the interactive viewer page for the
+entry and print its `file://` link** (best-effort, reusing the `gogo-view` build;
+falls back to the static `diagrams.html` path), and set `state.md` to a terminal
+`shipped` status. Copy-not-move (the work folder stays the source); idempotent. If
+no report exists it STOPs with "run `/gogo:report <feature>` first".
 
 ### View → command `/gogo:view` (skill `gogo-view`)
 Read any report as a self-contained, offline interactive webpage (the `report.md`
-summary as HTML + its mermaid diagrams in a pan/zoom/drag canvas). Lists reports
-from `.gogo/changelog/` and `.gogo/work/*/report/`, builds the page from the
-vendored `.gogo/resources/` assets, and opens it.
+summary as HTML + its mermaid diagrams made **interactive**: flowchart-family kinds
+get an xplan-style rich renderer — draggable token-styled node cards with a
+live-re-routing edge layer, minimap, zoom/fit, and a persisted layout — other kinds
+fall back to a pan/zoom/drag canvas; a report carrying a `before/` set renders
+**before / after side by side**). Lists reports from `.gogo/changelog/` and
+`.gogo/work/*/report/`, builds the page from the vendored `.gogo/resources/` assets,
+and opens it.
 
 ## Loops & bounds
 
