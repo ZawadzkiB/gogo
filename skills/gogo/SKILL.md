@@ -71,10 +71,10 @@ slug from the feature name). These files are the pipeline's memory + audit trail
 - `decisions.md` — open/closed forks that needed the user
 - `review/issues.json` — the living, typed review findings (the contract); `review-NN.md` renders each round's snapshot
 - `test/issues.json` — the living, typed test findings (same contract); `test-NN.md` renders each round's snapshot
-- `report/` — the as-built bundle (written at ⑤): `report/report.md` (planned-vs-shipped, implementation, decisions+reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`, `result.json`. `/gogo:done` copies this bundle to `.gogo/changelog/`.
+- `report/` — the as-built bundle (written at ⑤): `report/report.md` (planned-vs-shipped, implementation, decisions+reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`, `result.json`. This is the full audit trail; `/gogo:done` **synthesizes** a high-level entry from it into `.gogo/changelog/` (it does not copy the bundle).
 - `charts/` — mermaid `.mmd` + `manifest.json` + offline `diagrams.html` (plan's intended design + `charts/before/` the plan-time as-is baseline; ② emits the as-built flow/sequence/class/activity set for review/test)
 
-The shipped bundle is also archived (chronologically) under `.gogo/changelog/<YYYY-MM-DD>-<slug>/` once the user runs `/gogo:done`.
+A **high-level synthesis** of the shipped work is archived (chronologically) under `.gogo/changelog/<YYYY-MM-DD>-<name>/` once the user runs `/gogo:done` — one or several related features can ship as a single merged release entry; the full detail stays in `.gogo/work/`.
 
 The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
 `result.json`, the feature `pipeline.json`) follow JSON Schemas in
@@ -90,7 +90,7 @@ exactly where it left off.
 
 ```
 user goal ─▶ ① PLAN ──(user accepts)──▶ ② IMPLEMENT ─▶ ③ REVIEW ─▶ ④ TEST ─▶ ⑤ REPORT ─▶ /gogo:done ─▶ shipped
-              ▲  │                            ▲            │           │       (update plan +   (copy bundle →
+              ▲  │                            ▲            │           │       (update plan +   (synthesize →
               │  └──(clarify / changes)──▶ wait            │           │        knowledge docs)  .gogo/changelog/)
               │                                └──issue─────┘           │
               │                                  (fix → re-review, ≤3)  │
@@ -161,19 +161,30 @@ and marking which phases ran and what's still open (`plan.md` is the one
 prerequisite).
 
 ### Ship → command `/gogo:done` (skill `gogo-done`)
-The explicit post-report gate. A **slug** ships that one feature; with **no slug**
-`/gogo:done` opens a **work board** — the shared `gogo-status` classifier labels every
-`.gogo/work/feature-*` (shipped · ready-to-ship · in-progress · unfinished) and the
-user picks which ready-to-ship features to ship (an interactive terminal-TUI kanban,
-`assets/kanban/board.py`, when `python3` + `tmux` + a tty are present; otherwise a
-status table + `AskUserQuestion` multi-select — never failing over the board; D5=A).
-Shipping is a single flow looped over the picks: copy each `report/` bundle (report.md
-+ diagrams + the `before/` set) into the append-only
-`.gogo/changelog/<YYYY-MM-DD>-<slug>/`, **build the interactive viewer page for the
-entry and print its `file://` link** (best-effort, reusing the `gogo-view` build;
-falls back to the static `diagrams.html` path), and set `state.md` to a terminal
-`shipped` status. Copy-not-move (the work folder stays the source); idempotent. A
-named slug with no report STOPs with "run `/gogo:report <feature>` first".
+The explicit post-report gate. A **slug** ships that one feature; **`slug1+slug2+...`**
+ships those as ONE merged release entry; with **no slug** `/gogo:done` opens the **work
+board cockpit** — the shared `gogo-status` classifier labels every `.gogo/work/feature-*`
+(shipped · ready-to-ship · in-progress · unfinished) and from the four-class table the
+user **views** any card (`v`), **ships** ready cards separately (`s`) or **merged**
+(`m`), **runs/resumes** the pipeline on an unbuilt card (`g`), and **filters** (`/`) —
+an interactive terminal-TUI kanban, `assets/kanban/board.py`, when `python3` + `tmux` +
+a tty are present; otherwise a status table + `AskUserQuestion` multi-select ship
+fallback — never failing over the board (D5=A). Each key writes a single-shot **intent**
+the orchestrator executes before **relaunching** the board (`go` hands off to the
+pipeline; `cancel` stops); the board never mutates gogo state. When shipping merged (or a
+≥2 fallback selection), one `AskUserQuestion` gates separate (N entries) vs merged (1
+entry). Every entry is a **high-level synthesis, not a copy** of the report
+bundle: gogo **writes** a `report/report.md`-style summary (*what was
+changed/done/implemented*, key outcomes, one-line decisions, review/test verdict, a
+member table + per-member section when merged, links back to each `.gogo/work/` folder),
+plus the **slug-prefixed** `.mmd` set, a `manifest.json` carrying a `members[]` array,
+and the merged `before/` set — into `.gogo/changelog/<YYYY-MM-DD>-<name>/` (date = newest
+member's `completed:`; **no `diagrams.html` copy** — the viewer builds from source). It
+**builds the interactive viewer page and prints its `file://` link** (best-effort,
+reusing the `gogo-view` build; falls back to the changelog folder path), and sets **each
+member's** `state.md` to a terminal `shipped` status. The audit trail stays in
+`.gogo/work/`; idempotent. A named slug with no report STOPs with "run `/gogo:report
+<feature>` first".
 
 ### View → command `/gogo:view` (skill `gogo-view`)
 Read any **plan or report** as a self-contained, offline interactive webpage (the

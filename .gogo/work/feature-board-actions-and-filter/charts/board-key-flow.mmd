@@ -1,0 +1,26 @@
+stateDiagram-v2
+  [*] --> Render
+  Render --> WaitKey
+
+  WaitKey --> FilterEdit: press slash
+  FilterEdit --> FilterEdit: printable / backspace (live case-insensitive match)
+  FilterEdit --> Render: Enter applies / Esc clears
+
+  WaitKey --> Render: arrows hjkl move (re-clamp to visible)
+  WaitKey --> Render: Esc clears an active filter
+  WaitKey --> Render: space or enter toggles a ready-to-ship card
+  WaitKey --> Render: guard violation shows a transient one-line hint
+
+  WaitKey --> Cancel: q
+  WaitKey --> Emit: v s m g (guards pass)
+
+  Emit --> [*]: write schema-2 intent, exit 0
+  Cancel --> [*]: exit 1, no file
+
+  note right of Emit
+    v  view focused card (any class)
+    s  ship selected ready-to-ship (>=1)
+    m  ship merged ready-to-ship (>=2)
+    g  go focused unfinished / in-progress
+    selection survives filtering
+  end note

@@ -1,0 +1,8 @@
+{
+  "slug": "changelog-merged-entries",
+  "updated": "2026-07-02",
+  "note": "Intended design: /gogo:done gains a post-selection separate-vs-merged gate, and ALL entry-writing unifies into one synthesis writer (1..N members): high-level report.md (never a full-report copy), slug-prefixed merged diagrams + before/, manifest members[], each member flipped to shipped. Selection surfaces (TUI board / fallback / +-joined arg) unchanged; board.py untouched; audit trail stays in .gogo/work/. As-is baseline in charts/before/.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/merged-done-flow.mmd", "title": "Intended: /gogo:done separate-vs-merged gate + one synthesis writer (1..N members)" }
+  ]
+}

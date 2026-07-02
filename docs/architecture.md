@@ -110,7 +110,7 @@ gogo/
 │   ├── gogo-review/          #   ③ review
 │   ├── gogo-test/            #   ④ test
 │   ├── gogo-knowledge/       #   ⑤ report + knowledge update (strict + lenient)
-│   ├── gogo-done/            #   ship: copy report bundle → .gogo/changelog/ + build/print viewer link; no-slug work board
+│   ├── gogo-done/            #   ship: synthesize high-level entry (single or merged) → .gogo/changelog/ + build/print viewer link; no-slug work board cockpit (view/ship/merge/go/filter intents + relaunch loop)
 │   ├── gogo-view/            #   interactive viewer for plans + reports (rich draggable nodes + before/after compare)
 │   ├── gogo-status/          #   read-only overview + the shared work-index classifier (shipped/ready/in-progress/unfinished)
 │   ├── gogo-skills/          #   audit knowledge budget + extract on-demand skills
@@ -145,8 +145,8 @@ your-project/
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
-│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages + kanban/ (work board scratch: board.py, work-index.json, ship-result.json)  [gogo-mermaid, /gogo:view, /gogo:done write]
-│   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<slug>/ (report.md + diagrams + before/ set)  [/gogo:done writes]
+│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages + kanban/ (work board scratch: board.py, work-index.json, board-intent.json, board-exit.code)  [gogo-mermaid, /gogo:view, /gogo:done write]
+│   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<name>/ (SYNTHESIZED report.md + slug-prefixed .mmd + manifest.json{members[]} + before/; single or merged; no diagrams.html)  [/gogo:done writes]
 │   └── work/
 │       └── feature-<slug>/   # one folder per piece of work:
 │           ├── plan.md            # the accepted plan (the contract) + functional requirements   [① writes]
@@ -179,8 +179,9 @@ your-project/
   `tech-stack`; writes `test/issues.json` + `test-NN.md`.
 - **⑤ Report** (orchestrator) — finalizes `plan.md`, writes the `report/` bundle
   (`report/report.md` + the as-built UML set + `diagrams.html`), updates the
-  gogo-owned knowledge summaries that drifted. `/gogo:done` then copies the bundle
-  to `.gogo/changelog/<date>-<slug>/`.
+  gogo-owned knowledge summaries that drifted. `/gogo:done` then **synthesizes** a
+  high-level entry from it into `.gogo/changelog/<date>-<name>/` (single or merged) —
+  it does not copy the bundle; the `report/` bundle stays the full audit trail.
 
 The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
 `result.json`, the feature `pipeline.json`) follow the JSON Schemas in

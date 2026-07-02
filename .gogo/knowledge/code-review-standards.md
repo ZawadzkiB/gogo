@@ -12,7 +12,10 @@ Generated-by: /gogo:build
 ## What a gogo review must check
 1. **Cross-file consistency.** Every enumeration that changed is in sync across
    `skills/gogo/SKILL.md`, the phase skill(s), the templates, and `README.md`.
-   No place still describes the old behaviour. (Grep the old terms.)
+   No place still describes the old behaviour. (Grep the old terms.) A doc-sync
+   sweep must enumerate **all** of `docs/*.md` — including the `docs/index.md`
+   quick-reference table — never just the plan's hand-listed subset (the surface
+   REV-001 caught slipping through in 0.8.0).
 2. **Version bumped.** `.claude-plugin/plugin.json` `version` advanced for any
    behavioural change.
 3. **Portability preserved.** No new hard dependency for the core loop. Optional

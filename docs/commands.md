@@ -133,33 +133,53 @@ broken run.
 
 ## Ship & view
 
-### `/gogo:done [feature-slug]`
+### `/gogo:done [feature-slug | slug1+slug2+...]`
 
-Ship report-complete features, via `gogo-done`. The explicit post-report
-"this is the end" gate. A **slug** ships that one; **no slug opens the work board**.
+Ship report-complete features into a high-level changelog, via `gogo-done`. The
+explicit post-report "this is the end" gate. A **slug** ships that one;
+**`slug1+slug2+...`** ships those as ONE merged release entry; **no slug opens the
+work board**.
 
-- **Work board (no slug):** classifies every `.gogo/work/feature-*` via the shared
-  `gogo-status` Step A classifier (shipped · ready-to-ship · in-progress ·
-  unfinished) and lets you pick which ready-to-ship features to ship — an
+- **Work board cockpit (no slug):** classifies every `.gogo/work/feature-*` via the
+  shared `gogo-status` Step A classifier (shipped · ready-to-ship · in-progress ·
+  unfinished) and, from the four-class table, lets you act with **action keys** — an
   **interactive terminal kanban** (`assets/kanban/board.py` in a tmux pane; `python3`
   + `tmux` are soft deps) when the tooling and a tty are present, otherwise a
-  **status table + `AskUserQuestion` multi-select** fallback. The board only
-  *selects*; shipping is the single flow below, looped over the picks (never fails
-  over the board).
-- **Reads:** for each shipped slug, `.gogo/work/feature-<slug>/report/report.md`
-  (required) + the rest of the `report/` bundle (incl. the `before/` set).
-- **Writes:** a copy of each bundle — incl. the `before/` set — to
-  `.gogo/changelog/<YYYY-MM-DD>-<slug>/` (append-only; copy-not-move; idempotent);
-  builds the interactive viewer page for the entry under `.gogo/resources/view/`
-  (best-effort, reusing the `gogo-view` build); and sets `state.md` to a terminal
-  `shipped` status. Board mode also writes runtime scratch under
-  `.gogo/resources/kanban/` (`board.py`, `work-index.json`, `ship-result.json`).
+  **status table + `AskUserQuestion` multi-select** ship fallback (never fails over the
+  board). Keys: **space/enter** select a ready-to-ship card, **v** view the focused card
+  (any class), **s** ship the selection separately, **m** ship it merged (≥2), **g**
+  run/resume the pipeline on an unbuilt card, **/** filter by text (Esc clears), **q**
+  cancel. Each key writes a single-shot **intent** `{schema:2, action, items}`; the
+  orchestrator executes it (view build / ship writer / pipeline handoff) and
+  **relaunches** the board — `go` ends the loop, `cancel` stops. The board only
+  *collects intents*; it never mutates gogo state.
+- **Merge gate:** when you ship merged (`m`), or a fallback selection is **≥2** slugs,
+  one `AskUserQuestion` — ship **separately** (N entries) or **merged** (1 entry). A
+  `+`-joined arg pre-answers *merged*; an explicit `s` pre-answers *separate*; a single
+  slug never asks. For a merged entry gogo suggests a release name from the members'
+  common theme and confirms it (you can override).
+- **Every entry is a synthesis, not a copy.** `report.md` is **written** — a
+  high-level summary of *what was changed/done/implemented* (lead paragraph, key
+  outcomes, one-line decisions, a review/test verdict, a member table + per-member
+  section when merged), with a **link back** to each member's `.gogo/work/` folder for
+  the full audit trail. No full-report duplication.
+- **Reads:** for each member, `.gogo/work/feature-<slug>/report/report.md` (required —
+  the synthesis source) + the `report/*.mmd`, `report/manifest.json`, and `before/`
+  set.
+- **Writes:** the synthesized entry to `.gogo/changelog/<YYYY-MM-DD>-<name>/` — the
+  written `report.md`, the **slug-prefixed** `.mmd` set, a merged `manifest.json`
+  carrying a **`members[]`** array, and the merged `before/` set (append-only,
+  idempotent; **no `diagrams.html` copy** — the viewer builds from source); builds the
+  interactive viewer page under `.gogo/resources/view/` (best-effort, reusing the
+  `gogo-view` build); and sets **each member's** `state.md` to a terminal `shipped`
+  status. Board mode also writes runtime scratch under `.gogo/resources/kanban/`
+  (`board.py`, `work-index.json`, `board-intent.json`, `board-exit.code`).
 - **Prints:** the `file://` link to each built interactive viewer page (with the
-  static `diagrams.html` path as a fallback — it never fails the command over the
-  link).
+  changelog folder path as a fallback — it never fails the command over the link).
 - **Validate-in:** a missing report for a named slug STOPs with "No report found for
   `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`."; board mode
-  with nothing ready-to-ship says so and stops without opening an empty board.
+  opens the cockpit whenever **any** feature exists (view `v` and go `g` are useful
+  with nothing ready-to-ship) and stops only when there are zero features.
 
 ### `/gogo:view [changelog-entry | feature-slug[:plan|:report]]`
 

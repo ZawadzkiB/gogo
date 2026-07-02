@@ -1,0 +1,27 @@
+{
+  "slug": "changelog-merged-entries",
+  "phase": "review",
+  "status": "ok",
+  "round": 2,
+  "inputs": [
+    ".gogo/work/feature-changelog-merged-entries/plan.md",
+    ".gogo/work/feature-changelog-merged-entries/review/issues.json",
+    ".gogo/work/feature-changelog-merged-entries/review-01.md",
+    "docs/index.md",
+    "templates/contracts/README.md",
+    "templates/contracts/charts-manifest.schema.json",
+    "skills/gogo-done/SKILL.md",
+    "skills/gogo-view/SKILL.md",
+    "commands/view.md",
+    "skills/gogo-status/SKILL.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-changelog-merged-entries/review/issues.json",
+    ".gogo/work/feature-changelog-merged-entries/review-02.md",
+    ".gogo/work/feature-changelog-merged-entries/review/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Round 2 (fix verification): REV-001 (major) + REV-002/003/004 (minor) all verified fixed — docs/index.md synthesis wording, contracts README members?, gogo-done schema-complete diagram entries, and the <date>-<name> wording pass (arg-resolution semantics unchanged). Regression glance over the 6 touched files clean: no stale 'copies the (report) bundle' outside .gogo/work; remaining <date>-<slug> are legitimate single-vs-merged contrasts; no broken examples or front-matter drift. Verdict APPROVE."
+}

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — board-actions-and-filter</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>board-actions-and-filter</code></h1>
+    <p class="hint">Offline viewer · mermaid vendored at .gogo/resources · regenerate via gogo-mermaid.</p>
+  </header>
+
+  <h2>As-built: board cockpit — action keys → intents → route → relaunch loop</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  D["/gogo:done (no slug)"]:::proc --> IDX["classify .gogo/work/* (gogo-status)"]:::proc
+  IDX --> B["board.py (tmux)\nspace select · / filter\nv · s · m · g · q"]:::gate
+  B -->|"intent {schema:2, action, items}"| R{route intent}:::gate
+  R -->|view| VW["gogo-view build:\nplan (unfinished/in-progress)\nreport (ready) · changelog (shipped)"]:::proc
+  VW --> B
+  R -->|ship| WR["Write changelog entry × N\n(0.8.0 writer, separate)"]:::out
+  R -->|ship-merged| WM["Write changelog entry\n(all picks as members[])"]:::out
+  WR --> B
+  WM --> B
+  R -->|go| GO["hand off: resume pipeline\nper state.md (like /gogo:go)"]:::out
+  R -->|cancel| STOP["stop — nothing shipped"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  </pre></div>
+
+  <h2>As-built: board.py key → guard → intent state machine</h2>
+  <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  [*] --> Render
+  Render --> WaitKey
+
+  WaitKey --> FilterEdit: press slash
+  FilterEdit --> FilterEdit: printable / backspace (live case-insensitive match)
+  FilterEdit --> Render: Enter applies / Esc clears
+
+  WaitKey --> Render: arrows hjkl move (re-clamp to visible)
+  WaitKey --> Render: Esc clears an active filter
+  WaitKey --> Render: space or enter toggles a ready-to-ship card
+  WaitKey --> Render: guard violation shows a transient one-line hint
+
+  WaitKey --> Cancel: q
+  WaitKey --> Emit: v s m g (guards pass)
+
+  Emit --> [*]: write schema-2 intent, exit 0
+  Cancel --> [*]: exit 1, no file
+
+  note right of Emit
+    v  view focused card (any class)
+    s  ship selected ready-to-ship (>=1)
+    m  ship merged ready-to-ship (>=2)
+    g  go focused unfinished / in-progress
+    selection survives filtering
+  end note
+  </pre></div>
+
+  <h2>Before (as-is): one-shot ship-only board</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  D["/gogo:done (no slug)"]:::proc --> IDX["classify .gogo/work/* (gogo-status)"]:::proc
+  IDX --> B["board.py (tmux)\nspace select · s ship · q cancel\n(ready-to-ship only; no view/go/filter)"]:::gate
+  B -->|"{ship:[...]} exit 0"| SHIP["Write changelog entry\n(separate-vs-merged asked in chat)"]:::out
+  B -->|"exit 1"| STOP["cancel — nothing shipped"]:::out
+  B -->|"exit 2 / launch fail"| FB["fallback: table + multi-select"]:::proc
+  FB --> SHIP
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from ../../../resources/mermaid.min.js — re-run gogo-mermaid.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

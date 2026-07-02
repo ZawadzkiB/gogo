@@ -1,0 +1,15 @@
+flowchart TD
+  D["/gogo:done (no slug)"]:::proc --> IDX["classify .gogo/work/* (gogo-status)"]:::proc
+  A["/gogo:done a+b+c"]:::proc --> NAME
+  IDX --> SEL{"board / multi-select\n(unchanged surfaces)"}:::gate
+  SEL -->|"1 slug"| W
+  SEL -->|"≥2 slugs"| Q{"separate or merged?"}:::gate
+  Q -->|"separate (xN)"| W
+  Q -->|merged| NAME["derive release name\n+ newest member date"]:::proc
+  NAME --> W["Write changelog entry (1..N members)\nsynthesize high-level report.md\n· slug-prefix + merge diagrams + before/\n· manifest members[...]"]:::art
+  W --> ENTRY[/".gogo/changelog/<date>-<name>/\n(report.md + .mmd + manifest + before/)"/]:::out
+  ENTRY --> SHIPPED["each member state.md → shipped\n(audit trail stays in .gogo/work/)"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

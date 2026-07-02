@@ -52,14 +52,18 @@ fixed_in_round?, fix_summary?    (required once status = fixed)
 
 ### `charts-manifest.schema.json` — the as-built diagram index
 
-`{ slug, updated?, note?, diagrams[] }`, each diagram `{ kind ∈ {flow, sequence,
-class, activity, use-case}, file (a .mmd under charts/, or report/ for the ⑤
-as-built report bundle), title }`. Implement ② emits the as-built set into
+`{ slug, updated?, note?, diagrams[], members? }`, each diagram `{ kind ∈ {flow,
+sequence, class, activity, use-case}, file (a .mmd under charts/, or report/ for
+the ⑤ as-built report bundle), title }`. Implement ② emits the as-built set into
 `charts/`; report ⑤ also emits a `report/manifest.json` (same schema) indexing the
 report bundle. Only the kinds that carry signal appear (per the diagram-subject
 rules in `gogo-mermaid` — diagram the **product**, never the task list). A
 pure-process change has an empty `diagrams` array and a `note`. Review ③ and test
-④ consume it to reason about the change.
+④ consume it to reason about the change. `members?` (additive, optional) = the
+array of member feature slugs a `/gogo:done` changelog entry ships — one for a
+single entry, several for a merged release; absent on plain charts/report
+manifests. It is what `gogo-status` reads to classify a merged entry's members as
+shipped even though the entry folder is named after the release, not each slug.
 
 ### `phase-result.schema.json` — the per-run record
 

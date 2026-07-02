@@ -1,0 +1,20 @@
+{
+  "slug": "changelog-merged-entries",
+  "track": "test",
+  "round": 1,
+  "updated": "2026-07-02",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "gogo-view uses `<kind>` as compare-pair variable name but slug-prefixed files make the name ambiguous",
+      "description": "skills/gogo-view/SKILL.md step 3 compare mode says 'Match each `before/<kind>.mmd` to the after `<kind>.mmd`' using `<kind>` as the pairing variable. Historically files were named `flow.mmd`, `sequence.mmd` so `<kind>` was unambiguous. After this feature, files are `<slug>-flow.mmd` and the variable `<kind>` now means the full filename stem including the slug prefix \u2014 which is correct behavior but collides with the diagram kind enum (flow/sequence/class/activity) also called `<kind>` in the same skill. An agent reading gogo-view in isolation (without gogo-done context) could misread the rule as 'pair only files whose name equals a kind enum value' and fail to pair `add-appointments-flow.mmd` with `before/add-appointments-flow.mmd`. Confirmed the actual behavior is correct (TC5 simulation passes); this is a wording clarity issue only.",
+      "proposed_solution": "In gogo-view SKILL.md step 3 compare mode, replace the variable `<kind>` with `<stem>` or `<basename-without-ext>` to distinguish it from the diagram kind enum. One sentence: 'Match each `before/<stem>.mmd` to the after `<stem>.mmd` by file basename (without extension and without the before/ path prefix).' This removes any collision with the kind enum naming.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fix_summary": "Renamed the compare-pairing variable in skills/gogo-view/SKILL.md step 3 from <kind> to <stem> (filename without extension; covers slug-prefixed changelog names) and retitled the bullets 'Pair by filename stem' / 'Unmatched stems'. Verified: pairing semantics unchanged (full-basename match), no other <kind>.mmd wording remains in the pairing clause."
+    }
+  ]
+}

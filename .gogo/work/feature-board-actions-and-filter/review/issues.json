@@ -1,0 +1,32 @@
+{
+  "slug": "board-actions-and-filter",
+  "track": "review",
+  "round": 2,
+  "updated": "2026-07-02",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "Interactive curses launch is unguarded: a startup failure or event-loop exception exits 1 with a traceback (not the documented exit 2), so gogo-done misreads it as a user cancel and skips the mandated fallback",
+      "description": "assets/kanban/board.py:400 (run_board) calls `curses.wrapper(_board_loop, records)` with no try/except, and neither main() nor the `sys.exit(main())` entrypoint guards it. Any curses startup failure (bad/absent TERM, terminal that can't cbreak) OR any uncaught exception inside the event loop propagates: Python prints a full traceback and exits with code 1 and no intent file. Reproduced live: `python3 assets/kanban/board.py --index <idx> --result <out> </dev/null` -> multi-line traceback, exit=1, no result file; likewise with `env -u TERM`. This violates the file's OWN documented exit-code contract (docstring lines 30-37: \"2 error -- ... or the board cannot start. No result file; a one-line reason on stderr and NO traceback\"). Worse, the consuming skill relies on 1-vs-2 to tell a cancel from a crash: skills/gogo-done/SKILL.md:288 treats `no $res && $code == 1` as \"board cancelled -- nothing shipped\" and STOPS, while `exit 2` would route to the guaranteed status-table + AskUserQuestion fallback (lines 290-293). So a board that crashes on startup or mid-loop is silently reported to the user as a deliberate cancel and the fallback the NFR mandates (non-functional-requirements.md: \"absence -> graceful fallback, never a failure\") never fires. The reviewer brief explicitly called for exit codes 0/1/2 honored on every path including curses exceptions; this path is not honored. (The normal tmux launch usually gives curses a working pty, which is why selftest can't cover this and it slipped through, but a crash mid-loop is reachable in the real launch path.)",
+      "proposed_solution": "AGENT-FIXABLE. Wrap the curses launch in run_board() so any failure maps to the documented exit 2 + one-line stderr + no traceback, e.g.:\n    def run_board(records, result_path):\n        import curses\n        try:\n            intent = curses.wrapper(_board_loop, records)\n        except Exception as exc:  # curses.error and any event-loop crash\n            print(\"board: cannot run the interactive board: %s\" % exc, file=sys.stderr)\n            return 2\n        if intent is None:\n            return 1\n        emit_intent(result_path, intent)\n        return 0\nEnsure no partial result file is emitted on the error path (it already isn't, since emit_intent runs only after a clean return). curses.wrapper already restores the terminal (endwin) before the exception surfaces, so no extra teardown is needed. Optionally add a note that curses exceptions -> exit 2 is intentionally untestable via --selftest (no tty).",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fix_summary": "run_board() now wraps curses.wrapper in try/except: any TUI startup/loop failure prints one stderr line ('board: cannot run the TUI: <exc>') and returns 2 -- a crash is an error, never a cancel. Verified live: TERM= + no tty -> exit 2, 1 stderr line, no traceback, no result file; --selftest still exit 0 (31/31)."
+    },
+    {
+      "id": "REV-002",
+      "title": "Stale validate-in wording in two FR5 reference docs contradicts the shipped relaxed cockpit gate (nothing-ready-to-ship now still opens the board)",
+      "description": "docs/commands.md:181 (\"board mode with nothing ready-to-ship says so and stops without opening an empty board.\") and docs/flow.md:107 (\"board mode with nothing ready-to-ship says so instead of opening an empty board.\") both describe the OLD gate. The feature relaxed validate-in (decisions.md implementation notes; skills/gogo-done/SKILL.md:76-82; commands/done.md:22-23): the cockpit now opens whenever ANY `.gogo/work/feature-*` exists so `v`/`g`/`/` work on non-shippable cards -- only ZERO features stops. README.md correctly dropped the old claim, but these two docs -- both explicitly listed for FR5 sync -- kept the stale line even though their surrounding cockpit prose was rewritten. This is exactly the all-of-docs/*.md doc-sync class code-review-standards.md elevates (the REV-001-in-0.8.0 lesson). A user/agent reading either reference would believe the cockpit refuses to open with nothing ready-to-ship, which the code and skill no longer do.",
+      "proposed_solution": "AGENT-FIXABLE. In both docs/commands.md:181 and docs/flow.md:107, replace the stale clause with the relaxed behavior, e.g.: \"...; board mode with zero work items says so and stops without opening an empty board (with items present but none ready-to-ship the cockpit still opens for view/go/filter -- you just can't ship/merge until something is report-complete).\" Match the wording already in skills/gogo-done/SKILL.md:76-82 and commands/done.md:22-23.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fix_summary": "docs/commands.md validate-in bullet + docs/flow.md board-mode line updated to the relaxed gate: the cockpit opens whenever any feature exists (v/g useful with nothing ready-to-ship); stops only at zero features. Now consistent with gogo-done SKILL, commands/done.md, README."
+    }
+  ]
+}

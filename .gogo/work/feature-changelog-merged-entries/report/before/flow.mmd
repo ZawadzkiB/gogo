@@ -1,0 +1,10 @@
+flowchart TD
+  D["/gogo:done (no slug)"]:::proc --> IDX["classify .gogo/work/* (gogo-status)"]:::proc
+  IDX --> SEL{"board / multi-select"}:::gate
+  SEL -->|"N slugs selected"| LOOP["Ship one feature × N\n(no merge option)"]:::proc
+  LOOP --> E1[/".gogo/changelog/<date>-<slug-1>/"/]:::out
+  LOOP --> E2[/".gogo/changelog/<date>-<slug-2>/"/]:::out
+  LOOP --> EN[/"… one entry per slug (N total)"/]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

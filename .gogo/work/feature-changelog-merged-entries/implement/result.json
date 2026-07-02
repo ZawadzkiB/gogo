@@ -1,0 +1,26 @@
+{
+  "slug": "changelog-merged-entries",
+  "phase": "implement",
+  "status": "ok",
+  "round": 2,
+  "inputs": [
+    ".gogo/work/feature-changelog-merged-entries/plan.md",
+    ".gogo/work/feature-changelog-merged-entries/decisions.md",
+    ".gogo/work/feature-changelog-merged-entries/review/issues.json",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/non-functional-requirements.md"
+  ],
+  "outputs": [
+    "docs/index.md",
+    "templates/contracts/README.md",
+    "skills/gogo-done/SKILL.md",
+    "skills/gogo-view/SKILL.md",
+    "commands/view.md",
+    "skills/gogo-status/SKILL.md",
+    ".gogo/work/feature-changelog-merged-entries/review/issues.json",
+    ".gogo/work/feature-changelog-merged-entries/implement/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Review round 1 fix pass (round 2): REV-001 rewrote docs/index.md:83 to the new /gogo:done semantics (synthesizes a high-level entry into .gogo/changelog/<date>-<name>/, written not copied, single-or-merged; swept the page); REV-002 added members? to the charts-manifest field list in templates/contracts/README.md; REV-003 made gogo-done step 4 manifest.json diagrams schema-complete ({kind,file,title}, must validate against charts-manifest.schema.json); REV-004 wording-only <date>-<slug>→<date>-<name> in gogo-view labels/arg-grammar, commands/view.md:11, gogo-status changelog_path. All four review findings marked fixed in review/issues.json. Docs/skills only — no product code path changed."
+}

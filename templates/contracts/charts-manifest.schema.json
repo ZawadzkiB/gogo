@@ -24,6 +24,14 @@
       "type": "array",
       "description": "The diagrams produced for this feature. Empty when the change carries no meaningful structure/behaviour to draw.",
       "items": { "$ref": "#/definitions/diagram" }
+    },
+    "members": {
+      "type": "array",
+      "description": "Additive, changelog-entry only: the member feature slugs a /gogo:done entry ships — one slug for a single entry, several for a merged release. Lets gogo-status classify a merged entry's members as shipped even though the entry folder is named after the release, not each slug. Absent on a plain report/implement charts manifest.",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      }
     }
   },
   "definitions": {

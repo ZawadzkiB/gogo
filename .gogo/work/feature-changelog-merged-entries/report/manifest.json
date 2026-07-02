@@ -1,0 +1,9 @@
+{
+  "slug": "changelog-merged-entries",
+  "updated": "2026-07-02",
+  "note": "As-built set for v0.8.0. flow = the shipped /gogo:done pipeline — three ways in (slug, +-joined merge list, board), one post-selection separate-vs-merged gate, one 'Write changelog entry (1..N members)' synthesis writer; the intended design held as built. sequence = the merged-ship runtime interaction (user answers the merge + release-name gates, the writer synthesizes the entry, flips each member to shipped, viewer link printed best-effort). Plan-time as-is baseline copied to report/before/ (renamed to flow.mmd so before/after pair by filename stem).",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "As-built: /gogo:done separate-vs-merged gate + one synthesis writer (1..N members)" },
+    { "kind": "sequence", "file": "report/sequence.mmd", "title": "As-built: merged-ship runtime — gates answered, entry synthesized, members flipped" }
+  ]
+}

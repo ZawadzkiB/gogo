@@ -1,0 +1,33 @@
+sequenceDiagram
+  actor U as User
+  participant D as /gogo:done
+  participant S as gogo-status classifier
+  participant B as board / multi-select
+  participant W as Write changelog entry (1..N)
+  participant WK as .gogo/work/feature-*/
+  participant CL as .gogo/changelog/&lt;date&gt;-&lt;name&gt;/
+  participant V as gogo-view build
+
+  U->>D: /gogo:done (no slug)
+  D->>S: classify .gogo/work/*
+  S-->>D: work-index (ready-to-ship, ...)
+  D->>B: open TUI board (or table fallback)
+  B-->>D: selected slugs (N >= 2)
+  D->>U: ship separately or merged? (one AskUserQuestion)
+  U-->>D: merged
+  Note over D: /gogo:done a+b+c pre-answers this gate (board skipped)
+  D->>U: suggested release name (common theme, D2)
+  U-->>D: confirm or override
+  D->>W: members[], release name, newest member date
+  loop each member
+    W->>WK: read report/report.md (+ decisions.md)
+    W->>CL: copy .mmd + before/ as slug-prefixed files
+  end
+  W->>CL: WRITE synthesized report.md (never a copy)
+  W->>CL: WRITE manifest.json { diagrams[], members[] }
+  Note over CL: slim set — no diagrams.html copy
+  loop each member
+    W->>WK: state.md -> status: shipped
+  end
+  W->>V: build interactive page (best-effort)
+  V-->>U: file:// viewer link (folder path fallback)

@@ -76,24 +76,36 @@ prerequisite. The in-pipeline ⑤ call (right after a green ④) keeps its stric
 
 ### Ship — command `/gogo:done` (skill `gogo-done`)
 
-The explicit post-report gate. A **slug** ships that one feature; with **no slug**
-`/gogo:done` opens a **work board** over every `.gogo/work/feature-*` — the shared
-`gogo-status` classifier labels each **shipped · ready-to-ship · in-progress ·
-unfinished** and you pick which ready-to-ship features to ship. The board is an
-**interactive terminal kanban** (`assets/kanban/board.py` in a tmux pane; `python3` +
-`tmux` are soft deps) when the tooling and a tty are present, otherwise a **status
-table + `AskUserQuestion` multi-select** fallback — it never fails over the board. The
-board only *selects*; shipping is the one flow below, looped over the picks.
+The explicit post-report gate. A **slug** ships that one feature; **`slug1+slug2+...`**
+ships those as ONE merged release entry; with **no slug** `/gogo:done` opens the **work
+board cockpit** over every `.gogo/work/feature-*` — the shared `gogo-status` classifier
+labels each **shipped · ready-to-ship · in-progress · unfinished** and from the
+four-class table you **view** any card (`v`), **ship** ready cards separately (`s`) or
+**merged** (`m`), **run/resume** the pipeline on an unbuilt card (`g`), and **filter**
+(`/`). The board is an **interactive terminal kanban** (`assets/kanban/board.py` in a
+tmux pane; `python3` + `tmux` are soft deps) when the tooling and a tty are present,
+otherwise a **status table + `AskUserQuestion` multi-select** ship fallback — it never
+fails over the board. Each key writes a single-shot **intent** `{schema:2, action,
+items}` the orchestrator executes before **relaunching** the board (`go` hands off to the
+pipeline; `q` cancels); the board only *collects intents* and never mutates gogo state.
+When shipping merged (or a ≥2 fallback selection) one `AskUserQuestion` gates separate (N
+entries) vs merged (1 entry).
 
-When you ship, `/gogo:done` **copies** each `report/` bundle (`report.md` + the `.mmd`
-UML set + the `before/` set + `diagrams.html`) into the append-only
-`.gogo/changelog/<YYYY-MM-DD>-<slug>/` archive, **builds the interactive viewer page
-for the entry and prints its `file://` link** (best-effort, reusing the `/gogo:view`
-build; falls back to the static `diagrams.html` path — never failing the command over
-the link), and sets `state.md` to a terminal `shipped` status. Copy-not-move (the work
-folder stays the source) and idempotent — re-running overwrites the same dated entry.
-A named slug with no report STOPs and tells you to run `/gogo:report <feature>` first;
-board mode with nothing ready-to-ship says so instead of opening an empty board.
+Every changelog entry is a **high-level synthesis, not a copy** of the report bundle.
+`/gogo:done` **writes** a `report.md` summarizing *what was changed/done/implemented*
+(lead paragraph, key outcomes, one-line decisions, a review/test verdict, a member table
++ per-member section when merged) with a **link back** to each member's `.gogo/work/`
+folder for the full audit trail — plus the **slug-prefixed** `.mmd` set, a merged
+`manifest.json` carrying a **`members[]`** array, and the merged `before/` set, into
+`.gogo/changelog/<YYYY-MM-DD>-<name>/` (date = newest member's `completed:`; **no
+`diagrams.html` copy** — the viewer builds from source). It **builds the interactive
+viewer page for the entry and prints its `file://` link** (best-effort, reusing the
+`/gogo:view` build; falls back to the changelog folder path — never failing the command
+over the link), and sets **each member's** `state.md` to a terminal `shipped` status.
+The audit trail stays in `.gogo/work/`; idempotent — re-running overwrites the same dated
+entry. A named slug with no report STOPs and tells you to run `/gogo:report <feature>`
+first; board mode opens the cockpit whenever any feature exists (`v`/`g` are useful
+with nothing ready-to-ship) and stops only when there are zero features.
 
 ### View — command `/gogo:view` (skill `gogo-view`)
 

@@ -1,0 +1,40 @@
+{
+  "slug": "board-actions-and-filter",
+  "phase": "review",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-board-actions-and-filter/plan.md",
+    ".gogo/work/feature-board-actions-and-filter/decisions.md",
+    ".gogo/work/feature-board-actions-and-filter/state.md",
+    ".gogo/work/feature-board-actions-and-filter/charts/manifest.json",
+    ".gogo/work/feature-board-actions-and-filter/charts/board-cockpit-flow.mmd",
+    ".gogo/work/feature-board-actions-and-filter/charts/board-key-flow.mmd",
+    ".gogo/work/feature-board-actions-and-filter/implement/result.json",
+    ".gogo/knowledge/code-review-standards.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    "assets/kanban/board.py",
+    "skills/gogo-done/SKILL.md",
+    "skills/gogo/SKILL.md",
+    "commands/done.md",
+    "commands/view.md",
+    "README.md",
+    "docs/commands.md",
+    "docs/flow.md",
+    "docs/architecture.md",
+    "docs/index.md",
+    ".claude-plugin/plugin.json",
+    "templates/contracts/charts-manifest.schema.json",
+    "templates/contracts/issues-list.schema.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-board-actions-and-filter/review/issues.json",
+    ".gogo/work/feature-board-actions-and-filter/review/review-01.md",
+    ".gogo/work/feature-board-actions-and-filter/review/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 2,
+  "summary": "Round 1 review of the /gogo:done board cockpit: 1 major (REV-001 unguarded curses launch exits 1+traceback instead of the documented exit 2, so gogo-done misreads a board crash as a user cancel and skips the mandated fallback) + 1 minor (REV-002 stale validate-in wording in docs/commands.md:181 and docs/flow.md:107). board.py py_compile OK, 31/31 selftest, headless matrix + guard/bad-index cases all correct, pure ASCII, no staged bytecode, charts+manifest valid, 0.9.0/12 commands, no-mutation invariant held. Verdict CHANGES."
+}

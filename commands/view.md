@@ -8,7 +8,7 @@ model: opus
 View a gogo plan or report as an interactive webpage, via the `gogo-view` skill.
 
 Target: $ARGUMENTS  (a feature `<slug>` — its **report if one exists, else its plan**;
-`<slug>:plan` or `<slug>:report` to force one; a `<date>-<slug>` changelog entry; or a
+`<slug>:plan` or `<slug>:report` to force one; a `<date>-<name>` changelog entry; or a
 path to a `plan.md`/`report.md`. If absent, `gogo-view` presents its grouped **Work**
 (each feature's plan + report) / **Changelog** (shipped reports) picker, newest first.)
 

@@ -41,6 +41,11 @@ Generated-by: /gogo:build
 - **Vendored Python must never ship compiled bytecode** — `__pycache__/` and
   `*.pyc` are gitignored so a vendored tool (e.g. `assets/kanban/board.py`) never
   drags platform-specific bytecode into the bundle.
+- **Changelog entries are high-level syntheses with a slim footprint** (since
+  0.8.0): an entry is a *written* summary + slug-prefixed `.mmd` set +
+  `manifest.json` (+ `before/`) — never a full-report copy and never a
+  `diagrams.html` duplicate. The full audit trail stays in `.gogo/work/` (linked);
+  the interactive page is built from source by `/gogo:view`.
 
 ## gogo overrides
 <!-- Preserved across re-runs. -->

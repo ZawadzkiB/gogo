@@ -1,0 +1,42 @@
+{
+  "slug": "changelog-merged-entries",
+  "phase": "report",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-changelog-merged-entries/plan.md",
+    ".gogo/work/feature-changelog-merged-entries/state.md",
+    ".gogo/work/feature-changelog-merged-entries/decisions.md",
+    ".gogo/work/feature-changelog-merged-entries/adjustments.md",
+    ".gogo/work/feature-changelog-merged-entries/review/issues.json",
+    ".gogo/work/feature-changelog-merged-entries/test/issues.json",
+    ".gogo/work/feature-changelog-merged-entries/review-01.md",
+    ".gogo/work/feature-changelog-merged-entries/review-02.md",
+    ".gogo/work/feature-changelog-merged-entries/test-01.md",
+    ".gogo/work/feature-changelog-merged-entries/implement/result.json",
+    ".gogo/work/feature-changelog-merged-entries/review/result.json",
+    ".gogo/work/feature-changelog-merged-entries/test/result.json",
+    ".gogo/work/feature-changelog-merged-entries/charts/manifest.json",
+    ".gogo/work/feature-changelog-merged-entries/charts/merged-done-flow.mmd",
+    ".gogo/work/feature-changelog-merged-entries/charts/before/manifest.json",
+    ".gogo/work/feature-changelog-merged-entries/charts/before/current-done-multiship.mmd"
+  ],
+  "outputs": [
+    ".gogo/work/feature-changelog-merged-entries/plan.md",
+    ".gogo/work/feature-changelog-merged-entries/report/report.md",
+    ".gogo/work/feature-changelog-merged-entries/report/flow.mmd",
+    ".gogo/work/feature-changelog-merged-entries/report/sequence.mmd",
+    ".gogo/work/feature-changelog-merged-entries/report/manifest.json",
+    ".gogo/work/feature-changelog-merged-entries/report/before/flow.mmd",
+    ".gogo/work/feature-changelog-merged-entries/report/before/manifest.json",
+    ".gogo/work/feature-changelog-merged-entries/report/result.json",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    ".gogo/knowledge/code-review-standards.md",
+    ".gogo/work/feature-changelog-merged-entries/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Clean green report for changelog-merged-entries (plugin 0.8.0): plan.md finalized to as-built (one delta — D1 answered mid-plan as a custom scope expansion: every changelog entry, single or merged, is a synthesis); as-built diagram set = the plan flow (held as built) + a new merged-ship sequence, before/ baseline copied in stem-paired (no diagrams.html in report/, per this feature's own slim-entry rule); high-level article-style report.md written; 3 knowledge docs reconciled (since-0.8.0 override, slim-entry footprint bar, docs/index.md sweep lesson from REV-001). validate-in + validate-out passed; 0 open issues (4 review + 1 test finding, all verified)."
+}

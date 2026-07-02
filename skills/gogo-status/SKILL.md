@@ -26,20 +26,24 @@ board** (Stage B) and roadmap #7's commenter. It **reads only**.
 - `report/report.md` (new bundle) or a legacy root `report.md` — does a final
   report exist?
 - `.gogo/changelog/*/` — is there a `<date>-<slug>/` entry whose slug matches this
-  feature (i.e. was it already shipped)?
+  feature, **or** a `<date>-<name>/manifest.json` whose `members` array lists this
+  slug (i.e. it shipped inside a merged release entry named after the release, not
+  the slug) — either means it was already shipped.
 
 ### Classification (first matching rule wins, top to bottom)
 
 | Class | Rule |
 |---|---|
-| **shipped** | `state.md` `status: shipped`, **or** a `.gogo/changelog/*-<slug>/` entry with a `report.md` exists for this slug |
+| **shipped** | `state.md` `status: shipped`, **or** a `.gogo/changelog/*-<slug>/` entry with a `report.md` exists for this slug, **or** this slug appears in any `.gogo/changelog/*/manifest.json` `members` array (a merged release entry named after the release) |
 | **ready-to-ship** | not shipped, **and** a final report exists (`report/report.md`, or a legacy root `report.md`) |
 | **in-progress** | no report, **and** `phase` is one of `implement` / `review` / `test` (or `status` is `implementing` / `reviewing` / `testing`) |
 | **unfinished** | anything else — early/`plan` phase, planned but not built, no report |
 
-Notes: a feature that has a report **and** a matching changelog entry is
-**shipped** (the changelog wins over ready-to-ship). `aborted` features report as
-**unfinished** (flag the `aborted` status in the record).
+Notes: a feature that has a report **and** a matching changelog entry — matched by
+folder slug **or** by `manifest.json` `members` — is **shipped** (the changelog wins
+over ready-to-ship). Set `changelog_path` to the entry dir that ships it (its own
+`<date>-<slug>/`, or the merged `<date>-<name>/` whose `members` list it). `aborted`
+features report as **unfinished** (flag the `aborted` status in the record).
 
 ### Output shape (the documented contract the board + status consume)
 
@@ -53,7 +57,7 @@ An array of records, newest-first (by `state.md` `created` or dir mtime). Each:
   "status":         "<raw state.md status>",
   "class":          "shipped|ready-to-ship|in-progress|unfinished",
   "report_path":    "<repo-relative report.md path, or null>",
-  "changelog_path": "<.gogo/changelog/<date>-<slug>/ path, or null>",
+  "changelog_path": "<.gogo/changelog/<date>-<name>/ path (name = the feature slug for a single entry, the release name for a merged one), or null>",
   "iterations":     "plan=N implement=N review=N test=N",
   "resume":         "<state.md resume hint>"
 }
@@ -69,6 +73,8 @@ ls -d .gogo/work/feature-*/     2>/dev/null   # every feature
 ls    .gogo/work/feature-*/report/report.md 2>/dev/null  # new-bundle reports
 ls    .gogo/work/feature-*/report.md         2>/dev/null  # legacy root reports
 ls -d .gogo/changelog/*/        2>/dev/null   # shipped entries (match slug suffix)
+# merged entries name the folder after the release, so also read membership:
+cat   .gogo/changelog/*/manifest.json 2>/dev/null   # a slug in a manifest's members[] == shipped
 ```
 
 ## `/gogo:status` rendering (Step B — read-only)

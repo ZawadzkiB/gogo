@@ -1,0 +1,42 @@
+{
+  "slug": "board-actions-and-filter",
+  "phase": "report",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-board-actions-and-filter/plan.md",
+    ".gogo/work/feature-board-actions-and-filter/adjustments.md",
+    ".gogo/work/feature-board-actions-and-filter/decisions.md",
+    ".gogo/work/feature-board-actions-and-filter/state.md",
+    ".gogo/work/feature-board-actions-and-filter/review/issues.json",
+    ".gogo/work/feature-board-actions-and-filter/review/review-01.md",
+    ".gogo/work/feature-board-actions-and-filter/review/result.json",
+    ".gogo/work/feature-board-actions-and-filter/test/issues.json",
+    ".gogo/work/feature-board-actions-and-filter/test-01.md",
+    ".gogo/work/feature-board-actions-and-filter/test/result.json",
+    ".gogo/work/feature-board-actions-and-filter/implement/result.json",
+    ".gogo/work/feature-board-actions-and-filter/charts/manifest.json",
+    ".gogo/work/feature-board-actions-and-filter/charts/board-cockpit-flow.mmd",
+    ".gogo/work/feature-board-actions-and-filter/charts/board-key-flow.mmd",
+    ".gogo/work/feature-board-actions-and-filter/charts/before/manifest.json",
+    ".gogo/work/feature-board-actions-and-filter/charts/before/current-board-shiponly.mmd"
+  ],
+  "outputs": [
+    ".gogo/work/feature-board-actions-and-filter/plan.md",
+    ".gogo/work/feature-board-actions-and-filter/report/report.md",
+    ".gogo/work/feature-board-actions-and-filter/report/flow.mmd",
+    ".gogo/work/feature-board-actions-and-filter/report/activity.mmd",
+    ".gogo/work/feature-board-actions-and-filter/report/manifest.json",
+    ".gogo/work/feature-board-actions-and-filter/report/before/flow.mmd",
+    ".gogo/work/feature-board-actions-and-filter/report/before/manifest.json",
+    ".gogo/work/feature-board-actions-and-filter/report/result.json",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/work/feature-board-actions-and-filter/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Clean green report for board-actions-and-filter (plugin 0.9.0): plan.md finalized to as-built (the intended design held; REV-001 crash-safe launch was the one behavioral fix post-implement); as-built diagram set = cockpit flow + board.py key/guard/intent activity state machine, before/ ship-only baseline copied in stem-paired (no diagrams.html in report/, per the 0.8.0 slim rule); article-style report.md written; 3 knowledge docs reconciled (test-strategy: live TUI now automatable via tmux send-keys/capture-pane; project-knowledge: since-0.9.0 cockpit bullet + version currency; tech-stack: cockpit role + tmux-on-host note, still a soft dep). validate-in + validate-out passed; 0 open issues (REV-001 major + REV-002 minor both fixed inline and verified; test round 1 ALL GREEN incl. the first live tmux-driven TUI round)."
+}

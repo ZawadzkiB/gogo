@@ -1,0 +1,9 @@
+{
+  "slug": "board-actions-and-filter",
+  "updated": "2026-07-02",
+  "note": "As-built set for v0.9.0 (the intended design held as built). flow = the shipped /gogo:done cockpit control flow: classify -> board.py (tmux) -> schema-v2 intent -> route (view/ship/ship-merged relaunch the board; go hands off to the pipeline; cancel stops). activity = board.py's internal key -> guard -> intent state machine (filter-edit vs command mode; per-class guards; emit/cancel exits). Sources: charts/board-cockpit-flow.mmd and charts/board-key-flow.mmd, copied in with kind names so before/after pair by filename stem. Plan-time as-is baseline copied to report/before/. No diagrams.html in this bundle (0.8.0 slim rule; /gogo:view builds the page from source).",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "As-built: board cockpit — action keys -> intents -> route -> relaunch loop" },
+    { "kind": "activity", "file": "report/activity.mmd", "title": "As-built: board.py key -> guard -> intent state machine (filter-edit vs command mode)" }
+  ]
+}

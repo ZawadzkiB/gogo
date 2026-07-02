@@ -1,0 +1,8 @@
+{
+  "slug": "changelog-merged-entries",
+  "updated": "2026-07-02",
+  "note": "As-is baseline (before): /gogo:done board multi-select always looped 'Ship one feature' per selected slug — N picks produced N separate changelog entries, each a full report-bundle copy; no way to combine related work items into one release entry. Copied into the report bundle from charts/before/ (source: charts/before/current-done-multiship.mmd); file path rewritten to the report/before/ location and renamed to the kind name flow.mmd so before/after pair by filename stem in the viewer.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/before/flow.mmd", "title": "Before: multi-select always ships N separate full-copy entries" }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "phase": "test",
+  "slug": "changelog-merged-entries",
+  "round": 1,
+  "status": "ok",
+  "date": "2026-07-02",
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 1,
+  "inputs": [
+    ".gogo/work/feature-changelog-merged-entries/plan.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-changelog-merged-entries/test/issues.json",
+    ".gogo/work/feature-changelog-merged-entries/test-01.md",
+    ".gogo/work/feature-changelog-merged-entries/test/result.json"
+  ],
+  "summary": "All 7 test cases GREEN. Fixture dogfood: merged entry (A+B) synthesized correctly — slug-prefixed diagrams, members[] in manifest, no diagrams.html, idempotent re-run, feature C untouched. Single-slug (C): same slim shape via same writer. Schema: all 12 real manifests valid; unknown-key rejection intact. Classifier: members[] detection works; malformed manifest skipped safely. Viewer: slug-prefix pairing confirmed correct. FR4: plugin.json=0.8.0, 12 commands, board.py unchanged+selftest PASS, no stale wording. One nit TEST-001 (gogo-view <kind> variable naming ambiguity, non-blocking — behavior is correct)."
+}

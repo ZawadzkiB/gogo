@@ -47,5 +47,9 @@ uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 - `jq` — handy for validating/reading JSON artifacts when present.
 - Node.js — only for the Playwright MCP.
 - `python3` + `tmux` (since 0.7.0) — soft deps for the `/gogo:done` interactive
-  work board (`board.py` curses TUI in a tmux pane). Detected at use (`command -v`
-  + tty check); absent → the status-table + `AskUserQuestion` multi-select fallback.
+  work board (`board.py` curses TUI in a tmux pane; since 0.9.0 the pipeline
+  **cockpit** — action keys + filter + intent relaunch loop). Detected at use
+  (`command -v` + tty check); absent → the status-table + `AskUserQuestion`
+  multi-select fallback. tmux is installed on this dev host (so the live-TUI test
+  path in `test-strategy.md` applies), but it **stays a soft dep** — same
+  detection, same fallback.

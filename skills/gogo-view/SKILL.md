@@ -68,8 +68,8 @@ Gather every selectable item, in **two groups**, newest first:
     label `<slug> — plan`.
   - its **report** — when `report/report.md` exists (or a legacy root `report.md`);
     label `<slug> — report`.
-- **Changelog** — each `.gogo/changelog/<date>-<slug>/` that contains a `report.md`;
-  label `<date>-<slug> — changelog`.
+- **Changelog** — each `.gogo/changelog/<date>-<name>/` that contains a `report.md`;
+  label `<date>-<name> — changelog`.
 
 ```bash
 ls -d .gogo/work/feature-*/          2>/dev/null  # each feature → plan (plan.md + charts/) + report if present
@@ -88,7 +88,7 @@ a report. Sort each group newest-first (by dir/file mtime, or the changelog date
 | `<slug>` | that feature's **report if it exists, else its plan** |
 | `<slug>:plan` | that feature's **plan** bundle (`plan.md` + `charts/`) |
 | `<slug>:report` | that feature's **report** bundle (`report/`, else legacy root `report.md`) |
-| `<date>-<slug>` (a changelog entry) | that changelog **report** |
+| `<date>-<name>` (a changelog entry; `<name>` = the feature slug for a single entry, the release name for a merged one) | that changelog **report** |
 | a path | the `plan.md` / `report.md` it names |
 
 A `<slug>:report` (or bare `<slug>`) that resolves to no report, or a `<slug>:plan`
@@ -96,13 +96,13 @@ with no `plan.md`, → STOP with the path tried (validate-in).
 
 **No resolvable arg** → present the **grouped picker** via `AskUserQuestion`: the
 Work items (each plan / report) and the Changelog items as options, each labeled
-`<slug> — plan` / `<slug> — report` / `<date>-<slug> — changelog`, newest first.
+`<slug> — plan` / `<slug> — report` / `<date>-<name> — changelog`, newest first.
 The pick builds + opens its page. Default highlight: the most recent changelog
 entry, else the newest work item.
 
 Record the chosen **kind** (`plan` | `report`), the source markdown (`plan.md` or
 `report.md`), its bundle dir, and a short **name** for the output file:
-`<slug>-plan` for a plan; the changelog `<date>-<slug>`, else the feature `<slug>`,
+`<slug>-plan` for a plan; the changelog `<date>-<name>`, else the feature `<slug>`,
 for a report.
 
 ### 2. Ensure shared resources (idempotent)
@@ -193,7 +193,7 @@ literal indentation/double-spaces. Plain-text pass, offline — no JS markdown l
 
 **Diagrams.** Gather the `.mmd` sources for the chosen bundle, **by layout** (always
 skip the non-diagram files `diagrams.html` and `manifest.json`):
-- new `report/` bundle (or a `<date>-<slug>/` changelog entry) → the `*.mmd`
+- new `report/` bundle (or a `<date>-<name>/` changelog entry) → the `*.mmd`
   beside `report.md`;
 - legacy root-layout report (`.gogo/work/feature-<slug>/report.md`) → the
   feature's `charts/*.mmd` (older features keep diagrams under `charts/`);
@@ -227,15 +227,17 @@ of a single column. The before/after sources depend on the bundle:
 
 Then:
 
-- **Pair by kind.** Match each `before/<kind>.mmd` to the after `<kind>.mmd`. For a
-  kind present in **both**, emit a `<div class="compare">` wrapping **two**
-  `figure.diagram` elements — **Before** (left) then **After** (right) — each with
-  its `.mmd` source inlined **verbatim** (never `fetch()`). Give the after figure the
-  normal `data-diagram="<basename>"` and the before figure
-  `data-diagram="before-<basename>"` so their saved layouts never collide. Mark them
-  `class="diagram compare-before"` / `class="diagram compare-after"` and caption
-  "Before — <title>" / "After — <title>".
-- **Unmatched kinds.** A kind present on only one side is a single full-width figure
+- **Pair by filename stem.** Match each `before/<stem>.mmd` to the after
+  `<stem>.mmd` by full basename — `<stem>` is the filename without extension
+  (`flow`, or a changelog entry's slug-prefixed `<slug>-flow`), not the manifest
+  `kind` enum. For a stem present in **both**, emit a `<div class="compare">`
+  wrapping **two** `figure.diagram` elements — **Before** (left) then **After**
+  (right) — each with its `.mmd` source inlined **verbatim** (never `fetch()`).
+  Give the after figure the normal `data-diagram="<basename>"` and the before
+  figure `data-diagram="before-<basename>"` so their saved layouts never collide.
+  Mark them `class="diagram compare-before"` / `class="diagram compare-after"`
+  and caption "Before — <title>" / "After — <title>".
+- **Unmatched stems.** A stem present on only one side is a single full-width figure
   inside its own `.compare` row with `class="diagram compare-solo"`, captioned
   "Added — <title>" (after only) or "Removed — <title>" (before only).
 - **Still fully interactive.** `interactive.js` renders **every** `figure.diagram`

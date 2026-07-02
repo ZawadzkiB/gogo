@@ -1,0 +1,60 @@
+{
+  "slug": "changelog-merged-entries",
+  "track": "review",
+  "round": 2,
+  "updated": "2026-07-02",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "docs/index.md still describes /gogo:done as \"copies the bundle\" (stale behaviour, singular feature)",
+      "description": "docs/index.md:83 (the top-level command quick-reference table) still reads: \"/gogo:done | The explicit 'this is shipped' gate for a report-complete feature. | copies the bundle to .gogo/changelog/<date>-<slug>/ ...\". This is the exact behaviour this feature changed — the entry is now a WRITTEN high-level synthesis (never a copy), the dir is <date>-<name>, and one OR several features can ship as a merged entry. The line was missed by the FR4 sync sweep (plan lists commands/done.md, skills/gogo, README, docs/{commands,flow,architecture} but not docs/index.md). It directly violates the plan's own acceptance test ('no stale copies the report bundle wording') and code-review-standard #1 (no place still describes the old behaviour). docs/index.md:75 ('ship it -> changelog + interactive report link') is fine.",
+      "proposed_solution": "AGENT-FIXABLE. Rewrite docs/index.md:83 to match the other synced docs: \"/gogo:done | The explicit 'this is shipped' gate — ship one report-complete feature, or several as ONE merged release entry (no slug opens the work board). | SYNTHESIZES a high-level entry (report.md written, not copied) into .gogo/changelog/<date>-<name>/ and builds + prints the interactive viewer link — see [Commands](commands.md)\". Drop the words 'copies the bundle' and the '-<slug>' dir suffix.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Rewrote docs/index.md:83 to the new semantics — SYNTHESIZES a high-level entry (report.md written, not copied) into .gogo/changelog/<date>-<name>/, single-or-merged framing; dropped 'copies the bundle' and the '-<slug>' suffix. Swept the rest of index.md (line 75 was already correct). [Verified round 2] docs/index.md:83 now reads exactly that; 'Synthesizes ... written, not copied ... <date>-<name>' with the single-or-merged framing and no-slug board note. Repo-wide grep for 'copies the (report )?bundle' returns zero hits outside .gogo/work (plan.md acceptance text + review-01.md snapshot only). No 'copies' language anywhere on the page."
+    },
+    {
+      "id": "REV-002",
+      "title": "contracts README omits the new members[] field of the charts manifest",
+      "description": "templates/contracts/charts-manifest.schema.json gained an additive optional `members` array (correct: additive, optional, kebab-case string items, root still additionalProperties:false so old manifests without members still validate). But templates/contracts/README.md:55 still documents the manifest shape as `{ slug, updated?, note?, diagrams[] }` — it never mentions `members`. The human-facing contracts index is now out of sync with the schema it describes (review dimension 4).",
+      "proposed_solution": "AGENT-FIXABLE. In templates/contracts/README.md, update the charts-manifest field list to `{ slug, updated?, note?, diagrams[], members? }` and add one clause: `members?` = the changelog-entry-only array of member slugs a /gogo:done entry ships (one for a single entry, several for a merged release; absent on plain charts/report manifests) — what gogo-status reads to classify a merged entry's members.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Updated the charts-manifest field list in templates/contracts/README.md to `{ slug, updated?, note?, diagrams[], members? }` and added a clause describing members? (changelog-entry-only member-slug array; absent on plain manifests; read by gogo-status). [Verified round 2] README.md:55 field list now includes members?; README.md:62-66 clause accurately mirrors the schema (charts-manifest.schema.json:28-35): additive/optional, one slug single / several merged, absent on plain report/implement manifests, read by gogo-status to classify a merged entry's members. Description is consistent with the schema's own members description."
+    },
+    {
+      "id": "REV-003",
+      "title": "gogo-done entry-writer under-specifies the manifest.json diagram entries (kind + file missing) — risk of a contract-invalid manifest",
+      "description": "skills/gogo-done/SKILL.md step 4 tells the agent to WRITE the entry manifest.json with `slug` = entry name, `diagrams[]` 'listing every prefixed .mmd with its title slug-prefixed (<slug>: <title>)', and `members`. But charts-manifest.schema.json (the schema the same file's Inputs/outputs table and gogo-status point at) requires EACH diagram to be `{ kind, file, title }` with additionalProperties:false and required kind+file+title. The instruction names only `title`, so a literal execution can emit diagram entries missing `kind` and `file` and thus fail contract validation. Secondary: the schema's `slug` is described as a feature slug (kebab-case) — for a merged entry `slug` is a release name; it still matches the pattern, so validity holds, but note the semantic stretch. gogo-view itself does not need kind/file (it infers kind from the mermaid body and captions from title), so this is a contract-conformance gap, not a viewer break.",
+      "proposed_solution": "AGENT-FIXABLE. In step 4, spell out that each diagram entry carries all three schema-required fields: `kind` (carried over from the member's source report/manifest.json, else inferred), `file` (the slug-prefixed .mmd basename written into the entry dir), and `title` (slug-prefixed). One added clause is enough.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "gogo-done step 4 now specifies each diagrams[] entry as schema-complete { kind, file, title }: kind carried over from the member's report/manifest.json else inferred from the .mmd header, file = the slug-prefixed basename (e.g. <slug>-flow.mmd), title slug-prefixed — and states the written manifest must validate against templates/contracts/charts-manifest.schema.json. [Verified round 2] SKILL.md:156-170 spells out all three required fields; the kind-inference mapping (flowchart/graph->flow, sequenceDiagram->sequence, classDiagram->class, stateDiagram->activity) is consistent with the schema enum and with gogo-view's own kind handling; an explicit must-validate statement is present. Secondary semantic-stretch note on slug=release-name is acknowledged and remains valid (release name is kebab-cased at :114, matches the pattern)."
+    },
+    {
+      "id": "REV-004",
+      "title": "\"<date>-<slug>\" naming now inaccurate for merged entries in reader-facing wording",
+      "description": "A merged entry's folder is <date>-<release-name>, where the release name is NOT a member slug (D2). Several reader-facing strings still say <date>-<slug>: skills/gogo-view/SKILL.md enumeration label + arg-grammar row + output-name note (lines ~71-72, 91, 99, 105, 196), commands/view.md:11 arg hint ('a <date>-<slug> changelog entry'), and skills/gogo-status/SKILL.md:60 output-shape example. Functionally harmless — gogo-view globs .gogo/changelog/*/ so a merged entry is still enumerated and a typed <date>-<name> arg still resolves as a directory match — so this is wording only. Note gogo-view was intentionally left out of the plan's FR4 sync scope (plan: 'renders with zero viewer changes'), so this may be judged out-of-scope / wontfix; flagging because commands/view.md's arg hint is user-visible.",
+      "proposed_solution": "AGENT-FIXABLE (or NEEDS-USER-DECISION on scope). Minimal precise fix: change the user-visible arg hints/grammar to '<date>-<name>' or the neutral 'a changelog entry' (commands/view.md:11, gogo-view arg-grammar row) and leave internal examples as-is. If the team prefers to keep gogo-view untouched per plan scope, mark wontfix.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Wording-only accuracy pass (no behaviour change): changed reader-facing <date>-<slug> to <date>-<name> in gogo-view (enumeration label, arg-grammar row with a parenthetical that name = slug for single / release name for merged, picker label, output-name note, bundle-layout note), commands/view.md:11 arg hint, and gogo-status changelog_path output-shape example. Arg RESOLUTION semantics unchanged; gogo-view not restructured. [Verified round 2] git diff confirms every gogo-view hunk is wording-only — the arg-grammar 'Resolves to' column ('that changelog report') is untouched, so <date>-<name> still resolves by directory match and enumeration still globs .gogo/changelog/*/ (semantics unchanged). gogo-view now has zero '<date>-<slug>' occurrences; gogo-status:60 changelog_path example carries the name-vs-release parenthetical; commands/view.md:10 says '<date>-<name> changelog entry'. gogo-status:28 and :45 legitimately retain '<date>-<slug>' as the single-entry side of an explicit single-vs-merged contrast (paired with '<date>-<name>' for the merged case) — correct, not stale. Likewise gogo-done:111 keeps <date>-<slug> for the single-member case vs <date>-<release-name> for merged."
+    }
+  ]
+}

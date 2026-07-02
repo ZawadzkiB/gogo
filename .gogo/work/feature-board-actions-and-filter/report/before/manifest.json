@@ -1,0 +1,8 @@
+{
+  "slug": "board-actions-and-filter",
+  "updated": "2026-07-02",
+  "note": "As-is baseline (before): the 0.7.0/0.8.0 board is a one-shot ship-picker — select ready-to-ship cards, s ships (separate-vs-merged asked afterwards in chat), q cancels; no view, no go, no filter; every non-ship outcome ends the board. Copied into the report bundle from charts/before/ (source: charts/before/current-board-shiponly.mmd); file path rewritten to the report/before/ location and renamed to the kind name flow.mmd so before/after pair by filename stem in the viewer.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/before/flow.mmd", "title": "Before: one-shot ship-only board" }
+  ]
+}

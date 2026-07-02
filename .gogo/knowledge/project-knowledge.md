@@ -114,3 +114,30 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   pane that ships on drop — or, when `python3`/`tmux`/tty are absent (**soft deps**),
   the status-table + `AskUserQuestion` multi-select fallback; shipping stays
   single-sourced. Command set still **12**; version **0.7.0**.
+- **Merged + synthesized changelog entries (since 0.8.0):** a changelog entry is a
+  **written synthesis, never a copy** — for merged releases AND ordinary single
+  ships (supersedes the 0.5.0 "copies the report bundle" behaviour above).
+  `/gogo:done` can ship several related features as ONE merged entry at
+  `.gogo/changelog/<date>-<name>/`: board/multi-select picks ≥2 → one
+  separate-vs-merged gate, or the direct `slug1+slug2` arg pre-answers it; the
+  release name is suggested + confirmed (D2), date = newest member. Entries carry
+  a **slim set** — synthesized `report.md` + slug-prefixed `.mmd` + `manifest.json`
+  with an additive optional **`members[]`** (charts-manifest schema) + `before/`;
+  **no `diagrams.html` copy** (`/gogo:view` builds the page from source).
+  `gogo-status` classifies a member as shipped via `members[]` even though the
+  entry dir is named after the release; `board.py` untouched; the full audit trail
+  stays in `.gogo/work/` (linked). Command set still **12**; version **0.8.0**.
+- **Board cockpit — action keys + filter + intent protocol v2 (since 0.9.0):**
+  the `/gogo:done` board is the **pipeline cockpit** — one mode, action keys
+  (`v` view · `s` ship · `m` ship-merged · `g` go/resume · `/` live filter ·
+  `q` cancel) with per-class guards. Every action is a **single-shot schema-v2
+  intent** `{"schema":2, "action", "items"}` written to **`board-intent.json`**
+  (renamed from `ship-result.json`; legacy `{"ship":[...]}` still parsed as
+  `action: ship`); `gogo-done` executes the intent and **relaunches the board**
+  (re-classifying in between) — only `go`/`cancel` end the loop; `board.py` stays
+  a **no-mutation selector** with the 0/1/2 exit contract, now **crash-safe**
+  (any TUI failure → exit 2 + one-line stderr, routed to the fallback, never
+  misread as a cancel). validate-in relaxed: the cockpit opens whenever **any**
+  `.gogo/work/feature-*` exists (only zero features stops). The chat fallback
+  stays ship-focused (`/gogo:view` + `/gogo:go` cover the rest). Command set
+  still **12**; version **0.9.0**.

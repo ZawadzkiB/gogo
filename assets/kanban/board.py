@@ -1,29 +1,48 @@
 #!/usr/bin/env python3
-"""gogo done board -- an interactive terminal kanban for /gogo:done.
+"""gogo done board -- an interactive terminal kanban cockpit for /gogo:done.
 
-Reads a work-index (records classified by the gogo-status Step A classifier),
-shows four columns -- unfinished, in-progress, ready-to-ship, shipped -- lets the
-user select ready-to-ship cards and confirm "ship", then writes the chosen slugs
-to a result file as {"ship": ["<slug>", ...]}.
+Reads a work-index (records classified by the gogo-status Step A classifier) and
+shows four columns -- unfinished, in-progress, ready-to-ship, shipped. It is the
+pipeline's cockpit: from the same table the user can VIEW any card's page, SHIP
+ready cards (separately or merged), GO (run/resume the pipeline) on an unbuilt
+card, and FILTER the board by text. It is ONE mode with action keys -- no
+view/manage toggle.
+
+Action keys (guards enforce legality per class):
+  arrows/hjkl  move the cursor            space/enter  toggle a ready-to-ship card
+  v  view the focused card (any class)    s  ship the selection (separately)
+  m  ship the selection merged (>=2)      g  go/resume the focused card
+  /  filter (Esc clears)                  q  cancel
+
+This is a selector/visualizer ONLY: it never copies, archives, or mutates any gogo
+state. Every action key just writes a single-shot INTENT to the result file and
+exits; the gogo-done orchestrator executes the intent (view build / ship writer /
+pipeline handoff) and relaunches the board. All execution stays single-sourced in
+the skill -- the board has no LLM and never ships anything itself.
+
+Intent result schema (v2), written on any action, exit 0:
+  {"schema": 2, "action": "view|ship|ship-merged|go", "items": ["<slug>", ...]}
+    - view / go  carry the single focused slug.
+    - ship / ship-merged  carry the selected ready-to-ship slugs (record order).
+gogo-done also accepts the legacy {"ship": [...]} shape as action "ship"
+(back-compat); see normalize_intent().
 
 Exit-code contract (the gogo-done skill branches on these):
-  0  confirmed  -- result file written (possibly {"ship": []} for an empty pick).
-  1  cancel     -- user quit (q/ESC); no result file written.
-  2  error      -- cannot read the work-index (missing/malformed --index or stdin),
-                   or the board cannot start. No result file; a one-line reason on
-                   stderr and NO traceback. The skill treats 2 like a launch
-                   failure -> its status-table fallback, never a cancel.
-
-This is a selector/visualizer only: it never copies, archives, or mutates any
-gogo state. The actual shipping stays single-sourced in the gogo-done skill,
-which reads the result file and runs its existing archive+link flow per slug.
+  0  action    -- result file written with a schema-v2 intent.
+  1  cancel    -- user quit (q); no result file written.
+  2  error     -- cannot read the work-index (missing/malformed --index or stdin),
+                  a headless guard violation, or the board cannot start. No result
+                  file; a one-line reason on stderr and NO traceback. The skill
+                  treats 2 like a launch failure -> its status-table fallback,
+                  never a cancel.
 
 Pure stdlib (curses, json, sys, argparse, tempfile, os). No network. Offline.
 
-Interactive curses needs a tty, so a headless self-test path (--selftest)
-exercises the classify -> select -> emit logic WITHOUT curses, for automated
-verification. A --headless --ship <slugs> path emits a result file without curses
-too (used by the skill's degradation and by smoke tests).
+Interactive curses needs a tty, so a headless self-test path (--selftest) exercises
+the classify -> guard -> intent logic WITHOUT curses, for automated verification. A
+--headless --action <a> [--ship <slugs>] path emits an intent file without curses
+(used by the skill's degradation and by smoke tests); --action defaults to "ship"
+and --ship still maps to the shipped items, for back-compat.
 """
 
 import argparse
@@ -33,9 +52,12 @@ import sys
 import tempfile
 
 # The four work-index classes, left-to-right in pipeline order. Only cards in
-# SHIPPABLE are selectable to ship; the rest are shown read-only for context.
+# SHIPPABLE are selectable to ship; GOABLE cards are the ones `g` can run/resume.
 CLASSES = ["unfinished", "in-progress", "ready-to-ship", "shipped"]
 SHIPPABLE = "ready-to-ship"
+GOABLE = ("unfinished", "in-progress")
+INTENT_SCHEMA = 2
+ACTIONS = ["view", "ship", "ship-merged", "go", "cancel"]
 
 
 # --------------------------------------------------------------------------- #
@@ -111,10 +133,93 @@ def filter_shippable(records, requested):
     return out
 
 
-def emit_result(path, ship_slugs):
-    """Write the result file as {"ship": ["<slug>", ...]} (the skill's input)."""
+def can_select(rec):
+    """A card is selectable (for ship/merge) only when it is ready-to-ship."""
+    return rec is not None and rec["class"] == SHIPPABLE
+
+
+def can_go(rec):
+    """`g` (run/resume the pipeline) applies only to unfinished / in-progress."""
+    return rec is not None and rec["class"] in GOABLE
+
+
+def match_record(rec, text):
+    """Case-insensitive substring match on slug + title. Empty text matches all."""
+    if not text:
+        return True
+    t = text.lower()
+    return t in rec["slug"].lower() or t in rec["title"].lower()
+
+
+def filtered_columns(records, text):
+    """Group into the four columns, keeping only records that match `text`."""
+    return {cls: [r for r in records if r["class"] == cls and match_record(r, text)]
+            for cls in CLASSES}
+
+
+def clamp_index(idx, n):
+    """Clamp a cursor row into [0, n-1]; 0 when the column is empty (so a filter
+    that narrows a column always re-clamps the cursor onto a visible card)."""
+    if n <= 0:
+        return 0
+    return max(0, min(idx, n - 1))
+
+
+def build_intent(action, items):
+    """The schema-v2 intent the board writes on any action."""
+    return {"schema": INTENT_SCHEMA, "action": action, "items": list(items)}
+
+
+def normalize_intent(data):
+    """Read either a schema-v2 intent or the legacy {"ship":[...]} shape and
+    return a normalized {"action", "items"} dict (back-compat for gogo-done)."""
+    if isinstance(data, dict) and "ship" in data and "action" not in data:
+        items = data.get("ship") or []
+        return {"action": "ship", "items": list(items)}
+    action = (data or {}).get("action", "ship")
+    items = (data or {}).get("items") or []
+    return {"action": action, "items": list(items)}
+
+
+def resolve_action(action, focus_rec, selected, records):
+    """Apply the per-class guards for an action and return (intent, hint): exactly
+    one is non-None. A legal action -> (schema-v2 intent, None); a guard violation
+    -> (None, "<one-line hint>"). This is the single source of truth the curses
+    loop, the headless path, and the self-test all share.
+
+    - view: any focused card.
+    - go:   the focused card, only if unfinished / in-progress.
+    - ship / ship-merged: the SELECTED ready-to-ship slugs (record order); the
+      selection is independent of the current filter, so it survives filtering.
+      merge needs >= 2.
+    """
+    ready = selectable_slugs(records)
+    sel_ready = [s for s in ready if s in selected]  # record order, ready only
+    if action == "view":
+        if focus_rec is None:
+            return None, "view: no card here"
+        return build_intent("view", [focus_rec["slug"]]), None
+    if action == "go":
+        if focus_rec is None:
+            return None, "go: no card here"
+        if not can_go(focus_rec):
+            return None, "go: only unfinished / in-progress cards"
+        return build_intent("go", [focus_rec["slug"]]), None
+    if action == "ship":
+        if not sel_ready:
+            return None, "ship: select ready-to-ship cards first (space)"
+        return build_intent("ship", sel_ready), None
+    if action == "ship-merged":
+        if len(sel_ready) < 2:
+            return None, "merge: select >= 2 ready-to-ship cards"
+        return build_intent("ship-merged", sel_ready), None
+    return None, "unknown action: %s" % action
+
+
+def emit_intent(path, intent):
+    """Write the schema-v2 intent to the result file (the skill's input)."""
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump({"ship": list(ship_slugs)}, fh, indent=2)
+        json.dump(intent, fh, indent=2)
         fh.write("\n")
 
 
@@ -141,46 +246,60 @@ def _addstr(win, y, x, text, attr=0):
 
 
 def _board_loop(stdscr, records):
-    """Run the curses event loop. Returns the chosen ship-slug list on confirm,
-    or None on cancel."""
+    """Run the curses event loop. Returns a schema-v2 intent dict on an action
+    key, or None on cancel (q)."""
     import curses
 
     curses.curs_set(0)
     stdscr.keypad(True)
 
-    cols = columns(records)
     order = CLASSES
-    selected = set()
+    all_cols = columns(records)
+    selected = set()                              # slugs (only ever ready-to-ship)
+    filter_text = ""
+    filter_edit = False
+    status_hint = ""
 
-    cur_col = 2 if cols[SHIPPABLE] else 0  # start on ready-to-ship if any
+    cur_col = 2 if all_cols[SHIPPABLE] else 0     # start on ready-to-ship if any
     cur_row = 0
 
-    CARD_TOP = 5
-
-    def clamp_row():
-        nonlocal cur_row
-        n = len(cols[order[cur_col]])
-        cur_row = 0 if n == 0 else max(0, min(cur_row, n - 1))
-
-    clamp_row()
+    CARD_TOP = 6
 
     while True:
+        fcols = filtered_columns(records, filter_text)
+        cur_col = max(0, min(cur_col, len(order) - 1))
+        cur_row = clamp_index(cur_row, len(fcols[order[cur_col]]))
+        items_here = fcols[order[cur_col]]
+        focus = items_here[cur_row] if items_here else None
+        shown = sum(len(fcols[c]) for c in order)
+        total = len(records)
+
         stdscr.erase()
         maxy, maxx = stdscr.getmaxyx()
         col_w = max(8, maxx // 4)
         card_rows = max(1, maxy - CARD_TOP - 1)
 
-        _addstr(stdscr, 0, 0, "gogo done -- work board", curses.A_BOLD)
+        _addstr(stdscr, 0, 0, "gogo done -- work board (cockpit)", curses.A_BOLD)
         _addstr(stdscr, 1, 0,
-                "move: arrows/hjkl   select: space/enter   ship: s   cancel: q",
+                "move: arrows/hjkl   select: space   "
+                "view:v  ship:s  merge:m  go:g  filter:/  quit:q",
                 curses.A_DIM)
+
+        if filter_edit:
+            fline = "filter (type; Enter=apply, Esc=clear): " + filter_text + "_"
+        elif filter_text:
+            fline = "filter: %s  (%d/%d shown)   Esc=clear" % (
+                filter_text, shown, total)
+        else:
+            fline = ""
+        _addstr(stdscr, 2, 0, fline, curses.A_DIM)
 
         for ci, cls in enumerate(order):
             x0 = ci * col_w
-            items = cols[cls]
+            items = fcols[cls]
             head = "%s (%d)" % (cls, len(items))
-            _addstr(stdscr, 3, x0, head, curses.A_BOLD)
-            _addstr(stdscr, 4, x0, "-" * (col_w - 1))
+            _addstr(stdscr, 4, x0, head, curses.A_BOLD)
+            _addstr(stdscr, 5, x0, "-" * (col_w - 1))
 
             start = 0
             if ci == cur_col and cur_row >= card_rows:
@@ -204,46 +323,90 @@ def _board_loop(stdscr, records):
                     attr |= curses.A_BOLD
                 _addstr(stdscr, y, x0, line[:col_w - 1], attr)
 
-        footer = "selected to ship: %d" % len(selected)
+        count = "selected: %d" % len(selected)
+        footer = ("%s   %s" % (count, status_hint)) if status_hint else count
         _addstr(stdscr, maxy - 1, 0, footer, curses.A_BOLD)
 
         stdscr.refresh()
         ch = stdscr.getch()
+        status_hint = ""                          # transient: cleared on next key
 
-        if ch in (ord("q"), ord("Q"), 27):            # cancel
+        # ----- filter input mode: keys are literal text ---------------------- #
+        if filter_edit:
+            if ch in (10, 13, curses.KEY_ENTER):
+                filter_edit = False
+            elif ch == 27:                        # Esc: clear + leave edit
+                filter_text = ""
+                filter_edit = False
+            elif ch in (curses.KEY_BACKSPACE, 127, 8):
+                filter_text = filter_text[:-1]
+            elif 32 <= ch <= 126:
+                filter_text += chr(ch)
+            continue
+
+        # ----- command mode -------------------------------------------------- #
+        if ch in (ord("q"), ord("Q")):            # cancel
             return None
-        if ch in (curses.KEY_LEFT, ord("h")):
+        elif ch == ord("/"):                      # open the filter input line
+            filter_edit = True
+        elif ch == 27:                            # Esc clears an active filter
+            if filter_text:
+                filter_text = ""
+        elif ch in (curses.KEY_LEFT, ord("h")):
             cur_col = max(0, cur_col - 1)
-            clamp_row()
         elif ch in (curses.KEY_RIGHT, ord("l")):
             cur_col = min(len(order) - 1, cur_col + 1)
-            clamp_row()
         elif ch in (curses.KEY_UP, ord("k")):
             cur_row = max(0, cur_row - 1)
         elif ch in (curses.KEY_DOWN, ord("j")):
-            n = len(cols[order[cur_col]])
-            cur_row = min(max(0, n - 1), cur_row + 1)
+            cur_row = min(max(0, len(items_here) - 1), cur_row + 1)
         elif ch in (ord(" "), curses.KEY_ENTER, 10, 13):  # toggle-select
-            items = cols[order[cur_col]]
-            if order[cur_col] == SHIPPABLE and items:
-                slug = items[cur_row]["slug"]
-                if slug in selected:
-                    selected.discard(slug)
-                else:
-                    selected.add(slug)
-        elif ch in (ord("s"), ord("S")):             # confirm ship
-            return [r["slug"] for r in cols[SHIPPABLE] if r["slug"] in selected]
+            if can_select(focus):
+                slug = focus["slug"]
+                selected.discard(slug) if slug in selected else selected.add(slug)
+            elif focus is not None:
+                status_hint = "only ready-to-ship cards can be selected"
+            else:
+                status_hint = "no card here"
+        elif ch in (ord("v"), ord("V")):
+            intent, hint = resolve_action("view", focus, selected, records)
+            if intent is not None:
+                return intent
+            status_hint = hint
+        elif ch in (ord("s"), ord("S")):
+            intent, hint = resolve_action("ship", focus, selected, records)
+            if intent is not None:
+                return intent
+            status_hint = hint
+        elif ch in (ord("m"), ord("M")):
+            intent, hint = resolve_action("ship-merged", focus, selected, records)
+            if intent is not None:
+                return intent
+            status_hint = hint
+        elif ch in (ord("g"), ord("G")):
+            intent, hint = resolve_action("go", focus, selected, records)
+            if intent is not None:
+                return intent
+            status_hint = hint
+        elif 32 <= ch <= 126:
+            status_hint = "unknown key '%s' -- keys: v s m g space / q" % chr(ch)
 
 
 def run_board(records, result_path):
-    """Launch the curses board. On confirm, emit the result file and return 0;
-    on cancel, write nothing and return 1."""
+    """Launch the curses board. On an action, emit the intent file and return 0;
+    on cancel, write nothing and return 1; on any curses/loop failure, print one
+    stderr line and return 2 (a crash is an ERROR, never a cancel -- exit-code
+    contract: 0=confirmed, 1=cancel, 2=error)."""
     import curses
 
-    chosen = curses.wrapper(_board_loop, records)
-    if chosen is None:
+    try:
+        intent = curses.wrapper(_board_loop, records)
+    except Exception as exc:  # curses startup (no tty, bad TERM) or loop failure
+        sys.stderr.write("board: cannot run the TUI: %s\n" % exc)
+        return 2
+    if intent is None:
         return 1
-    emit_result(result_path, chosen)
+    emit_intent(result_path, intent)
     return 0
 
 
@@ -252,8 +415,8 @@ def run_board(records, result_path):
 # --------------------------------------------------------------------------- #
 
 def selftest():
-    """Exercise classify -> select -> emit without curses. Prints PASS/FAIL per
-    check and returns 0 if all pass, 1 otherwise."""
+    """Exercise classify -> guard -> intent (and the filter logic) without curses.
+    Prints PASS/FAIL per check and returns 0 if all pass, 1 otherwise."""
     fixture = [
         {"slug": "alpha", "class": "shipped", "title": "Alpha"},
         {"slug": "bravo", "class": "ready-to-ship", "title": "Bravo"},
@@ -263,37 +426,107 @@ def selftest():
         {"slug": "foxtrot", "class": "bogus-class"},  # unknown -> unfinished
     ]
     recs = normalize_records(load_index(fixture))
+    by = {r["slug"]: r for r in recs}
     checks = []
 
-    checks.append(("normalize keeps 6 records with valid slugs", len(recs) == 6))
-    checks.append(("unknown class defaults to unfinished",
-                   next(r for r in recs if r["slug"] == "foxtrot")["class"] == "unfinished"))
-    checks.append(("selectable == [bravo, delta]",
-                   selectable_slugs(recs) == ["bravo", "delta"]))
+    def chk(name, cond):
+        checks.append((name, bool(cond)))
 
-    # guard: a non-ready slug (charlie/alpha) can never be shipped
-    shipped = filter_shippable(recs, ["bravo", "charlie", "alpha", "delta"])
-    checks.append(("guard filters non-ready slugs -> [bravo, delta]",
-                   shipped == ["bravo", "delta"]))
-    checks.append(("guard drops duplicates",
-                   filter_shippable(recs, ["bravo", "bravo"]) == ["bravo"]))
+    # -- classify / normalize (unchanged behaviour) -------------------------- #
+    chk("normalize keeps 6 records with valid slugs", len(recs) == 6)
+    chk("unknown class defaults to unfinished", by["foxtrot"]["class"] == "unfinished")
+    chk("selectable == [bravo, delta]", selectable_slugs(recs) == ["bravo", "delta"])
+    chk("guard filters non-ready slugs -> [bravo, delta]",
+        filter_shippable(recs, ["bravo", "charlie", "alpha", "delta"]) == ["bravo", "delta"])
+    chk("guard drops duplicates",
+        filter_shippable(recs, ["bravo", "bravo"]) == ["bravo"])
+
+    # -- per-class action guards (resolve_action) ---------------------------- #
+    i, h = resolve_action("view", by["alpha"], set(), recs)
+    chk("view on a shipped card -> intent view [alpha]",
+        h is None and i == build_intent("view", ["alpha"]))
+    i, h = resolve_action("view", by["echo"], set(), recs)
+    chk("view on an unfinished card -> intent view [echo]",
+        h is None and i == build_intent("view", ["echo"]))
+
+    i, h = resolve_action("go", by["charlie"], set(), recs)
+    chk("go on in-progress -> intent go [charlie]",
+        h is None and i == build_intent("go", ["charlie"]))
+    i, h = resolve_action("go", by["echo"], set(), recs)
+    chk("go on unfinished -> intent go [echo]",
+        h is None and i == build_intent("go", ["echo"]))
+    i, h = resolve_action("go", by["bravo"], set(), recs)
+    chk("go rejected on ready-to-ship (hint, no intent)", i is None and bool(h))
+    i, h = resolve_action("go", by["alpha"], set(), recs)
+    chk("go rejected on shipped (hint, no intent)", i is None and bool(h))
+
+    i, h = resolve_action("ship", None, {"bravo"}, recs)
+    chk("ship with a ready selection -> intent ship [bravo]",
+        h is None and i == build_intent("ship", ["bravo"]))
+    i, h = resolve_action("ship", None, set(), recs)
+    chk("ship rejected on empty selection (hint, no intent)", i is None and bool(h))
+    i, h = resolve_action("ship", None, {"bravo", "charlie"}, recs)
+    chk("ship ignores a non-ready slug in the selection -> [bravo]",
+        h is None and i == build_intent("ship", ["bravo"]))
+
+    i, h = resolve_action("ship-merged", None, {"bravo"}, recs)
+    chk("merge rejected with < 2 selected (hint, no intent)", i is None and bool(h))
+    i, h = resolve_action("ship-merged", None, {"bravo", "delta"}, recs)
+    chk("merge with >= 2 -> intent ship-merged [bravo, delta]",
+        h is None and i == build_intent("ship-merged", ["bravo", "delta"]))
+    i, h = resolve_action("ship-merged", None, {"bravo", "delta", "charlie"}, recs)
+    chk("merge ignores a non-ready slug -> [bravo, delta]",
+        h is None and i == build_intent("ship-merged", ["bravo", "delta"]))
+
+    chk("selection survives filtering (ship uses full records, not the filter)",
+        resolve_action("ship", None, {"bravo", "delta"}, recs)[0]
+        == build_intent("ship", ["bravo", "delta"]))
+
+    # -- filter logic -------------------------------------------------------- #
+    narrowed = filtered_columns(recs, "bra")
+    chk("filter 'bra' narrows ready-to-ship to [bravo]",
+        [r["slug"] for r in narrowed[SHIPPABLE]] == ["bravo"])
+    chk("filter 'bra' shows exactly 1 card overall",
+        sum(len(narrowed[c]) for c in CLASSES) == 1)
+    chk("filter is case-insensitive ('BRA' matches bravo)",
+        match_record(by["bravo"], "BRA"))
+    chk("filter matches on title ('harl' matches Charlie)",
+        match_record(by["charlie"], "harl"))
+    chk("clearing the filter ('') shows all 6",
+        sum(len(filtered_columns(recs, "")[c]) for c in CLASSES) == 6)
+    chk("cursor re-clamps when a filter narrows a column", clamp_index(5, 1) == 0)
+    chk("cursor clamps to 0 on an empty column", clamp_index(3, 0) == 0)
+
+    # -- intent emission shape (schema v2) + legacy back-compat -------------- #
+    chk("build_intent shape is schema v2",
+        build_intent("ship", ["bravo", "delta"])
+        == {"schema": 2, "action": "ship", "items": ["bravo", "delta"]})
+    chk("empty ship intent -> items []",
+        build_intent("ship", []) == {"schema": 2, "action": "ship", "items": []})
+    chk("legacy {'ship':[...]} parses as action ship",
+        normalize_intent({"ship": ["bravo", "delta"]})
+        == {"action": "ship", "items": ["bravo", "delta"]})
+    chk("schema-v2 intent normalizes to itself",
+        normalize_intent(build_intent("ship-merged", ["bravo", "delta"]))
+        == {"action": "ship-merged", "items": ["bravo", "delta"]})
 
     tmpdir = tempfile.mkdtemp(prefix="gogo-board-selftest-")
     try:
         p1 = os.path.join(tmpdir, "result.json")
-        emit_result(p1, shipped)
+        emit_intent(p1, build_intent("ship-merged", ["bravo", "delta"]))
         with open(p1, encoding="utf-8") as fh:
             data = json.load(fh)
-        checks.append(('emit shape {"ship":[...]}',
-                       data == {"ship": ["bravo", "delta"]}))
+        chk("emit_intent round-trips a schema-v2 intent",
+            data == {"schema": 2, "action": "ship-merged", "items": ["bravo", "delta"]})
 
-        p2 = os.path.join(tmpdir, "empty.json")
-        emit_result(p2, [])
+        p2 = os.path.join(tmpdir, "view.json")
+        emit_intent(p2, build_intent("view", ["alpha"]))
         with open(p2, encoding="utf-8") as fh:
-            empty = json.load(fh)
-        checks.append(('empty selection -> {"ship": []}', empty == {"ship": []}))
+            vdata = json.load(fh)
+        chk("emit_intent writes a view intent",
+            vdata == {"schema": 2, "action": "view", "items": ["alpha"]})
     finally:
-        for name in ("result.json", "empty.json"):
+        for name in ("result.json", "view.json"):
             try:
                 os.remove(os.path.join(tmpdir, name))
             except OSError:
@@ -306,7 +539,9 @@ def selftest():
     ok = all(passed for _, passed in checks)
     for name, passed in checks:
         print(("PASS" if passed else "FAIL") + " - " + name)
-    print("selftest: " + ("PASS" if ok else "FAIL"))
+    print("selftest: %s (%d/%d)" % (
+        "PASS" if ok else "FAIL",
+        sum(1 for _, p in checks if p), len(checks)))
     return 0 if ok else 1
 
 
@@ -314,17 +549,49 @@ def selftest():
 # CLI.
 # --------------------------------------------------------------------------- #
 
+def _headless(records, result_path, action, requested):
+    """Emit a schema-v2 intent without curses, applying the same per-class guards.
+    Returns the process exit code (0 action / 1 cancel / 2 guard violation)."""
+    if action == "cancel":
+        return 1
+    if action in ("ship", "ship-merged"):
+        items = filter_shippable(records, requested)   # ready-to-ship guard
+        if action == "ship-merged" and len(items) < 2:
+            print("board: ship-merged needs >= 2 ready-to-ship slugs",
+                  file=sys.stderr)
+            return 2
+        emit_intent(result_path, build_intent(action, items))
+        return 0
+    # view / go are single-focus: take the first requested slug.
+    if not requested:
+        print("board: --action %s needs a slug in --ship" % action, file=sys.stderr)
+        return 2
+    slug = requested[0].strip()
+    rec = next((r for r in records if r["slug"] == slug), None)
+    if rec is None:
+        print("board: unknown slug '%s'" % slug, file=sys.stderr)
+        return 2
+    if action == "go" and not can_go(rec):
+        print("board: go only applies to unfinished / in-progress (%s is %s)"
+              % (slug, rec["class"]), file=sys.stderr)
+        return 2
+    emit_intent(result_path, build_intent(action, [slug]))
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Interactive terminal kanban for /gogo:done (selector only).")
+        description="Interactive terminal kanban cockpit for /gogo:done (selector only).")
     parser.add_argument("--index", default="-",
                         help="work-index JSON path, or '-' for stdin (default)")
     parser.add_argument("--result",
-                        help="path to write the {\"ship\":[...]} result file")
+                        help="path to write the schema-v2 intent result file")
+    parser.add_argument("--action", default="ship", choices=ACTIONS,
+                        help="headless intent action (default: ship, for back-compat)")
     parser.add_argument("--ship", default=None,
-                        help="comma-separated slugs to ship headlessly (no curses)")
+                        help="comma-separated slugs for the headless intent items")
     parser.add_argument("--headless", action="store_true",
-                        help="emit the result file without curses (needs --ship)")
+                        help="emit the intent file without curses (uses --action/--ship)")
     parser.add_argument("--selftest", action="store_true",
                         help="run the headless self-test and exit")
     args = parser.parse_args(argv)
@@ -344,11 +611,10 @@ def main(argv=None):
         return 2
 
     if args.headless or args.ship is not None:
-        if not args.result:
-            parser.error("--result is required to write the ship list")
+        if args.action != "cancel" and not args.result:
+            parser.error("--result is required to write the intent")
         requested = [s for s in (args.ship or "").split(",") if s.strip()]
-        emit_result(args.result, filter_shippable(records, requested))
-        return 0
+        return _headless(records, args.result, args.action, requested)
 
     if not args.result:
         parser.error("--result is required for the interactive board")
