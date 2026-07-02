@@ -1,0 +1,23 @@
+{
+  "slug": "xplan-board-and-simple-done",
+  "phase": "test",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-xplan-board-and-simple-done/plan.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/review/issues.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/charts/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-xplan-board-and-simple-done/test/issues.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/test-01.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/test/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 1,
+  "summary": "Round 1 combined test (Stages A+B). Server matrix: all 15+ checks PASS (py_compile, --selftest, GET/POST routes, 400/409/202, Host/Origin 403 guards, traversal probes contained, SIGTERM cleanup). React board: all Playwright scenarios PASS (4 columns, filter, checkboxes, mark-done footer, POST\u2192202, shipping tags+toast, live card move after poll, view link new tab, drag ready\u2192changelog, illegal drag bounce). Stage A spec-read: REV-001 (+ is never a filter) and REV-002 (filter loops) verified in gogo-done + gogo-view SKILL.md. FR8 sweep: plugin.json=0.10.0, 13 commands everywhere stated, no stale TUI refs, dist tracked+stageable, node_modules not staged, 0.8.0 writer byte-identical to 47d872f, charts manifest valid. One new nit (TEST-001): illegal drag while shipping replaces persistent info toast; ships otherwise work correctly and card tag remains. All review findings REV-001..REV-007 verified fixed."
+}

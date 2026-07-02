@@ -1,0 +1,8 @@
+{
+  "slug": "xplan-board-and-simple-done",
+  "updated": "2026-07-02",
+  "note": "As-is baseline (before): the 0.9.0 TUI cockpit — board.py curses in tmux with v/s/m/g/filter intents + relaunch loop. Architecturally sound (intents + orchestrator execution) but the surface failed in real use: the detached tmux session + manual attach never reached the user; only the chat fallback was usable.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/before/current-tui-cockpit.mmd", "title": "Before: the 0.9.0 tmux TUI cockpit (surface failed in real use)" }
+  ]
+}

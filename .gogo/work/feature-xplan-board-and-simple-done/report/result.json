@@ -1,0 +1,43 @@
+{
+  "slug": "xplan-board-and-simple-done",
+  "phase": "report",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-xplan-board-and-simple-done/plan.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/adjustments.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/decisions.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/state.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/review/issues.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/review/review-01.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/review/review-02.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/review/result.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/test/issues.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/test-01.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/test/result.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/implement/result.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/charts/manifest.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/charts/xplan-board-flow.mmd",
+    ".gogo/work/feature-xplan-board-and-simple-done/charts/before/manifest.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/charts/before/current-tui-cockpit.mmd"
+  ],
+  "outputs": [
+    ".gogo/work/feature-xplan-board-and-simple-done/plan.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/report/report.md",
+    ".gogo/work/feature-xplan-board-and-simple-done/report/flow.mmd",
+    ".gogo/work/feature-xplan-board-and-simple-done/report/sequence.mmd",
+    ".gogo/work/feature-xplan-board-and-simple-done/report/manifest.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/report/before/flow.mmd",
+    ".gogo/work/feature-xplan-board-and-simple-done/report/before/manifest.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/report/result.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/test/result.json",
+    ".gogo/work/feature-xplan-board-and-simple-done/state.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/non-functional-requirements.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Clean green report for xplan-board-and-simple-done (plugin 0.10.0): plan.md finalized to as-built (the intended design held; mid-plan React pivot + D5 Host/Origin hardening are the two recorded deltas; 8 findings total, all minor/nit, all verified); as-built diagram set = the drift-free flow (from charts/) + a NEW ship-from-board sequence diagram (browser -> POST /api/ship -> intent -> orchestrator watch -> writer -> board.json rebuild -> poll -> live column move, incl. guards + watchdog), before/ TUI-cockpit baseline copied in stem-paired, no diagrams.html (0.8.0 slim rule); article-style report.md written; 3 knowledge docs reconciled (test-strategy: deferred full rewrite landed — TUI-era text retired, browser-board seams selftest/curl-matrix/Playwright; testing-tools: Playwright scope now includes the plugin's own board; non-functional-requirements: the D5 localhost-server bar recorded) and tech-stack/coding-rules/project-knowledge verified already current. Also normalized test/result.json to the phase-result schema (feature->slug, dropped date — a phase-4 validate-out miss). validate-in + validate-out passed; 0 open issues (REV-001..007 + TEST-001 all fixed and verified)."
+}

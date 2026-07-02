@@ -1,0 +1,20 @@
+{
+  "slug": "xplan-board-and-simple-done",
+  "track": "test",
+  "round": 1,
+  "updated": "2026-07-02",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "Illegal drag while shipping replaces persistent info toast; after 4s dismiss no toast indicates ship in progress until watchdog fires",
+      "description": "When the user drags a non-ready card (e.g. in-progress) to the changelog column while a ship is already in progress, App.tsx onDrop calls setToast({ msg: 'only ready -> changelog is allowed...', kind: 'hint' }). This replaces the persistent 'shipping N items... waiting for gogo' info toast with the hint toast. Because hint kind is not 'info' or 'warn', the auto-dismiss useEffect fires a 4s timer, and the info toast is gone after it expires. The shipping state (shippingRef, card .is-shipping class, 'shipping...' tag) is maintained correctly, but the toast feedback is absent until the watchdog fires (~3 min). In practice the card tag is still visible, and the ship will reconcile on the next poll (3s) if the orchestrator is working, so impact is very low. Live-verified: drag gamma-wip (in-progress) to changelog while alpha-feature was shipping \u2014 no POST fired, no intent created, hint toast shown then auto-dismissed, shipping state remained on alpha-feature card.",
+      "proposed_solution": "AGENT-FIXABLE. In onDrop, before calling setToast for the illegal-drag hint, save the current toast and restore it after the hint auto-dismisses (or: show the hint alongside the info toast with a brief overlay); alternatively, check shippingRef.current.length > 0 before overwriting the toast and issue the hint as a secondary non-overwriting notification. Simple fix: in the hint branch, if shippingRef.current.length > 0, append the hint to the card visually (a transient border flash or tooltip) rather than replacing the global toast.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fix_summary": "App.tsx onDrop: the illegal-drag hint is now guarded by shippingRef.current.length === 0, so it can never clobber the persistent 'shipping...' info toast. dist rebuilt (index-C_LxGwCR.js) and index.html references the new hash; spot-strings for both toasts present in the bundle."
+    }
+  ]
+}

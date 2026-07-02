@@ -1,0 +1,307 @@
+/*
+ * gogo board styles -- dark only. CSS custom properties mirror TONE in
+ * src/tokens.ts (ported from xplan's global.css :root + .wf-* shell). Inline
+ * styles (TS) and these class rules both resolve from the same palette; change a
+ * value in both. No @font-face / no network -- system fallbacks only (offline).
+ */
+
+:root {
+  --bg: #141518;
+  --surface: #1c1d21;
+  --surface2: #23252a;
+  --surfaceHi: #2b2d33;
+  --border: #2a2c32;
+  --borderHi: #363943;
+  --text: #dcdde0;
+  --textDim: #a4a6ab;
+  --muted: #71747c;
+  --faint: #494c54;
+
+  --done: #5db97a;
+  --doneFill: rgba(93, 185, 122, 0.13);
+  --doneStroke: rgba(93, 185, 122, 0.65);
+
+  --todoText: #6c6f78;
+  --todoStroke: #3e424b;
+  --todoFill: rgba(110, 114, 124, 0.06);
+
+  --extra: #e6a14a;
+  --extraFill: rgba(230, 161, 74, 0.13);
+  --extraStroke: rgba(230, 161, 74, 0.65);
+
+  --accent: #7aa8ff;
+  --accentFill: rgba(122, 168, 255, 0.14);
+  --danger: #e0625c;
+
+  --ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui);
+}
+* { box-sizing: border-box; }
+
+.wf-mono { font-family: var(--mono); }
+.wf-row { display: flex; align-items: center; }
+
+/* ── App shell ──────────────────────────────────────────────── */
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.board-header {
+  height: 44px;
+  flex-shrink: 0;
+  background: #0e0f12;
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  gap: 12px;
+}
+.board-header .brand {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.board-header .brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--done);
+  box-shadow: 0 0 8px var(--doneStroke);
+}
+.board-header .repo {
+  font-size: 11px;
+  color: var(--muted);
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+}
+.board-header .spacer { flex: 1; }
+
+.filter-input {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-family: var(--ui);
+  width: 220px;
+  outline: none;
+}
+.filter-input::placeholder { color: var(--muted); }
+.filter-input:focus { border-color: var(--borderHi); box-shadow: 0 0 0 2px var(--accentFill); }
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.refresh .pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--done);
+  animation: gogo-pulse 1.4s ease-out;
+}
+.refresh.is-error .pulse { background: var(--danger); animation: none; }
+@keyframes gogo-pulse {
+  0%   { box-shadow: 0 0 0 0 var(--doneStroke); opacity: 1; }
+  70%  { box-shadow: 0 0 0 6px rgba(93, 185, 122, 0); opacity: 0.9; }
+  100% { box-shadow: 0 0 0 0 rgba(93, 185, 122, 0); opacity: 0.6; }
+}
+
+/* ── Board / columns ────────────────────────────────────────── */
+.board-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  gap: 12px;
+  padding: 16px 14px 72px;
+  align-items: flex-start;
+}
+.board-col {
+  width: 268px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.col-head {
+  padding: 0 4px 8px;
+  gap: 6px;
+}
+.col-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.col-name { font-size: 12px; color: var(--text); font-weight: 500; }
+.col-count { font-size: 10px; color: var(--muted); margin-left: 2px; }
+.col-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 4px;
+  min-height: 40px;
+}
+.col-empty {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  text-align: center;
+  padding: 10px 0;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+/* ── Panels / cards (the .wf-panel shell) ───────────────────── */
+.wf-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.card {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: grab;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.card:hover { transform: translateY(-1px); }
+.card:active { cursor: grabbing; }
+.card.is-dragging { opacity: 0.5; }
+.card.is-shipping { opacity: 0.6; }
+
+.card-top { justify-content: space-between; gap: 6px; }
+.card-slug {
+  font-size: 9.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.card-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-right: 5px; }
+.card-check { display: inline-flex; align-items: center; cursor: pointer; }
+.card-check input { accent-color: var(--accent); cursor: pointer; }
+.card-title { font-size: 12px; color: var(--text); line-height: 1.4; }
+
+.card-chips { flex-wrap: wrap; gap: 4px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 6px;
+  border-radius: 10px;
+  font-size: 9.5px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  white-space: nowrap;
+}
+
+.card-foot { justify-content: space-between; gap: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.shipping-tag { font-size: 9.5px; color: var(--extra); }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.wf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--ui);
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  line-height: 1;
+  text-decoration: none;
+}
+.wf-btn:hover { background: var(--surfaceHi); }
+.wf-btn-primary { background: var(--done); color: #0f1a12; border-color: var(--done); font-weight: 500; }
+.wf-btn-primary:hover { background: #6dca8a; }
+.view-btn { padding: 4px 9px; font-size: 10.5px; color: var(--textDim); }
+
+/* ── Footer selection bar ───────────────────────────────────── */
+.footer-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--borderHi);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+.footer-bar .count { font-family: var(--mono); font-size: 11px; color: var(--textDim); }
+
+/* ── Toast ──────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  right: 16px;
+  top: 56px;
+  max-width: 320px;
+  padding: 9px 13px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+}
+.toast-info { border-color: var(--extraStroke); color: var(--extra); }
+.toast-hint { border-color: var(--borderHi); color: var(--textDim); }
+.toast-error { border-color: var(--danger); color: var(--danger); }
+.toast-warn {
+  border-color: var(--extraStroke);
+  color: var(--extra);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.toast-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.7;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.toast-dismiss:hover { opacity: 1; }
+
+/* ── Empty / connecting ─────────────────────────────────────── */
+.board-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 40px;
+}

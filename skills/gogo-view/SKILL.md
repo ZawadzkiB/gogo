@@ -53,9 +53,12 @@ path every phase reads). Reports still live in `report/`.
 At least one **viewable item** must exist — a feature `plan.md` (a plan bundle), a
 `report.md` under `.gogo/changelog/*/` or `.gogo/work/feature-*/report/`, or a
 legacy root `report.md` (report bundles). None of any → **STOP** and tell the user
-to run `/gogo:plan` first (then `/gogo:report`, `/gogo:done`). An explicit slug/path
-arg that resolves to nothing (e.g. `<slug>:report` when no report exists, or
-`<slug>` with neither a plan nor a report) → STOP with the path(s) tried.
+to run `/gogo:plan` first (then `/gogo:report`, `/gogo:done`). An **explicit target**
+arg that resolves to nothing (a `<slug>:plan` / `<slug>:report` selector, a
+`<date>-<name>` entry, or a path — the user named one specific bundle) → STOP with the
+path(s) tried. A **bare free-text** arg that matches no bundle is **not** a STOP — it is
+treated as a case-insensitive **filter** over the enumerated items (② Step 1); only if
+the filter matches nothing do you say so.
 
 ## ② Steps
 
@@ -91,14 +94,27 @@ a report. Sort each group newest-first (by dir/file mtime, or the changelog date
 | `<date>-<name>` (a changelog entry; `<name>` = the feature slug for a single entry, the release name for a merged one) | that changelog **report** |
 | a path | the `plan.md` / `report.md` it names |
 
-A `<slug>:report` (or bare `<slug>`) that resolves to no report, or a `<slug>:plan`
-with no `plan.md`, → STOP with the path tried (validate-in).
+An **explicit target** — a `<slug>:plan` with no `plan.md`, or a `<slug>:report` /
+`<date>-<name>` / path that resolves to no such bundle — → STOP with the path tried
+(validate-in). A **bare** arg that resolves to nothing (names no feature slug, changelog
+entry, or path) is **not** a target typo — treat it as a **filter** (below).
 
-**No resolvable arg** → present the **grouped picker** via `AskUserQuestion`: the
-Work items (each plan / report) and the Changelog items as options, each labeled
-`<slug> — plan` / `<slug> — report` / `<date>-<name> — changelog`, newest first.
-The pick builds + opens its page. Default highlight: the most recent changelog
-entry, else the newest work item.
+**No resolvable target → filter + grouped picker (FR3).** Present the **grouped picker**
+via `AskUserQuestion` — the Work items (each plan / report) and the Changelog items as
+options, each labeled `<slug> — plan` / `<slug> — report` / `<date>-<name> — changelog`,
+newest first — but **narrow it first with a case-insensitive substring filter** so the
+menu stays legible:
+- a **bare non-resolving arg** → use that arg as the filter term (no filter question);
+- else if there are **more than 4** enumerated items (more than fit one
+  `AskUserQuestion`) → ask a text filter first ("filter items — a substring of the slug,
+  date, or name");
+- else → no filter, show them all.
+Match the filter case-insensitively against each item's **label** (slug + kind + date /
+name). **Loop until the menu fits:** matches nothing → say so and re-ask (or show the
+full list); still more than 4 → state the count and re-ask for a narrower term (offering
+the 4 newest matches as the escape hatch); ≤4 → show the picker. The pick builds +
+opens its page. Default highlight: the most recent changelog entry, else the newest work
+item.
 
 Record the chosen **kind** (`plan` | `report`), the source markdown (`plan.md` or
 `report.md`), its bundle dir, and a short **name** for the output file:

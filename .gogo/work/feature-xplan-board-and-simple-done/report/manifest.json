@@ -1,0 +1,9 @@
+{
+  "slug": "xplan-board-and-simple-done",
+  "updated": "2026-07-02",
+  "note": "As-built set for v0.10.0 (the intended design held as built). flow = the shipped /gogo:xplan control flow: classify -> pre-build view pages -> server.py serving the committed React dist/ + GET /api/board + POST /api/ship -> board (drag/select/filter/view) -> ship intent -> gogo-done synthesis writer (multiple = ONE merged entry) -> rebuild -> poll refresh, plus the simplified /gogo:done list feeding the same writer. sequence = the ship-from-board runtime interaction, added at report: browser -> POST /api/ship -> ship-intent.json -> orchestrator watch loop -> writer -> board.json rebuild -> ~3s poll -> live column move, incl. the D5 Host/Origin + ready-only guards, the 400/403/409 error path, and the ~3-min toast watchdog. flow source: charts/xplan-board-flow.mmd (verified drift-free in review round 2), copied in with the kind name so before/after pair by filename stem. Plan-time as-is baseline copied to report/before/. No diagrams.html in this bundle (0.8.0 slim rule; /gogo:view builds the page from source).",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "As-built: /gogo:xplan React board + simplified /gogo:done list -> one synthesis writer" },
+    { "kind": "sequence", "file": "report/sequence.mmd", "title": "As-built: ship-from-board — POST /api/ship -> intent -> watcher -> writer -> rebuild -> live column move" }
+  ]
+}

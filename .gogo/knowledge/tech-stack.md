@@ -17,16 +17,24 @@ Generated-by: /gogo:build
 - **JavaScript (vendored, not authored)** — `assets/mermaid/mermaid.min.js` (UMD
   build, works over `file://`). Do not edit; it's a dependency snapshot. The
   `/gogo:view` renderer modules (`assets/viewer/*.js`) ARE authored.
-- **Python (vendored, authored) — since 0.7.0** — `assets/kanban/board.py`, the
-  `/gogo:done` work-board curses TUI. **Pure stdlib** (no pip), pure ASCII, ships a
-  `--selftest`; a soft dep (see below).
+- **Python (vendored, authored) — since 0.7.0** — `assets/xplan-board/server.py`, the
+  `/gogo:xplan` browser-board server (serves the committed React `dist/` + `GET /api/board`
+  + `POST /api/ship`, localhost only). **Pure stdlib** (no pip), pure ASCII, ships a
+  `--selftest`, documented exit codes (0 pass / 2 bad args or selftest fail); a soft dep
+  (see below). (Replaced the 0.7.0–0.9.0 `board.py` curses TUI, removed in 0.10.0.)
+- **TypeScript / React (authored, since 0.10.0)** — `assets/xplan-board/src/*`, the
+  `/gogo:xplan` kanban ported from xplan, built with **Vite**. The built `dist/` is
+  **committed** so runtime needs no toolchain; npm/node is **dev-time only** (D4=A).
 - **JSON** — `.claude-plugin/plugin.json` (manifest + version), `marketplace.json`,
   `.mcp.json` (Playwright MCP server).
 
 ## "Build"
-There is **no compile/build step**. The plugin is consumed as files. The only
-release action is bumping `version` in `.claude-plugin/plugin.json` so installs
-can detect the update.
+The plugin is consumed as files — **no build step for the markdown / skills / hooks**.
+The **one** built asset is the `/gogo:xplan` React board: `cd assets/xplan-board &&
+npm install && npm run build` (Vite) regenerates the **committed** `dist/`. That is a
+**dev-time** step only — plugin users serve the committed `dist/` with `python3`, no npm
+required (D4=A). The release action is bumping `version` in
+`.claude-plugin/plugin.json` so installs can detect the update.
 
 ## Run / install
 - Marketplace: `gogo` → GitHub `ZawadzkiB/gogo`.
@@ -45,11 +53,10 @@ uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 ## Optional tooling (graceful — never required)
 - `mmdc` (mermaid CLI) — only used for SVG/PNG export if already present.
 - `jq` — handy for validating/reading JSON artifacts when present.
-- Node.js — only for the Playwright MCP.
-- `python3` + `tmux` (since 0.7.0) — soft deps for the `/gogo:done` interactive
-  work board (`board.py` curses TUI in a tmux pane; since 0.9.0 the pipeline
-  **cockpit** — action keys + filter + intent relaunch loop). Detected at use
-  (`command -v` + tty check); absent → the status-table + `AskUserQuestion`
-  multi-select fallback. tmux is installed on this dev host (so the live-TUI test
-  path in `test-strategy.md` applies), but it **stays a soft dep** — same
-  detection, same fallback.
+- Node.js — for the Playwright MCP, and (dev-time only) to build the `/gogo:xplan` React
+  board (`npm run build`).
+- `python3` (since 0.7.0) — soft dep for the `/gogo:xplan` browser board: its stdlib
+  `server.py` serves the committed React `dist/` + the board API on `127.0.0.1`. Detected
+  at use (`command -v python3`); absent → point at `/gogo:done`'s filterable
+  ready-to-ship list (no board, no hard failure). The 0.7.0–0.9.0 `board.py` curses TUI
+  and its `tmux` soft dep were removed in 0.10.0.

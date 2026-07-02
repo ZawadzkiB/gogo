@@ -4,8 +4,9 @@ description: >-
   Read-only overview of every gogo feature — and the home of the shared work-index
   classifier that labels each .gogo/work/feature-* as shipped / ready-to-ship /
   in-progress / unfinished. /gogo:status renders that index as a table (phase,
-  status, iterations, resume hint); other surfaces (the /gogo:done work board,
-  roadmap #7) reuse the same classifier. Never modifies anything.
+  status, iterations, resume hint); other surfaces (/gogo:done's ready-to-ship list,
+  /gogo:xplan's browser board, roadmap #7) reuse the same classifier. Never modifies
+  anything.
 ---
 
 # gogo-status — feature overview + the shared work-index classifier
@@ -18,8 +19,9 @@ prints it. `/gogo:status` **never writes** — it only reports.
 
 Given the repo's `.gogo/`, produce one **work-index record** per
 `.gogo/work/feature-*/`. This is the single source of truth for "what state is each
-feature in" — consumed by `/gogo:status` (Step B) and by the **`/gogo:done` work
-board** (Stage B) and roadmap #7's commenter. It **reads only**.
+feature in" — consumed by `/gogo:status` (Step B), by `/gogo:done`'s ready-to-ship list,
+by **`/gogo:xplan` (the browser board)**, and by roadmap #7's commenter. It **reads
+only**.
 
 ### Inputs read per feature
 - `state.md` — the `phase` and `status` lines, plus `iterations` and `resume`.

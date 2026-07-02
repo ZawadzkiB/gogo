@@ -215,17 +215,17 @@ prerequisite. (The in-pipeline ⑤, right after a green test, keeps its strict g
 **`/gogo:done [feature-slug | slug1+slug2+...]`**
 
 Ship report-complete features into a high-level changelog. A **slug** ships that one;
-**`slug1+slug2+...`** ships those as ONE merged release entry; **no slug opens the work
-board cockpit** over every `.gogo/work/feature-*` — the shared `/gogo:status` classifier
-labels each **shipped · ready-to-ship · in-progress · unfinished** and from the
-four-class table you **view** any card (`v`), **ship** ready cards separately (`s`) or
-**merged** (`m`), **run/resume** the pipeline on an unbuilt card (`g`), and **filter**
-(`/`) — an interactive terminal kanban when `python3` + `tmux` + a tty are present,
-otherwise a status table + multi-select ship fallback (never failing over the board).
-Each key writes a single-shot **intent** the orchestrator runs before **relaunching**
-the board (`go` hands off to the pipeline; `q` cancels). When you ship merged (or pick
-**≥2** in the fallback), one question gates separate (N entries) vs merged (1
-entry). Every entry is a **high-level synthesis, not a copy** of the report bundle —
+**`slug1+slug2+...`** ships those as ONE merged release entry; **no slug opens the
+ready-to-ship list** over every `.gogo/work/feature-*` — the shared `/gogo:status`
+classifier labels each **shipped · ready-to-ship · in-progress · unfinished**, prints the
+four-class table for context, then offers the ready-to-ship items as a **filterable
+`AskUserQuestion` multi-select**. **Selecting multiple items merges them into ONE entry**
+(release name suggested + confirmed); one pick is one entry — multi-select *is* the merge
+signal, so there is no extra merge-or-split question. A non-slug arg (or, with more ready
+items than fit one question, an answer) is a case-insensitive substring filter over
+slug+title. It is a plain terminal list — always available, no soft dep (the **browser
+board** is `/gogo:xplan`, below). Every entry is a **high-level synthesis, not a copy** of
+the report bundle —
 gogo **writes** a `report.md` summarizing *what was changed/done/implemented* (key
 outcomes, one-line decisions, a review/test verdict, a member table + per-member section
 when merged) with a **link back** to each member's `.gogo/work/` folder for the full
@@ -252,12 +252,28 @@ grouped **Work** (each feature's plan + report) / **Changelog** (shipped reports
 picker — plans render in place from `plan.md` + `charts/` — and opens your pick; falls
 back to printing the `file://` path if it can't auto-open.
 
+**`/gogo:xplan`**
+
+Open the gogo work as a **browser kanban** — a React board (ported from xplan) served by
+a `python3` **stdlib** server on **localhost**.
+Four fixed columns **plan · in progress · ready · changelog**, fed by the shared
+`/gogo:status` classifier plus the changelog entries: drag-and-drop, a live text filter,
+a **view** button per card that opens its pre-built HTML page, and **mark-done from the
+board** — check ready cards (or drag a ready card onto the changelog column), where
+**multiple picks = ONE merged entry** (same signal as `/gogo:done`). It pre-builds every
+view page at launch, then keeps a **long-running** server and **watches for a ship
+intent**: each one runs the same synthesis writer, rebuilds the board index, and the
+polling board moves the card to changelog **live** (multiple ships per session). `python3`
+is a **soft dep** — without it, `/gogo:xplan` points you at `/gogo:done`'s list and never
+fails; the built board is **committed** (`assets/xplan-board/dist/`) so no npm is needed
+at runtime (npm is dev-time only). Localhost only, offline, writes only under `.gogo/`.
+
 **`/gogo:status`**
 
 Lists every feature under `.gogo/work/` with its phase, status, and iteration counts.
 Read-only. It also hosts the shared **work-index classifier** (shipped · ready-to-ship
-· in-progress · unfinished) that the `/gogo:done` work board reuses to decide what is
-shippable.
+· in-progress · unfinished) that `/gogo:done`'s ready-to-ship list and `/gogo:xplan`'s
+browser board reuse to decide what is shippable.
 
 **`/gogo:resume [feature-slug]`**
 
@@ -291,9 +307,9 @@ when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
 **`.gogo/resources/`** — one vendored mermaid runtime per project
 (`mermaid.min.js`, shared by every feature) plus the interactive viewer module set
-(`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`), and
-`kanban/` (the `/gogo:done` work-board scratch — the vendored `board.py`, the
-work-index, and the board-intent). Offline, no network, no build.
+(`viewer/`) that `/gogo:view`, `/gogo:done`, and `/gogo:xplan` build pages from (into
+`view/`), and `xplan-board/` (the `/gogo:xplan` browser-board runtime — `board.json`,
+the `ship-intent.json` the board POSTs, and `server.pid`). Offline, no network, no build.
 
 **`.gogo/work/feature-<slug>/`** — one folder per piece of work:
 

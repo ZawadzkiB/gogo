@@ -1,0 +1,20 @@
+{
+  "name": "gogo-xplan-board",
+  "private": true,
+  "version": "0.10.0",
+  "type": "module",
+  "description": "gogo's browser kanban (/gogo:xplan) - a React port of xplan's board. Source lives here; the built dist/ is committed so plugin users need no npm (npm is a dev-time dependency only).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,32 @@
+sequenceDiagram
+  autonumber
+  actor U as User (browser)
+  participant B as React board (dist/)
+  participant S as server.py (127.0.0.1)
+  participant I as ship-intent.json
+  participant O as orchestrator (gogo-xplan watch loop)
+  participant W as gogo-done synthesis writer
+  participant J as board.json
+
+  U->>B: select ready cards / drag ready → changelog
+  B->>S: POST /api/ship {schema:2, action, items}
+  note over S: guards — Host allowlist + Origin check (D5),<br/>schema v2, ready-only, no intent pending
+  alt guard fails
+    S-->>B: 400 / 403 / 409 + reason
+    B-->>U: error toast (this attempt's slugs cleared)
+  else accepted
+    S->>I: write intent (unique tmp + O_CREAT|O_EXCL, atomic)
+    S-->>B: 202 Accepted
+    B-->>U: persistent "shipping N items… waiting for gogo" toast + card tags
+    O->>I: watch loop — read + delete intent
+    O->>W: ship items (multiple = ONE merged changelog entry)
+    W-->>O: .gogo/changelog/&lt;date&gt;-&lt;name&gt;/ written · members → shipped
+    O->>J: rebuild board.json (re-classify) + affected pages
+    loop every ~3s (paused while dragging)
+      B->>S: GET /api/board
+      S->>J: re-read per request
+      S-->>B: fresh payload
+    end
+    B-->>U: shipped card moves to the changelog column · toast clears
+  end
+  note over B: ~3-min watchdog — an unreconciled ship downgrades the stuck<br/>info toast to a dismissible warning; polling continues

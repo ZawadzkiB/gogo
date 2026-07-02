@@ -38,12 +38,16 @@ Generated-by: /gogo:build
   hard-code absolute paths.
 
 ## Vendored executable assets (since 0.7.0)
-- An **authored** vendored executable (e.g. `assets/kanban/board.py`, distinct from
-  the third-party `mermaid.min.js` snapshot) must be **pure standard library** (no
-  pip/network), **pure ASCII**, ship a **`--selftest`**, and expose a **documented
-  exit-code contract** the calling skill branches on. It stays a **soft dep**
-  (detected at use; graceful fallback) and **never commits compiled bytecode**
-  (`__pycache__/`, `*.pyc` are gitignored).
+- An **authored** vendored executable (e.g. `assets/xplan-board/server.py`, the
+  `/gogo:xplan` board server — distinct from the third-party `mermaid.min.js` snapshot)
+  must be **pure standard library** (no pip/network), **pure ASCII**, ship a
+  **`--selftest`**, and expose a **documented exit-code contract** the calling skill
+  branches on. It stays a **soft dep** (detected at use; graceful fallback) and **never
+  commits compiled bytecode** (`__pycache__/`, `*.pyc` are gitignored).
+- A vendored asset **built from source** (e.g. the `/gogo:xplan` React board) commits its
+  **build output** (`assets/xplan-board/dist/`) so plugin users need no toolchain at
+  runtime; the build tool (npm/node) stays a **dev-time only** dependency and its install
+  dir (`node_modules/`) is gitignored (D4=A).
 
 ## Style
 - Plain ASCII where practical; the phase glyphs `①②③④⑤` are an intentional exception.

@@ -1,0 +1,97 @@
+{
+  "slug": "xplan-board-and-simple-done",
+  "track": "review",
+  "round": 3,
+  "updated": "2026-07-02",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "A `+`-joined arg with a bad/unknown part silently degrades to a no-match filter instead of a clear STOP (error-handling regression)",
+      "description": "skills/gogo-done/SKILL.md validate-in (lines 64-72) now qualifies the merge STOP with '(each part naming a real feature)', and \u00a9 Resolve mode (lines 88-93) only merges 'a +-joined list whose parts ALL name real features'. Any arg that 'does NOT resolve to feature slug(s)' falls through to List mode as a filter. This leaves the partial case underspecified: `/gogo:done foo+bar` where `foo` is a real feature but `bar` is a typo / non-existent slug. It is not 'all parts real' (no merge) and it is arguably 'does not resolve' (filter) \u2014 so an executing agent would treat the whole string 'foo+bar' as a case-insensitive substring filter, which matches nothing, and report 'no matches for foo+bar'. The 0.9.0/47d872f behaviour was a clean STOP naming the offending feature ('No report found for `bar` \u2014 run /gogo:report ...'). The rewrite regressed that: a single typo inside a merge now yields a confusing empty filter rather than an actionable error.",
+      "proposed_solution": "AGENT-FIXABLE. In gogo-done, make the `+` grammar authoritative: if `$ARGUMENTS` contains a `+`, treat it as an explicit merge slug-list and validate EVERY part \u2014 any part that names no `.gogo/work/feature-<part>/` or lacks report.md \u2192 STOP naming that part (the existing 'No report found for `<feature>`' message), exactly as before. Only a bare (no-`+`) non-empty arg that resolves to no feature becomes the List-mode filter. Update validate-in bullet 1 and \u00a9 Resolve mode so the partial-`+` case routes to STOP, not to filter.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fix_summary": "A `+`-containing arg is now authoritative: validate-in STOPs on ANY unknown part ('unknown feature <part> -- check /gogo:status'), never falls through to the filter; Resolve mode + validate-in both state '+ arg is never a filter'; only a bare +-free arg filters. Verified round 2 by re-read of skills/gogo-done/SKILL.md validate-in (the '+ is always an explicit merge list -- never a filter' clause is present)."
+    },
+    {
+      "id": "REV-002",
+      "title": "The text filter narrows only once \u2014 >4 items still matching after the filter leaves the AskUserQuestion over its own stated 4-option capacity (undefined path in both gogo-done and gogo-view)",
+      "description": "Both filter specs are built on the premise that an AskUserQuestion holds at most 4 options: gogo-done List mode Step 3 (skills/gogo-done/SKILL.md:236-244) and gogo-view \u00a9 Step 1 (skills/gogo-view/SKILL.md:102-115) each say 'more than 4 items \u2192 ask a text filter first'. But after the filter is applied, the only failure they handle is the ZERO-match case ('If it matches nothing, say so and re-ask'). A filter term that still matches 5+ items is not handled \u2014 the flow then offers a single AskUserQuestion multi-select that cannot fit them, which is exactly the condition the filter was introduced to avoid. This matches the plan (FR2/FR3 describe a single filter step) so it is partly a plan-level gap, but as written an executing agent has no defined behaviour for 'filtered result still exceeds one question'.",
+      "proposed_solution": "AGENT-FIXABLE. In both gogo-done Step 3 and gogo-view \u00a9 Step 1, make the narrow step loop: after applying the filter, if the surviving set still exceeds one AskUserQuestion's capacity, re-ask for a tighter filter (or state you are showing the first N and offer 'refine') rather than presenting an over-capacity question. One sentence in each skill closes the gap; keep the wording symmetric across the two files.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fix_summary": "The filter now LOOPS until the list fits in both skills: no match -> re-ask/full list; >4 matches -> state the count + re-ask narrower (4 newest as escape hatch); <=4 -> proceed. Verified round 2 by re-read of gogo-done Step 3 ('Loop until the list fits') and gogo-view Step 1 ('Loop until the menu fits') \u2014 wording is symmetric."
+    },
+    {
+      "id": "REV-003",
+      "title": "App.tsx renders a `version` chip the board.json producer never emits \u2014 dead UI, producer/consumer contract mismatch",
+      "description": "assets/xplan-board/src/App.tsx types BoardItem with `version?: string` (line 24) and renders a version chip guarded by `item.version` (lines 332-338, 334-336). But the gogo-xplan board.json item shape (skills/gogo-xplan/SKILL.md lines 108-129) enumerates slug, title, class, column, view_url, report_path, changelog_path, iterations, status \u2014 there is NO `version` field, and a grep of the skill confirms it is never emitted. So the version chip is permanently dead: it can never render. Conversely the skill emits `status` which App types but never renders (harmless), and report_path/changelog_path are typed-but-unused (harmless). The `version` gap is the one real inconsistency \u2014 the consumer expects a field the producer does not produce (code-review-standards.md #7, contract clarity). Not a crash (the `&&` guard degrades cleanly) but it is dead code and a broken shape agreement.",
+      "proposed_solution": "AGENT-FIXABLE. Pick one and make producer + consumer agree: (a) have gogo-xplan \u2461 add `version` to the board.json item shape for shipped/ready items (derive it from the member's state.md / plugin.json / changelog manifest) so the chip renders as intended; or (b) drop the `version` chip branch in App.tsx and the `version?` field from the BoardItem type. If keeping `status`/`report_path`/`changelog_path` in the payload, note they are intentionally reserved so the next reader does not treat them as dead too.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 3,
+      "fix_summary": "Dropped the dead `version` chip from App.tsx (the render branch + the `version?` BoardItem field); the board.json shape has no version source. The `iterations` chip stays. Rebuilt dist -- the only `.version` left in the bundle is React's own `18.3.1`. [orchestrator-verified: selftest exit 0 incl. Host/Origin checks; live 403/202/409 smoke by fixer; dist spot-strings present; version chip absent]"
+    },
+    {
+      "id": "REV-004",
+      "title": "A ship that never completes on the orchestrator side leaves a permanently stuck 'shipping...' toast + is-shipping card (no timeout / error path)",
+      "description": "assets/xplan-board/src/App.tsx clears the in-flight ship state ONLY when the shipped slug reappears in the changelog column: loadBoard() reconciles `shipping` against `column === 'changelog'` and calls setToast(null) only once `still.length === 0` (lines 76-84). The persistent 'shipping N items... waiting for gogo' toast is deliberately kind:'info' so the 4s auto-dismiss (lines 101-107) skips it. If the orchestrator reads+deletes ship-intent.json (per skills/gogo-xplan \u2465 step 1) but the gogo-done writer then fails or the session is abandoned, the card never reaches changelog: the `shipping` set never clears, the info toast stays forever, and the card keeps its is-shipping styling + 'shipping...' tag. There is no timeout or failure path in the client \u2014 the only recovery is a full page reload (which resets React state). Given D2=A (long-running server, multiple ships per session), an incomplete ship silently wedges the surface with no signal that anything went wrong.",
+      "proposed_solution": "AGENT-FIXABLE. In App.tsx, arm a timeout when a ship is accepted (setShipping in the 202 branch, ~60-90s): if the slug(s) have not reconciled to the changelog column by then, clear the `shipping` set + the info toast and surface a recoverable hint (e.g. 'still working, or the ship didn't finish \u2014 check the chat; you can retry'). Clear the timer on successful reconcile. This makes the surface self-heal instead of requiring a reload.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 3,
+      "fix_summary": "App.tsx ship() now folds every non-202 (400/409/500) into an error toast carrying the server's own message and clears this attempt's shipping slugs; added a ~3-min watchdog (shippedAtRef + warnedRef): if the shipped slugs haven't reconciled to column=changelog it downgrades the persistent info toast ONCE to a dismissible 'warn' ('still waiting on gogo -- check the chat; this can be safely dismissed') with an x button, while polling continues and still self-clears on a late finish. Rebuilt dist (string present). [orchestrator-verified: selftest exit 0 incl. Host/Origin checks; live 403/202/409 smoke by fixer; dist spot-strings present; version chip absent]"
+    },
+    {
+      "id": "REV-005",
+      "title": "FR8 sweep left two committed .gogo/knowledge files describing the removed TUI (incl. a reference to the just-deleted assets/kanban/board.py)",
+      "description": "The product-surface sweep (skills/, commands/, docs/, README.md, templates/) is clean \u2014 grep for tmux|board.py|curses|cockpit|board-intent|resources/kanban returns nothing, command count is 13 everywhere it is stated, version is 0.10.0. But two committed dogfood-knowledge files were not updated and still describe the removed 0.9.0 TUI: (1) .gogo/knowledge/testing-tools.md:33-34 (Mode: owned) instructs `python3 assets/kanban/board.py --selftest` (and `--headless --ship a,b`) \u2014 a file THIS change deletes, so it is now a broken instruction that will not self-heal (owned files are not overwritten by /gogo:build); (2) .gogo/knowledge/project-knowledge.md:113-140 (Mode: proxy of ../../README.md) still carries a 'Board cockpit \u2014 action keys + intent protocol v2' / board-intent.json section presenting the removed curses+tmux board as current \u2014 this is a proxy of the now-clean README so it self-heals on the next /gogo:build reconcile. Neither file was in the plan's FR8 scope (the plan swept docs/README and explicitly deferred the test-strategy.md TUI section to \u2464); code-review-standards.md #1 nonetheless says 'No place still describes the old behaviour (grep the old terms)', and this is the same class of miss the 0.8.0 REV-001 lesson warns about. Impact is limited to gogo maintainers dogfooding gogo on this repo (always-read context determinism), not shipped plugin users \u2014 but the board.py instruction is now factually broken.",
+      "proposed_solution": "AGENT-FIXABLE. At minimum fix the broken reference in testing-tools.md \u2014 replace `python3 assets/kanban/board.py --selftest` with `python3 assets/xplan-board/server.py --selftest` (+ the curl smoke), mirroring the note test-strategy.md already got ('removed in 0.10.0, superseded by /gogo:xplan'). For project-knowledge.md (a README proxy) either re-run /gogo:build to reconcile it from the swept README now, or leave it for \u2464 knowledge \u2014 but do not ship a knowledge file instructing a deleted binary. Low priority; can also be folded into the \u2464 knowledge reconcile like the round-1 deferred-sweep reminder.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 3,
+      "fix_summary": "testing-tools.md (owned) now points `--selftest` at `assets/xplan-board/server.py` (guards: intent/ready/path-traversal/Host-Origin) + a curl smoke, noting board.py was removed in 0.10.0. project-knowledge.md (README proxy): marked the 0.9.0 TUI-cockpit bullet as REPLACED in 0.10.0 and added a 0.10.0 reality bullet (browser board /gogo:xplan + server.py; simplified done/view list pickers; 13 commands). Minimal edits; full reconcile deferred to phase 5. [orchestrator-verified: selftest exit 0 incl. Host/Origin checks; live 403/202/409 smoke by fixer; dist spot-strings present; version chip absent]"
+    },
+    {
+      "id": "REV-006",
+      "title": "POST /api/ship has a TOCTOU race (fixed tmp name + exists() 409-guard) under ThreadingHTTPServer \u2014 defense-in-depth only",
+      "description": "assets/xplan-board/server.py serves with ThreadingHTTPServer (line 273, concurrent). _serve_ship() guards a pending intent with `if intent_file.exists(): return 409` (line 254) and then writes to a FIXED tmp name `ship-intent.json.tmp` before os.replace (lines 257-261). Two truly-simultaneous valid POSTs can both pass the exists() check (neither has written yet), both write to the same tmp path (interleaving / one truncating the other), and both os.replace \u2014 so both callers get 202 but only one intent survives, and the client would believe two ships were queued. This is a real TOCTOU + shared-tmp race, but it is NOT reachable from the single-user board UI: drags and the mark-done button issue sequential single POSTs (a merged selection is one POST), and a lingering intent otherwise yields the intended 409. Verified by code-read; not reproduced live (the UI cannot emit concurrent posts). Classing as a nit \u2014 correctness hardening, not a live user bug.",
+      "proposed_solution": "AGENT-FIXABLE. Make 'already pending' atomic instead of check-then-write: write the tmp with a UNIQUE name (tempfile.mkstemp in data_dir) then os.replace, and/or create the final ship-intent.json with os.open(path, O_CREAT|O_EXCL|O_WRONLY) so a second concurrent writer fails cleanly with 409 rather than clobbering. Small, pure-stdlib.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 3,
+      "fix_summary": "server.py _serve_ship() now writes the payload to a UNIQUE tmp (tempfile.mkstemp in data_dir) and claims the intent via an atomic os.open(O_CREAT|O_EXCL) on the rename target itself (409 on the loser) before os.replace -- no fixed-tmp clobber and no check-then-write TOCTOU. Pure stdlib. Verified live: a second concurrent-style POST while pending -> 409. [orchestrator-verified: selftest exit 0 incl. Host/Origin checks; live 403/202/409 smoke by fixer; dist spot-strings present; version chip absent]"
+    },
+    {
+      "id": "REV-007",
+      "title": "No Host/Origin check on the localhost server \u2014 DNS-rebinding / CSRF residual for POST /api/ship (within the plan's accepted 'no auth' scope)",
+      "description": "assets/xplan-board/server.py binds 127.0.0.1 only (verified \u2014 no 0.0.0.0 path) and does path-traversal defence well, but it validates neither the Host nor the Origin header on POST /api/ship. Any web page the user visits while the board is running could `fetch('http://127.0.0.1:<port>/api/ship', {method:'POST', body: ...})` (a classic localhost CSRF / DNS-rebinding vector) and trigger a ship of the user's ready-to-ship features. Real impact is bounded: it can only ship features already ready-to-ship (the server's ready-only guard holds), it requires the board running + a malicious page open concurrently, and it is reversible via the changelog. The plan explicitly scopes auth OUT ('auth (localhost only)', Out of scope), so this is a conscious residual, flagged for an explicit accept/decline rather than treated as a defect. A Host-header allowlist (reject Host not in 127.0.0.1/localhost:<port>) is cheap DNS-rebinding hardening that is NOT auth and stays pure-stdlib.",
+      "proposed_solution": "NEEDS-USER-DECISION. Accept the residual (consistent with the stated 'localhost only, no auth' scope \u2014 do nothing), OR add lightweight hardening in server.py: reject any request whose Host header host-part is not 127.0.0.1 / localhost (blocks DNS-rebind), and/or reject POST /api/ship when an Origin header is present and is not the server's own origin (blocks cross-site fetch). A few stdlib lines; no dependency, no auth. The user decides how far to harden a single-user local tool.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 3,
+      "fix_summary": "HARDEN per D5: server.py rejects any request whose Host host-part is not 127.0.0.1/localhost with 403 (host_allowed, applied to GET/HEAD/POST via _host_ok) -- DNS-rebind guard; POST /api/ship additionally requires Origin absent OR a localhost origin else 403 (origin_allowed) -- CSRF guard. Both added to --selftest. Pure stdlib. Verified live: evil Host -> 403, evil Origin -> 403 (no intent written), normal browser-like requests still 200/202. [orchestrator-verified: selftest exit 0 incl. Host/Origin checks; live 403/202/409 smoke by fixer; dist spot-strings present; version chip absent]"
+    }
+  ]
+}

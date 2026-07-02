@@ -19,10 +19,15 @@
 # Playwright MCP working dir (test tooling scratch — page snapshots, layout)
 .playwright-mcp/
 
-# Python bytecode cache — assets/kanban/board.py is vendored source; the .pyc
-# it compiles to on run is regenerable and must never be committed.
+# Python bytecode cache — assets/xplan-board/server.py is vendored source; the
+# .pyc it compiles to on run is regenerable and must never be committed.
 __pycache__/
 *.pyc
+
+# /gogo:xplan React board: node_modules is a DEV-TIME install only. The BUILT
+# dist/ (assets/xplan-board/dist/) IS committed on purpose so plugin users need
+# no npm at runtime (D4=A) — do NOT ignore it.
+assets/xplan-board/node_modules/
 
 # Internal roadmap — local backlog, not part of the published plugin
 roadmap.md

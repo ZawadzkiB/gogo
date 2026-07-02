@@ -99,9 +99,9 @@ pointer, and `.gogo/skills/index.md` registers every extraction.
 
 ```
 gogo/
-├── commands/                 # ultra-thin entry points — 12 slash commands
+├── commands/                 # ultra-thin entry points — 13 slash commands
 │   ├── build.md  plan.md  go.md  implement.md  review.md  test.md
-│   ├── report.md  done.md  view.md  status.md  resume.md  skills.md
+│   ├── report.md  done.md  view.md  xplan.md  status.md  resume.md  skills.md
 ├── skills/                   # the operating manuals (all the logic)
 │   ├── gogo/                 #   orchestrator: phases, loops, decision gates
 │   ├── gogo-build/           #   wire/refresh .gogo/knowledge config
@@ -110,8 +110,9 @@ gogo/
 │   ├── gogo-review/          #   ③ review
 │   ├── gogo-test/            #   ④ test
 │   ├── gogo-knowledge/       #   ⑤ report + knowledge update (strict + lenient)
-│   ├── gogo-done/            #   ship: synthesize high-level entry (single or merged) → .gogo/changelog/ + build/print viewer link; no-slug work board cockpit (view/ship/merge/go/filter intents + relaunch loop)
+│   ├── gogo-done/            #   ship: synthesize high-level entry (single or merged) → .gogo/changelog/ + build/print viewer link; no-slug = filterable ready-to-ship multi-select (multiple = ONE merged entry)
 │   ├── gogo-view/            #   interactive viewer for plans + reports (rich draggable nodes + before/after compare)
+│   ├── gogo-xplan/           #   the /gogo:xplan browser kanban: classify → pre-build pages → serve React dist via server.py → watch ship intent → gogo-done writer → live refresh
 │   ├── gogo-status/          #   read-only overview + the shared work-index classifier (shipped/ready/in-progress/unfinished)
 │   ├── gogo-skills/          #   audit knowledge budget + extract on-demand skills
 │   ├── gogo-contracts/       #   validate-in / validate-out at every hand-off
@@ -129,7 +130,7 @@ gogo/
 │   ├── viewer/               #   the interactive viewer (modular, vanilla, no build):
 │   │   │                     #   geometry.js · viewport.js · mermaid-parse.js ·
 │   │   │                     #   render.js · interactive.js · viewer.css · viewer.template.html
-│   └── kanban/              #   board.py — vendored python3 curses TUI for the /gogo:done work board (soft dep; --selftest headless)
+│   └── xplan-board/         #   the /gogo:xplan browser kanban: React+Vite source (src/, package.json) + COMMITTED dist/ (npm dev-time only, D4=A) + server.py (vendored python3 stdlib server; localhost only; --selftest)
 ├── .mcp.json                 # Playwright MCP (optional; UI testing)
 └── .claude-plugin/
     ├── plugin.json           # manifest + version (bump on any behaviour change)
@@ -145,7 +146,7 @@ your-project/
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
-│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages + kanban/ (work board scratch: board.py, work-index.json, board-intent.json, board-exit.code)  [gogo-mermaid, /gogo:view, /gogo:done write]
+│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages + xplan-board/ (browser-board runtime: board.json, ship-intent.json, server.pid)  [gogo-mermaid, /gogo:view, /gogo:done, /gogo:xplan write]
 │   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<name>/ (SYNTHESIZED report.md + slug-prefixed .mmd + manifest.json{members[]} + before/; single or merged; no diagrams.html)  [/gogo:done writes]
 │   └── work/
 │       └── feature-<slug>/   # one folder per piece of work:

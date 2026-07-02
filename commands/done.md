@@ -1,6 +1,6 @@
 ---
-description: Ship report-complete features into a high-level changelog — with a slug, ship that one; with slug1+slug2 ship those as ONE merged release entry; with no slug, open the work board COCKPIT (terminal kanban, or a status table + multi-select fallback) where action keys view (v), ship (s), ship-merged (m), go/resume (g), and filter (/) each write a single-shot intent the orchestrator runs before relaunching the board; when ≥2 are shipped merged, confirm a release name. Every entry is a SYNTHESIZED report.md (not a copy of the report bundle) + the slug-prefixed .mmd set + a manifest.json with members[] + before/, plus a printed interactive viewer link; each member's state.md becomes shipped. Validates inputs.
-argument-hint: "[feature-slug | slug1+slug2+...]"
+description: Ship report-complete features into a high-level changelog — with a slug, ship that one; with slug1+slug2 ship those as ONE merged release entry; with no slug (or a filter word), classify every .gogo/work/feature-*, print the four-class status table, and offer the ready-to-ship items as a filterable AskUserQuestion multi-select where selecting MULTIPLE items merges them into ONE entry (release name suggested + confirmed) and one pick is one entry. Every entry is a SYNTHESIZED report.md (not a copy of the report bundle) + the slug-prefixed .mmd set + a manifest.json with members[] + before/, plus a printed interactive viewer link; each member's state.md becomes shipped. Validates inputs.
+argument-hint: "[feature-slug | slug1+slug2+... | filter-text]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Skill, TodoWrite, AskUserQuestion
 model: opus
 ---
@@ -10,34 +10,30 @@ Mark features **shipped** and write a high-level entry into the changelog, via t
 reads like a release history; the full audit trail stays in `.gogo/work/` (linked).
 
 Target: $ARGUMENTS  (a **slug** ships that one; **`slug1+slug2+...`** ships those as
-ONE merged release entry; **no slug opens the work board cockpit** over every
-`.gogo/work/feature-*` so you can view, ship, merge-ship, go/resume, and filter.)
+ONE merged release entry; **no slug** opens the ready-to-ship **list** over every
+`.gogo/work/feature-*`; a **non-slug word** filters that list.)
 
 Load `gogo-done` and follow it:
 
 1. **validate-in** — each **named** slug (or every `+`-joined slug) must be
    report-complete: `.gogo/work/feature-<slug>/report/report.md` must exist. Missing →
    STOP with: "No report found for `<feature>` — run `/gogo:report <feature>` first,
-   then `/gogo:done`." (`/gogo:report` works even on a past/broken run.) For the
-   **board** (no slug), if there are no work items at all, say so and stop — don't open
-   an empty board (with items but nothing ready-to-ship the cockpit still opens for
-   view/go/filter).
-2. **Cockpit** — a slug / `slug1+slug2` resolves directly; **no slug** opens the work
-   board cockpit: classify every work item via the shared gogo-status Step A classifier
-   (shipped · ready-to-ship · in-progress · unfinished) and act on it with **action
-   keys** — an **interactive terminal kanban** (`assets/kanban/board.py` in a tmux pane)
-   when `python3` + `tmux` + a tty are present, else a **status table + `AskUserQuestion`
-   multi-select** ship fallback (never fail over the board). Keys: **space/enter** select
-   a ready-to-ship card, **v** view the focused card, **s** ship separately, **m** ship
-   merged (≥2), **g** run/resume the pipeline on an unbuilt card, **/** filter (Esc
-   clears), **q** cancel. Each key writes a single-shot **intent** (`{schema:2, action,
-   items}`); the orchestrator executes it (view build / ship writer / pipeline handoff)
-   and **relaunches** the board — `go` ends the loop, `cancel` stops. The board only
-   *collects intents*; it never mutates gogo state.
-3. **Merge gate** — when a fallback selection is **≥2** slugs, one `AskUserQuestion`: ship
-   **separately** (N entries) or **merged** (1 entry)? A `+`-joined arg pre-answers
-   *merged*; a single slug never asks. For a merged entry, gogo suggests a release name
-   from the members' common theme and confirms it (you can override).
+   then `/gogo:done`." (`/gogo:report` works even on a past/broken run.) For the **list**
+   (no slug), if there are no work items at all, say so and stop; if there are items but
+   none ready-to-ship, say so and stop — the list only ships ready-to-ship items. A
+   non-resolving arg is not an error — it becomes a text filter for the list.
+2. **List** — a slug / `slug1+slug2` resolves directly; **no slug** (or a filter word)
+   opens the ready-to-ship list: classify every work item via the shared gogo-status
+   Step A classifier (shipped · ready-to-ship · in-progress · unfinished), print the
+   four-class status table for context, then offer the **ready-to-ship** items as a
+   filterable `AskUserQuestion` **multi-select**. A non-slug arg is a case-insensitive
+   substring filter over slug+title; with more ready items than fit one question, ask a
+   filter first. It mentions `/gogo:view <slug>` (open a card's page) and `/gogo:go
+   <slug>` (run/resume the pipeline).
+3. **Multiple = merge (no extra question)** — **selecting multiple items merges them into
+   ONE entry**; one pick is one entry. A `+`-joined arg is the same merge signal. For a
+   merged entry, gogo suggests a release name from the members' common theme and confirms
+   it (you can override). There is no extra merge-or-split question.
 4. **Write the entry (per entry)** — a **synthesized** high-level `report.md` (*what was
    changed/done/implemented*, key outcomes, one-line decisions, review/test verdict,
    member table + per-member section when merged, links back to each `.gogo/work/`

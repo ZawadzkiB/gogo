@@ -162,19 +162,17 @@ prerequisite).
 
 ### Ship → command `/gogo:done` (skill `gogo-done`)
 The explicit post-report gate. A **slug** ships that one feature; **`slug1+slug2+...`**
-ships those as ONE merged release entry; with **no slug** `/gogo:done` opens the **work
-board cockpit** — the shared `gogo-status` classifier labels every `.gogo/work/feature-*`
-(shipped · ready-to-ship · in-progress · unfinished) and from the four-class table the
-user **views** any card (`v`), **ships** ready cards separately (`s`) or **merged**
-(`m`), **runs/resumes** the pipeline on an unbuilt card (`g`), and **filters** (`/`) —
-an interactive terminal-TUI kanban, `assets/kanban/board.py`, when `python3` + `tmux` +
-a tty are present; otherwise a status table + `AskUserQuestion` multi-select ship
-fallback — never failing over the board (D5=A). Each key writes a single-shot **intent**
-the orchestrator executes before **relaunching** the board (`go` hands off to the
-pipeline; `cancel` stops); the board never mutates gogo state. When shipping merged (or a
-≥2 fallback selection), one `AskUserQuestion` gates separate (N entries) vs merged (1
-entry). Every entry is a **high-level synthesis, not a copy** of the report
-bundle: gogo **writes** a `report/report.md`-style summary (*what was
+ships those as ONE merged release entry; with **no slug** `/gogo:done` opens the
+**ready-to-ship list** — the shared `gogo-status` classifier labels every
+`.gogo/work/feature-*` (shipped · ready-to-ship · in-progress · unfinished), prints the
+four-class table for context, then offers the ready-to-ship items as a **filterable
+`AskUserQuestion` multi-select**. **Selecting multiple items merges them into ONE entry**
+(release name suggested + confirmed); one pick is one entry — multi-select *is* the merge
+signal, and there is no extra merge-or-split question. A non-slug arg (or, when more ready
+items exist than fit one question, an answer) is a case-insensitive substring filter over
+slug+title. It is a plain terminal list — no tty, no soft dep, always available (the
+browser board is `/gogo:xplan`, below). Every entry is a **high-level synthesis, not a
+copy** of the report bundle: gogo **writes** a `report/report.md`-style summary (*what was
 changed/done/implemented*, key outcomes, one-line decisions, review/test verdict, a
 member table + per-member section when merged, links back to each `.gogo/work/` folder),
 plus the **slug-prefixed** `.mmd` set, a `manifest.json` carrying a `members[]` array,
@@ -196,6 +194,21 @@ renders **before / after side by side**). Surfaces both **plans and reports** vi
 grouped **Work** (each feature's plan + report) / **Changelog** (shipped reports)
 picker — plans rendered in place from `plan.md` + `charts/` (D1=A) — builds the page
 from the vendored `.gogo/resources/` assets, and opens it.
+
+### Board → command `/gogo:xplan` (skill `gogo-xplan`)
+The **browser kanban** — the gogo work as a React board (ported from xplan) served by a
+`python3` **stdlib** server on **localhost**. Four fixed columns —
+**plan · in progress · ready · changelog** — fed by the shared `gogo-status` classifier
+plus the changelog entries; drag-and-drop, a text filter, a **view** button per card that
+opens its pre-built HTML page, and **mark-done from the board** (check ready cards, or
+drag a ready card onto the changelog column — **multiple = ONE merged entry**, same
+signal as `/gogo:done`). `/gogo:xplan` pre-builds all view pages at launch (D3=A, reusing
+the `gogo-view` build), starts a **long-running** server, and **watches for a ship
+intent**: on each it runs the same `gogo-done` synthesis writer, rebuilds the board index,
+and the polling board moves the card to changelog **live** (D2=A — multiple ships per
+session). `python3` is a **soft dep** — absent, it points at `/gogo:done`'s list and
+never hard-fails; the React `dist/` is committed so users need no npm (npm is dev-time
+only, D4=A). Only ever writes under `.gogo/`; localhost only, offline.
 
 ## Loops & bounds
 

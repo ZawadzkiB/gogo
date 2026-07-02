@@ -127,7 +127,8 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   `gogo-status` classifies a member as shipped via `members[]` even though the
   entry dir is named after the release; `board.py` untouched; the full audit trail
   stays in `.gogo/work/` (linked). Command set still **12**; version **0.8.0**.
-- **Board cockpit — action keys + filter + intent protocol v2 (since 0.9.0):**
+- **Board cockpit — action keys + filter + intent protocol v2 (since 0.9.0;
+  the curses/tmux TUI was REPLACED by the browser board in 0.10.0 — see next):**
   the `/gogo:done` board is the **pipeline cockpit** — one mode, action keys
   (`v` view · `s` ship · `m` ship-merged · `g` go/resume · `/` live filter ·
   `q` cancel) with per-class guards. Every action is a **single-shot schema-v2
@@ -141,3 +142,14 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   `.gogo/work/feature-*` exists (only zero features stops). The chat fallback
   stays ship-focused (`/gogo:view` + `/gogo:go` cover the rest). Command set
   still **12**; version **0.9.0**.
+- **Browser board + simplified done/view lists (since 0.10.0):** the curses/tmux
+  TUI (`assets/kanban/board.py`) is **removed**; **`/gogo:xplan`** opens a
+  **browser kanban** — a React board (`assets/xplan-board/` src + committed
+  `dist/`, a port of xplan's board view) served by a pure-stdlib, localhost-only
+  `assets/xplan-board/server.py` (`GET /api/board` polled live, `POST /api/ship`
+  writes a schema-v2 intent the orchestrator ships via the gogo-done writer then
+  rebuilds; columns plan · in-progress · ready · changelog map 1:1 to the
+  `gogo-status` classes). npm/node is a **dev-time** dep only. `/gogo:done` and
+  `/gogo:view` now use **simplified list pickers** (a text filter that loops
+  until the set fits one `AskUserQuestion`); a multi-select still ships as **one
+  merged entry**. Command set now **13**; version **0.10.0**.

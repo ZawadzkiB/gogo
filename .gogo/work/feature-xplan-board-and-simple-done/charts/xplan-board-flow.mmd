@@ -1,0 +1,17 @@
+flowchart TD
+  X["/gogo:xplan"]:::proc --> IDX["classify .gogo/work/* + changelog\n(gogo-status)"]:::proc
+  IDX --> PB["pre-build view pages\n(gogo-view build, all items)"]:::proc
+  PB --> SRV["server.py (python3 stdlib, localhost)\nserves React dist/ + GET /api/board + POST /api/ship"]:::proc
+  SRV --> BRD["React board (ported from xplan)\nplan | in progress | ready | changelog\ndrag+drop · view · select · filter"]:::gate
+  BRD -->|"view card"| PAGE[/"built HTML page\n(plan / report / changelog)"/]:::art
+  BRD -->|"drag ready → changelog\nor select + mark done"| POST["POST /api/ship\n{schema:2, action, items}"]:::proc
+  POST --> INT[/"ship-intent.json"/]:::art
+  INT --> ORCH["orchestrator: synthesis writer\n(multiple = ONE merged entry)"]:::out
+  ORCH --> REF["rebuild work-index + pages"]:::proc
+  REF -->|"board polls /api/board"| BRD
+  D["/gogo:done (no slug)"]:::proc --> LST["table + filterable multi-select\nmultiple = merge"]:::gate
+  LST --> ORCH
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

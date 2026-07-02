@@ -1,0 +1,13 @@
+flowchart TD
+  D["/gogo:done (no slug)"]:::proc --> IDX["classify .gogo/work/* (gogo-status)"]:::proc
+  IDX --> B["board.py curses TUI in tmux\nv · s · m · g · / · q (0.9.0 cockpit)"]:::gate
+  B -->|"intent (schema v2) via file"| R{route intent}:::gate
+  R -->|view / ship / merge| RL["execute + relaunch board"]:::proc
+  RL --> B
+  R -->|go| GO["resume pipeline"]:::out
+  R -->|cancel| STOP["stop"]:::out
+  B -.->|"REAL-WORLD FAILURE:\ndetached session + attach dance\nnever reached the user"| FB["fallback: table + multi-select\n(separate-vs-merged gate)"]:::proc
+  FB --> W["Write changelog entry (1..N)"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

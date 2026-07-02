@@ -9,15 +9,15 @@ description: >-
   manifest.json carrying a members[] array, and the before/ set. One OR several related
   work items can ship as ONE merged release entry. It builds the interactive viewer
   page for the entry (reusing the gogo-view build) and prints its file:// link, and
-  sets each member's state.md to a terminal `shipped` status. With NO slug it opens the
-  interactive work board — the pipeline's COCKPIT (terminal-TUI kanban, or a status
-  table + multi-select fallback): from the four-class table the user can view any card
-  (v), ship the selection separately (s) or merged (m), run/resume the pipeline on an
-  unbuilt card (g), and filter by text (/). Each key writes a single-shot INTENT and the
-  board relaunches after the orchestrator executes it (go ends the loop and hands off;
-  cancel stops); when the selection is shipped merged the user is asked for a release
-  name. Use when the user runs /gogo:done or says work is shipped / finished / released.
-  Synthesis-not-copy, idempotent, writes only under .gogo/, offline.
+  sets each member's state.md to a terminal `shipped` status. With NO slug it classifies
+  every .gogo/work/feature-* (shared gogo-status classifier), prints the four-class
+  status table for context, and offers the ready-to-ship items as a filterable
+  AskUserQuestion multi-select: selecting MULTIPLE items merges them into ONE changelog
+  entry (release name suggested + confirmed), one pick is one entry — multi-select IS the
+  merge signal, there is no extra merge-or-split question. A non-slug arg (or, when there
+  are more ready items than fit one question, an answer) is a case-insensitive substring
+  filter over slug+title. Use when the user runs /gogo:done or says work is shipped /
+  finished / released. Synthesis-not-copy, idempotent, writes only under .gogo/, offline.
 ---
 
 # gogo-done — synthesize report-complete features into the changelog
@@ -33,21 +33,18 @@ already lives, in `.gogo/work/feature-<slug>/` (linked from the entry).
 Three ways in, one entry-writer:
 - **`/gogo:done <slug>`** — ship that one feature as a single-member entry.
 - **`/gogo:done slug1+slug2+slug3`** — ship those `+`-joined features as ONE **merged**
-  release entry (the `+` pre-answers the merge gate; skips the board).
-- **`/gogo:done`** (no slug) — open the **work board** (D5=A), the pipeline's
-  **cockpit** (D1=A/D2=A/D3=A of this feature): classify every `.gogo/work/feature-*`
-  and, from the four-class table, the user can **view** any card, **ship** ready cards
-  (separately or **merged**), **go** (run/resume the pipeline) on an unbuilt card, and
-  **filter** by text. Each action key writes a single-shot **intent** and exits; the
-  orchestrator executes it and **relaunches** the board (so it feels persistent). An
-  explicit `s` (separate ship) does **not** ask the merge gate; `m` (merge) ships all
-  picks as one entry (release-name confirmed in chat).
+  release entry (the `+` is the merge signal; skips the list).
+- **`/gogo:done`** (no slug, or a non-resolving filter arg) — open the **ready-to-ship
+  list**: classify every `.gogo/work/feature-*` (shared gogo-status classifier), print
+  the four-class status table for context, then offer the **ready-to-ship** items as a
+  filterable `AskUserQuestion` **multi-select**. **Selecting multiple items merges them
+  into ONE** entry (release name suggested + confirmed); one pick is one entry. There is
+  **no extra merge-or-split question** — multi-select *is* the merge signal.
 
 Either way the actual shipping is the single **"Write changelog entry (1..N members)"**
-flow below — the board only *collects intents*; it never archives anything itself or
-mutates gogo state (D5). Pure `Read` / `Write` / `Bash` (+ `Skill` to reuse the
-`gogo-view` build and to hand off `go` to the pipeline); only ever writes under
-`.gogo/`; offline.
+flow below — the list only *selects members*; it never archives anything itself. Pure
+`Read` / `Write` / `Bash` (+ `Skill` to reuse the `gogo-view` build); only ever writes
+under `.gogo/`; offline.
 
 ## Inputs (declared) and outputs
 
@@ -56,30 +53,32 @@ mutates gogo state (D5). Pure `Read` / `Write` / `Bash` (+ `Skill` to reuse the
 | in (required, per member) | `.gogo/work/feature-<slug>/report/report.md` | the as-built report — the **synthesis source**, never copied |
 | in (optional, per member) | `report/*.mmd`, `report/manifest.json` | the as-built UML set + its index (kinds/titles) |
 | in (optional, per member) | `report/before/*.mmd` + `report/before/manifest.json` | the plan-time "before" set (FR8) → viewer compare mode |
-| in (board mode) | the shared **work-index** (gogo-status Step A classifier, in-memory) | the four-class record shape the board consumes; the orchestrator also uses each card's `class` to route a `view` intent |
-| in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/kanban/board.py` | vendored terminal-TUI cockpit (copied on demand; soft dep) |
+| in (list mode) | the shared **work-index** (gogo-status Step A classifier, in-memory) | the four-class record shape the list consumes (`slug`, `title`, `status`, `class`, …) |
 | in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/{mermaid/mermaid.min.js, viewer/*}` | vendored viewer runtime (copied on demand) |
-| in (board mode) | `.gogo/resources/kanban/board-intent.json` — the board's schema-v2 **intent** `{schema:2, action, items}` (legacy `{"ship":[...]}` accepted as `action:ship`) | what the orchestrator reads + routes each loop iteration |
 | out | `.gogo/changelog/<YYYY-MM-DD>-<name>/` — **synthesized** `report.md` + slug-prefixed `*.mmd` + `manifest.json` (with a `members[]` array) + `before/` | append-only archive; **no `diagrams.html` copy** |
 | out | `.gogo/resources/view/<date>-<name>.html` (interactive viewer page, best-effort) | self-contained offline page |
-| out (board mode) | `.gogo/resources/kanban/{board.py, work-index.json, board-intent.json, board-exit.code}` | runtime scratch for the TUI (`.gogo/`-only) |
 | out | each member's `state.md` (status → `shipped`) | human state |
 
 ## ① validate-in (gate)
 
-- **`<slug>` or `slug1+slug2+...` given** → confirm **each** named feature is
-  **report-complete**: `.gogo/work/feature-<slug>/report/report.md` exists. Any missing
-  → **STOP** naming the missing feature(s):
+- **`<slug>` or `slug1+slug2+...` given** (each part naming a real feature) → confirm
+  **each** named feature is **report-complete**:
+  `.gogo/work/feature-<slug>/report/report.md` exists. Any missing → **STOP** naming the
+  missing feature(s):
 
   > No report found for `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`.
 
-- **No slug (board mode / cockpit)** → no hard prerequisite: the board classifies
-  whatever exists. If there are **zero work items at all** (`.gogo/work/feature-*`),
-  say so plainly ("no features yet — run `/gogo:plan` first") and stop without opening
-  an empty board. If there are items but **none ready-to-ship**, the cockpit still
-  opens — its `view` / `go` / `filter` work on any card (D3=A: `g` runs/resumes
-  unbuilt work); the user just can't `ship` / `merge` until something is
-  report-complete (note that plainly, and point at `/gogo:report <feature>`).
+  **An arg containing `+` is always an explicit merge list — never a filter.** If ANY
+  `+`-part names no real feature, **STOP** naming the unknown part(s) ("unknown feature
+  `<part>` — check `/gogo:status`"); do not fall through to list mode. Only a **bare,
+  `+`-free** arg that resolves to no feature is treated as a text **filter** for list
+  mode (② Resolve mode).
+
+- **No slug (list mode)** → no hard prerequisite: classify whatever exists. If there are
+  **zero work items at all** (`.gogo/work/feature-*`), say so plainly ("no features yet —
+  run `/gogo:plan` first") and stop. If there are items but **none ready-to-ship**, say so
+  ("nothing report-complete to ship yet — run `/gogo:report <feature>` first, then
+  `/gogo:done`") and stop — the list only ships ready-to-ship items.
 
 `/gogo:report` works even on a past/broken run (it writes a best-effort report), so the
 guidance is always actionable. Never write an entry for a feature that hasn't been reported.
@@ -87,14 +86,16 @@ guidance is always actionable. Never write an entry for a feature that hasn't be
 ## ② Resolve mode
 
 From `$ARGUMENTS`:
-- a single **slug** → run **Write changelog entry** with that one member (a single entry);
-- a **`+`-joined list** (`slug1+slug2+...`) → **merge**: derive the release name (D2=A)
-  + newest member date, then run **Write changelog entry** with those members as ONE
-  entry. The `+` pre-answers the separate-vs-merged gate, so the board is skipped;
-- **empty** → run **Board mode** (below), which selects the ready-to-ship slugs, applies
-  the merge gate, and then runs **Write changelog entry**. (Back-compat: if there is
-  exactly one report-complete feature and no slug, you may write it directly — but
-  prefer the board so the user sees the full picture.)
+- a single **slug** that names a real `.gogo/work/feature-<slug>/` → run **Write
+  changelog entry** with that one member (a single entry);
+- a **`+`-joined list** (`slug1+slug2+...`) → **merge**: every part must name a real
+  feature (any unknown part → **STOP** per validate-in — a `+` arg is never a filter);
+  derive the release name + newest member date, then run **Write changelog entry** with
+  those members as ONE entry. The `+` is the merge signal, so list mode is skipped;
+- a **non-empty, `+`-free arg that does NOT resolve** to a feature slug → **List mode**
+  (below) with that arg as the case-insensitive substring **filter** (FR2);
+- **empty** → **List mode** (below) with no preset filter — which selects the
+  ready-to-ship members, then runs **Write changelog entry**.
 
 ## Write changelog entry (1..N members) — the single entry-writer
 
@@ -218,147 +219,53 @@ difference is 1 vs N members; there is no divergent single-vs-merged code path.
    error), do **not** fail `/gogo:done` — skip the page and let Return fall back to the
    changelog folder path.
 
-## Board mode (no slug) — the work cockpit (D5=A · D1/D2/D3=A)
+## List mode (no slug) — the filterable ready-to-ship list
 
-The board is a **selector/visualizer** over every work item — the pipeline's
-**cockpit**. It never archives or mutates gogo state (D5): every action key just
-writes a single-shot **intent** and exits; the orchestrator **executes** the intent
-and **relaunches** the board, so it feels persistent. The loop continues until the
-user picks **go** (hand off) or **cancel** (stop).
+No slug (or a non-resolving filter arg) picks the members to ship from a plain
+in-terminal list. It **selects members** for the entry-writer; it never archives or
+mutates gogo state itself. Picking **multiple** items *is* the request to merge them
+into ONE entry — there is **no extra merge-or-split question**.
 
 1. **Build the work-index.** Run the shared **gogo-status Step A classifier**
    (`skills/gogo-status/SKILL.md`) to label every `.gogo/work/feature-*` as
    **shipped · ready-to-ship · in-progress · unfinished**, newest-first, in its
-   documented record shape (`slug`, `title`, `status`, `class`, `changelog_path`, …).
-   This is the same read-only classifier `/gogo:status` renders — reuse it, don't
-   re-derive. **Keep these records in hand:** the orchestrator uses each card's `class`
-   (and `changelog_path`) to route a `view` intent to the right page.
-2. **Choose the surface.** The interactive terminal kanban is used only when all of
-   these hold; otherwise fall back (never fail over the board):
-   - `python3` is available (`command -v python3`),
-   - `tmux` is available (`command -v tmux`),
-   - there is an interactive **tty** (`[ -t 0 ] && [ -t 1 ]`, or a resolvable
-     `$TMUX` / terminal).
-
-3. **Interactive TUI path — the relaunch loop (all three present).** Launch the board
-   for **one iteration**, read its intent, **route** it (table below), and — for
-   `view` / `ship` / `ship-merged` — **return here and relaunch** so the cockpit feels
-   persistent. Only `go` and `cancel` end the loop.
-
-   `board.py`'s exit codes are the contract: **0** = an action (a schema-v2 intent was
-   written), **1** = user cancel (no intent file), **2** = error (bad/missing index or
-   cannot start). A tmux *client's* own exit status is unreliable, and `tmux
-   new-session` refuses to **nest** when `$TMUX` is already set (the norm for tmux
-   users) — so launch nesting-safely and capture the **board's own** exit code. Never
-   assume `new-session` works.
-   ```bash
-   set -euo pipefail
-   mkdir -p .gogo/resources/kanban
-   cp "${CLAUDE_PLUGIN_ROOT}/assets/kanban/board.py" .gogo/resources/kanban/board.py  # vendored, idempotent copy
-   idx=".gogo/resources/kanban/work-index.json"       # write the classifier records here (Write tool) first
-   res=".gogo/resources/kanban/board-intent.json"     # board writes the schema-v2 intent ONLY on an action
-   code=".gogo/resources/kanban/board-exit.code"      # the board's OWN exit code (tmux's is unreliable)
-   rm -f "$res" "$code"
-   sess="gogo-done-$$"                                 # unique target -> a stale/duplicate session can't block the launch
-   # record the board's exit code, then signal a wait-for channel so we can block on it
-   run="python3 '.gogo/resources/kanban/board.py' --index '$idx' --result '$res'; echo \$? > '$code'; tmux wait-for -S '$sess'"
-   if [ -n "${TMUX:-}" ]; then
-     # already inside tmux: new-session would refuse to nest -> run in a NEW WINDOW, then block on the channel
-     tmux new-window -n "$sess" "$run" && tmux wait-for "$sess" 2>/dev/null || true
-   elif [ -t 0 ] && [ -t 1 ]; then
-     # a real tty: an attached, uniquely-named session blocks until the board exits
-     tmux new-session -A -s "$sess" "$run" || true
-   else
-     # PROVEN detached-launch pattern (orchestrator shell has no tty): start detached, tell the
-     # user to attach, then BLOCK on the wait-for channel + the board's own exit code.
-     tmux new-session -d -s "$sess" "$run" || true
-     echo "Board running in tmux — attach in another terminal:  tmux attach -t $sess"
-     tmux wait-for "$sess" 2>/dev/null || true
-   fi
-   ```
-   - Write the classifier records array to `$idx` first (the board reads
-     `{slug, class, title, status}`; extra keys are ignored). `board.py` renders the
-     four columns; the user moves the cursor (arrows/hjkl), **space/enter** toggles a
-     **ready-to-ship** card (only those are selectable), **v** views the focused card,
-     **s** ships the selection separately, **m** ships it merged (≥2), **g** runs/resumes
-     the focused card, **/** filters, **q** cancels.
-   - **First, sort a cancel / error from an action — a launch failure or error is NOT a
-     cancel:**
-     ```bash
-     if [ ! -f "$res" ] && [ -f "$code" ] && [ "$(cat "$code")" = "1" ]; then
-       echo "board cancelled — nothing shipped"        # the board RAN and the user quit (q): stop
-     elif [ ! -f "$res" ]; then
-       echo "board did not run (launch failed / exit 2 / error) — using the status-table fallback"
-       # -> fall through to the Step 4 fallback (status table + AskUserQuestion)
-     fi
-     ```
-     A real cancel is only: no `$res` **and** `$code` is `1` (the board ran and the user
-     quit) → stop. If `$res` is **missing** and `$code` is **absent** (tmux never
-     started the board: a missing binary, a stale session) OR is **2** (bad/missing
-     index) OR any other non-`0`/`1` value, treat it as a **board error → the guaranteed
-     fallback** — never silently do nothing (Degradation rule; matches
-     `charts/board-cockpit-flow.mmd`: "board error → fallback, never fail over the board").
-   - **Route the intent (exit 0 — `$res` exists).** Read `board-intent.json`
-     (schema-v2 `{schema:2, action, items}`; **also accept the legacy `{"ship":[...]}`
-     shape as `action:ship` for back-compat), then:
-
-     | `action` | The orchestrator does | Then |
-     |---|---|---|
-     | **view** | Build + open the page for the focused card's class (look its `class` up in the Step-1 work-index): **unfinished / in-progress → `<slug>:plan`** (plan bundle), **ready-to-ship → `<slug>:report`** (work report), **shipped → its changelog `<date>-<name>`** (from `changelog_path`). Reuse the **`gogo-view` build** — don't reimplement it — and print its `file://` link. | **relaunch** the board (return to step 3) |
-     | **ship** | Run **Write changelog entry** once **per slug** in `items` (each a single-member entry). Explicit `s` = **separate** → do **NOT** ask the separate-vs-merged gate. | **relaunch** |
-     | **ship-merged** | Run **Write changelog entry** **once** with all `items` as `members[]` (derive + **confirm the release name** in chat, D2=A). | **relaunch** |
-     | **go** | **END the loop** and hand off to the pipeline: resume the focused feature per its `state.md` (exactly like `/gogo:go <slug>`). | loop ends |
-     | **cancel** (exit 1, no `$res`) | Stop — nothing shipped. | loop ends |
-
-     After a `view`, `ship`, or `ship-merged` intent, **relaunch the board** (repeat
-     step 3 with a freshly-written `$idx` if state changed — a just-shipped feature now
-     classifies as `shipped`). Skip (with a one-line note) any `ship` slug that turns
-     out not to be report-complete.
-4. **Fallback path (no tmux / no python3 / no tty / tmux launch failure /
-   `board.py` exit 2 / board error).** **Never** fail over the board — degrade to
-   the guaranteed in-terminal flow. The fallback stays **ship-focused** (no relaunch
-   loop, no view/go surface — it just ships):
-   - Render the work-index as a **status table** grouped by class (shipped ·
-     ready-to-ship · in-progress · unfinished) so the user sees the full picture.
-   - Offer the **ready-to-ship** items via **`AskUserQuestion` multi-select** ("which
-     features to ship?"). Non-ready items are shown for context but are **not**
-     selectable (same guard the TUI enforces).
-   - Hand the chosen slugs to **Step 5** (merge gate + entry-writer) — which **keeps**
-     the separate-vs-merged gate for a ≥2 selection.
-   - **Mention** that `/gogo:view <slug>` opens any card's page and `/gogo:go <slug>`
-     runs/resumes the pipeline — the fallback doesn't surface `v` / `g` itself.
-   - (You may also drive `board.py` headlessly as the emit step —
-     `board.py --index <idx> --result <res> --headless --action ship --ship <slug,slug>`
-     — which applies the same ready-to-ship guard and writes the intent. The
-     `AskUserQuestion` multi-select is the primary fallback UI.)
-5. **Merge gate + write (FR1) — the fallback's ship path.** With the fallback's
-   selected slugs in hand (the TUI's explicit `s` / `m` already pre-answer this gate —
-   `s` = separate, `m` = merged — so they skip straight to the writer):
-   - **0 slugs** → nothing to do; say so and stop.
-   - **1 slug** → run **Write changelog entry** with that one member (a single entry;
-     **no** merge question is asked for N=1).
-   - **≥2 slugs** → ask **one** `AskUserQuestion`: ship **separately** (N entries) or
-     **merged** (1 entry)?
-     - *separate* → run **Write changelog entry** once **per slug** (each a single-member
-       entry).
-     - *merged* → derive the release name (D2=A, confirm) + newest member date, then run
-       **Write changelog entry** **once** with all selected members.
-   Because the entry-writer is idempotent and `.gogo/`-only, N separate entries is just
-   the one flow looped. Skip (with a one-line note) any selected slug that turns out not
-   to be report-complete.
+   documented record shape (`slug`, `title`, `status`, `class`, …). This is the same
+   read-only classifier `/gogo:status` renders — reuse it, don't re-derive.
+2. **Print the four-class status table (context).** Render the work-index as a table
+   grouped by class (shipped · ready-to-ship · in-progress · unfinished) so the user sees
+   the full picture before choosing. Only **ready-to-ship** items are shippable; the other
+   classes are shown for context. Mention that `/gogo:view <slug>` opens any card's page
+   and `/gogo:go <slug>` runs/resumes the pipeline.
+3. **Filter (FR2 — case-insensitive substring over `slug` + `title`).** Narrow the
+   **ready-to-ship** list before offering it:
+   - a **non-resolving arg** was passed (② Resolve mode) → use it as the filter;
+   - else there are **more than 4** ready-to-ship items (more than fit one
+     `AskUserQuestion`) → ask a text filter first ("filter ready-to-ship items — a
+     substring of the slug or title");
+   - else → no filter.
+   Match it case-insensitively as a substring of each item's `slug` + `title`. **Loop
+   until the list fits:** matches **nothing** → say so and re-ask (or fall back to the
+   full ready-to-ship list); still **more than 4** → state the count and re-ask for a
+   narrower term (offering the 4 newest matches as the escape hatch); **≤4** → Step 4.
+4. **Select + ship.** Offer the (filtered) **ready-to-ship** items via one
+   `AskUserQuestion` **multi-select** ("which features to ship?"). Non-ready items are not
+   selectable — they appear only in the context table (Step 2). Then hand the picks
+   straight to the **"Write changelog entry (1..N members)"** writer:
+   - **0 picks** → nothing to do; say so and stop.
+   - **1 pick** → **Write changelog entry** with that one member (a single entry).
+   - **≥2 picks** → **merge**: **Write changelog entry** **once** with all picks as
+     `members[]` (derive + confirm the release name, per the writer). **Selecting multiple
+     IS the merge signal — no extra merge-or-split question is asked.**
+   Skip (with a one-line note) any pick that turns out not to be report-complete.
 
 ## ③ Return
 
-- **Single entry** (`<slug>`, or one board pick, or one of N "separate" entries) — a
-  one-line confirmation per entry: which member(s) were synthesized, to which
-  `.gogo/changelog/<date>-<name>/`, and that each member's `state.md` is now `shipped`.
-- **Merged entry** — one confirmation naming the release, its
-  `.gogo/changelog/<date>-<release-name>/`, and the member slugs marked `shipped`.
-- **Board mode (cockpit)** — the board relaunches after each `view` / `ship` /
-  `ship-merged`, so confirm **per intent as it runs**: one line per changelog entry
-  written (per ship / merge), the `file://` link per `view`, and note any features left
-  unshipped when the user finally `q`-cancels. A **`go`** intent ends the board loop —
-  say which feature the pipeline is resuming, then hand off (like `/gogo:go <slug>`).
+- **Single entry** (`<slug>`, or one list pick) — a one-line confirmation: which
+  member(s) were synthesized, to which `.gogo/changelog/<date>-<name>/`, and that each
+  member's `state.md` is now `shipped`.
+- **Merged entry** (`slug1+slug2`, or a multi-pick from the list) — one confirmation
+  naming the release, its `.gogo/changelog/<date>-<release-name>/`, and the member slugs
+  marked `shipped`.
 
 Then, for each entry, **print the interactive viewer link** — the absolute `file://`
 URL to the built page — with the changelog **folder path** as the fallback:
@@ -377,14 +284,11 @@ any time (it builds the page from the entry's `report.md` + `.mmd`).
 
 ## Degradation
 
-- **No `tmux` / no `python3` / no tty / a tmux launch failure (e.g. nested `$TMUX`,
-  stale session) / `board.py` exit 2 / any board error** → the status table +
-  `AskUserQuestion` multi-select **ship** fallback (above). The fallback is
-  ship-focused: no relaunch loop, no `v` / `g` surface — it just mentions `/gogo:view`
-  and `/gogo:go`. Only a clean board run that returns `1` with no intent file is a real
-  user cancel (stop, ship nothing); every other no-intent outcome routes to the
-  fallback, never a silent no-op. The board is a convenience layered on top; the classify
-  → select → merge gate → write result is identical for the ship path either way.
+- The ready-to-ship **list is always available** — a plain `AskUserQuestion`, with no
+  tty, no python3, no external tool required. The only "degradation" is having **no work
+  to offer**: **zero features** → "run `/gogo:plan` first"; **zero ready-to-ship** → "run
+  `/gogo:report <feature>` first". Neither is a failure — each stops cleanly with
+  actionable guidance.
 - If a diagram artifact is absent (a pure-process feature drew nothing), the entry is
   still valid — a synthesized `report.md` alone is a complete entry. A `.mmd` glob that
   matches nothing is a no-op, not an error.

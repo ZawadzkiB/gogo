@@ -1,0 +1,8 @@
+{
+  "slug": "xplan-board-and-simple-done",
+  "updated": "2026-07-02",
+  "note": "Intended design: /gogo:xplan hosts a React board (ported from xplan: TONE palette, .wf-panel cards, native HTML5 DnD; dist/ committed, npm dev-time only) served by a python3 stdlib server; view opens pre-built pages; drag ready->changelog or select+mark-done POSTs a schema-v2 ship intent the orchestrator executes with the 0.8.0 synthesis writer (multiple = ONE merged entry), then the polling board refreshes live. /gogo:done becomes a plain filterable multi-select list with the same multiple=merge semantics; the 0.9.0 TUI is removed. As-is baseline (the TUI cockpit) in charts/before/.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/xplan-board-flow.mmd", "title": "Intended: /gogo:xplan React board + simplified /gogo:done list -> one synthesis writer" }
+  ]
+}
