@@ -1,0 +1,22 @@
+{
+  "slug": "pipeline-cockpit",
+  "updated": "2026-07-03",
+  "note": "Merged release entry: pipeline-commands (0.2.0) + changelog-merged-entries (0.8.0) + board-actions-and-filter (0.9.0) + cli-cockpit-and-events (0.10.0 + the gogo CLI). Diagrams flattened from each member's report bundle (charts/ for the legacy-layout pipeline-commands) with slug-prefixed names; before/ carries each member's plan-time baseline (pairs by filename stem; pipeline-commands predates before-sets). Slim set — no diagrams.html; /gogo:view builds the page from source.",
+  "members": [
+    "pipeline-commands",
+    "changelog-merged-entries",
+    "board-actions-and-filter",
+    "cli-cockpit-and-events"
+  ],
+  "diagrams": [
+    { "kind": "flow", "file": "pipeline-commands-pipeline.mmd", "title": "pipeline-commands: Command pipeline — typed artifacts through validate-in/out, looping on issues" },
+    { "kind": "activity", "file": "pipeline-commands-issue-lifecycle.mmd", "title": "pipeline-commands: Issue lifecycle in the living issues.json" },
+    { "kind": "sequence", "file": "pipeline-commands-handoff.mmd", "title": "pipeline-commands: Validated review → implement hand-off via gogo-contracts" },
+    { "kind": "flow", "file": "changelog-merged-entries-flow.mmd", "title": "changelog-merged-entries: /gogo:done separate-vs-merged gate + one synthesis writer (1..N members)" },
+    { "kind": "sequence", "file": "changelog-merged-entries-sequence.mmd", "title": "changelog-merged-entries: merged-ship runtime — gates answered, entry synthesized, members flipped" },
+    { "kind": "flow", "file": "board-actions-and-filter-flow.mmd", "title": "board-actions-and-filter: board cockpit — action keys → intents → route → relaunch loop" },
+    { "kind": "activity", "file": "board-actions-and-filter-activity.mmd", "title": "board-actions-and-filter: board.py key → guard → intent state machine" },
+    { "kind": "flow", "file": "cli-cockpit-and-events-flow.mmd", "title": "cli-cockpit-and-events: gogo CLI cockpit — deterministic reader, Claude executor, events telemetry" },
+    { "kind": "sequence", "file": "cli-cockpit-and-events-sequence.mmd", "title": "cli-cockpit-and-events: a column move launches Claude — huh confirm → tmux → events.jsonl → fsnotify" }
+  ]
+}

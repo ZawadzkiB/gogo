@@ -1,0 +1,49 @@
+# Release the gogo CLI — the otp-cli pattern: RAW binaries attached straight to
+# the GitHub Release for the pushed tag. No goreleaser, no archives, no
+# checksums, no version stamping (the committed const Version in cli/main.go is
+# the version, bumped per release like plugin.json). The only automation is the
+# cross-compile itself: Go binaries are per-OS/arch, so one runner builds all
+# four and uploads them.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the release + upload assets
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go.mod
+
+      # The one gate: the CLI suite must be green before anything is published.
+      - name: test
+        working-directory: cli
+        run: go test -race ./...
+
+      - name: build (darwin/linux x arm64/amd64)
+        working-directory: cli
+        run: |
+          mkdir -p dist
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
+            GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 \
+              go build -trimpath -o "dist/gogo-${target%/*}-${target#*/}" .
+          done
+          ls -la dist/
+
+      # Create the release for the tag with the assets attached; if it already
+      # exists (e.g. created by hand first, or a re-run), just (re)upload.
+      - name: publish assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" cli/dist/gogo-* \
+            --verify-tag --generate-notes \
+          || gh release upload "${GITHUB_REF_NAME}" cli/dist/gogo-* --clobber

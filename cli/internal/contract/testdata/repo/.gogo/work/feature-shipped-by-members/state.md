@@ -1,0 +1,6 @@
+- **feature:** Shipped inside a merged release
+- **phase:** done
+- **status:** done
+- **created:** 2026-06-17
+- **iterations:** plan=1 · implement=1 · review=1 · test=1 · report=1
+- **resume:** none

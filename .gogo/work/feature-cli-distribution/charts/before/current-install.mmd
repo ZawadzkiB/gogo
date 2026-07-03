@@ -1,0 +1,8 @@
+flowchart TD
+  U["user wants the gogo CLI"]:::proc --> GO{"Go toolchain installed?"}:::gate
+  GO -->|yes| B["git clone + cd cli && go build -o gogo ."]:::proc
+  GO -->|no| X["no path — cannot install"]:::out
+  B --> BIN["./cli/gogo (local build only,\nno releases, no CI, hardcoded version)"]:::out
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

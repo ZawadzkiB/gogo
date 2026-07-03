@@ -77,3 +77,9 @@ computed node-diff (decision D4).>
 
 ## Follow-ups & known limitations
 <Out-of-scope items, deferred work, tech debt, known gaps.>
+
+## Summary (TL;DR)
+<The FINAL section — a closing recap in a few bold-led lines: **what shipped**,
+the **review verdict** and the **test verdict** (one line each), and a pointer to
+the **follow-ups** above. A reader who skims only this block should know what
+landed and whether it is clean.>

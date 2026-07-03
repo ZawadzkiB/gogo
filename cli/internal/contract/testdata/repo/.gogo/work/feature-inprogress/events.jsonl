@@ -1,0 +1,4 @@
+{"ts":"2026-06-30T09:00:00Z","event":"phase-started","phase":"implement","status":"implementing","slug":"inprogress"}
+{"ts":"2026-06-30T10:15:30Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"inprogress"}
+{"ts":"2026-06-30T10:42:11Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"2 blockers, 1 minor","slug":"inprogress"}
+{"ts":"2026-06-30T11:00:00Z","event":"round-opened","phase":"review","status":"reviewing","round":2,"slug":"inprogress"}

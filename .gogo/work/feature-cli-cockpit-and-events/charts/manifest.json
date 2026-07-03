@@ -1,0 +1,8 @@
+{
+  "slug": "cli-cockpit-and-events",
+  "updated": "2026-07-03",
+  "note": "As-built (Stage B, implement round 3) CONFIRMS the intended flow — no drift, so the single flow diagram is retained (noted, not redrawn per gogo-implement step 5). The shipped Go/Bubble Tea CLI (cli/, binary `gogo`) matches the design exactly: internal/contract is the deterministic reader (state.md + classifier + manifests + issues + events.jsonl, no LLM); internal/tui is the 4-column board → drill-in → glamour viewer; internal/pages is the native goldmark `w` page builder (before/after compare); internal/launch spawns claude /gogo:go|/gogo:done in attachable tmux sessions; fsnotify refreshes the board from the appended events.jsonl. As-is baseline (LLM in the read hot path, no history in state.md) in charts/before/. Only judgement call vs the plan: mermaid-ascii is dropped as a lib (its renderer is reachable only via a cobra/gin cmd package) in favour of a minimal internal flowchart→ASCII renderer + source fallback (the plan's accepted fallback).",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/cli-cockpit-flow.mmd", "title": "As-built (holds vs intended): gogo CLI cockpit — deterministic reader, Claude executor, events telemetry" }
+  ]
+}

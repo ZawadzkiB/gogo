@@ -1,0 +1,5 @@
+{ "slug": "inprogress", "track": "review", "round": 2, "updated": "2026-06-30",
+  "issues": [
+    { "id": "REV-001", "title": "A blocker", "description": "d", "proposed_solution": "p", "severity": "major", "priority": "P1", "status": "open", "origin": "review", "found_in_round": 2 },
+    { "id": "REV-002", "title": "A nit", "description": "d", "proposed_solution": "p", "severity": "nit", "priority": "P3", "status": "fixed", "origin": "review", "found_in_round": 1, "fixed_in_round": 2, "fix_summary": "done" }
+  ] }

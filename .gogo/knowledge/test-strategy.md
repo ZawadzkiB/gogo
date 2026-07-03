@@ -70,3 +70,26 @@ cancel, all asserted live):
   the emitted intent file (or its documented absence on cancel).
 - **Clean up**: kill every test session; write fixtures to the scratchpad only;
   remove `__pycache__` (it's gitignored, but keep runs tidy).
+
+### Go TUI (the `gogo` CLI) — unit tests are NOT enough (since 0.10.0)
+The 0.10.0 lesson (TEST-001): the CLI shipped a green 50-test `-race` suite and
+two review approvals, yet **every launch form was unsubmittable live** — the
+model's Update() dropped huh's async messages, a class of bug no model-level
+unit test had exercised. The strategy therefore has two mandatory layers:
+- **Model unit tests for logic** — drive `Update()` directly for guards,
+  classification, badges, filters; for forms/dialogs, **pump the full command
+  graph** (execute returned `tea.Cmd`s, expand `tea.Batch`, re-feed each msg)
+  to the terminal state (`huh.StateCompleted`/aborted) and assert an injected
+  fake launcher fires exactly once/never.
+- **Live tmux driving for integration** — same send-keys/capture-pane method as
+  above, against a fixture `.gogo/` tree with a PATH-stubbed `claude`: real
+  keystrokes to real completion (submit AND cancel paths), then assert the stub's
+  recorded argv + call count and the board's rendered state. **Only this layer
+  catches message-routing/focus/lifecycle integration bugs** — never sign off an
+  interactive flow that has not been driven to completion with real keystrokes.
+
+- **TTY-dependent behaviour is invisible to `go test`** (no TTY in CI): glamour's
+  `WithAutoStyle()` froze the live TUI for 5s per render (termenv OSC query swallowed
+  by Bubble Tea's stdin reader) while every unit test passed in ~4ms. Detect terminal
+  properties ONCE before the TUI starts; never query the terminal from a render path;
+  always include one live tmux drive before shipping a TUI change (TEST-003, 0.10.0).

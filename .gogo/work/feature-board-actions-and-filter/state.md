@@ -13,9 +13,9 @@
 
 - **feature:** /gogo:done board cockpit — action keys (view · ship · merge-ship · go) + text filter + intent protocol v2
 - **phase:** done        <!-- plan | implement | review | test | knowledge | done -->
-- **status:** done
+- **status:** shipped
 - **created:** 2026-07-02
 - **branch:** main
 - **iterations:** plan=1 · implement=1 · review=1 · test=1 · report=1
-- **resume:** none
+- **resume:** none — shipped to .gogo/changelog/2026-07-03-pipeline-cockpit/
 - **open-decision:** none (D1=A action keys · D2=A intents+relaunch · D3=A incl. g)

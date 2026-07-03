@@ -1,0 +1,6 @@
+- **feature:** Unfinished, planned only
+- **phase:** plan
+- **status:** plan-accepted
+- **created:** 2026-06-28
+- **iterations:** plan=1 · implement=0 · review=0 · test=0
+- **resume:** implement — build the plan

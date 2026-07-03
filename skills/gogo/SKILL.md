@@ -71,6 +71,7 @@ slug from the feature name). These files are the pipeline's memory + audit trail
 - `decisions.md` — open/closed forks that needed the user
 - `review/issues.json` — the living, typed review findings (the contract); `review-NN.md` renders each round's snapshot
 - `test/issues.json` — the living, typed test findings (same contract); `test-NN.md` renders each round's snapshot
+- `events.jsonl` — append-only progress telemetry: one schema'd JSON line per phase transition (beside every `state.md` write), for the `gogo` CLI cockpit; a missing file is never an error
 - `report/` — the as-built bundle (written at ⑤): `report/report.md` (planned-vs-shipped, implementation, decisions+reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`, `result.json`. This is the full audit trail; `/gogo:done` **synthesizes** a high-level entry from it into `.gogo/changelog/` (it does not copy the bundle).
 - `charts/` — mermaid `.mmd` + `manifest.json` + offline `diagrams.html` (plan's intended design + `charts/before/` the plan-time as-is baseline; ② emits the as-built flow/sequence/class/activity set for review/test)
 
@@ -205,6 +206,30 @@ from the vendored `.gogo/resources/` assets, and opens it.
   then re-review, then re-test.
 - Track rounds in `state.md` `iterations:`.
 
+## Pipeline telemetry — events.jsonl
+
+At **every** phase/status transition, append one compact JSON line to
+`.gogo/work/feature-<slug>/events.jsonl` **beside** (never instead of) the
+`state.md` write, per `events.schema.json`
+(`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`). This append-only stream is what a
+deterministic consumer (the `gogo` CLI cockpit) reads for live progress and
+per-item history; `state.md` stays the single human resume file. Create the file
+if absent; **best-effort** — a failed append never fails a phase, and a missing
+`events.jsonl` is never an error.
+
+**Ownership — one emitter per transition.** Phase lifecycle events are emitted by
+the **phase skills** — the orchestrator emits **only the gate events**. Each phase
+skill owns *all* of its phase's events (they must, because `/gogo:implement`,
+`/gogo:review`, … also run standalone with no orchestrator), so **never emit
+`phase-started` / `phase-done` from here**: `gogo-plan` owns `phase-started`/plan +
+`plan-accepted`/plan (its terminal event), `gogo-implement` owns
+`phase-started`/`fix-round` + `phase-done`/implement, `gogo-review` owns
+`round-opened`/`issues-found` + `phase-done`/review, `gogo-test` the same for test,
+`gogo-knowledge` owns `phase-started`/`phase-done`/report, and `gogo-done` owns
+`shipped`/done. As the orchestrator you emit **only** `gate-opened` / `gate-resolved`
+around a decision gate (below). Each transition is emitted **exactly once, by its
+owning skill** — the timeline never double-counts.
+
 ## Decision gates — stopping for the user
 
 Stop **only** for genuine forks: ambiguous requirements, scope changes,
@@ -215,11 +240,18 @@ When you do stop:
 1. Append the question + options + **your recommendation** to `decisions.md`
    (use the template's `D<n>` shape).
 2. Set `state.md` → `status: waiting-for-user`, `resume: <phase>`,
-   `open-decision: D<n>`.
+   `open-decision: D<n>`. **Append the transition event** (best-effort, per
+   `events.schema.json`):
+   `{"ts":"<RFC3339>","event":"gate-opened","phase":"<resume phase>","status":"waiting-for-user","note":"D<n>","slug":"<slug>"}`.
+   Gate events use the **events** `phase` vocabulary — if the resume phase in
+   `state.md` is `knowledge` (the fifth phase's skill name), map it to **`report`**
+   in the event's `phase` field (the events enum has `report`, not `knowledge`).
 3. End your turn and ask (use `AskUserQuestion` for clear forks; prose for
    open-ended). The Notification hook pings the user.
 4. On the answer: append a `RESOLVED` block to `decisions.md`, clear
-   `open-decision`, and resume at `state.md`'s `resume` phase.
+   `open-decision`, and resume at `state.md`'s `resume` phase. **Append the
+   transition event** (best-effort, same `knowledge`→`report` phase mapping as in
+   step 2): `{"ts":"<RFC3339>","event":"gate-resolved","phase":"<resume phase>","status":"<resumed status>","note":"D<n>","slug":"<slug>"}`.
 
 ## Resume
 

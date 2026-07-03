@@ -1,0 +1,8 @@
+- **feature:** In progress feature
+- **phase:** review
+- **status:** reviewing
+- **created:** 2026-06-30
+- **iterations:** plan=1 · implement=2 · review=2 · test=0
+- **resume:** review — round 2 open
+- **open-decision:** none
+- **stage:** B of B

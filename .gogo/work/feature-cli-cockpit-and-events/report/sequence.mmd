@@ -1,0 +1,22 @@
+sequenceDiagram
+  actor U as user
+  participant B as board (tui.Model)
+  participant H as huh form (confirm · release name)
+  participant L as internal/launch
+  participant T as tmux session gogo-done-a+b
+  participant C as claude /gogo:done a+b
+  participant G as .gogo/work/feature-* (state.md · events.jsonl)
+  participant W as fsnotify watchSet
+
+  U->>B: space-select ready cards · press d (ship) / m (move)
+  B->>B: attemptAction — classifier guards (legal moves only)
+  B->>H: open form — confirm summary + suggested release name
+  U->>H: Enter/Tab submits (Esc / Ctrl+C aborts + clears selection)
+  H-->>B: huh.StateCompleted (confirm=true via heap-stable *formBinding)
+  B->>L: launcher(intent) — injectable seam, defaults to launch.Launch
+  L->>T: tmux new-session -d -s gogo-done-… (single argv, no shell)
+  T->>C: claude "/gogo:done a+b" — interactive, gates answerable (a attaches)
+  C->>G: phase skills append events.jsonl + update state.md
+  G-->>W: fs change (debounced; watch set re-armed on reload)
+  W-->>B: reloadMsg → LoadRepo → columns + badges refresh
+  Note over B,G: a card moves columns only when the contract files change — never optimistically

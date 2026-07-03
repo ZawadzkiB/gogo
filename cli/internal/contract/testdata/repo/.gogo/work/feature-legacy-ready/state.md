@@ -1,0 +1,6 @@
+- **feature:** Legacy root report layout
+- **phase:** knowledge
+- **status:** done
+- **created:** 2026-06-24
+- **iterations:** plan=1 · implement=1 · review=1 · test=1
+- **resume:** report done

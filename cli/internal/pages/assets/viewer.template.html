@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GOGO_VIEW_TITLE</title>
+  <!-- gogo interactive viewer · self-contained · offline (file://) · vendored assets only, no network -->
+  <link rel="stylesheet" href="GOGO_VIEWER_CSS" />
+</head>
+<body>
+  <main class="report">
+    <!-- summary slot: report.md pre-rendered to readable HTML by gogo-view (D7, no JS md lib) -->
+    <article class="summary">
+GOGO_VIEW_SUMMARY
+    </article>
+
+    <!-- diagrams slot: one figure per .mmd; interactive.js wraps each in a pan/zoom/drag canvas -->
+    <section class="diagrams">
+GOGO_VIEW_DIAGRAMS
+    </section>
+  </main>
+
+  <!-- saved node positions (from <name>.layout.json); empty object when none -->
+  <script>window.GOGO_LAYOUT = GOGO_VIEW_LAYOUT;</script>
+
+  <!-- vendored mermaid, then the viewer modules as ORDERED plain script tags
+       (ES modules and fetch are both blocked over file://; each module attaches
+       to the shared window.gogoViewer namespace). -->
+  <script src="GOGO_MERMAID_SRC"></script>
+  <script src="GOGO_GEOMETRY_SRC"></script>
+  <script src="GOGO_VIEWPORT_SRC"></script>
+  <script src="GOGO_MERMAID_PARSE_SRC"></script>
+  <script src="GOGO_RENDER_SRC"></script>
+  <script src="GOGO_VIEWER_SRC"></script>
+</body>
+</html>

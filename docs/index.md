@@ -97,6 +97,7 @@ compare). Full per-command detail: [Commands](commands.md); the phase mechanics:
 | [Agents](agents.md) | The I/O reference — what each agent consumes and produces |
 | [Discovery](discovery.md) | How `/gogo:build` finds and wires knowledge, and verifies it against code |
 | [Contracts](contracts.md) | The typed artifacts that cross phase boundaries + the validate gate |
+| [CLI contract](cli-contract.md) | The frozen file surface the `gogo` CLI (the Go/Bubble Tea cockpit in `cli/`) reads with no LLM — layout, `state.md` grammar, classifier, events.jsonl |
 | [Architecture](architecture.md) | The two splits and the complete file map |
 
 ## Portability

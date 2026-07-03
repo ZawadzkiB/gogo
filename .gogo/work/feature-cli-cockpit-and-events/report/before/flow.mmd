@@ -1,0 +1,9 @@
+flowchart TD
+  U["/gogo:done · /gogo:view (chat)"]:::proc --> LLM["LLM loads skill, reads files,\nclassifies, renders tables,\nconverts markdown, asks questions"]:::gate
+  LLM -->|"30-60s+ of thinking\nfor read-only work"| OUT["table / picker / built page"]:::out
+  LLM -->|"synthesis (the one real LLM job)"| WR["Write changelog entry"]:::out
+  ST["state.md (current phase only,\nno timestamps, no history)"]:::art -.-> LLM
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

@@ -1,0 +1,13 @@
+{
+  "slug": "2026-07-03-cli-distribution",
+  "updated": "2026-07-03",
+  "note": "Shipped entry for cli-distribution: tag push -> raw GitHub Release binaries + README curl one-liners (otp-cli pattern). before/ = the go-build-only baseline.",
+  "members": ["cli-distribution"],
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "cli-distribution-flow.mmd",
+      "title": "cli-distribution: As-built: tag -> raw release assets -> README curl one-liner"
+    }
+  ]
+}

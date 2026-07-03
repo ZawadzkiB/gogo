@@ -88,6 +88,21 @@ Update `state.md`: phase=implement, status=implementing, bump
 `iterations: implement=<n+1>`. (`issues.json`/`charts/manifest.json`/`result.json`
 are the machine state; `state.md` stays the human-facing file.)
 
+**Append the transition event(s) (telemetry).** Beside this `state.md` write,
+append compact JSON line(s) to `.gogo/work/feature-<slug>/events.jsonl` per
+`events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`). First the
+**entry** event — **plain mode** → `{"ts":"<RFC3339>","event":"phase-started","phase":"implement","status":"implementing","slug":"<slug>"}`;
+**`--issues` mode** (re-entering to fix) →
+`{"ts":"<RFC3339>","event":"fix-round","phase":"implement","status":"implementing","round":<this round>,"slug":"<slug>"}`.
+Then, because `implement/result.json` was written `ok` in ③ (validate-out passed —
+this run hands off to review), the phase's **terminal** event (this skill owns
+`phase-done`/implement; the orchestrator no longer emits it):
+`{"ts":"<RFC3339>","event":"phase-done","phase":"implement","status":"implementing","slug":"<slug>"}`
+(emit it *after* the entry event so ordering reads start → done). A run that stops
+`blocked` in ③ never reaches here, so `phase-done` marks only a successful hand-off.
+Create the file if absent; **best-effort** — never fail the phase if the append
+fails (append-only telemetry; `state.md` stays the human resume file).
+
 ## Return
 
 A concise summary: what you changed (files), what's green, which issues you fixed

@@ -22,11 +22,22 @@ Generated-by: /gogo:build
   `--selftest`; a soft dep (see below).
 - **JSON** — `.claude-plugin/plugin.json` (manifest + version), `marketplace.json`,
   `.mcp.json` (Playwright MCP server).
+- **Go (since 0.10.0)** — the **`gogo` CLI** in `cli/` (module
+  `github.com/ZawadzkiB/gogo/cli`, **Go 1.25**): a deterministic cockpit that
+  parses the `.gogo/` contract files (spec: `docs/cli-contract.md`) — no LLM in
+  the read path. Pinned deps: the Charm stack (**bubbletea**, **bubbles**,
+  **lipgloss**, **glamour**, **huh**) + **goldmark** (md→HTML) + **fsnotify**
+  (live refresh). Viewer assets + `mermaid.min.js` are `go:embed`ded
+  (`cli/internal/pages/assets/`, synced from `assets/` via `make sync-assets`).
 
 ## "Build"
-There is **no compile/build step**. The plugin is consumed as files. The only
+The **markdown plugin** has no compile/build step — it is consumed as files; the
 release action is bumping `version` in `.claude-plugin/plugin.json` so installs
-can detect the update.
+can detect the update. The **CLI** (since 0.10.0) does build:
+`cd cli && go build -o gogo .` (or `make build`); the binary is gitignored.
+Note: `go install ./cli` names the binary after the module tail (`cli`, not
+`gogo`) — use the explicit `-o gogo` build. `gogo --version` mirrors the plugin
+version.
 
 ## Run / install
 - Marketplace: `gogo` → GitHub `ZawadzkiB/gogo`.
@@ -36,9 +47,11 @@ can detect the update.
   + `/reload-plugins`; no marketplace-update needed).
 
 ## Test
-No unit/integration suite (it's a markdown plugin). Verification = **dogfood**:
+The markdown-plugin side has no unit suite — verification = **dogfood**:
 install, then run `/gogo:build`, `/gogo:plan`, `/gogo:go` on a sample repo and
-inspect the produced `.gogo/` artifacts. UI/browser testing for *target* projects
+inspect the produced `.gogo/` artifacts. The **CLI** (since 0.10.0) has a real
+Go suite: `cd cli && gofmt -l . && go vet ./... && go test -race ./...`
+(~50+ tests across contract/tui/launch/pages/diagram + a `gogo status` golden). UI/browser testing for *target* projects
 uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 `testing-tools.md` / `test-strategy.md`.
 

@@ -1,0 +1,9 @@
+{"ts":"2026-07-03T20:43:13Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","note":"plan drafted (2 rounds: goreleaser -> otp-cli pattern)","slug":"cli-distribution"}
+{"ts":"2026-07-03T20:43:13Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","note":"D1=custom otp-cli raw assets; D2=A ride v0.10.0","slug":"cli-distribution"}
+{"ts":"2026-07-03T20:43:13Z","event":"phase-started","phase":"implement","status":"implementing","note":"orchestrator inline: release.yml + README install","slug":"cli-distribution"}
+{"ts":"2026-07-03T20:49:09Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"cli-distribution"}
+{"ts":"2026-07-03T20:49:10Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"0 blockers, 0 majors, 1 minor, 1 nit","slug":"cli-distribution"}
+{"ts":"2026-07-03T20:49:11Z","event":"phase-done","phase":"review","status":"reviewing","slug":"cli-distribution"}
+{"ts":"2026-07-03T20:52:20Z","event":"phase-done","phase":"implement","status":"done","note":"workflow + README built inline; local build loop green","slug":"cli-distribution"}
+{"ts":"2026-07-03T20:52:20Z","event":"phase-started","phase":"report","status":"done","note":"light report bundle","slug":"cli-distribution"}
+{"ts":"2026-07-03T20:52:20Z","event":"phase-done","phase":"report","status":"done","note":"report-complete; first live run = v0.10.0 tag","slug":"cli-distribution"}

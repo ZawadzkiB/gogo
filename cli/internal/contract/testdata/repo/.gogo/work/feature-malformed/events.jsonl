@@ -1,0 +1,5 @@
+{"ts":"2026-06-30T09:00:00Z","event":"phase-started","phase":"implement","status":"implementing"}
+this is not json at all
+{"ts":"not-a-timestamp","event":"round-opened","phase":"review","status":"reviewing","round":1}
+{ broken json ,,,
+{"ts":"2026-06-30T12:00:00Z","event":"phase-done","phase":"review","status":"reviewing","round":2,"future_field":"ignored"}

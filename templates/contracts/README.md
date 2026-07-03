@@ -22,6 +22,7 @@ always run. No new required dependency.
 | `charts-manifest.schema.json` | `charts/manifest.json` | implement ② | review ③, test ④ |
 | `phase-result.schema.json` | `<phase>/result.json` (per run) | every standalone command | orchestrator `go` (Stage B) |
 | `pipeline.schema.json` | `pipeline.json` (feature-level index) | every standalone command | orchestrator `go` (Stage B) |
+| `events.schema.json` | `events.jsonl` (append-only, one object per line) | each phase skill (its phase's events) + orchestrator (gate events) | the `gogo` CLI cockpit (`docs/cli-contract.md`) |
 
 > The feature folder is `.gogo/work/feature-<slug>/`. Paths in the table are
 > relative to it.
@@ -79,6 +80,22 @@ phase entry `{ status, valid, round?, open_issues?, artifacts[] }`. A glanceable
 index of what each phase last produced and whether it is contract-valid. **Stage
 A** may emit it; the orchestrator **consuming** it to drive the loop is **Stage
 B**. `state.md` stays the human-facing phase/status file in both stages.
+
+### `events.schema.json` — the append-only progress stream
+
+One event object per line of a feature's `events.jsonl` (JSON **Lines**, not a
+JSON array): `{ ts, event, phase, status, round?, note?, slug? }` where `event ∈
+{phase-started, plan-accepted, phase-done, round-opened, issues-found, fix-round,
+gate-opened, gate-resolved, shipped}` and `phase ∈ {plan, implement, review,
+test, report, done}`. Each **phase skill appends** one line at its own phase/status
+transitions (it owns *all* of its phase's events), and the **orchestrator appends**
+the two gate events (`gate-opened` / `gate-resolved`) — always **beside** the
+`state.md` write, never instead of it, and each transition **exactly once** by its
+one owner. It is **append-only, best-effort telemetry**: a failed append never fails the
+phase, and a **missing `events.jsonl` is never an error** (older features predate
+it). `state.md` stays the single human resume file; `events.jsonl` adds the
+timeline + rounds a deterministic consumer (the `gogo` CLI) needs for live
+progress and per-item history. The frozen consumer view is `docs/cli-contract.md`.
 
 ## Validating by hand
 

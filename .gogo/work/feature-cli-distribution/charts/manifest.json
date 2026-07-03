@@ -1,0 +1,12 @@
+{
+  "slug": "cli-distribution",
+  "updated": "2026-07-03",
+  "note": "Intended design (otp-cli pattern): tag push -> release.yml -> go test gate -> 4x GOOS/GOARCH go build -> RAW binaries attached to the GitHub Release; README curl one-liners (uname-selected asset) install into ~/bin or /usr/local/bin. No goreleaser/checksums/installer by user decision. As-is baseline (go build only, no CI) in charts/before/.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "charts/release-flow.mmd",
+      "title": "Intended: tag -> raw release assets -> README curl one-liner"
+    }
+  ]
+}

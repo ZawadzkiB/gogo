@@ -1,0 +1,6 @@
+- **feature:** Ready to ship
+- **phase:** knowledge
+- **status:** done
+- **created:** 2026-06-25
+- **iterations:** plan=1 · implement=2 · review=1 · test=1 · report=1
+- **resume:** report — ready for /gogo:done

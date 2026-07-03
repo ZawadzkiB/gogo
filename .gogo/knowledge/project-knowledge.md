@@ -141,3 +141,18 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   `.gogo/work/feature-*` exists (only zero features stops). The chat fallback
   stays ship-focused (`/gogo:view` + `/gogo:go` cover the rest). Command set
   still **12**; version **0.9.0**.
+- **The `gogo` CLI + events telemetry (since 0.10.0):** the repo now also ships a
+  **Go binary** — `cli/` (Go 1.25, Charm stack: bubbletea/bubbles/lipgloss/
+  glamour/huh + goldmark + fsnotify) — a **deterministic cockpit** that opens the
+  4-column board in milliseconds by parsing the contract files directly (**no LLM
+  in the read path**): drill-in terminal viewers (glamour md, issues tables,
+  events timelines, ASCII flowcharts via an internal renderer), a native `w` web
+  page build, and column moves that **launch Claude** (`/gogo:go`, `/gogo:done`)
+  in attachable tmux sessions `gogo-<action>-<slug>` — the CLI never mutates
+  pipeline state. Every feature gains **`events.jsonl`** (append-only telemetry,
+  `templates/contracts/events.schema.json`, RFC3339): **phase skills own their
+  lifecycle events, the orchestrator emits only gate events** — each transition
+  exactly once, beside every state.md write; a missing file is never an error.
+  The frozen consumer spec is **`docs/cli-contract.md`**. Subcommands
+  status/view/events; `gogo --version` mirrors plugin.json. Command set still
+  **12** (the CLI is a binary, not a 13th command); version **0.10.0**.

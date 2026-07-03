@@ -15,9 +15,9 @@
 
 - **feature:** /gogo:done merged changelog entries — ship several related work items as one synthesized release entry
 - **phase:** done        <!-- plan | implement | review | test | knowledge | done -->
-- **status:** done
+- **status:** shipped
 - **created:** 2026-07-02
 - **branch:** main
 - **iterations:** plan=1 · implement=2 · review=2 · test=1 · report=1
-- **resume:** none
+- **resume:** none — shipped to .gogo/changelog/2026-07-03-pipeline-cockpit/
 - **open-decision:** none (D1=custom synthesis-only · D2=A suggest+ask · D3=A post-selection gate)

@@ -1,0 +1,10 @@
+flowchart TD
+  D["/gogo:done (no slug)"]:::proc --> IDX["classify .gogo/work/* (gogo-status)"]:::proc
+  IDX --> B["board.py (tmux)\nspace select · s ship · q cancel\n(ready-to-ship only; no view/go/filter)"]:::gate
+  B -->|"{ship:[...]} exit 0"| SHIP["Write changelog entry\n(separate-vs-merged asked in chat)"]:::out
+  B -->|"exit 1"| STOP["cancel — nothing shipped"]:::out
+  B -->|"exit 2 / launch fail"| FB["fallback: table + multi-select"]:::proc
+  FB --> SHIP
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

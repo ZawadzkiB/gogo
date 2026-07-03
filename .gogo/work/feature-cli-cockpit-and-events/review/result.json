@@ -1,0 +1,42 @@
+{
+  "slug": "cli-cockpit-and-events",
+  "phase": "review",
+  "status": "ok",
+  "round": 3,
+  "inputs": [
+    "plan.md",
+    "docs/cli-contract.md",
+    ".gogo/knowledge/code-review-standards.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    "cli/main.go",
+    "cli/status.go",
+    "cli/view.go",
+    "cli/events.go",
+    "cli/go.mod",
+    "cli/Makefile",
+    "cli/internal/contract/*.go",
+    "cli/internal/launch/launch.go",
+    "cli/internal/tui/*.go",
+    "cli/internal/pages/*.go",
+    "cli/internal/diagram/ascii.go",
+    "cli/internal/textfmt/textfmt.go",
+    "cli/**/*_test.go",
+    "skills/gogo-status/SKILL.md",
+    "skills/gogo-view/SKILL.md",
+    "README.md",
+    "docs/architecture.md",
+    "docs/index.md",
+    ".gitignore",
+    ".claude-plugin/plugin.json"
+  ],
+  "outputs": [
+    "review/issues.json",
+    "review-02.md",
+    "review/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 5,
+  "summary": "Stage B review round 3 (issues.json round 3): APPROVE — no open blockers/majors. Ran gates green (go vet + go test all packages + go build), verified gogo status/events/view against the real repo, a hostile-slug/garbage fixture (no crash, no shell injection, sane exit codes), and an empirical tmux argv probe proving the launch line execs directly with NO shell interpretation. Explicit verdicts: (a) launch injection SAFE — slugs never reach a shell, every launch behind the huh confirm; (b) classifier FAITHFUL to skills/gogo-status verbatim rule order incl. members[]/legacy/changelog-wins; (c) fsnotify/tea concurrency CORRECT — goroutine only signals a channel, model mutates only in Update via reloadMsg; (d) pages FAITHFUL to gogo-view step-3 (figures, before- prefix, compare-by-stem, solo Added/Removed, tokens all replaced, offline, mmd escape round-trips). Embedded assets byte-identical to source; binary gitignored; plugin.json 0.10.0; docs accurate (CLI explicitly not a 13th slash command). 5 new findings, all minor/nit, all AGENT-FIXABLE except REV-012 (needs-user-decision): REV-008 badge prefers latest event over state.md -> stale badge disagreeing with its column (observed live); REV-009 README install wrong twice (Go 1.22+ vs go.mod 1.25.0; 'go install ./cli' binary named cli not gogo); REV-010 fsnotify watch set not re-armed for mid-session new features; REV-011 watcher/goroutine never closed; REV-012 mermaid.min.js committed twice (accept-by-design). Prior REV-001..007 (Stage A) remain verified (spot-check only)."
+}

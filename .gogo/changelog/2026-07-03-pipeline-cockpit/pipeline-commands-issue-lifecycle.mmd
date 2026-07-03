@@ -1,0 +1,15 @@
+stateDiagram-v2
+  [*] --> open: review / test finds it
+  open --> fixed: implement --issues (sets fix_summary)
+  fixed --> verified: re-review confirms
+  fixed --> open: re-review still fails
+  open --> wontfix: user decision
+  open --> new: surfaced this round
+  verified --> [*]
+  wontfix --> [*]
+  note right of open
+    id, title, description
+    severity in {blocker,major,minor,nit}
+    priority in {P0,P1,P2,P3}
+    proposed_solution
+  end note

@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ZawadzkiB/gogo/contracts/events.schema.json",
+  "title": "gogo pipeline event",
+  "description": "One pipeline-telemetry event. A feature's events.jsonl is JSON Lines: ONE object like this per line (a compact JSON object terminated by a newline), NOT a JSON array — parse it line by line, and skip a malformed line rather than failing. A line is appended by the phase skills (each owns its phase's events) and the orchestrator (the two gate events) at every phase/status transition, BESIDE (never instead of) the state.md write, so a deterministic consumer (the gogo CLI) can show live progress and per-item history. It is append-only telemetry: state.md stays the single human resume file, and a MISSING events.jsonl is never an error (older features predate this contract). NOTE on forward-compat: additionalProperties:false here is PRODUCER self-validation at the current schema version — it does NOT govern the consumer. Forward-compatibility relies on the CONSUMER parsing leniently (skipping unknown/invalid lines and ignoring fields it does not recognize, as Go's encoding/json does), never on re-validating each line against this pinned schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ts", "event", "phase", "status"],
+  "properties": {
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 timestamp of the transition (a strict ISO-8601 profile, UTC, e.g. 2026-07-03T14:05:00Z — pinned to what Go's time.RFC3339 parses; a broader ISO-8601 value like '2026-07-03 14:05' is NOT valid). Carries the stream's ordering + timing signal (when implement started, when review round 2 opened, when it bounced back)."
+    },
+    "event": {
+      "type": "string",
+      "description": "Which transition happened. phase-started / phase-done bracket a phase; plan-accepted marks the plan-acceptance moment; round-opened opens an implement/review/test round; issues-found records review/test findings (count in note); fix-round marks implement re-entering to fix an issues list; gate-opened / gate-resolved bracket a user decision gate; shipped marks /gogo:done archiving the changelog entry.",
+      "enum": [
+        "phase-started",
+        "plan-accepted",
+        "phase-done",
+        "round-opened",
+        "issues-found",
+        "fix-round",
+        "gate-opened",
+        "gate-resolved",
+        "shipped"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "description": "The pipeline phase this event belongs to. Note the naming: the state.md `phase` line labels the fifth phase `knowledge` (the gogo-knowledge skill name); events use `report` for that same phase (the consumer-facing name in the flow plan -> implement -> review -> test -> report -> done).",
+      "enum": ["plan", "implement", "review", "test", "report", "done"]
+    },
+    "status": {
+      "type": "string",
+      "description": "The state.md status at emit time — mirrors the `- **status:** <value>` line so the two files never drift. A free string (not an enum) so state.md can evolve its status vocabulary without breaking this contract; the known values are awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | shipped | aborted.",
+      "minLength": 1
+    },
+    "round": {
+      "type": "integer",
+      "description": "The implement/review/test round this event belongs to, when relevant (matches state.md iterations and the review-NN / test-NN snapshot). Omit for single-shot transitions (plan, report, gates, shipped).",
+      "minimum": 1
+    },
+    "note": {
+      "type": "string",
+      "description": "One human-readable line of context (e.g. \"2 blockers, 1 minor\" for issues-found, or the changelog entry path for shipped)."
+    },
+    "slug": {
+      "type": "string",
+      "description": "Optional feature slug (kebab-case, no feature- prefix) so a line is self-describing when copied out of its events.jsonl. When present it matches the enclosing feature folder; when absent the folder path is the source of truth. Recommended but not required.",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    }
+  }
+}

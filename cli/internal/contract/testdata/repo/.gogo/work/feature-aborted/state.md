@@ -1,0 +1,6 @@
+- **feature:** Aborted feature
+- **phase:** plan
+- **status:** aborted
+- **created:** 2026-06-15
+- **iterations:** plan=1
+- **resume:** none — aborted

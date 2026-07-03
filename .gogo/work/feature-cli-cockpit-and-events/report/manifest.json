@@ -1,0 +1,9 @@
+{
+  "slug": "cli-cockpit-and-events",
+  "updated": "2026-07-03",
+  "note": "As-built set for v0.10.0. flow = the intended-design chart retained verbatim (implement round 3 confirmed no drift): deterministic Go contract reader -> bubbletea board -> drill-in viewers / goldmark web page, with column moves launching claude /gogo:go|/gogo:done in tmux and the appended events.jsonl closing the fsnotify refresh loop. sequence = the move-launches-claude runtime loop as actually shipped (board -> huh confirm with heap-stable binding -> injectable launcher -> single-argv tmux claude session -> skills append events.jsonl -> debounced re-armed fsnotify -> board refresh) — the interaction TEST-001/002 hardened. Plan-time as-is baseline copied to report/before/ (renamed to the kind stem flow.mmd so before/after pair by filename). No diagrams.html in this bundle (0.8.0 slim rule; /gogo:view builds the page from source).",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "As-built: gogo CLI cockpit — deterministic reader, Claude executor, events telemetry" },
+    { "kind": "sequence", "file": "report/sequence.mmd", "title": "As-built: a column move launches Claude — huh confirm → tmux session → events.jsonl → fsnotify refresh" }
+  ]
+}

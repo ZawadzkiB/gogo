@@ -45,6 +45,25 @@ Generated-by: /gogo:build
   (detected at use; graceful fallback) and **never commits compiled bytecode**
   (`__pycache__/`, `*.pyc` are gitignored).
 
+## Go code in `cli/` (since 0.10.0)
+- **Gates before hand-off:** `gofmt -l .` clean · `go vet ./...` clean ·
+  `go test -race ./...` green. Non-negotiable for any `cli/` change.
+- **The CLI stays a deterministic reader.** It parses the frozen contract
+  (`docs/cli-contract.md`) leniently (skip bad lines, degrade on garbage — never
+  crash) and **never mutates pipeline state** — every state-changing action
+  launches Claude (`/gogo:go`, `/gogo:done`).
+- **Injection safety:** spawned commands are a **single argv element, no shell**
+  (tmux/exec direct); slugs must never reach a shell.
+- **Injectable seams for launch-class side effects** (e.g. `Model.launcher`
+  defaulting to `launch.Launch`) so tests can assert fire-exactly-once without
+  spawning anything.
+- **Bubbletea gotcha (recorded, TEST-001):** the Model is a **value type copied
+  on every Update** — never bind library pointers (`huh` `.Value(&m.field)`)
+  into it; put mutable form/dialog targets behind a **heap-stable pointer**
+  (e.g. `*formBinding`) shared across copies. And forward **every** `tea.Msg`
+  (not just `KeyMsg`) to an active child component — async protocols like huh's
+  `nextFieldMsg` die silently otherwise.
+
 ## Style
 - Plain ASCII where practical; the phase glyphs `①②③④⑤` are an intentional exception.
 - Bash hooks: `set -euo pipefail`, best-effort (`|| true`), silent no-op when a

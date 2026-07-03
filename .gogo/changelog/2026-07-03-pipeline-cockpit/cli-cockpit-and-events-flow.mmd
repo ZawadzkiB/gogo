@@ -1,0 +1,15 @@
+flowchart TD
+  U["user terminal: gogo"]:::proc --> RD["contract reader (Go)\n.gogo/work/* + changelog/*\nstate.md · manifests · issues · events.jsonl"]:::art
+  RD --> BRD["board TUI (bubbletea)\nplan | in progress | ready | changelog\n/ filter · badges: review r2 · waiting-for-user"]:::gate
+  BRD -->|enter| FILES["item file list\nplan · report · decisions · issues · events"]:::proc
+  FILES -->|open| TERM["glamour viewer (in terminal)"]:::out
+  FILES -->|w| WEB["goldmark page build → browser\n(compare pairing, no LLM)"]:::out
+  BRD -->|"move plan→implement"| GO["launch: claude '/gogo:go slug'\n(tmux session gogo-go-slug)"]:::proc
+  BRD -->|"move ready→changelog\n(multi = one merged entry)"| DONE["launch: claude '/gogo:done a+b+c'\n(tmux session gogo-done-…)"]:::proc
+  GO --> PIPE["pipeline runs; skills append\nevents.jsonl + update state.md"]:::art
+  DONE --> PIPE
+  PIPE -->|fsnotify| BRD
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

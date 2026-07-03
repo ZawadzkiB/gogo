@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cli-cockpit-and-events</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cli-cockpit-and-events</code></h1>
+    <p class="hint">Offline viewer · mermaid vendored at .gogo/resources · regenerate via gogo-mermaid.</p>
+  </header>
+
+  <h2>Intended: gogo CLI cockpit — deterministic reader, Claude executor, events telemetry</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  U["user terminal: gogo"]:::proc --> RD["contract reader (Go)\n.gogo/work/* + changelog/*\nstate.md · manifests · issues · events.jsonl"]:::art
+  RD --> BRD["board TUI (bubbletea)\nplan | in progress | ready | changelog\n/ filter · badges: review r2 · waiting-for-user"]:::gate
+  BRD -->|enter| FILES["item file list\nplan · report · decisions · issues · events"]:::proc
+  FILES -->|open| TERM["glamour viewer (in terminal)"]:::out
+  FILES -->|w| WEB["goldmark page build → browser\n(compare pairing, no LLM)"]:::out
+  BRD -->|"move plan→implement"| GO["launch: claude '/gogo:go slug'\n(tmux session gogo-go-slug)"]:::proc
+  BRD -->|"move ready→changelog\n(multi = one merged entry)"| DONE["launch: claude '/gogo:done a+b+c'\n(tmux session gogo-done-…)"]:::proc
+  GO --> PIPE["pipeline runs; skills append\nevents.jsonl + update state.md"]:::art
+  DONE --> PIPE
+  PIPE -->|fsnotify| BRD
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  </pre></div>
+
+  <h2>Before (as-is): LLM in the hot path of read-only work; no pipeline telemetry</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  U["/gogo:done · /gogo:view (chat)"]:::proc --> LLM["LLM loads skill, reads files,\nclassifies, renders tables,\nconverts markdown, asks questions"]:::gate
+  LLM -->|"30-60s+ of thinking\nfor read-only work"| OUT["table / picker / built page"]:::out
+  LLM -->|"synthesis (the one real LLM job)"| WR["Write changelog entry"]:::out
+  ST["state.md (current phase only,\nno timestamps, no history)"]:::art -.-> LLM
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from ../../../resources/mermaid.min.js — re-run gogo-mermaid.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "slug": "cli-distribution",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-03",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "CI release gate runs `go test ./...` without `-race`",
+      "description": ".github/workflows/release.yml `test` step runs `go test ./...` (no `-race`). This is the ONLY automated gate before the release binaries publish. coding-rules.md (Go code in cli/) names `go test -race ./...` non-negotiable for any cli/ change, and the CLI is concurrent (bubbletea value-copy Model + fsnotify watcher \u2014 the exact class of bug TEST-001 records), where the race detector earns its keep. Note: plan.md FR1 explicitly names `go test ./...` as 'the one gate', so the implementation is plan-faithful \u2014 this flags a standards tension, not a plan deviation. Non-blocking.",
+      "proposed_solution": "AGENT-FIXABLE. Change the `test` step to `go test -race ./...`. It stays a single gate (no new step), strengthens it, and works on ubuntu-latest (gcc present so the race detector's CGO requirement is met; the `CGO_ENABLED=0` lives only on the separate build step and is unaffected). If the user prefers the plan's literal `go test ./...`, mark wontfix.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fix_summary": "Workflow gate now `go test -race ./...`. [orchestrator-fixed inline + verified: YAML parses, README renders]",
+      "fixed_in_round": 2
+    },
+    {
+      "id": "REV-002",
+      "title": "No-sudo curl one-liner installs to `~/bin` with no PATH reminder",
+      "description": "README.md 'The gogo CLI' install, the no-sudo one-liner (lines ~281-283), drops the binary into `~/bin` but never tells the user to ensure `~/bin` is on PATH. On a fresh machine `~/bin` is commonly not on PATH, so running `gogo` right after install yields 'command not found' \u2014 a first-run footgun. The sudo variant targets `/usr/local/bin` (already on PATH) so it is unaffected. Confirmed: README contains no 'PATH' mention.",
+      "proposed_solution": "AGENT-FIXABLE. Add a one-line note after the no-sudo block, e.g. 'ensure `~/bin` is on your PATH (add `export PATH=\"$HOME/bin:$PATH\"` to your shell rc)'. Matches the otp-cli house pattern without changing the command.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fix_summary": "PATH note added under the ~/bin one-liner. [orchestrator-fixed inline + verified: YAML parses, README renders]",
+      "fixed_in_round": 2
+    }
+  ]
+}

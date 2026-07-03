@@ -124,11 +124,23 @@ gogo/
 │   ├── skills-index.template.md  # scaffold for .gogo/skills/index.md
 │   ├── state.template.md  decisions.template.md  report.template.md
 ├── hooks/                    # config-check.sh, notify.sh, hooks.json (best-effort)
+├── cli/                      # the `gogo` CLI — a Go/Bubble Tea cockpit (NOT a slash
+│   │                         #   command; a separate binary): deterministic reader of
+│   │                         #   the cli-contract, kanban board, terminal viewers,
+│   │                         #   Claude-launching moves. `cd cli && go build -o gogo .`
+│   ├── main.go + status/view/events   #   root board + non-interactive subcommands
+│   ├── internal/contract/    #   parse state.md/manifests/issues/events + the classifier
+│   ├── internal/pages/       #   goldmark `w` page builder (+ go:embed of assets/viewer +
+│   │                         #   mermaid.min.js; re-sync via `make sync-assets`)
+│   ├── internal/tui/         #   bubbletea board · drill-in · glamour/huh
+│   ├── internal/{launch,diagram,textfmt}/  # tmux/claude spawn · mmd→ASCII · shared formatters
+│   └── go.mod / go.sum       #   pinned deps (binary is gitignored, built from source)
 ├── assets/
 │   ├── mermaid/              #   vendored mermaid.min.js + viewer.template.html
 │   ├── viewer/               #   the interactive viewer (modular, vanilla, no build):
 │   │   │                     #   geometry.js · viewport.js · mermaid-parse.js ·
 │   │   │                     #   render.js · interactive.js · viewer.css · viewer.template.html
+│   │   │                     #   (also go:embed-copied into cli/internal/pages/assets/)
 │   └── kanban/              #   board.py — vendored python3 curses TUI for the /gogo:done work board (soft dep; --selftest headless)
 ├── .mcp.json                 # Playwright MCP (optional; UI testing)
 └── .claude-plugin/
@@ -153,6 +165,7 @@ your-project/
 │           ├── adjustments.md     # log of changes/clarifications during planning                 [① writes]
 │           ├── state.md           # current phase/status/iterations — lets work resume            [every phase]
 │           ├── decisions.md       # forks that needed your call + recommendation + answer          [gates]
+│           ├── events.jsonl       # append-only progress telemetry — one JSON line per phase transition (read by the gogo CLI)  [every transition]
 │           ├── review/issues.json # living, typed review findings (the contract)                  [③ writes, ② reads]
 │           ├── review-NN.md        # each review round's rendered snapshot                          [③ writes]
 │           ├── test/issues.json    # living, typed test findings (same contract)                   [④ writes, ② reads]

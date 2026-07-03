@@ -1,0 +1,8 @@
+{
+  "slug": "cli-distribution",
+  "updated": "2026-07-03",
+  "note": "As-is baseline (before): the only install path is building from source with a local Go toolchain; no releases, no CI, version hardcoded.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/before/current-install.mmd", "title": "Before: go build from source is the only path" }
+  ]
+}

@@ -46,6 +46,20 @@ Generated-by: /gogo:build
   `manifest.json` (+ `before/`) — never a full-report copy and never a
   `diagrams.html` duplicate. The full audit trail stays in `.gogo/work/` (linked);
   the interactive page is built from source by `/gogo:view`.
+- **Second sanctioned vendored mermaid copy (since 0.10.0, REV-012 accepted):**
+  `cli/internal/pages/assets/mermaid.min.js` duplicates
+  `assets/mermaid/mermaid.min.js` (~3.3 MB) because `go:embed` requires the file
+  inside the module — the price of a standalone `go install`-able binary. Kept
+  byte-identical via `make sync-assets` (the `assets/` copy is the source of
+  truth). Exactly these two copies; never a third.
+
+## Performance (since 0.10.0 — the CLI bar)
+- **The read path is deterministic and LLM-free.** Managing/viewing existing work
+  (board, status, view, events) must start in **milliseconds** — the `gogo` CLI
+  parses the contract files directly; an LLM in a read-only path is a regression.
+- The LLM appears only where it adds value — pipeline execution and changelog
+  synthesis — and is *launched* by the cockpit (`claude` in tmux), never awaited
+  inline for reads.
 
 ## gogo overrides
 <!-- Preserved across re-runs. -->

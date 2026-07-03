@@ -47,6 +47,13 @@ bad input.
      MCP (`browser_*` tools — real flows + exploration + screenshots), **CLI**
      via shell, **API** via HTTP,
    - adds/extends e2e tests for the new behaviour.
+
+   **Append the round-open event (telemetry).** As round `NN` opens, append one
+   compact JSON line to `.gogo/work/feature-<slug>/events.jsonl` per
+   `events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`):
+   `{"ts":"<RFC3339>","event":"round-opened","phase":"test","status":"testing","round":NN,"slug":"<slug>"}`.
+   Create the file if absent; **best-effort** — never fail the phase if the append
+   fails (append-only telemetry; `state.md` stays the human resume file).
 3. **Update the living `test/issues.json`** (the contract — D1/D2, same shape as
    review's). For this round:
    - **New issue** → append with a fresh stable `id` (e.g. `TEST-004`),
@@ -56,6 +63,10 @@ bad input.
    - **Prior `open`/`new` still failing** → leave `open`.
    - Never renumber/reuse ids; resolved issues stay for the audit trail. Bump the
      file's `round` to `NN` and `updated` to today.
+
+   **If this round has any `open`/`new` issues, append the findings event**
+   (best-effort, per `events.schema.json`):
+   `{"ts":"<RFC3339>","event":"issues-found","phase":"test","status":"testing","round":NN,"note":"<e.g. 1 blocker>","slug":"<slug>"}`.
 4. **Render the human snapshot** `test-NN.md`: what was exercised (UI/CLI/API),
    results, new/extended tests, and this round's issues with id/severity/priority/
    status. The JSON is the contract; the markdown is the readable companion.
@@ -83,6 +94,15 @@ Decide purely on the **issues list** (count of `open`/`new`):
 Update `state.md`: phase=test, status=testing, bump `iterations: test=<n+1>` each
 round. (`issues.json`/`result.json` are the machine state; `state.md` stays the
 human-facing file.)
+
+**Append the terminal event (telemetry).** Only when the feature is **all-green**
+(no `open`/`new` issues — advancing to ⑤ report), append one compact JSON line to
+`.gogo/work/feature-<slug>/events.jsonl` per `events.schema.json`
+(`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`) — this skill owns `phase-done`/test
+(the orchestrator no longer emits it):
+`{"ts":"<RFC3339>","event":"phase-done","phase":"test","status":"testing","slug":"<slug>"}`.
+A round that loops back to implement or escalates to re-planning is **not** a
+`phase-done`. Best-effort — never fail the phase if the append fails.
 
 ## Degradation (portability)
 

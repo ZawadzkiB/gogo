@@ -264,6 +264,73 @@ shippable.
 Resumes a feature that paused for your decision, folding your answer into
 `decisions.md` and continuing the loop.
 
+## The gogo CLI
+
+An **instant, deterministic cockpit** for your pipeline — a native **`gogo`
+binary** (Go + Bubble Tea, in `cli/`) that opens a kanban board in milliseconds
+by **parsing the contract files the plugin already writes** ([the CLI
+contract](https://zawadzkib.github.io/gogo/cli-contract.html)) with **no LLM in
+the read path**. It is a companion binary, **not** a 13th slash command — the
+slash commands stay the pipeline engine; the CLI is the read/launch cockpit.
+
+**Install** — grab the prebuilt binary from the GitHub release (no Go needed;
+the `uname` bits pick the right asset — darwin/linux × arm64/amd64):
+
+```bash
+# into ~/bin (no sudo)
+mkdir -p ~/bin && \
+curl -fsSL "https://github.com/ZawadzkiB/gogo/releases/latest/download/gogo-$(uname -s | tr 'A-Z' 'a-z')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" -o ~/bin/gogo && \
+chmod +x ~/bin/gogo
+```
+
+(If `gogo` isn't found afterwards, add `~/bin` to your PATH:
+`export PATH="$HOME/bin:$PATH"` in your shell rc.)
+
+```bash
+# or system-wide (sudo)
+curl -fsSL "https://github.com/ZawadzkiB/gogo/releases/latest/download/gogo-$(uname -s | tr 'A-Z' 'a-z')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" -o /tmp/gogo && \
+sudo mv /tmp/gogo /usr/local/bin/gogo && sudo chmod +x /usr/local/bin/gogo
+```
+
+Pin a version by replacing `latest/download` with `download/vX.Y.Z`. Assets:
+`gogo-darwin-arm64` · `gogo-darwin-amd64` · `gogo-linux-amd64` ·
+`gogo-linux-arm64` (built + attached by `.github/workflows/release.yml` on
+every `v*` tag).
+
+**Or build from source** (needs Go 1.25+, matching `cli/go.mod`):
+
+```bash
+cd cli && go build -o gogo .
+# `go install ./cli` also works, but names the binary after the module tail
+# (`cli`, not `gogo`) — rename it, or prefer the explicit `-o gogo` build above.
+```
+
+**What it does:**
+
+- **Board** (`gogo`) — four columns **plan · in progress · ready · changelog**
+  from the ported work-index classifier; cards are your feature folders with a
+  live sub-phase badge (`review r2`, `waiting-for-user`, `running`). `/` filters
+  live; **fsnotify** refreshes the board while the pipeline runs.
+- **Drill-in** (`enter`) — browse a feature's files **in the terminal**:
+  markdown via **glamour**, `issues.json` as a table, `events.jsonl` as a
+  timeline, `.mmd` diagrams as ASCII (flowchart-family) or source; `w` builds
+  the interactive HTML page natively (goldmark, before/after compare) and opens
+  the browser; `G` opens the file in `glow` when installed.
+- **Moves launch Claude** — `m` on a plan/in-progress card runs
+  `claude "/gogo:go <slug>"`; selecting ready cards (`space`) and pressing `m`/`d`
+  runs `claude "/gogo:done a+b+c"` (multiple = ONE merged entry) — always behind a
+  confirmation, in an attachable **tmux** session (`a` attaches; gates stay
+  answerable). The CLI **never mutates pipeline state** — a card moves columns
+  only when the contract files actually change.
+- **Scriptable** — `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
+  `gogo events <slug>`, `gogo --version` (mirrors the plugin).
+
+**Soft deps** (detected at use, graceful fallback): `tmux` (else backgrounded
+`claude -p` + log), `claude` (needed only to launch), `glow` (the built-in
+glamour view is the fallback). Keymap: `←→` columns · `↑↓` cards · `space`
+select · `enter` drill-in · `v` view · `w` web · `m` move · `d` ship · `a`
+attach · `/` filter · `G` glow · `q` quit.
+
 ## Agents
 
 - **`gogo`** — the orchestrator: owns the flow/loop, knows what to run when, and
@@ -307,6 +374,7 @@ work-index, and the board-intent). Offline, no network, no build.
 | `review-NN.md` | Each code-review round's rendered snapshot of `issues.json` |
 | `test/issues.json` | The living, typed test findings (same contract) |
 | `test-NN.md` | Each test round's rendered snapshot |
+| `events.jsonl` | Append-only progress telemetry — one JSON line per phase transition (schema'd), read by the `gogo` CLI cockpit; a missing file is never an error |
 | `report/` | The as-built bundle (written at report phase): `report/report.md` (planned-vs-shipped, implementation, decisions + reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`. This is the full audit trail; `/gogo:done` **synthesizes** a high-level entry from it into `.gogo/changelog/<date>-<name>/` (it does not copy the bundle) |
 | `charts/` | Mermaid diagrams (`.mmd`) + `charts/before/` (the plan-time as-is baseline) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement as-built flow / sequence / class / activity set |
 

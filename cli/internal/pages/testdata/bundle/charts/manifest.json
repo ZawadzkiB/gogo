@@ -1,0 +1,4 @@
+{ "slug": "sample", "diagrams": [
+  { "kind": "flow", "file": "charts/flow.mmd", "title": "Sample flow" },
+  { "kind": "sequence", "file": "charts/sequence.mmd", "title": "Sample sequence" }
+] }

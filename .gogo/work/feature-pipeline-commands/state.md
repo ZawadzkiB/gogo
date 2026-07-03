@@ -13,9 +13,9 @@
 
 - **feature:** Composable, validatable pipeline commands (typed phase commands + validation gates)
 - **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** done   <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
+- **status:** shipped   <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | done | aborted -->
 - **created:** 2026-06-24
 - **branch:** main
 - **iterations:** plan=0 · implement=2 · review=2 (APPROVE) · test=2 (GREEN)
-- **resume:** none           <!-- Stage A complete; report.md written. Stage B (go chaining) is a separate feature. -->
+- **resume:** none — shipped to .gogo/changelog/2026-07-03-pipeline-cockpit/ <!-- Stage A complete; Stage B (go chaining) is a separate feature. -->
 - **open-decision:** none    <!-- D1–D7 resolved as recommended (user, 2026-06-24) -->

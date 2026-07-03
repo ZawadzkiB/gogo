@@ -1,0 +1,8 @@
+{
+  "slug": "cli-distribution",
+  "updated": "2026-07-03",
+  "note": "As-built set: the release flow shipped exactly as the round-2 intended design (raw assets, otp-cli pattern). Before baseline (go-build-only install) in report/before/, kind-named for stem pairing.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "As-built: tag -> raw release assets -> README curl one-liner" }
+  ]
+}

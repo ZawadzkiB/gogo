@@ -190,6 +190,16 @@ difference is 1 vs N members; there is no divergent single-vs-merged code path.
    (leave `phase: done`). This is what lets `/gogo:status` and the board treat a merged
    entry's members as shipped even though the folder is named after the release.
 
+   **Append the ship event (telemetry).** Beside each member's `state.md` write,
+   append one compact JSON line to that member's
+   `.gogo/work/feature-<member-slug>/events.jsonl` per `events.schema.json`
+   (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`):
+   `{"ts":"<RFC3339>","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/<date>-<name>/","slug":"<member-slug>"}`
+   (for a merged entry the `note` may also list the members). `shipped` is the done
+   phase's **terminal** event — this skill owns it and there is no `phase-done`/done.
+   Create the file if absent; **best-effort** — never fail `/gogo:done` if the append
+   fails (append-only telemetry; `state.md` stays the human resume file).
+
 6. **Build the interactive viewer page for the entry (FR10, best-effort).** Reuse the
    **`gogo-view` build** — don't reimplement it — so the entry gets the same xplan-style
    interactive page (draggable token-styled node cards + owned edge layer + minimap for

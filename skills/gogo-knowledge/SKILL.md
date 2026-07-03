@@ -55,6 +55,17 @@ Phase ⑤ has two gates; they differ **only here**, in what they require to run.
 `plan.md` is missing → **STOP** (there is no contract to report against).
 
 ## Steps
+
+**Append the phase-start event (telemetry).** As phase ⑤ begins, append one
+compact JSON line to `.gogo/work/feature-<slug>/events.jsonl` per
+`events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`):
+`{"ts":"<RFC3339>","event":"phase-started","phase":"report","status":"<state.md status at entry>","slug":"<slug>"}`.
+Create the file if absent; **best-effort** — never fail the phase if the append
+fails (append-only telemetry; `state.md` stays the human resume file). Note events
+call this phase `report` even though `state.md` labels it `knowledge`. This skill
+owns both `phase-started`/report and `phase-done`/report (below); the orchestrator
+emits neither.
+
 1. **Finalize the plan.** Update `.gogo/work/feature-<slug>/plan.md` to the as-built
    state (what actually shipped vs the original).
    - **Strict (green run):** set `state.md` phase=done, status=done, resume=none.
@@ -126,6 +137,9 @@ Phase ⑤ has two gates; they differ **only here**, in what they require to run.
      **reason** it was made.
    - **Review outcome**, **test outcome**, the **diagrams** (link `./diagrams.html`,
      same folder), **knowledge updates**, and **follow-ups**.
+   - **Summary (TL;DR)** — the FINAL section (`## Summary (TL;DR)`, at the very
+     end): a few bold-led lines closing the report — **what shipped**, the review
+     and test **verdicts** (one line each), and a pointer to the **follow-ups**.
    - **Before / after comparison** (FR8) — if a `report/before/` set exists, add a
      comparison section: for each kind present in **both** the before and after sets,
      show the two diagrams **side by side** (fenced mermaid blocks — before then
@@ -141,13 +155,16 @@ Phase ⑤ has two gates; they differ **only here**, in what they require to run.
    **Write it like a readable article (FR3 — legibility, keep the sections above).**
    `report.md` is what `/gogo:view` and the changelog surface to a human, so author
    it to be *read*, not just recorded — phrasing/emphasis only, **not** new sections
-   (D4=A):
+   beyond the closing `## Summary (TL;DR)` (D4=A):
    - **Lead each section with a 1-2 sentence summary** (open the report with a crisp
      "what shipped and why") before the detail.
    - **Short, scannable sections** — tight paragraphs, lists, and tables over walls
      of text.
    - **Bold the decisions, outcomes, and key terms** so a skim surfaces them.
    - Plain language; define a term once, then reuse it.
+   - **Close with `## Summary (TL;DR)`** — the final section: what shipped, the
+     review/test verdicts (one line each), and a follow-ups pointer, so a skim of
+     just the opening lead and this closing block conveys the whole report.
    The viewer renders this with article typography (readable measure, styled
    headings, a lead paragraph, visible emphasis).
 4. **Update gogo-owned knowledge — never the originals.** Walk `.gogo/knowledge/*`
@@ -181,3 +198,10 @@ clean run → phase=done, status=done, resume=none; a lenient/past-broken run �
 leave `phase`/`status` at their real pre-report values (never `done`) and update
 only `resume:` with an honest report-only + gaps note. In lenient mode,
 `result.json`'s `summary` should name the gaps.
+
+**Append the phase-done event (telemetry).** Beside that `state.md` write, append
+one line to `.gogo/work/feature-<slug>/events.jsonl` (best-effort, per
+`events.schema.json`) mirroring the status just written — clean green run →
+`{"ts":"<RFC3339>","event":"phase-done","phase":"report","status":"done","slug":"<slug>"}`;
+a lenient/past-broken run → the same with `status` set to the honest pre-report
+value (never `done`).

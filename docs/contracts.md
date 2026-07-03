@@ -25,6 +25,7 @@ All live in the feature folder `.gogo/work/feature-<slug>/`.
 | `charts-manifest.schema.json` | `charts/manifest.json` | implement ② | review ③, test ④ |
 | `phase-result.schema.json` | `<phase>/result.json` (per run) | every standalone command | orchestrator `go` |
 | `pipeline.schema.json` | `pipeline.json` (feature-level index) | every standalone command | orchestrator `go` |
+| `events.schema.json` | `events.jsonl` (append-only, one object per line) | each phase skill (its phase's events) + orchestrator (gate events) | the `gogo` CLI cockpit (`docs/cli-contract.md`) |
 
 ### `issues-list.schema.json` — the living issues list
 
@@ -73,6 +74,17 @@ validate-out gates passed.
 phase entry `{ status, valid, round?, open_issues?, artifacts[] }` — a glanceable
 index of what each phase last produced and whether it is contract-valid.
 `state.md` stays the human-facing phase/status file alongside it.
+
+### `events.schema.json` — the append-only progress stream
+
+One event object per line of a feature's `events.jsonl` (JSON **Lines**, not a JSON
+array): `{ ts, event, phase, status, round?, note?, slug? }`. **Unlike the schemas
+above, it is not a cross-phase hand-off gate** — it is **append-only, best-effort
+telemetry** appended beside each `state.md` write (a failed append never fails the
+phase; a missing `events.jsonl` is never an error). Each phase skill owns its
+phase's events and the orchestrator owns the two gate events, so every transition is
+emitted **exactly once**. Its consumer is the deterministic `gogo` CLI cockpit, not
+another pipeline phase; the frozen consumer view is `docs/cli-contract.md`.
 
 ## The validate gate
 

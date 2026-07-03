@@ -1,0 +1,11 @@
+{
+  "phase": "report",
+  "status": "ok",
+  "round": 1,
+  "slug": "cli-distribution",
+  "inputs": ["plan.md", "decisions.md", "review/issues.json", "charts/manifest.json"],
+  "outputs": ["report/report.md", "report/flow.mmd", "report/manifest.json", "report/before/flow.mmd", "report/before/manifest.json", "report/result.json"],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Small-feature report: otp-cli-pattern release workflow + README curl install, review APPROVE with 2 lows fixed inline; first live Actions run deferred to the v0.10.0 tag push."
+}

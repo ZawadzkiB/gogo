@@ -46,6 +46,13 @@ contract error; do not review on bad input.
 
    The reviewer reads `code-review-standards.md`, `coding-rules.md`, and
    `non-functional-requirements.md` and produces its findings.
+
+   **Append the round-open event (telemetry).** As round `NN` opens, append one
+   compact JSON line to `.gogo/work/feature-<slug>/events.jsonl` per
+   `events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`):
+   `{"ts":"<RFC3339>","event":"round-opened","phase":"review","status":"reviewing","round":NN,"slug":"<slug>"}`.
+   Create the file if absent; **best-effort** — never fail the phase if the append
+   fails (append-only telemetry; `state.md` stays the human resume file).
 2. **Update the living `review/issues.json`** (the contract — D1/D2). For this round:
    - **New finding** → append an issue with a fresh stable `id` (e.g. `REV-007`),
      `origin: review`, `found_in_round: NN`, `status: new`, and all FR4 fields
@@ -56,6 +63,10 @@ contract error; do not review on bad input.
    - **Prior `open`/`new` still unaddressed** → leave `open`.
    - Never renumber or reuse an id; resolved issues stay for the audit trail.
    - Bump the file's top-level `round` to `NN` and `updated` to today.
+
+   **If this round has any `open`/`new` findings, append the findings event**
+   (best-effort, per `events.schema.json`):
+   `{"ts":"<RFC3339>","event":"issues-found","phase":"review","status":"reviewing","round":NN,"note":"<e.g. 2 blockers, 1 minor>","slug":"<slug>"}`.
 3. **Render the human snapshot** `review-NN.md` from this round's issues (the
    audit view): per finding, its id, severity/priority, status, the finding and
    proposed fix; plus the verdict (clean vs has-open). The JSON is the contract;
@@ -84,6 +95,15 @@ Decide purely on the **issues list** (count of `open`/`new`):
 Update `state.md`: phase=review, status=reviewing, bump `iterations: review=<n+1>`
 each round. (`issues.json`/`result.json` are the machine state; `state.md` stays
 the human-facing file.)
+
+**Append the terminal event (telemetry).** Only when this round is **clean** (no
+`open`/`new` blockers/majors — review is done and advancing to ④ test), append one
+compact JSON line to `.gogo/work/feature-<slug>/events.jsonl` per
+`events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`) — this skill
+owns `phase-done`/review (the orchestrator no longer emits it):
+`{"ts":"<RFC3339>","event":"phase-done","phase":"review","status":"reviewing","slug":"<slug>"}`.
+A round that loops back to implement or opens a decision gate is **not** a
+`phase-done`. Best-effort — never fail the phase if the append fails.
 
 ## If browser/agent delegation is unavailable
 

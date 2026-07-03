@@ -1,0 +1,8 @@
+{
+  "slug": "cli-cockpit-and-events",
+  "updated": "2026-07-02",
+  "note": "As-is baseline (before): managing/viewing work goes through the LLM in chat — /gogo:done and /gogo:view load skills, classify, render, convert and ask interactively (slow for read-only operations); state.md records only the current phase, with no timestamps or transition history for any external observer.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/before/current-llm-hot-path.mmd", "title": "Before: LLM in the hot path of read-only work; no pipeline telemetry" }
+  ]
+}

@@ -1,0 +1,2 @@
+{ "slug": "big-release", "updated": "2026-06-17", "members": ["shipped-by-members", "other-thing"],
+  "diagrams": [ { "kind": "flow", "file": "big-release-flow.mmd", "title": "Release flow" } ] }

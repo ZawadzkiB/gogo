@@ -1,0 +1,11 @@
+flowchart TD
+  T["git push tag vX.Y.Z"]:::proc --> GH["GitHub Actions: release.yml"]:::proc
+  GH --> GATE["go test gate"]:::gate
+  GATE --> B["4x GOOS/GOARCH go build\n(raw binaries: gogo-darwin-arm64 ...)"]:::art
+  B --> REL[/"GitHub Release vX.Y.Z\nraw assets (the otp-cli pattern)"/]:::out
+  U["user: README curl one-liner\n(uname picks the asset)"]:::proc --> BIN["~/bin/gogo (or /usr/local/bin)\n+ chmod +x -- board anywhere"]:::out
+  REL --> U
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

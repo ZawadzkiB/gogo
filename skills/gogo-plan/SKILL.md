@@ -29,18 +29,26 @@ description: >-
    - **Changes checklist** — files to add/modify, in build order
    - **Tests** — what will be verified, at which level
    - **Out of scope**
+   - **Summary (TL;DR)** — the FINAL section (`## Summary (TL;DR)`, at the very
+     end): 3-5 bold-led lines that close the plan — **what** is being built,
+     **why**, the **chosen approach**, and **what happens next**. A skimmer who
+     reads only this should get the whole shape.
    - `Status: awaiting acceptance`
 
    Design **within** the bars in `non-functional-requirements.md`.
 
    **Write it like a readable article (FR3 — legibility, keep the sections above).**
    `plan.md` is viewable in `/gogo:view` (see Step 4), so author it for a human
-   reader — this is phrasing/emphasis only, **not** new sections (D4=A):
+   reader — this is phrasing/emphasis only, **not** new sections beyond the
+   closing `## Summary (TL;DR)` (D4=A):
    - **Lead with a 1-2 sentence summary** of the goal/approach before the detail.
    - **Short, scannable sections** — a few tight paragraphs, never walls of text.
    - **Bold the decisions, outcomes, and key terms** so a skim surfaces them.
    - Prefer **lists and tables** over long prose runs; plain language; define a
      term once, then reuse it.
+   - **Close with `## Summary (TL;DR)`** — the final section: 3-5 bold-led lines
+     (what's being built · why · the chosen approach · what happens next), so a
+     reader who skims only the lead and this closing block still gets the plan.
    The viewer renders this with article typography (readable measure, styled
    headings, a lead paragraph, visible emphasis).
 4. **Draw the intended design** (not the task list). Use the `gogo-mermaid` skill
@@ -72,6 +80,13 @@ description: >-
    `state.md` and `decisions.template.md` → `decisions.md`; create
    `adjustments.md` (header only). Set `state.md`: phase=plan,
    status=awaiting-plan-acceptance, created=<today>, iterations all 0.
+
+   **Append the transition event (telemetry).** Beside this `state.md` write,
+   append one compact JSON line to `.gogo/work/feature-<slug>/events.jsonl` per
+   `events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`):
+   `{"ts":"<RFC3339>","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"<slug>"}`.
+   Create the file if absent; **best-effort** — never fail the phase if the append
+   fails (append-only telemetry; `state.md` stays the human resume file).
 6. **Present + STOP.** Show the plan; ask the user to accept or request changes
    (`AskUserQuestion` with Accept / Request changes when the forks are clear).
    **Write no product code.**
@@ -79,6 +94,12 @@ description: >-
      re-present (stay in phase ①).
    - Accept → set `state.md` status=plan-accepted and add a top line to `plan.md`:
      `Status: **accepted** (user, <today>)`. Tell the user to run `/gogo:go`.
+     **Append the transition event** (beside the `state.md` write, best-effort, per
+     `events.schema.json`):
+     `{"ts":"<RFC3339>","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"<slug>"}`.
+     `plan-accepted` is the plan phase's **terminal** event — this skill owns both
+     plan events and there is no separate `phase-done`/plan (the orchestrator emits
+     none).
 
 ## Hard rule
 Never start implementing in this phase. Acceptance is the gate between plan and
