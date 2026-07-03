@@ -160,9 +160,14 @@ e2e at every relevant level per `test-strategy.md`/`testing-tools.md` — UI
 right?). Results → `test/issues.json` (the living, typed contract) + a
 `test-NN.md` rendered snapshot per round.
 - **Issue (fixable)** → back to ② → ③ → ④.
-- **Issue needing a user decision** → back to ① (re-plan how to handle it,
-  re-accept), via a decision gate.
-- **All green** → ⑤.
+- **Issue needing a user decision** (a code/scope fork) → back to ① (re-plan how
+  to handle it, re-accept), via a decision gate.
+- **Hands-on/e2e check can't run** (no emulator/device/browser/dev-server/app, or
+  a failed connection) → **user decision gate**, resuming at ④ — *never a silent
+  skip*. Ask the user: help set up the env and retry (e.g. they boot the emulator
+  + app, you reconnect), try an alternative, or explicitly skip. **Only the user
+  may skip** a hands-on check.
+- **All green** (incl. every relevant hands-on check run or user-skipped) → ⑤.
 
 ### ⑤ Report → skill `gogo-knowledge`
 Update `plan.md` to as-built; draw the as-built UML set (chosen by what changed —
@@ -303,8 +308,16 @@ its owning skill** — the timeline never double-counts.
 ## Decision gates — stopping for the user
 
 Stop **only** for genuine forks: ambiguous requirements, scope changes,
-destructive/irreversible actions, or trade-offs with no obvious right answer. For
-everything else, decide, note it, and keep moving.
+destructive/irreversible actions, trade-offs with no obvious right answer, **or a
+hands-on/e2e verification that can't run** (missing emulator/device/browser/
+dev-server/app, or a failed connection). For everything else, decide, note it, and
+keep moving.
+
+For the e2e-blocked case specifically: **never silently skip it.** Ask the user how
+to proceed — help set up the environment and retry (e.g. they boot the emulator +
+start the app; you re-run ④ to reconnect), try an alternative verification, or
+explicitly skip. Loop on retries; the check is **only** skipped when the user says
+so. On resolve, resume at **④** (re-test), not ①.
 
 When you do stop:
 1. Append the question + options + **your recommendation** to `decisions.md`

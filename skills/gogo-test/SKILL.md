@@ -85,10 +85,15 @@ still fails, write `test/result.json` with `status: blocked`,
 Decide purely on the **issues list** (count of `open`/`new`):
 - Any `open`/`new` issue, fixable → back to **② implement** with
   `--issues test/issues.json` → ③ review → back here (re-test, same living list).
-- Any issue needing a user decision → back to **① plan** (re-plan how to handle
-  it, re-accept) via a decision gate (`decisions.md` + waiting-for-user).
+- Any issue needing a user decision (a code/scope fork) → back to **① plan**
+  (re-plan how to handle it, re-accept) via a decision gate (`decisions.md` +
+  waiting-for-user).
+- **Hands-on/e2e check blocked** (tooling/emulator/device/dev-server/app
+  unavailable, or won't connect) → **user decision gate** — *never a silent skip*
+  — resuming at **④** (not ①): see "Hands-on/e2e blocked" below.
 - **All green** (build + unit + e2e + hands-on, per the done-bar in
-  `test-strategy.md`; no `open`/`new` issues) → advance to **⑤ report**
+  `test-strategy.md`; no `open`/`new` issues, **and every relevant hands-on check
+  was either run or explicitly user-skipped**) → advance to **⑤ report**
   (`gogo-knowledge`).
 
 Update `state.md`: phase=test, status=testing, bump `iterations: test=<n+1>` each
@@ -104,10 +109,32 @@ human-facing file.)
 A round that loops back to implement or escalates to re-planning is **not** a
 `phase-done`. Best-effort — never fail the phase if the append fails.
 
-## Degradation (portability)
+## Hands-on/e2e blocked → user decision gate (never a silent skip)
 
-If the Playwright MCP / Node is unavailable: skip browser automation, run the
-project's own test commands, exercise API/CLI directly, and write **manual
-UI-check steps** into `test-NN.md` (and raise a `test/issues.json` issue if a
-check can't be run). Never fail the phase for missing browser tooling — note the
-gap so the user can run those checks.
+When the tester reports a relevant hands-on/e2e check it could **not** run —
+missing Playwright/Node, **no emulator/device, an unreachable dev server or app,
+or a failed connection** — the orchestrator does **not** auto-skip and does
+**not** mark the phase green. It raises a **user decision gate**, exactly like a
+review decision:
+
+1. Record it in `decisions.md` (the blocked check, what the tester tried + the
+   error, and the options), using the `D<n>` shape.
+2. Set `state.md` → `status: waiting-for-user`, `resume: test`,
+   `open-decision: D<n>`.
+3. **Ask the user** (AskUserQuestion for a clear fork; prose when open-ended),
+   offering: **resolve the environment and retry** (e.g. the user boots the
+   emulator + starts the app; you re-run ④ to reconnect), **try an alternative**
+   verification, or **explicitly skip** this check.
+
+Then **loop**: if the user unblocks it, re-run `gogo-tester` (same living
+`test/issues.json`) and re-attempt — pass → mark the blocked issue resolved and
+continue; still blocked → ask again (retry / alternative / skip). A hands-on
+check is **only ever skipped when the user says so** — the tester and orchestrator
+never skip it on their own.
+
+**Portability, restated:** missing tooling must not *crash* the phase — but it now
+*pauses for the user* instead of auto-skipping. The tester still runs everything
+it can (suites, API/CLI, any reachable UI) and writes **manual UI-check steps**
+into `test-NN.md`; the difference is the un-runnable check becomes a
+`needs-user-decision` issue that gates the phase until the user resolves or skips
+it.
