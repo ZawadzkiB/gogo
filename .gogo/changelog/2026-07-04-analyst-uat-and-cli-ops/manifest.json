@@ -1,0 +1,12 @@
+{
+  "slug": "analyst-uat-and-cli-ops",
+  "updated": "2026-07-04",
+  "note": "Single-member 0.11.0 entry: gogo-analyst + analysis.md planning intelligence, the UAT gate (awaiting-uat + uat.md, same-item loop, /gogo:done IS the acceptance), ## Custom preserved 1:1, orchestrator-first docs, CLI ops (delete-to-trash + restore, log peek, --permission-mode auto launches, status-gated classifier). Diagrams flattened from the member's report bundle with slug-prefixed names; before/ carries the plan-time baseline (pairs by filename stem). Slim set — no diagrams.html; /gogo:view builds the page from source. This entry's ship was the first production traversal of the UAT gate the feature itself built.",
+  "members": [
+    "analyst-uat-and-cli-ops"
+  ],
+  "diagrams": [
+    { "kind": "flow", "file": "analyst-uat-and-cli-ops-flow.mmd", "title": "analyst-uat-and-cli-ops: As-built — analyst-planned, UAT-gated pipeline (mid-UAT lock) + CLI 0.11.0 ops" },
+    { "kind": "sequence", "file": "analyst-uat-and-cli-ops-sequence.mmd", "title": "analyst-uat-and-cli-ops: As-built — the UAT loop: accept via /gogo:done, or issues → lock → analyst → re-accept → rerun (same item)" }
+  ]
+}
