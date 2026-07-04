@@ -1,5 +1,6 @@
 ---
 name: gogo-mermaid
+user-invocable: false
 description: >-
   Author portable Mermaid diagrams for the gogo pipeline (plan/flow/state/sequence
   charts) with zero external dependencies, and build a self-contained offline

@@ -1,5 +1,6 @@
 ---
 name: gogo
+user-invocable: false
 description: >-
   The project's development pipeline — plan → implement → review → test → report.
   Use for ANY non-trivial change: a new feature, a meaningful refactor, a

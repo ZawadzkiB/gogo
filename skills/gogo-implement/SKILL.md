@@ -1,5 +1,6 @@
 ---
 name: gogo-implement
+user-invocable: false
 description: >-
   Phase ② of the gogo pipeline — implement an accepted plan, and re-enter to
   apply review/test fixes from a typed issues list. The operating manual for the

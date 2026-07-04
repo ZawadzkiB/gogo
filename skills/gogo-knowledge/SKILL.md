@@ -1,5 +1,6 @@
 ---
 name: gogo-knowledge
+user-invocable: false
 description: >-
   Phase ⑤ of the gogo pipeline — the success/report step. After tests pass,
   reconcile the plan to as-built and update the project's gogo-owned knowledge

@@ -1,5 +1,6 @@
 ---
 name: gogo-plan
+user-invocable: false
 description: >-
   Phase ① of the gogo pipeline — the operating manual for the gogo-analyst agent:
   read the named knowledge set (incl. analysis.md), analyse the goal against the

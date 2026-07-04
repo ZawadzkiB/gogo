@@ -1,5 +1,6 @@
 ---
 name: gogo-test
+user-invocable: false
 description: >-
   Phase ④ of the gogo pipeline — e2e test and explore the change at every
   relevant level (UI/CLI/API) per the project's testing tools and strategy; emit

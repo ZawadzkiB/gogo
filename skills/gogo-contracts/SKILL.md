@@ -1,5 +1,6 @@
 ---
 name: gogo-contracts
+user-invocable: false
 description: >-
   The gogo pipeline's "type system": the registry of artifact JSON Schemas plus
   the reusable, portable validate-in / validate-out procedure every phase command

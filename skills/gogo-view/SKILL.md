@@ -1,5 +1,6 @@
 ---
 name: gogo-view
+user-invocable: false
 description: >-
   Build and open a self-contained, offline interactive webpage for a gogo plan or
   report — the plan.md / report.md summary pre-rendered to readable HTML plus its
