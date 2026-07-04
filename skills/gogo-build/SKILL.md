@@ -1,5 +1,6 @@
 ---
 name: gogo-build
+user-invocable: false
 description: >-
   Initialize or refresh gogo's per-project knowledge config. Discovers the
   project's existing docs (Claude/Copilot/Cursor/Windsurf/Codex configs, README,

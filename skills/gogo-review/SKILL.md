@@ -1,5 +1,6 @@
 ---
 name: gogo-review
+user-invocable: false
 description: >-
   Phase ③ of the gogo pipeline — review the implementation against the project's
   code-review standards and non-functional requirements; emit the living, typed

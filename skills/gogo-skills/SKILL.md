@@ -1,5 +1,6 @@
 ---
 name: gogo-skills
+user-invocable: false
 description: >-
   Keep .gogo/knowledge/* lean so the pipeline stays deterministic. Audits each
   knowledge file against a line budget, auto-discovers cohesive sections worth

@@ -16,7 +16,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.11.0"
+const Version = "0.11.1"
 
 func main() {
 	args := os.Args[1:]

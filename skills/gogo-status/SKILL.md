@@ -1,5 +1,6 @@
 ---
 name: gogo-status
+user-invocable: false
 description: >-
   Read-only overview of every gogo feature — and the home of the shared work-index
   classifier that labels each .gogo/work/feature-* as shipped / ready-to-ship /

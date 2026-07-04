@@ -146,6 +146,25 @@ ls ~/.claude/plugins/cache/gogo/gogo/   # newest dir = active version
 > Using a local clone as the marketplace? A plain `git pull` in the clone is
 > enough — no `marketplace update` needed — followed by `/reload-plugins`.
 
+## Developing gogo locally
+
+Point the marketplace at your clone once:
+
+```
+/plugin marketplace add /path/to/gogo
+/plugin install gogo@gogo
+```
+
+Then, after each change:
+
+1. Edit files in the clone.
+2. Bump `version` in `.claude-plugin/plugin.json` (the reload only picks up a new version).
+3. Reload and restart Claude Code:
+   ```
+   claude plugin marketplace update gogo
+   claude plugin update gogo@gogo
+   ```
+
 ## Commands
 
 Each command is an ultra-thin entry point to the orchestrator — no flow logic

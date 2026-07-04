@@ -1,5 +1,6 @@
 ---
 name: gogo-done
+user-invocable: false
 description: >-
   The "ship it" step after phase ⑤ — when the user declares work done, write a
   high-level entry into the append-only .gogo/changelog/<YYYY-MM-DD>-<name>/ archive:
