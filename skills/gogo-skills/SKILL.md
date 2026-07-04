@@ -28,8 +28,10 @@ it writes nothing until the user approves each candidate. Modelled on `gogo-buil
 
 ## Budget
 - Count the **body lines** of each knowledge file (exclude the `gogo:meta` HTML
-  header). Classify **OK** `<200` · **WARN** `200-400` · **OVER** `>400`. Defaults
-  overridable: `--warn N`, `--max N`.
+  header **and any `## Custom` section** — `## Custom` is user-owned, not gogo's
+  always-read context, so its lines never count toward the budget). Classify **OK**
+  `<200` · **WARN** `200-400` · **OVER** `>400`. Defaults overridable: `--warn N`,
+  `--max N`.
 - For a **proxy** file (`Mode: proxy`), measure only the gogo-owned summary body
   we control — **never** the linked upstream's length.
 
@@ -49,8 +51,10 @@ single H2 is itself oversized (D2). Propose a section only when it is:
 - **big enough to matter** — roughly **≥20 lines** saved; smaller sections aren't
   worth their own skill (leave them inline).
 Rank candidates by `lines-saved × locality`. A tight, cohesive file yields **no**
-candidates (no false positives). Never flag the `gogo:meta` header or a
-`## gogo overrides` section.
+candidates (no false positives). Never flag the `gogo:meta` header, a
+`## gogo overrides` section, or a **`## Custom`** section — `## Custom` is
+user-owned (the file promises gogo never rewrites it), so it is never proposed as a
+candidate and never extracted.
 
 ## Step 3 — classify each candidate (kind + destination) (D1)
 - **knowledge** → `.gogo/skills/<slug>/` — project-/convention-specific, prose-

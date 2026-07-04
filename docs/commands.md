@@ -10,6 +10,11 @@ just invokes a skill and passes arguments. The logic lives in the skills (the
 "operating manuals"). Source of truth: `commands/*.md` and the `skills/*/SKILL.md`
 they invoke.
 
+**Architecture:** commands invoke the **orchestrator**; the orchestrator delegates
+every phase to its specialist agent (① `gogo-analyst` · ② `gogo-developer` ·
+③ `gogo-reviewer` · ④ `gogo-tester` · ⑤ orchestrator + `gogo-knowledge`) and owns
+the gates in chat.
+
 There are **12** commands in four groups: **orchestration** (`build`, `plan`,
 `go`, `status`, `resume`), the **standalone phase commands** (`implement`,
 `review`, `test`, `report` — each a typed function with validate-in /
@@ -32,15 +37,21 @@ Set up or refresh the project's knowledge config. Runs the `gogo-build` skill.
 - **Now also:** verifies the high-signal distilled facts against the actual code
   and records verified / corrected / unverifiable (see [Discovery](discovery.md)).
 - **Idempotent:** re-run anytime — picks up new docs, preserves every
-  `## gogo overrides` section and every `Mode: owned` body. `--force` resets to
-  fresh scaffolds.
+  `## gogo overrides` section, every **`## Custom`** section (**user-owned — copied
+  1:1, never rewritten**, in any mode; build reports which it preserved), and every
+  `Mode: owned` body. `--force` resets to fresh scaffolds (but still carries any
+  `## Custom` over verbatim). The distinction: `## gogo overrides` is gogo-authored;
+  `## Custom` is yours, untouchable.
 
 ### `/gogo:plan "<goal>"`
 
-Runs **phase ① (plan) only**. Acts as the orchestrator via the `gogo` + `gogo-plan`
-skills.
+Runs **phase ① (plan) only**. Acts as the orchestrator, delegating ① to the
+**`gogo-analyst`** agent (the `gogo` + `gogo-plan` skills).
 
-- **Reads:** `.gogo/knowledge/*` (config gate — stops if missing) and the codebase.
+- **Reads:** `.gogo/knowledge/*` — especially `analysis.md` (the analysis
+  procedure), `project-knowledge.md`, `tech-stack.md`,
+  `non-functional-requirements.md`, `coding-rules.md` (config gate — stops if
+  missing) — and the codebase (**code = source of truth**).
 - **Writes:** `.gogo/work/feature-<slug>/` with `plan.md` (incl. the feature's
   functional requirements), `adjustments.md`, `state.md`, and an intended-design
   mermaid chart.
@@ -51,8 +62,11 @@ skills.
 Runs **phases ② -> ③ -> ④ -> ⑤** for an accepted plan. Acts as the orchestrator
 in chat, so it can pause at gates.
 
-- **Reads:** `state.md` (refuses unless `plan-accepted` or a resumable in-loop
-  state) and the relevant knowledge.
+- **Reads:** `state.md` (runs only on `plan-accepted` or a resumable mid-pipeline
+  state — `implementing` / `reviewing` / `testing`; **`awaiting-uat` and
+  `waiting-for-user` are not runnable** — `awaiting-uat` is the user's UAT gate and a
+  mid-UAT re-plan sits at `waiting-for-user` until re-acceptance) and the relevant
+  knowledge.
 - **Delegates:** ② implement -> `gogo-developer`, ③ review -> `gogo-reviewer`,
   ④ test -> `gogo-tester`; routes findings through the loop (fixable ->
   re-implement; decision -> ask the user; clean/green -> advance) and keeps
@@ -70,11 +84,15 @@ is shippable.
 
 ### `/gogo:resume [feature-slug]`
 
-Resumes a feature that paused for your decision.
+Resumes a feature that paused for your decision — including a feature at the **UAT gate**
+(`awaiting-uat`) when you have feedback rather than a `/gogo:done` acceptance.
 
-- **Reads:** `state.md` + `decisions.md`.
+- **Reads:** `state.md` + `decisions.md` (and, at the UAT gate, `plan.md` + `uat.md`).
 - **Writes:** appends a `### RESOLVED (user, <date>)` block, clears
-  `open-decision`, and re-enters the pipeline at `state.md`'s `resume:` phase.
+  `open-decision`, and re-enters the pipeline at `state.md`'s `resume:` phase. At the UAT
+  gate it folds your feedback into the loop — the orchestrator hands it to `gogo-analyst`,
+  which records the `uat.md` round and adjusts `plan.md`; you re-accept and `/gogo:go`
+  reruns ②→⑤ on the same work item (see [Flow → UAT](flow.md)).
 
 ## Standalone phase commands
 
@@ -124,7 +142,8 @@ broken run.
 - **Writes:** the finalized as-built `plan.md`, the `report/` bundle
   (`report/report.md` + the as-built UML set + `report/diagrams.html` +
   `report/manifest.json`), updated gogo-owned knowledge docs (never the proxied
-  originals), `report/result.json`, and sets `state.md` to done.
+  originals, and never a `## Custom` section), `report/result.json`, and sets
+  `state.md` to **`awaiting-uat`** (the UAT gate — no longer `done`).
 - **Strict vs lenient:** in-pipeline (right after a green ④) it keeps a strict
   validate-in gate. Run **standalone on a past/broken/incomplete run** it does
   **not** refuse — it synthesizes a best-effort `report/report.md` from whatever
@@ -158,6 +177,14 @@ work board**.
   `+`-joined arg pre-answers *merged*; an explicit `s` pre-answers *separate*; a single
   slug never asks. For a merged entry gogo suggests a release name from the members'
   common theme and confirms it (you can override).
+- **`/gogo:done` IS the UAT acceptance (0.11.0 — the plan-gate symmetry).** Phase ⑤ now
+  leaves a feature at `status: awaiting-uat`; running `/gogo:done` is what accepts the UAT
+  gate — **no extra confirmation question is asked** (mirroring how accepting a plan
+  unlocks `/gogo:go`). It records a one-line accept round in the member's `uat.md`
+  (`## UAT round N — accepted (user, <date>) — via /gogo:done`), emits a `uat-passed`
+  event, and ships. If instead you have questions or issues, don't run `/gogo:done` —
+  describe them and the orchestrator's UAT loop re-plans the SAME item (see
+  [Flow → UAT](flow.md) and `/gogo:resume`).
 - **Every entry is a synthesis, not a copy.** `report.md` is **written** — a
   high-level summary of *what was changed/done/implemented* (lead paragraph, key
   outcomes, one-line decisions, a review/test verdict, a member table + per-member
@@ -176,10 +203,12 @@ work board**.
   (`board.py`, `work-index.json`, `board-intent.json`, `board-exit.code`).
 - **Prints:** the `file://` link to each built interactive viewer page (with the
   changelog folder path as a fallback — it never fails the command over the link).
-- **Validate-in:** a missing report for a named slug STOPs with "No report found for
-  `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`."; board mode
-  opens the cockpit whenever **any** feature exists (view `v` and go `g` are useful
-  with nothing ready-to-ship) and stops only when there are zero features.
+- **Validate-in:** a named slug must be **report-complete** *and* at the UAT gate
+  (`status: awaiting-uat`; a pre-0.11 `done`/`shipped` member is accepted for
+  back-compat). A missing report STOPs with "No report found for `<feature>` — run
+  `/gogo:report <feature>` first, then `/gogo:done`."; board mode opens the cockpit
+  whenever **any** feature exists (view `v` and go `g` are useful with nothing
+  ready-to-ship) and stops only when there are zero features.
 
 ### `/gogo:view [changelog-entry | feature-slug[:plan|:report]]`
 
@@ -214,7 +243,10 @@ Keep `.gogo/knowledge/*` lean so the pipeline stays deterministic. Runs the
 `gogo-skills` skill.
 
 - **No prompt** -> audit / auto-discover: measure each file's body lines (OK
-  `<200` · WARN `200-400` · OVER `>400`), discover cohesive extraction candidates,
+  `<200` · WARN `200-400` · OVER `>400`; a user-owned `## Custom` section is
+  excluded from the count and is never an extraction candidate — like
+  `## gogo overrides`, never proposed or rewritten), discover cohesive extraction
+  candidates,
   classify each as a `knowledge` skill (-> `.gogo/skills/`) or a `standalone`
   skill (-> `.claude/skills/`), and **propose them, then STOP for per-candidate
   approval** before writing anything.

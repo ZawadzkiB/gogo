@@ -26,3 +26,8 @@ Generated-by: /gogo:build (scaffold)
 
 ## Project-specific gotchas (verified)
 <filled in over time by the report phase as the pipeline learns them>
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

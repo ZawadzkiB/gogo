@@ -49,8 +49,11 @@ flowchart LR
 *Plan waits for your acceptance before any code is written. Review and test loop
 fixes back into implement, and either can **pause for your decision** at any point
 — you answer and it resumes. On success, Report writes an as-built `report/` bundle
-(`report/report.md` + diagrams) and updates your knowledge docs.
-**Every phase is grounded in your `.gogo/knowledge/` config.***
+(`report/report.md` + diagrams) and updates your knowledge docs, then stops at the
+**UAT gate** (`awaiting-uat`) for you to verify the work — running `/gogo:done`
+**is** the acceptance, or your feedback loops back into planning on the same work
+item (recorded in `uat.md`). **Every phase is grounded in your `.gogo/knowledge/`
+config.***
 
 ## Generic flow, your rules
 
@@ -61,6 +64,7 @@ like *your* project.
 
 | File | What it holds | Read in |
 |---|---|---|
+| `analysis.md` | how to analyze a feature before planning: the procedure, which files to read, code = source of truth | Plan |
 | `project-knowledge.md` | architecture, domains, glossary, key decisions | Plan |
 | `tech-stack.md` | languages, frameworks, and the build / run / test commands | Plan · Implement · Test |
 | `non-functional-requirements.md` | standing quality bars: performance, security, accessibility, reliability, limits | Plan · Review · Test |
@@ -80,6 +84,12 @@ manifests, test configs) and add a short gogo-specific summary — they don't
 duplicate them. Where a project has no doc for a topic, gogo authors that file
 from your codebase. You create them once with `/gogo:build` and refresh anytime;
 re-runs pick up new docs and **preserve your edits**.
+
+**Your own notes survive: `## Custom`.** Any knowledge file can carry a `## Custom`
+section — anything *you* write there is **user-owned and copied 1:1**: `/gogo:build`
+re-runs and the report phase **never rewrite it** (build reports what it preserved).
+It sits alongside the gogo-authored `## gogo overrides` block — the distinction is
+simply **overrides = gogo's notes; Custom = yours, untouchable.**
 
 So adopting gogo in a new project is just `/gogo:build` — no flow to rewrite.
 
@@ -106,7 +116,9 @@ deterministic.
 /gogo:build                 # wire gogo to this project's docs (run once; re-run anytime)
 /gogo:plan "add CSV export to the reports page"
 # review the plan, accept it, then:
-/gogo:go
+/gogo:go                    # implement → review → test → report, stops at the UAT gate
+# verify the work, then:
+/gogo:done                  # your acceptance — ships it to the changelog (or give feedback to loop back)
 ```
 
 > Hacking on gogo itself? Add your local clone as the marketplace instead of the
@@ -309,8 +321,9 @@ cd cli && go build -o gogo .
 
 - **Board** (`gogo`) — four columns **plan · in progress · ready · changelog**
   from the ported work-index classifier; cards are your feature folders with a
-  live sub-phase badge (`review r2`, `waiting-for-user`, `running`). `/` filters
-  live; **fsnotify** refreshes the board while the pipeline runs.
+  live sub-phase badge (`review r2`, `waiting-for-user`, `awaiting-uat`,
+  `running`). `/` filters live; **fsnotify** refreshes the board while the
+  pipeline runs.
 - **Drill-in** (`enter`) — browse a feature's files **in the terminal**:
   markdown via **glamour**, `issues.json` as a table, `events.jsonl` as a
   timeline, `.mmd` diagrams as ASCII (flowchart-family) or source; `w` builds
@@ -320,21 +333,36 @@ cd cli && go build -o gogo .
   `claude "/gogo:go <slug>"`; selecting ready cards (`space`) and pressing `m`/`d`
   runs `claude "/gogo:done a+b+c"` (multiple = ONE merged entry) — always behind a
   confirmation, in an attachable **tmux** session (`a` attaches; gates stay
-  answerable). The CLI **never mutates pipeline state** — a card moves columns
-  only when the contract files actually change.
+  answerable). Launches run in claude's **auto (classifier) permission mode** so
+  the skills' safe file steps don't nag inside an unwatched session (NOT a full
+  bypass); set `GOGO_CLAUDE_PERMISSION_MODE` to override the value (any
+  `claude --permission-mode` value; empty string omits the flag → claude prompts),
+  and the confirm states the effective mode. The CLI **never mutates pipeline
+  state** — a card moves columns only when the contract files actually change.
+- **Peek a session (`l`)** — read-only view of a live `gogo-*` session's recent
+  output (`tmux capture-pane`, `r` re-captures) without attaching; for a
+  backgrounded `claude -p` run it tails the log instead. `a` from the peek
+  escalates to a full attach.
+- **Delete to trash (`x`)** — moves a card's work folder to `.gogo/trash/` behind
+  an explicit confirm (recoverable, never `rm`); changelog cards are append-only
+  and bounce. `gogo trash` lists deleted work; `gogo trash restore <entry>` puts
+  it back.
 - **Scriptable** — `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
-  `gogo events <slug>`, `gogo --version` (mirrors the plugin).
+  `gogo events <slug>`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
 
 **Soft deps** (detected at use, graceful fallback): `tmux` (else backgrounded
 `claude -p` + log), `claude` (needed only to launch), `glow` (the built-in
-glamour view is the fallback). Keymap: `←→` columns · `↑↓` cards · `space`
-select · `enter` drill-in · `v` view · `w` web · `m` move · `d` ship · `a`
-attach · `/` filter · `G` glow · `q` quit.
+glamour view is the fallback). Keymap: `←→`/`h` columns · `↑↓`/`jk` cards ·
+`space` select · `enter` drill-in · `v` view · `w` web · `m` move · `d` ship ·
+`a` attach · `l` peek · `x` delete→trash · `/` filter · `G` glow · `q` quit.
 
 ## Agents
 
 - **`gogo`** — the orchestrator: owns the flow/loop, knows what to run when, and
   delegates to the specialists. Also usable hands-off ("build X end-to-end").
+- **`gogo-analyst`** — phase ① specialist: reads `analysis.md` + the named knowledge
+  set, analyses the goal against the actual code, and writes the plan (and re-analyses
+  UAT feedback into a plan delta on the same work item).
 - **`gogo-developer`** — implements the accepted plan and applies review/test fixes.
 - **`gogo-reviewer`** — fresh-eyes, adversarial code review.
 - **`gogo-tester`** — e2e/UI testing via the bundled Playwright MCP.
@@ -344,7 +372,7 @@ attach · `/` filter · `G` glow · `q` quit.
 gogo keeps everything under one **`.gogo/`** folder — plain markdown you can read,
 edit, and commit:
 
-**`.gogo/knowledge/`** — your project's configuration: the nine files described in
+**`.gogo/knowledge/`** — your project's configuration: the ten files described in
 [**Generic flow, your rules**](#generic-flow-your-rules) above. Every file states
 its own purpose in its header, and `index.md` is the folder's purpose-map.
 
@@ -370,6 +398,7 @@ work-index, and the board-intent). Offline, no network, no build.
 | `adjustments.md` | Log of changes/clarifications you asked for during planning |
 | `state.md` | Current phase/status/iterations — lets work resume across sessions |
 | `decisions.md` | Forks that needed your call, with gogo's recommendation + your answer |
+| `uat.md` | The **UAT gate** log (appears once report ⑤ reaches `awaiting-uat`) — one round per user check: a `/gogo:done` accept line, or an analyst-authored issues round (verbatim input + analysis + plan delta + verdict) when feedback loops back into planning on the same work item |
 | `review/issues.json` | The living, typed review findings — the **contract** review hands to implement (one list, updated in place across rounds) |
 | `review-NN.md` | Each code-review round's rendered snapshot of `issues.json` |
 | `test/issues.json` | The living, typed test findings (same contract) |
@@ -377,6 +406,11 @@ work-index, and the board-intent). Offline, no network, no build.
 | `events.jsonl` | Append-only progress telemetry — one JSON line per phase transition (schema'd), read by the `gogo` CLI cockpit; a missing file is never an error |
 | `report/` | The as-built bundle (written at report phase): `report/report.md` (planned-vs-shipped, implementation, decisions + reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`. This is the full audit trail; `/gogo:done` **synthesizes** a high-level entry from it into `.gogo/changelog/<date>-<name>/` (it does not copy the bundle) |
 | `charts/` | Mermaid diagrams (`.mmd`) + `charts/before/` (the plan-time as-is baseline) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement as-built flow / sequence / class / activity set |
+
+**`.gogo/trash/`** — deleted work, recoverable. Deleting a board card (`x` in the
+`gogo` CLI) **moves** its `feature-<slug>/` folder here (`<compact-ts>-<slug>/`,
+never `rm`); `gogo trash` lists it and `gogo trash restore <entry>` puts it back.
+The CLI's one write outside `.gogo/resources/`.
 
 **`.gogo/changelog/`** — the append-only shipped archive, a high-level release
 history. When you run `/gogo:done`, gogo **synthesizes** an entry into

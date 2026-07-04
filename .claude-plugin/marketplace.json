@@ -3,15 +3,15 @@
   "name": "gogo",
   "description": "The gogo development pipeline plugin.",
   "owner": {
-    "name": "Bartłomiej Zawadzki",
+    "name": "Bart\u0142omiej Zawadzki",
     "email": "zawadzkibartek@gmail.com"
   },
   "plugins": [
     {
       "name": "gogo",
-      "description": "Generic plan → implement → review → test → report pipeline with per-project knowledge config.",
+      "description": "Knowledge-grounded plan -> implement -> review -> test -> report pipeline with an analyst agent, a human UAT gate, events telemetry, synthesized changelog releases, and a native TUI cockpit (gogo CLI).",
       "author": {
-        "name": "Bartłomiej Zawadzki"
+        "name": "Bart\u0142omiej Zawadzki"
       },
       "category": "development",
       "source": "."

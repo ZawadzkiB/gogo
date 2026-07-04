@@ -51,7 +51,8 @@ The markdown-plugin side has no unit suite — verification = **dogfood**:
 install, then run `/gogo:build`, `/gogo:plan`, `/gogo:go` on a sample repo and
 inspect the produced `.gogo/` artifacts. The **CLI** (since 0.10.0) has a real
 Go suite: `cd cli && gofmt -l . && go vet ./... && go test -race ./...`
-(~50+ tests across contract/tui/launch/pages/diagram + a `gogo status` golden). UI/browser testing for *target* projects
+(~120 test functions as of 0.11.0, across contract/tui/launch/pages/diagram/**trash**
++ a `gogo status` golden). UI/browser testing for *target* projects
 uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 `testing-tools.md` / `test-strategy.md`.
 
@@ -66,3 +67,8 @@ uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
   multi-select fallback. tmux is installed on this dev host (so the live-TUI test
   path in `test-strategy.md` applies), but it **stays a soft dep** — same
   detection, same fallback.
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

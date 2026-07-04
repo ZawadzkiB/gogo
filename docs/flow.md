@@ -17,28 +17,34 @@ flowchart LR
     IMP ==> REV["③ REVIEW"]
     REV ==>|clean| TEST["④ TEST · e2e"]
     TEST ==>|all green| REP["⑤ REPORT"]
-    REP ==> DONE([done])
+    REP ==>|awaiting-uat| UAT{"UAT · you verify"}
+    UAT ==>|"/gogo:done accepts"| DONE([shipped])
+    UAT -. "feedback -> uat.md round -> adjust plan (SAME item) -> re-accept" .-> P
     REV -->|"issues -> fix"| IMP
     TEST -->|"issues -> fix"| IMP
     P -. "changes / clarify" .-> P
 
     classDef phase fill:#e8ecff,stroke:#7c8bd9,stroke-width:1.5px,color:#111
     classDef io fill:#fff3d6,stroke:#caa54a,color:#111
+    classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
     class P,IMP,REV,TEST,REP phase
+    class UAT gate
     class G,DONE io
 ```
 
 ## The phases
 
-### ① Plan — skill `gogo-plan` (orchestrator, in chat)
+### ① Plan — skill `gogo-plan` (delegate to `gogo-analyst`)
 
-Analyse the goal against the knowledge docs; create
-`.gogo/work/feature-<slug>/`; write `plan.md` (Goal / Context / Functional
-requirements / Approach + alternatives / Changes checklist / Tests /
-Out-of-scope); draw the intended design with `gogo-mermaid`; init `state.md`.
-**Present the plan and STOP for acceptance.** Changes or clarifications are logged
-to `adjustments.md`, then the plan is revised and re-presented. **Do not
-implement until the user accepts — a hard gate.**
+Delegated to the **`gogo-analyst`**: it reads the named knowledge set (incl.
+`analysis.md`, the analysis procedure), analyses the goal against the actual
+codebase (**code = source of truth**), creates `.gogo/work/feature-<slug>/`, writes
+`plan.md` (Goal / Context / Functional requirements / Approach + alternatives /
+Changes checklist / Tests / Out-of-scope), draws the intended design with
+`gogo-mermaid`, and inits `state.md`. **Present the plan and STOP for acceptance —
+the orchestrator owns that gate.** Changes or clarifications are logged to
+`adjustments.md`, then the plan is revised and re-presented. **Do not implement
+until the user accepts — a hard gate.**
 
 ### ② Implement — skill `gogo-implement` (delegate to `gogo-developer`)
 
@@ -65,14 +71,39 @@ Finalize `plan.md` to as-built; draw the as-built UML set (chosen by what change
 class / sequence / activity / use-case / flow) into the feature's `report/` folder;
 write `report/report.md` (planned-vs-shipped, implementation, decisions + reasons,
 review/test outcomes, diagram + audit links); update whatever `.gogo/knowledge/*`
-drifted (gogo-owned summaries only — never the proxied originals); set `state.md`
-to done.
+drifted (gogo-owned summaries only — never the proxied originals, and never a
+`## Custom` section); set `state.md` to **`awaiting-uat`** — the UAT gate (no longer
+`done`).
 
 Run **standalone via `/gogo:report <feature>`, this phase also reports on a past or
 broken run**: instead of refusing a non-green feature it synthesizes a best-effort
 `report/report.md` from whatever artifacts exist and marks which phases ran and
 what's still open (a "Run status / gaps" section). `plan.md` is the one
 prerequisite. The in-pipeline ⑤ call (right after a green ④) keeps its strict gate.
+
+### UAT — the gate between ⑤ and Ship (the plan-gate symmetry)
+
+⑤ leaves the feature at **`status: awaiting-uat`**, and you verify the shipped work. This
+is the plan-acceptance gate mirrored at the *exit* — and there is **no extra confirmation
+question**. Two ways forward:
+
+- **Accept by running `/gogo:done`** — the command *is* the acceptance. Its validate-in
+  requires `awaiting-uat` (a legacy `done` is accepted too), it records a one-line accept
+  round in `uat.md`, emits `uat-passed`, and ships. No question is asked.
+- **Raise questions/issues instead** — the orchestrator **locks the gate first**: it sets
+  `status: waiting-for-user` (`open-decision: UAT round N`, `resume: plan`) and emits
+  `uat-opened` **before** handing your input to the **`gogo-analyst`** (its second job).
+  The feature **stays `waiting-for-user` for the whole re-plan** — so it is neither
+  ship-able (`/gogo:done` needs `awaiting-uat`) nor rerun-able (`/gogo:go` needs
+  `plan-accepted`) until you re-accept. The analyst analyses the input against the current
+  `plan.md` + `decisions.md` **and the code** (code = source of truth), appends a **`uat.md`
+  round** (verbatim input + analysis + proposed plan delta + a disposition per point:
+  `fix-needed` / `works-as-designed` / `new-scope`), and updates `plan.md` (`adjustments.md`
+  logs the delta). You **re-accept** the adjusted plan — only that flips it to
+  `plan-accepted` (recorded through the normal plan-acceptance flow, whose `plan-accepted`
+  event is `gogo-plan`'s; the orchestrator then emits `uat-failed`) — and `/gogo:go` reruns
+  **②→⑤** on the **SAME work item** (never a new one), back to `awaiting-uat`. `state.md`
+  `iterations:` gains `uat=N`.
 
 ### Ship — command `/gogo:done` (skill `gogo-done`)
 
@@ -129,14 +160,20 @@ page from the vendored `.gogo/resources/` assets (no network, no build), and ope
   implementation, then re-review, then re-test.
 - A test issue that needs a user decision routes back to **① plan** (re-plan how
   to handle it, re-accept).
-- Round counts are tracked in `state.md` `iterations:`.
+- **UAT -> plan -> go** — at the `awaiting-uat` gate, user feedback routes back to
+  **① plan** (via `gogo-analyst`, recorded in `uat.md`), you re-accept, and `/gogo:go`
+  reruns ②→⑤ on the **same work item**.
+- Round counts are tracked in `state.md` `iterations:` (incl. `uat=N` for UAT loops).
 
 ## Who runs each phase
 
-- **The orchestrator** runs the *interactive* phases in chat: ① plan + the
-  acceptance gate, every decision gate, and ⑤ report.
-- It **delegates the heads-down phases** via the `Task` tool, each to a
-  fresh-context specialist: ② -> `gogo-developer`, ③ -> `gogo-reviewer`,
+**Commands invoke the orchestrator; the orchestrator delegates every phase to its
+specialist agent and owns the gates in chat.**
+
+- **The orchestrator** owns the *interactive gates* in chat: the ① plan-acceptance
+  gate, every decision gate, and the ⑤ report step.
+- It **delegates every phase** via the `Task` tool, each to a fresh-context
+  specialist: ① -> `gogo-analyst`, ② -> `gogo-developer`, ③ -> `gogo-reviewer`,
   ④ -> `gogo-tester`. A delegated worker that hits a real fork **returns** it to
   the orchestrator, which handles the gate and re-delegates with the answer. See
   [Agents](agents.md) for the full I/O reference.

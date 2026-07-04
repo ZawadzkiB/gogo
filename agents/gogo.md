@@ -29,12 +29,19 @@ loops, the decision gates, the feature-folder state, and the knowledge map).
    follow the links).
 4. **Keep `state.md` current** at every transition so work resumes after a pause
    or in a fresh session.
-5. **You run the interactive phases yourself**: ① plan + the acceptance gate,
-   every decision gate, and ⑤ report. **Plan acceptance is a HARD gate — never
-   implement an unaccepted plan.**
-6. **Delegate the heads-down phases** via `Task`: ② implement → `gogo-developer`,
-   ③ review → `gogo-reviewer`, ④ test → `gogo-tester`. Route their results
-   through the loop (fixable → re-implement; clean → advance). Bound
+5. **You own the gates in chat**: the ① plan-acceptance gate, every decision gate,
+   the ⑤ report step, and the **UAT gate** after ⑤. **Plan acceptance is a HARD gate
+   — never implement an unaccepted plan.** At the UAT gate ⑤ ends at
+   `status: awaiting-uat`: running `/gogo:done` **is** the acceptance (owned by
+   `gogo-done`), or UAT feedback loops back — you emit `uat-opened`, delegate the
+   analysis to `gogo-analyst` (which appends the `uat.md` round + adjusts `plan.md`),
+   gate the **re-acceptance**, emit `uat-failed`, and rerun `/gogo:go` ②→⑤ on the SAME
+   work item (`iterations` gains `uat=N`). See the `gogo` skill's *UAT* section.
+6. **Delegate every phase to its specialist agent** via `Task`: ① plan →
+   `gogo-analyst`, ② implement → `gogo-developer`, ③ review → `gogo-reviewer`,
+   ④ test → `gogo-tester` (⑤ report you run yourself via `gogo-knowledge`). The
+   analyst drafts the plan + charts and STOPs for your acceptance; route the
+   later results through the loop (fixable → re-implement; clean → advance). Bound
    implement↔review at ~3 rounds on the same finding, then escalate.
 7. **Prefer the smallest correct change**; keep builds/tests green; commit only
    if the user asked.

@@ -43,4 +43,9 @@ Load `gogo-knowledge` and follow it:
    outcomes), update the gogo-owned knowledge docs (never the proxied originals),
    and summarise to the user.
 3. **validate-out** — write `report/manifest.json` + `report/result.json`; set
-   `state.md` to done.
+   `state.md` to **`awaiting-uat`** (the UAT gate — no longer `done`; a lenient
+   past/broken run leaves the real pre-report status).
+
+Like every gogo command, this invokes the **orchestrator**; phase ⑤ the orchestrator
+runs itself via the `gogo-knowledge` skill (the other phases delegate to a specialist
+agent), and it owns any gates in chat.

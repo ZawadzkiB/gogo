@@ -1,0 +1,38 @@
+{
+  "slug": "analyst-uat-and-cli-ops",
+  "phase": "review",
+  "status": "ok",
+  "round": 3,
+  "inputs": [
+    ".gogo/work/feature-analyst-uat-and-cli-ops/plan.md",
+    ".gogo/work/feature-analyst-uat-and-cli-ops/decisions.md",
+    ".gogo/knowledge/code-review-standards.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    "cli/internal/trash/trash.go",
+    "cli/trash.go",
+    "cli/internal/tui/delete.go",
+    "cli/internal/tui/peek.go",
+    "cli/internal/tui/update.go",
+    "cli/internal/tui/move.go",
+    "cli/internal/tui/model.go",
+    "cli/internal/tui/view.go",
+    "cli/internal/tui/styles.go",
+    "cli/internal/launch/launch.go",
+    "cli/internal/contract/contract.go",
+    "cli/internal/contract/files.go",
+    "cli/internal/contract/events.go",
+    "cli/main.go",
+    ".claude-plugin/plugin.json",
+    "docs/cli-contract.md",
+    "README.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-analyst-uat-and-cli-ops/review/issues.json",
+    ".gogo/work/feature-analyst-uat-and-cli-ops/review-03.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 4,
+  "summary": "Stage C (CLI ops, 0.11.0) review round 3: REV-001..008 spot-checked and hold (all verified — Stage A/B fixes in place). 0 open blockers/majors/minors; 4 new findings, all nit (P3), all AGENT-FIXABLE hardening/polish: REV-009 EXDEV copyTree follows symlinks (deref + possible cycle recursion) in the rarely-hit cross-device fallback; REV-010 MoveToTrash lacks a package-level work-folder guard (changelog-not-deletable is enforced UI-only, safe by construction); REV-011 uniqueDest -N suffix leaks into the parsed slug so a same-second re-delete restores under a wrong name (unreachable at board speed); REV-012 Esc-cancel of a delete confirm wipes the ready-ship selection (inconsistent with the Cancel button). Priority verdicts: (a) trash data-safety incl. EXDEV is SAFE — source removed only after a verified copy, copy error removes partial DEST not source; (b) changelog defense holds, guard is UI-only; (c) env-override tri-state CORRECT via os.LookupEnv (unset->auto, empty->omit, set->verbatim, flag+value separate argv, -p gets it too); (d) badge priority CORRECT (waiting-for-user > running > awaiting-uat > phase). Gates green: gofmt/vet/build clean, go test -race -count=1 ./... all packages pass, gogo --version=0.11.0=plugin.json. Injection probe (feature-a;$(touch PWNED) + hostile restore args) executed nothing and errored cleanly; trash pkg has no os/exec. Embedded viewer assets untouched. Verdict APPROVE (no open blockers/majors — nits batched, do not block advance to test)."
+}

@@ -12,8 +12,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Action is the pipeline verb a column move triggers.
@@ -45,6 +47,132 @@ type Result struct {
 
 var sessionUnsafe = regexp.MustCompile(`[^a-z0-9-]+`)
 
+// --- launched-session permission mode (FR8) ---------------------------------
+//
+// Board-launched claude sessions run in Claude's AUTO (classifier-based)
+// permission mode so the shipped skills' safe file/read/write/copy steps stop
+// nagging for approval inside a session nobody is watching (decision D2 —
+// classifier auto, NOT a full bypass). The exact flag + value were verified
+// against `claude --help` at dev time:
+//
+//	--permission-mode <mode>   choices: acceptEdits, auto, bypassPermissions,
+//	                           manual, dontAsk, plan
+//
+// "auto" is the classifier mode that auto-approves classified-safe actions
+// (claude also ships a `claude auto-mode` inspector for it) — the closest match
+// to "auto-approve classified-safe actions" without the danger of
+// bypassPermissions, so that is the pick. The value is overridable per the env
+// knob below; the flag + value are always SEPARATE argv elements (never a shell
+// string), so a value can never reach a shell (injection safety).
+
+// PermissionModeEnv overrides the launched-session permission mode. Set it to
+// any claude --permission-mode value to change it, or to the empty string to
+// omit the flag entirely (claude then uses its own default — interactive
+// prompting). Unset → DefaultPermissionMode.
+const PermissionModeEnv = "GOGO_CLAUDE_PERMISSION_MODE"
+
+// DefaultPermissionMode is the classifier auto mode (verified via claude --help).
+const DefaultPermissionMode = "auto"
+
+// PermissionMode resolves the effective mode. Unset env → DefaultPermissionMode.
+// Present-but-empty → omit=true (the caller drops the flag). Present-nonempty →
+// that value verbatim.
+func PermissionMode() (mode string, omit bool) {
+	v, ok := os.LookupEnv(PermissionModeEnv)
+	if !ok {
+		return DefaultPermissionMode, false
+	}
+	if v == "" {
+		return "", true
+	}
+	return v, false
+}
+
+// PermissionArgs returns the permission flag as separate argv elements
+// (["--permission-mode", "<mode>"]), or nil when the flag must be omitted. Never
+// a shell string — safe to splice directly into an exec/tmux argv.
+func PermissionArgs() []string {
+	mode, omit := PermissionMode()
+	if omit {
+		return nil
+	}
+	return []string{"--permission-mode", mode}
+}
+
+// PermissionSummary is a one-line description of the effective mode for the huh
+// confirmation (so the user sees what a launch will run under).
+func PermissionSummary() string {
+	mode, omit := PermissionMode()
+	if omit {
+		return "permission: claude default (prompts — flag omitted via " + PermissionModeEnv + ")"
+	}
+	if mode == DefaultPermissionMode {
+		return "permission: auto (classifier)"
+	}
+	return "permission: " + mode + " (via " + PermissionModeEnv + ")"
+}
+
+// ClaudePrintArgs builds the argv for a backgrounded `claude -p <command>` run
+// (the no-tmux fallback), with the permission flag spliced in as separate argv
+// elements ahead of -p.
+func ClaudePrintArgs(command string) []string {
+	args := append([]string(nil), PermissionArgs()...)
+	return append(args, "-p", command)
+}
+
+// --- session log peek (FR7) --------------------------------------------------
+
+// PeekLines is how many lines of a session's pane (scrollback + screen) a peek
+// captures — read-only, never an attach.
+const PeekLines = 300
+
+// CapturePaneArgs is the argv for `tmux capture-pane`: a read-only snapshot of a
+// session's active pane — the last `lines` lines (`-S -<lines>`), printed (`-p`).
+func CapturePaneArgs(session string, lines int) []string {
+	return []string{"capture-pane", "-t", session, "-p", "-S", "-" + strconv.Itoa(lines)}
+}
+
+// CapturePane returns a read-only snapshot of a live session's pane (best-effort;
+// no tmux → an error, never a panic).
+func CapturePane(session string, lines int) (string, error) {
+	if !HasTmux() {
+		return "", fmt.Errorf("tmux not installed")
+	}
+	out, err := exec.Command("tmux", CapturePaneArgs(session, lines)...).Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// BackgroundLogFor returns the newest background log under
+// .gogo/resources/cli/logs whose file name contains slug, or "" if none — the
+// no-tmux `claude -p` fallback writes <action>-<label>.log there (see
+// backgroundLogPath). Used by the log peek when there is no live tmux session.
+func BackgroundLogFor(root, slug string) string {
+	dir := filepath.Join(root, ".gogo", "resources", "cli", "logs")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	var best string
+	var bestMod time.Time
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".log") || !strings.Contains(e.Name(), slug) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if best == "" || info.ModTime().After(bestMod) {
+			best = filepath.Join(dir, e.Name())
+			bestMod = info.ModTime()
+		}
+	}
+	return best
+}
+
 // BuildIntent resolves an action + slugs (+ optional release) into the exact
 // command and tmux session name. Pure — the unit-tested core of the launcher.
 func BuildIntent(action Action, slugs []string, release string) Intent {
@@ -72,23 +200,69 @@ func BuildIntent(action Action, slugs []string, release string) Intent {
 // sessionName builds "gogo-<action>-<sanitized>" (tmux-safe: lowercase,
 // [a-z0-9-] only). tmux forbids '.' and ':' in session names.
 func sessionName(action, label string) string {
+	return "gogo-" + action + "-" + sanitizeLabel(label)
+}
+
+// sanitizeLabel lowercases a slug/label and reduces it to tmux-safe [a-z0-9-]
+// (the exact transform sessionName applies). Empty → "run".
+func sanitizeLabel(label string) string {
 	s := sessionUnsafe.ReplaceAllString(strings.ToLower(label), "-")
 	s = strings.Trim(s, "-")
 	if s == "" {
 		s = "run"
 	}
-	return "gogo-" + action + "-" + s
+	return s
+}
+
+// SessionMatchesSlug reports whether a running tmux session name was created for
+// slug, following the "gogo-<action>-<sanitized-slug>" convention (sessionName)
+// plus uniqueSession's collision suffix ("-<n>"). This is an EXACT boundary
+// match on the sanitized-slug component — NOT a substring search — so one
+// feature's session is never misattributed to another whose sanitized name is a
+// textual substring of it (e.g. session "gogo-done-awaiting-card" must not match
+// slug "waiting-card"; TEST-005).
+func SessionMatchesSlug(session, slug string) bool {
+	sanitized := sanitizeLabel(slug)
+	for _, action := range []Action{ActionGo, ActionDone} {
+		base := "gogo-" + string(action) + "-" + sanitized
+		if session == base {
+			return true
+		}
+		// uniqueSession appends "-<n>" (n≥2) on a name collision — accept the
+		// base name followed by a purely-numeric suffix, nothing else.
+		if rest, ok := strings.CutPrefix(session, base+"-"); ok && allDigits(rest) {
+			return true
+		}
+	}
+	return false
+}
+
+// allDigits reports whether s is a non-empty run of ASCII digits.
+func allDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // TmuxNewSessionArgs are the argv for `tmux <args>` that starts a detached,
 // attachable session running the interactive claude command. No shell quoting
-// is needed: tmux execs the command + its single argument directly.
+// is needed: tmux execs the command + its single argument directly, and the
+// permission flag (FR8) is spliced in as its own argv elements — the slug is
+// always a single, separate argv element, never a shell string.
 // The session is anchored to the repo root (`-c root`): launching claude from
 // wherever the board happened to run (e.g. cli/) makes Claude Code treat that
 // dir as a NEW project — first-run MCP/trust prompts park the session
 // (TEST-013). The repo root carries the user's existing approvals.
 func TmuxNewSessionArgs(root string, in Intent) []string {
-	return []string{"new-session", "-d", "-s", in.Session, "-c", root, "claude", in.Command}
+	args := []string{"new-session", "-d", "-s", in.Session, "-c", root, "claude"}
+	args = append(args, PermissionArgs()...)
+	return append(args, in.Command)
 }
 
 // Detection helpers (soft deps — detected at use, never required).
@@ -183,7 +357,7 @@ func Launch(root string, in Intent) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	cmd := exec.Command("claude", "-p", in.Command)
+	cmd := exec.Command("claude", ClaudePrintArgs(in.Command)...)
 	cmd.Dir = root // same anchoring as the tmux path (TEST-013)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile

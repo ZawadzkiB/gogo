@@ -34,6 +34,7 @@ Generated-by: /gogo:build
 ## Knowledge file wiring
 | Knowledge file | Mode | Sources linked / synthesized-from |
 |---|---|---|
+| analysis.md | owned | repo (thin commands → skills → agents/templates/cli; enumeration-sync trap) |
 | project-knowledge.md | proxy | `README.md` |
 | tech-stack.md | owned | repo structure (markdown plugin; no build) |
 | non-functional-requirements.md | owned | `README.md` "Portability & prerequisites" + invariants |
@@ -46,3 +47,8 @@ Generated-by: /gogo:build
 - None low; `testing-tools.md` / `test-strategy.md` are **medium** (synthesized —
   there is no test suite to anchor them). Confirm the dogfood flow matches how you
   actually verify changes.
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

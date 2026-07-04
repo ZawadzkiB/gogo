@@ -26,6 +26,7 @@ _Run `/gogo:build` to populate this file._
 ## Knowledge file wiring
 | Knowledge file | Mode | Sources linked / synthesized-from |
 |---|---|---|
+| analysis.md | — | — |
 | project-knowledge.md | — | — |
 | tech-stack.md | — | — |
 | non-functional-requirements.md | — | — |
@@ -46,3 +47,8 @@ conflict **code wins**: the gogo-owned summary is corrected (never the upstream
 
 ## Needs review (low confidence)
 <files where gogo guessed — please confirm>
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

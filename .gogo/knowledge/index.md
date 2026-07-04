@@ -19,6 +19,7 @@ across `/gogo:build` re-runs.
 ## Files
 | File | Purpose | Read in phase | Mode here |
 |---|---|---|---|
+| `analysis.md` | how to analyze a gogo change before planning (procedure + which files; code = truth) | plan | owned |
 | `project-knowledge.md` | architecture, domains, glossary, key decisions | plan | proxy → README |
 | `tech-stack.md` | languages, build/run/test commands | plan, implement, test | owned |
 | `non-functional-requirements.md` | portability/safety/reliability bars | plan, review, test | owned |
@@ -27,3 +28,8 @@ across `/gogo:build` re-runs.
 | `testing-tools.md` | the test tools and how to run them | test | owned |
 | `test-strategy.md` | how to verify + the done-bar | test | owned |
 | `_discovered.md` | what `/gogo:build` found + how each file was wired | build | report |
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

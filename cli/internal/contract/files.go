@@ -48,6 +48,8 @@ func Artifacts(f *Feature) []Artifact {
 	}
 	add("decisions.md", filepath.Join(f.Dir, "decisions.md"), KindMarkdown)
 	add("adjustments.md", filepath.Join(f.Dir, "adjustments.md"), KindMarkdown)
+	// uat.md — the UAT gate log (0.11.0); glamour-rendered like the other prose.
+	add("uat.md", filepath.Join(f.Dir, "uat.md"), KindMarkdown)
 
 	for _, rf := range roundSnapshots(f.Dir) {
 		add(rf, filepath.Join(f.Dir, rf), KindMarkdown)

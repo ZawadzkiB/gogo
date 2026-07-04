@@ -1,0 +1,30 @@
+sequenceDiagram
+  actor U as user
+  participant K as gogo-knowledge (5 report)
+  participant O as orchestrator (gogo)
+  participant S as state.md + events.jsonl
+  participant A as gogo-analyst
+  participant W as plan.md + uat.md (same work item)
+  participant D as /gogo:done (gogo-done)
+
+  K->>S: phase=done, status=awaiting-uat (+ phase-done/report event)
+  Note over U,S: the UAT gate - user verifies the work; one legal command per state
+  alt user accepts
+    U->>D: runs /gogo:done (this IS the acceptance - no confirm question)
+    D->>S: validate-in requires awaiting-uat (waiting-for-user is REFUSED)
+    D->>W: uat.md verdict line - "accepted by /gogo:done, date"
+    D->>S: uat-passed then shipped - status: shipped
+  else user raises issues or questions
+    U->>O: describes the issues in chat
+    O->>S: LOCK FIRST - status: waiting-for-user, open-decision: UAT round N, resume: plan (+ uat-opened)
+    Note over S: mid-re-plan: /gogo:done AND /gogo:go both refuse (REV-004)
+    O->>A: delegate - analyze the input vs plan.md + decisions.md + the CODE
+    A->>W: append uat.md round (verbatim input - analysis - plan delta - disposition) + update plan.md
+    A-->>O: STOP - verdict: re-planned, awaiting re-acceptance
+    U->>O: re-accepts the adjusted plan
+    O->>S: normal plan-acceptance flow - plan-accepted (event owned by gogo-plan)
+    O->>W: append "re-accepted (user, date)" to the round's Verdict (TEST-001)
+    O->>S: iterations gain uat=N + uat-failed event
+    O->>O: /gogo:go reruns (2)->(5) on the SAME item - never a new one
+    O->>S: lands back at awaiting-uat (mid-rerun stale report classifies in-progress - TEST-004)
+  end

@@ -1,0 +1,37 @@
+{
+  "slug": "analyst-uat-and-cli-ops",
+  "phase": "implement",
+  "status": "ok",
+  "round": 6,
+  "inputs": [
+    ".gogo/work/feature-analyst-uat-and-cli-ops/plan.md",
+    ".gogo/work/feature-analyst-uat-and-cli-ops/test/issues.json",
+    ".gogo/work/feature-analyst-uat-and-cli-ops/test-01.md",
+    ".gogo/work/feature-analyst-uat-and-cli-ops/decisions.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md"
+  ],
+  "outputs": [
+    "cli/internal/contract/contract.go",
+    "cli/internal/contract/contract_test.go",
+    "cli/internal/launch/launch.go",
+    "cli/internal/launch/launch_test.go",
+    "cli/internal/tui/model.go",
+    "cli/internal/tui/update.go",
+    "cli/internal/tui/stagec_test.go",
+    "cli/internal/tui/view.go",
+    "cli/main.go",
+    "skills/gogo-status/SKILL.md",
+    "docs/cli-contract.md",
+    "skills/gogo/SKILL.md",
+    "skills/gogo-build/SKILL.md",
+    "agents/gogo-analyst.md",
+    "templates/uat.template.md",
+    "templates/report.template.md",
+    "README.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Fix round 6 (test round 1 = 3 major + 4 minor + 3 nit, all agent-fixable) — fixed all 10 TEST-001..010. Two majors are CLI code: TEST-004 the classifier's ready-to-ship rule now gates on a report AND a ship-gate status (readyToShipStatus: awaiting-uat or legacy done), so a UAT rerun's stale report (status implementing/plan-accepted/waiting-for-user) classifies in-progress not ready-to-ship — changed together in cli/internal/contract/contract.go, skills/gogo-status/SKILL.md rule table+note, and docs/cli-contract.md §3 table+note+the 0.11.0 changed-block (additive clarification per decisions.md's TEST-004 note; no version bump). TEST-005 session-to-slug matching is now an EXACT boundary match (new launch.SessionMatchesSlug: gogo-<action>-<sanitized-slug> + uniqueSession's numeric -<n> suffix, sanitizing the slug like sessionName does) instead of strings.Contains, so 'gogo-done-awaiting-card' no longer matches slug 'waiting-card' — tui hasLiveSession/liveSessionFor delegate to it (removed the now-unused strings import from update.go). Third major TEST-009: README ## Agents now lists gogo-analyst (5th agent). Minors/nits: TEST-001 gave the uat.md re-accepted verdict line an owner (gogo/SKILL.md UAT step 3 + uat.template.md note + gogo-analyst.md step 4 note); TEST-002 documented h/j/k in the board help line, cli/main.go, and README keymap; TEST-003 added an events ts producer-discipline note to cli-contract §5 (real UTC at emission, append-only, file-order authoritative when non-monotonic); TEST-006 gogo-build Step 4 '9'→'8 content files (except _discovered.md and index.md)'; TEST-007 gogo-analyst.md external-docs fallback gained the 'record the external ref as an assumption' clause; TEST-008 added a FR7 session-log-peek bullet to the 0.11.0 block; TEST-010 report.template.md example status → awaiting-uat. New Go tests: TestClassifyReadyRequiresUATStatus (contract), TestSessionMatchesSlug (launch), TestLiveSessionExactMatch (tui). Gates: gofmt -l clean, go vet clean, go test -race -count=1 ./... all green; status golden unaffected; rebuilt gogo 0.11.0; real-repo ./gogo status reads clean (11 features, this one in-progress/implement). Did NOT touch state.md."
+}

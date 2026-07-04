@@ -1,0 +1,18 @@
+flowchart TD
+  P["/gogo:plan"]:::proc --> AN["gogo-analyst (new)\nanalysis.md procedure - named knowledge files\ncode = source of truth - external-docs hook"]:::gate
+  AN -->|"plan.md + charts"| ACC{"user accepts"}:::gate
+  ACC --> GO["/gogo:go - orchestrator delegates\n(2) developer - (3) reviewer - (4) tester - (5) report"]:::proc
+  GO --> UAT{"UAT - status: awaiting-uat\nuser checks the work"}:::gate
+  UAT -->|"issues raised"| LOCK["mid-UAT lock - status: waiting-for-user\n(uat-opened; done AND go both refuse)"]:::gate
+  LOCK --> ANA["gogo-analyst: analyze vs plan + decisions + CODE\nappend uat.md round - propose plan delta"]:::proc
+  ANA -->|"user re-accepts -> plan-accepted\n(uat=N - uat-failed) - SAME item"| GO
+  UAT -->|"pass = running /gogo:done (IS the acceptance)\nuat.md verdict - uat-passed -> shipped"| DONE["/gogo:done ships (synthesis writer)"]:::out
+  B["/gogo:build re-run"]:::proc --> CUST["preserve ## Custom 1:1\n(user-owned, never rewritten)"]:::art
+  CLI["gogo CLI 0.11.0"]:::proc --> X["x delete -> .gogo/trash/ (recoverable)\n+ gogo trash list/restore - changelog un-deletable"]:::out
+  CLI --> L["l log peek (capture-pane, read-only)"]:::out
+  CLI --> PM["launches: --permission-mode auto\n(GOGO_CLAUDE_PERMISSION_MODE tri-state)"]:::out
+  CLI --> BDG["awaiting-uat badge on ready\nclassifier: ready = report AND awaiting-uat/done"]:::art
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

@@ -46,7 +46,7 @@ func (m Model) viewBoard() string {
 	if status == "" {
 		status = m.boardStatusLine()
 	}
-	help := "←→ cols · ↑↓ cards · space select · enter drill · v view · w web · m move · d ship · a attach · / filter · q quit"
+	help := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · / filter · q quit"
 	return strings.Join([]string{header, body, statusStyle(status), helpStyle.Render(help)}, "\n")
 }
 
@@ -54,8 +54,8 @@ func (m Model) viewBoard() string {
 // live session (TEST-006), else the running-sessions summary.
 func (m Model) boardStatusLine() string {
 	if f := m.focusedCard(); f != nil && hasLiveSession(f.Slug, m.sessions) {
-		return sessionStyle.Render("● "+f.Slug) + " has a live session — press " +
-			slugStyle.Render("a") + " to attach"
+		return sessionStyle.Render("● "+f.Slug) + " has a live session — " +
+			slugStyle.Render("l") + " peek · " + slugStyle.Render("a") + " attach"
 	}
 	return m.sessionsLine()
 }
@@ -175,8 +175,11 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		head = mark + slugStyle.Render(truncate(slug, width-4)) + dot
 		titleLine = dimStyle.Render(truncate(title, width))
 		bs := columnStyles[colIdx].badge
-		if f.WaitingForUser() {
+		switch {
+		case f.WaitingForUser():
 			bs = waitStyle
+		case f.AwaitingUAT():
+			bs = uatStyle
 		}
 		badgeLine = bs.Render(truncate(b, width))
 	}
@@ -229,8 +232,14 @@ func (m Model) viewDrill() string {
 func (m Model) viewViewer() string {
 	title := colTitleStyle.Render(m.viewerTitle)
 	help := helpStyle.Render("↑↓/jk line · space/b page · d/u ½page · g/G top/bottom · w web · esc back · (glow: G from the file list)")
+	verb := "rendering"
+	if m.peeking {
+		// Read-only session-log peek (FR7): r re-captures, a escalates to attach.
+		help = helpStyle.Render("↑↓/jk scroll · r re-capture · a attach · q back  (read-only log peek)")
+		verb = "capturing"
+	}
 	if m.viewerLoading {
-		body := m.spinner.View() + " rendering " + m.viewerTitle + "…"
+		body := m.spinner.View() + " " + verb + " " + m.viewerTitle + "…"
 		return strings.Join([]string{title, "", dimStyle.Render(body), help}, "\n")
 	}
 	return strings.Join([]string{title, m.viewport.View(), help}, "\n")

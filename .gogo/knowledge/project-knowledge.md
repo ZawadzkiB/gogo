@@ -156,3 +156,32 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   The frozen consumer spec is **`docs/cli-contract.md`**. Subcommands
   status/view/events; `gogo --version` mirrors plugin.json. Command set still
   **12** (the CLI is a binary, not a 13th command); version **0.10.0**.
+- **Planning analyst + the UAT gate + CLI ops (since 0.11.0):** phase ① is now
+  delegated to a **fifth agent — `gogo-analyst`** — driven by **`analysis.md`**,
+  the **10th knowledge file** (the ordered analysis procedure, knowledge files
+  named per phase, **code = source of truth**, a capability-detected
+  external-docs hook); every command states the **orchestrator-first** chain
+  (command → orchestrator → specialist agent). Report ⑤'s green path now ends
+  at **`status: awaiting-uat`** — the **UAT gate**: running `/gogo:done` IS the
+  acceptance (recorded as the `uat.md` verdict line; `uat-passed` → `shipped`);
+  issues instead **lock the item** (`waiting-for-user` + `uat-opened` — done AND
+  go both refuse) while `gogo-analyst` re-plans the **SAME work item** (`uat.md`
+  round + plan delta), and only user re-acceptance (`plan-accepted`, then
+  `uat=N` + `uat-failed`) reruns ②→⑤. Classifier: **ready-to-ship = a final
+  report AND `awaiting-uat`/legacy `done`** (additive clarification — a rerun's
+  stale report is in-progress). Every knowledge file may carry a user-owned
+  **`## Custom`** section — preserved 1:1 by build re-runs, the ⑤ reconcile,
+  and `/gogo:skills` (exempt from budget + extraction). CLI 0.11.0: `x` delete
+  → recoverable **`.gogo/trash/<ts>-<slug>/`** + `gogo trash` list/restore
+  (changelog un-deletable at UI + package level; the CLI's ONE write outside
+  `.gogo/resources/`), `l` read-only session log peek (capture-pane, never an
+  attach), launches carry **`--permission-mode auto`**
+  (`GOGO_CLAUDE_PERMISSION_MODE` tri-state: unset→auto · set→verbatim ·
+  empty→omit), `awaiting-uat` badge on ready cards (`waiting-for-user` wins
+  mid-UAT). Agents **5**; knowledge files **10**; command set still **12**;
+  version **0.11.0**.
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

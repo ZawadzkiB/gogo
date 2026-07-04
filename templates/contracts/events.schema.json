@@ -14,7 +14,7 @@
     },
     "event": {
       "type": "string",
-      "description": "Which transition happened. phase-started / phase-done bracket a phase; plan-accepted marks the plan-acceptance moment; round-opened opens an implement/review/test round; issues-found records review/test findings (count in note); fix-round marks implement re-entering to fix an issues list; gate-opened / gate-resolved bracket a user decision gate; shipped marks /gogo:done archiving the changelog entry.",
+      "description": "Which transition happened. phase-started / phase-done bracket a phase; plan-accepted marks the plan-acceptance moment; round-opened opens an implement/review/test round; issues-found records review/test findings (count in note); fix-round marks implement re-entering to fix an issues list; gate-opened / gate-resolved bracket a user decision gate; uat-opened marks the user routing awaiting-uat feedback to the analyst (orchestrator); uat-failed marks that a re-planned uat round was re-accepted and /gogo:go is about to rerun (orchestrator; round summary in note); uat-passed marks /gogo:done accepting the UAT gate (gogo-done, just before shipped); shipped marks /gogo:done archiving the changelog entry.",
       "enum": [
         "phase-started",
         "plan-accepted",
@@ -24,6 +24,9 @@
         "fix-round",
         "gate-opened",
         "gate-resolved",
+        "uat-opened",
+        "uat-passed",
+        "uat-failed",
         "shipped"
       ]
     },

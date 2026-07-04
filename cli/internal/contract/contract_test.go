@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -34,6 +35,49 @@ func TestClassifier(t *testing.T) {
 		if got := want[f.Slug]; got != f.Class {
 			t.Errorf("%s: class = %q, want %q", f.Slug, f.Class, got)
 		}
+	}
+}
+
+// TestClassifyReadyRequiresUATStatus pins TEST-004: a report on disk only
+// classifies ready-to-ship when the status is a genuine ship gate (awaiting-uat
+// or a legacy done). A UAT rerun re-runs ②→⑤ on the same feature without
+// clearing the prior report/, so a mid-rerun feature (phase implement, status
+// implementing/plan-accepted/waiting-for-user) carries a STALE report — and must
+// classify in-progress, never ready-to-ship.
+func TestClassifyReadyRequiresUATStatus(t *testing.T) {
+	withReport := func(t *testing.T) string {
+		t.Helper()
+		dir := t.TempDir()
+		rd := filepath.Join(dir, "report")
+		if err := os.MkdirAll(rd, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(rd, "report.md"), []byte("# report"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	cases := []struct {
+		name, phase, status string
+		want                string
+	}{
+		{"awaiting-uat + report → ready", "done", "awaiting-uat", ClassReadyToShip},
+		{"legacy done + report → ready", "knowledge", "done", ClassReadyToShip},
+		{"mid-rerun implementing + stale report → in-progress", "implement", "implementing", ClassInProgress},
+		{"mid-rerun plan-accepted + stale report → in-progress", "implement", "plan-accepted", ClassInProgress},
+		{"mid-rerun waiting-for-user + stale report → in-progress", "implement", "waiting-for-user", ClassInProgress},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := &Feature{Dir: withReport(t), Phase: c.phase, Status: c.status}
+			classify(f, nil)
+			if f.Class != c.want {
+				t.Errorf("class = %q, want %q (phase=%q, status=%q)", f.Class, c.want, c.phase, c.status)
+			}
+			if f.ReportPath == "" {
+				t.Errorf("stale report should still be detected on disk (ReportPath empty)")
+			}
+		})
 	}
 }
 

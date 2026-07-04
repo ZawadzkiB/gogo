@@ -18,6 +18,7 @@ hand-off.
 ```mermaid
 flowchart LR
     subgraph KN["knowledge (.gogo/knowledge)"]
+      AN[analysis]:::kn
       PK[project-knowledge]:::kn
       TS[tech-stack]:::kn
       NFR[non-functional-requirements]:::kn
@@ -28,6 +29,7 @@ flowchart LR
     end
 
     ORCH(["gogo (orchestrator)"]):::orch
+    ANALYST(["gogo-analyst ①"]):::analyst
     DEV(["gogo-developer ②"]):::dev
     REV(["gogo-reviewer ③"]):::rev
     TEST(["gogo-tester ④"]):::test
@@ -38,10 +40,13 @@ flowchart LR
     TISS[/test issues.json/]:::art
     REPORT[/"report/report.md"/]:::art
 
-    PK --> ORCH
-    TS --> ORCH
-    NFR --> ORCH
-    ORCH ==> PLAN
+    AN --> ANALYST
+    PK --> ANALYST
+    TS --> ANALYST
+    NFR --> ANALYST
+    CR --> ANALYST
+    ANALYST ==> PLAN
+    PLAN --> ORCH
     ORCH ==> REPORT
 
     PLAN --> DEV
@@ -68,6 +73,7 @@ flowchart LR
 
     classDef kn fill:#fff3d6,stroke:#caa54a,color:#111
     classDef orch fill:#d9f2f2,stroke:#3aa0a0,color:#111
+    classDef analyst fill:#dfe7ff,stroke:#6f86d6,color:#111
     classDef dev fill:#e6f5e6,stroke:#86b886,color:#111
     classDef rev fill:#ffe0e6,stroke:#d98aa0,color:#111
     classDef test fill:#fff0d6,stroke:#d9a441,color:#111
@@ -77,16 +83,41 @@ flowchart LR
 *Solid arrows into an agent = consumes; thick arrows out = produces; the dotted
 arrows feed an issues list back to the developer in fix mode.*
 
+**Commands invoke the orchestrator; the orchestrator delegates every phase to its
+specialist agent (① analyst · ② developer · ③ reviewer · ④ tester · ⑤ orchestrator +
+`gogo-knowledge`) and owns the gates in chat.**
+
 ## `gogo` — the orchestrator
 
-Owns the flow, the loops, and the decision gates; runs the interactive phases
-(① plan, every gate, ⑤ report) and delegates the heads-down phases. It does not
-write product code — it coordinates and surfaces genuine decisions.
+Owns the flow, the loops, and the decision gates; owns the interactive gates (the
+plan-acceptance gate, every decision gate, the ⑤ report step, and the **UAT gate** after
+⑤), and **delegates every phase to its specialist agent**. It does not write product code
+— it coordinates and surfaces genuine decisions. At the UAT gate it emits
+`uat-opened`/`uat-failed` and drives the loop (delegates the analysis to `gogo-analyst`,
+gates the re-acceptance, reruns `/gogo:go`); `/gogo:done` owns the acceptance path.
 
 | Direction | Artifacts |
 |---|---|
-| Consumes | `.gogo/knowledge/*` (esp. `project-knowledge`, `tech-stack`, `non-functional-requirements`); `state.md`; `decisions.md`; each specialist's `result.json` / issues list |
-| Produces | the feature folder; `plan.md`; `adjustments.md`; `state.md` (kept current); `decisions.md` entries; intended-design `charts/`; at ⑤ the `report/` bundle (`report/report.md` + the as-built UML set + `diagrams.html`), and updated gogo-owned knowledge summaries |
+| Consumes | `.gogo/knowledge/*` (esp. `project-knowledge`, `tech-stack`, `non-functional-requirements`); `state.md`; `decisions.md`; `uat.md`; each specialist's `result.json` / issues list |
+| Produces | the feature folder (via ①); `state.md` (kept current); `decisions.md` entries; the UAT loop's `uat-opened`/`uat-failed` events; at ⑤ the `report/` bundle (`report/report.md` + the as-built UML set + `diagrams.html`), and updated gogo-owned knowledge summaries |
+
+## `gogo-analyst` — phase ① plan
+
+The planning specialist. Reads the named knowledge set (incl. `analysis.md`),
+analyses the goal against the actual codebase (**code = source of truth**, following
+`analysis.md`'s procedure), and writes the plan the user must accept. Presents the
+plan and STOPs — the orchestrator owns the acceptance gate. A leaf agent (no `Task`).
+**Second job — the UAT loop:** when a feature at `awaiting-uat` gets user feedback
+instead of a `/gogo:done` acceptance, the orchestrator delegates the analysis here — it
+weighs the input against the current `plan.md` + `decisions.md` **and the code**, appends
+a `uat.md` round (verbatim input + analysis + plan delta + a disposition per point:
+`fix-needed` / `works-as-designed` / `new-scope`), updates `plan.md` (logging the delta in
+`adjustments.md`), and STOPs for the user to re-accept.
+
+| Direction | Artifacts |
+|---|---|
+| Consumes | the goal (or UAT feedback); `analysis.md`; `project-knowledge.md`; `tech-stack.md`; `non-functional-requirements.md`; `coding-rules.md`; the actual codebase; at UAT the current `plan.md` + `decisions.md` |
+| Produces | the feature folder; `plan.md` (Goal / Context / functional requirements / Approach / Changes checklist / Tests / Out-of-scope); `adjustments.md`; `state.md`; `decisions.md`; the intended-design `charts/` + `charts/before/` set; at UAT a `uat.md` round + the plan delta |
 
 ## `gogo-developer` — phase ② implement
 

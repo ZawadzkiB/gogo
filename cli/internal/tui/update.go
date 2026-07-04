@@ -2,7 +2,6 @@ package tui
 
 import (
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
@@ -73,6 +72,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sessions = msg.sessions
 		return m, sessionTick()
 
+	case peekContentMsg:
+		// A finished peek capture (FR7). Apply it only if the viewer is still the
+		// peek that requested it (the user may have moved on).
+		if m.mode == modeViewer && m.peeking && msg.slug == m.peekSlug {
+			m.viewport.SetContent(msg.content)
+			m.viewport.GotoTop()
+			m.viewerLoading = false
+		}
+		return m, nil
+
 	case spinner.TickMsg:
 		if m.mode == modeViewer && m.viewerLoading {
 			var cmd tea.Cmd
@@ -142,7 +151,9 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.quit()
 	case "left", "h":
 		m.colIdx = clamp(m.colIdx-1, 0, 3)
-	case "right", "l":
+	case "right":
+		// `l` is the log-peek key (FR7), so column-right is the arrow only here;
+		// `h` stays a left alias. Slightly asymmetric on purpose — peek won `l`.
 		m.colIdx = clamp(m.colIdx+1, 0, 3)
 	case "up", "k":
 		m.cardIdx[m.colIdx] = clamp(m.cardIdx[m.colIdx]-1, 0, len(m.cols[m.colIdx])-1)
@@ -169,6 +180,10 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.launchAction(true)
 	case "a":
 		return m.attachFocused()
+	case "l":
+		return m.peekFocused()
+	case "x":
+		return m.deleteFocused()
 	}
 	// Cursor/column moves change which card is focused — re-window so it stays
 	// fully visible (scroll-into-view), and refresh each column's offset (TEST-014).
@@ -254,8 +269,22 @@ func (m Model) updateDrill(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "esc", "left", "h":
+		if m.peeking {
+			return m.closePeek(), nil // peek launched from the board → back to board
+		}
 		m.mode = modeDrill
 		return m, nil
+	case "r":
+		// FR7: re-capture the session/log while peeking (no-op in a normal viewer).
+		if m.peeking {
+			m.viewerLoading = true
+			return m, tea.Batch(m.capturePeekCmd(), m.spinner.Tick)
+		}
+	case "a":
+		// FR7: escalate a read-only peek to a full attach.
+		if m.peeking {
+			return m.attachFromPeek()
+		}
 	case "w":
 		return m, m.buildPageCmd()
 	case "g":
@@ -294,7 +323,7 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// nothing and a launch could feel un-escapable; ctrl+c still flows through
 	// the form and lands in StateAborted below.
 	if k, ok := msg.(tea.KeyMsg); ok && k.Type == tea.KeyEsc {
-		return m.cancelForm(), nil
+		return m.cancelForm(m.pendingDelete != nil), nil
 	}
 	fm, cmd := m.form.Update(msg)
 	if f, ok := fm.(*huh.Form); ok {
@@ -302,9 +331,15 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch m.form.State {
 	case huh.StateCompleted:
+		// A delete confirm (FR6) is its own completion path — move to trash or cancel.
+		if m.pendingDelete != nil {
+			return m.finishDelete()
+		}
 		if m.binding == nil || !m.binding.confirm {
-			// Completed on "Cancel" — same as an abort.
-			return m.cancelForm(), nil
+			// Completed on "Cancel" — same as an abort. Only a SHIP form reaches
+			// here (a delete form is handled above via finishDelete), so
+			// pendingDelete is nil and the selection is (correctly) cleared.
+			return m.cancelForm(m.pendingDelete != nil), nil
 		}
 		// Build the launch command NOW (it captures pending + the edited release
 		// name), then clear the consumed launch state on the model we return so a
@@ -318,20 +353,27 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = modeBoard
 		return m, launchCmd
 	case huh.StateAborted:
-		return m.cancelForm(), nil
+		return m.cancelForm(m.pendingDelete != nil), nil
 	}
 	return m, cmd
 }
 
-// cancelForm returns to the board and clears ALL launch-in-progress state — the
-// pending intent AND the ready-card selection — so a stale, unconfirmed target
-// can never be silently re-shipped by a later, unrelated m/d press (TEST-002).
-func (m Model) cancelForm() Model {
+// cancelForm returns to the board and clears the in-flight form state. For a SHIP
+// form (preserveSelection=false) it ALSO drops the pending intent AND the
+// ready-card selection, so a stale, unconfirmed launch target can never be
+// silently re-shipped by a later, unrelated m/d press (TEST-002). For a DELETE
+// form (preserveSelection=true) the ready-ship selection is unrelated to the
+// delete, so it survives — an Esc-abort of a delete now matches the Cancel-button
+// (finishDelete) path instead of wiping the user's multi-selection (REV-012).
+func (m Model) cancelForm(preserveSelection bool) Model {
 	m.mode = modeBoard
 	m.status = "cancelled"
-	m.selected = map[string]bool{}
-	m.pending = launch.Intent{}
-	m.pendingShip = false
+	if !preserveSelection {
+		m.selected = map[string]bool{}
+		m.pending = launch.Intent{}
+		m.pendingShip = false
+	}
+	m.pendingDelete = nil
 	m.binding = nil
 	m.form = nil
 	return m
@@ -366,9 +408,13 @@ func (m Model) attachFocused() (tea.Model, tea.Cmd) {
 	})
 }
 
+// liveSessionFor returns the running gogo-* tmux session launched for slug, or
+// "". It matches the session's sanitized-slug component EXACTLY (launch.
+// SessionMatchesSlug), never by substring — so one feature's session is never
+// misattributed to another whose slug is a substring of it (TEST-005).
 func liveSessionFor(slug string, sessions []string) string {
 	for _, s := range sessions {
-		if strings.Contains(s, slug) {
+		if launch.SessionMatchesSlug(s, slug) {
 			return s
 		}
 	}

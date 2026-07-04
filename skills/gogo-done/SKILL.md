@@ -63,15 +63,35 @@ mutates gogo state (D5). Pure `Read` / `Write` / `Bash` (+ `Skill` to reuse the
 | out | `.gogo/changelog/<YYYY-MM-DD>-<name>/` — **synthesized** `report.md` + slug-prefixed `*.mmd` + `manifest.json` (with a `members[]` array) + `before/` | append-only archive; **no `diagrams.html` copy** |
 | out | `.gogo/resources/view/<date>-<name>.html` (interactive viewer page, best-effort) | self-contained offline page |
 | out (board mode) | `.gogo/resources/kanban/{board.py, work-index.json, board-intent.json, board-exit.code}` | runtime scratch for the TUI (`.gogo/`-only) |
+| out (per member) | `.gogo/work/feature-<slug>/uat.md` — the UAT accept round appended before shipping | append-only gate log |
 | out | each member's `state.md` (status → `shipped`) | human state |
 
-## ① validate-in (gate)
+## ① validate-in (gate) — report-complete **and** at the UAT gate
 
 - **`<slug>` or `slug1+slug2+...` given** → confirm **each** named feature is
   **report-complete**: `.gogo/work/feature-<slug>/report/report.md` exists. Any missing
   → **STOP** naming the missing feature(s):
 
   > No report found for `<feature>` — run `/gogo:report <feature>` first, then `/gogo:done`.
+
+  **The UAT gate (from 0.11.0 — the plan-gate symmetry).** Phase ⑤ now ends at
+  `state.md` `status: awaiting-uat`, and **running `/gogo:done` IS the UAT acceptance**
+  (there is no extra confirmation question — mirroring how accepting a plan unlocks
+  `/gogo:go`). So for each named member require `status: awaiting-uat`. **Back-compat:**
+  a pre-0.11 feature reported at `status: done` (or any already-shipped `done`/`shipped`
+  member) is **also accepted** — note in the run summary that it predates the UAT gate.
+  **A report-complete member at `waiting-for-user` is REFUSED** — that status means a
+  **mid-UAT re-plan is in progress** (the user raised issues, the plan was revised but not
+  yet re-accepted or re-implemented), so its `report.md`/`plan.md` no longer match the
+  code and it must not ship. **STOP**:
+
+  > `<feature>` is mid-UAT re-plan (`waiting-for-user`) — re-accept the adjusted plan and
+  > run `/gogo:go` to rerun ②→⑤, landing back at `awaiting-uat`, before shipping.
+
+  A member still mid-pipeline (`implementing`/`reviewing`/`testing`) has no report yet, so
+  the report-complete check above already stops it. Net: ship a report-complete member
+  only at `awaiting-uat` (normal path) or `done` (legacy) — **never** at
+  `waiting-for-user`.
 
 - **No slug (board mode / cockpit)** → no hard prerequisite: the board classifies
   whatever exists. If there are **zero work items at all** (`.gogo/work/feature-*`),
@@ -103,10 +123,34 @@ it (with 1, N pre-answered, or the selected members). It is idempotent and `.gog
 A single member (`members = [<slug>]`) and a merged set share **one shape** — the only
 difference is 1 vs N members; there is no divergent single-vs-merged code path.
 
+**Slim by design — plain file ops + synthesis (D2).** The whole job is *"prepare the
+changelog entry from the work item's report + files"*: **Read** the report(s), **Write**
+the synthesized `report.md` + `manifest.json` + the `uat.md` accept round, **copy** the
+`.mmd`/`before/` set, and flip each `state.md` — nothing here **requires** running a
+script, so a board-launched session in Claude's **auto (classifier) permission mode**
+covers it without a bypass or an approval nag. The `bash` blocks below (date derivation,
+the `cp`/`mkdir`/`rm` assembly) are `.gogo/`-only file conveniences; where a plain Read
+suffices (e.g. reading a member's `completed:` line) a Read is equally fine, and any
+`jq`/`python` stays **optional + graceful** — never a hard dependency, never a required
+approval.
+
 1. **Resolve + validate the members.** For each member slug, require
    `.gogo/work/feature-<slug>/report/report.md`. Skip (with a one-line note) any slug
    that isn't report-complete — never write an entry for a feature without a report. If
    nothing report-complete remains, stop.
+
+   **Record the UAT acceptance FIRST (FR4 — the plan-gate symmetry).** For **each**
+   member, before anything else, append a UAT accept round to its
+   `.gogo/work/feature-<slug>/uat.md` (create the file from
+   `${CLAUDE_PLUGIN_ROOT}/templates/uat.template.md` if absent) — a one-line verdict:
+
+   > `## UAT round N — accepted (user, <YYYY-MM-DD>) — via /gogo:done`
+
+   where `N` continues that member's existing round numbering (1 if there are no prior
+   rounds). Running `/gogo:done` **is** the acceptance, so this is the record of it — no
+   separate confirmation question is asked. Then ship exactly as today. (A legacy member
+   at `status: done` that never had a UAT gate gets the same one-line accept round, noted
+   as pre-0.11.) This is a plain **Write/append** — no script, auto-mode-safe.
 
 2. **Derive the entry date + name — do not hardcode.**
    - **Date** = the **newest** member's `- **completed:** <YYYY-MM-DD>` field (the value
@@ -190,15 +234,20 @@ difference is 1 vs N members; there is no divergent single-vs-merged code path.
    (leave `phase: done`). This is what lets `/gogo:status` and the board treat a merged
    entry's members as shipped even though the folder is named after the release.
 
-   **Append the ship event (telemetry).** Beside each member's `state.md` write,
-   append one compact JSON line to that member's
+   **Append the ship events (telemetry).** Beside each member's `state.md` write,
+   append two compact JSON lines to that member's
    `.gogo/work/feature-<member-slug>/events.jsonl` per `events.schema.json`
-   (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`):
+   (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`) — **first the UAT-pass**, then the
+   ship, so the timeline reads accept → ship:
+   `{"ts":"<RFC3339>","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"<member-slug>"}`
+   then
    `{"ts":"<RFC3339>","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/<date>-<name>/","slug":"<member-slug>"}`
-   (for a merged entry the `note` may also list the members). `shipped` is the done
-   phase's **terminal** event — this skill owns it and there is no `phase-done`/done.
-   Create the file if absent; **best-effort** — never fail `/gogo:done` if the append
-   fails (append-only telemetry; `state.md` stays the human resume file).
+   (for a merged entry the ship `note` may also list the members). `uat-passed` is the
+   UAT gate's acceptance event — **this skill (`gogo-done`) owns it** (the orchestrator
+   owns `uat-opened`/`uat-failed` for the feedback loop). `shipped` is the done phase's
+   **terminal** event — this skill owns it and there is no `phase-done`/done. Create the
+   file if absent; **best-effort** — never fail `/gogo:done` if the append fails
+   (append-only telemetry; `state.md` stays the human resume file).
 
 6. **Build the interactive viewer page for the entry (FR10, best-effort).** Reuse the
    **`gogo-view` build** — don't reimplement it — so the entry gets the same xplan-style

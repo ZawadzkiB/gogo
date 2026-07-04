@@ -63,6 +63,17 @@ Generated-by: /gogo:build
   (e.g. `*formBinding`) shared across copies. And forward **every** `tea.Msg`
   (not just `KeyMsg`) to an active child component — async protocols like huh's
   `nextFieldMsg` die silently otherwise.
+- **State rules gate on `status`, never on artifact presence (TEST-004, 0.11.0):**
+  artifacts outlive the state that produced them — a stale `report/` survives a
+  UAT rerun, so a classifier/validate rule keyed on file existence lies
+  mid-pipeline. Key such rules on the `state.md` status (ready-to-ship = report
+  AND `awaiting-uat`/legacy `done`), and treat any relaxation as a contract change.
+- **Attribute sessions by exact convention parse, never substring (TEST-005,
+  0.11.0):** matching a slug into session names with `strings.Contains`
+  cross-attributes overlapping slugs (`auth`/`oauth`, `waiting-card` inside
+  `awaiting-card`). Parse the `gogo-<action>-<sanitized-slug>` convention (plus
+  the numeric collision suffix) where it is OWNED — the launch package — and
+  compare the slug component exactly (`launch.SessionMatchesSlug`).
 
 ## Style
 - Plain ASCII where practical; the phase glyphs `①②③④⑤` are an intentional exception.
@@ -86,3 +97,8 @@ Generated-by: /gogo:build
   **only** sanctioned write outside `.gogo/` is an extracted **standalone** skill's
   `.claude/skills/<slug>/` dir — and only when the user approves that candidate as
   standalone (never automatic). Everything else still honors `.gogo/`-only.
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

@@ -93,3 +93,28 @@ unit test had exercised. The strategy therefore has two mandatory layers:
   by Bubble Tea's stdin reader) while every unit test passed in ~4ms. Detect terminal
   properties ONCE before the TUI starts; never query the terminal from a render path;
   always include one live tmux drive before shipping a TUI change (TEST-003, 0.10.0).
+
+### State-machine / UAT-loop testing (since 0.11.0)
+The 0.11.0 UAT gate was verified by **spec-executing the state machine
+status-by-status** on scratch fixtures; the pattern generalizes to any gogo
+state/gate change:
+- **Walk every status, both branches.** Build a fixture at the entry state
+  (⑤-green → `awaiting-uat`), then execute each skill's instructions literally
+  on the accept path AND the issues path (lock → analyst round → re-accept →
+  rerun), asserting `state.md` + `events.jsonl` after EVERY transition; reset
+  to a snapshot between branches. Include a legacy-shape fixture (pre-0.11
+  `status: done`) for every back-compat clause.
+- **The one-legal-command property is an explicit test target.** For each
+  status, assert which commands REFUSE (quote the refusal text verbatim, then
+  spec-execute the gate against the fixture) as well as which one proceeds —
+  and check the property at the **classifier layer** too: TEST-004 (0.11.0)
+  showed a stale `report/` made a mid-rerun feature classify ready-to-ship
+  until the classifier gated on status, not artifact presence.
+- **Validate the emitted events line-by-line** against `events.schema.json`
+  and check single-owner emission (each transition exactly once, by its owning
+  skill) — a structural hand validator suffices when no jsonschema tool exists.
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

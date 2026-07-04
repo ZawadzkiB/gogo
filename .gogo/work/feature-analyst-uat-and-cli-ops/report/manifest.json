@@ -1,0 +1,9 @@
+{
+  "slug": "analyst-uat-and-cli-ops",
+  "updated": "2026-07-04",
+  "note": "As-built set for 0.11.0. flow = the intended pipeline-v2 chart, confirmed as-built with ONE structural addition folded in: the REV-004 mid-UAT lock (issues raised -> status waiting-for-user -> analyst re-plan -> re-accept -> rerun) on the UAT branch, plus the TEST-004 classifier status-gate on the CLI branch (ready = report AND awaiting-uat/legacy done). sequence = NEW: the UAT loop end-to-end, the feature's heart - accept branch (/gogo:done IS the acceptance: uat.md verdict, uat-passed -> shipped) and issues branch (lock first -> gogo-analyst analyzes vs plan+decisions+code -> uat.md round + plan delta -> user re-accepts (plan-accepted owned by gogo-plan) -> uat=N + uat-failed -> /gogo:go reruns (2)->(5) on the SAME item -> back to awaiting-uat). Plan-time as-is baseline copied to report/before/ (renamed to the kind stem flow.mmd so before/after pair by filename). No diagrams.html in this bundle (0.8.0 slim rule; /gogo:view builds the page from source).",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "As-built: analyst-planned, UAT-gated pipeline (mid-UAT lock) + CLI 0.11.0 ops" },
+    { "kind": "sequence", "file": "report/sequence.mmd", "title": "As-built: the UAT loop - accept via /gogo:done, or issues -> lock -> analyst -> re-accept -> rerun (same item)" }
+  ]
+}

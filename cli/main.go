@@ -16,7 +16,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.10.0"
+const Version = "0.11.0"
 
 func main() {
 	args := os.Args[1:]
@@ -32,6 +32,8 @@ func main() {
 		os.Exit(cmdView(args[1:]))
 	case "events":
 		os.Exit(cmdEvents(args[1:]))
+	case "trash":
+		os.Exit(cmdTrash(args[1:]))
 	case "-h", "--help", "help":
 		printHelp()
 	default:
@@ -64,6 +66,8 @@ usage:
   gogo status          print the work-index classifier table
   gogo view <target>   view a plan/report — glamour in the terminal, or --web for the browser
   gogo events <slug>   print a feature's events.jsonl timeline
+  gogo trash           list .gogo/trash/ entries (deleted work, recoverable)
+  gogo trash restore <entry>   move a trashed entry back to .gogo/work/
   gogo --version       print the version (mirrors the plugin)
 
 view targets:
@@ -77,8 +81,13 @@ view flags:
   --open               with --web, open the page in a browser
 
 board keys:
-  ←→ columns · ↑↓ cards · space select (ready) · enter drill-in · v quick-view
-  w web page · m move/launch · d ship · a attach session · / filter · G glow · q quit
+  ←→/h columns · ↑↓/jk cards · space select (ready) · enter drill-in · v quick-view
+  w web page · m move/launch · d ship · a attach session · l peek log · x delete→trash
+  / filter · G glow · q quit
+
+launch permission mode (FR8): board-launched claude sessions run in auto
+(classifier) permission mode; set GOGO_CLAUDE_PERMISSION_MODE to override (any
+claude --permission-mode value; empty string omits the flag → claude prompts).
 `)
 }
 

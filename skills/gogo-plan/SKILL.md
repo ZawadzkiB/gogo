@@ -1,25 +1,54 @@
 ---
 name: gogo-plan
 description: >-
-  Phase ① of the gogo pipeline — analyse a goal against the project's knowledge
-  docs and write a plan the user must accept before any code is written. Creates
-  .gogo/work/feature-<slug>/. Invoked by the gogo orchestrator or on /gogo:plan.
-  Hard gate: never implement an unaccepted plan.
+  Phase ① of the gogo pipeline — the operating manual for the gogo-analyst agent:
+  read the named knowledge set (incl. analysis.md), analyse the goal against the
+  actual codebase (code = source of truth), and write a plan the user must accept
+  before any code is written. Creates .gogo/work/feature-<slug>/. Invoked by the
+  gogo orchestrator (delegating ① to gogo-analyst) or on /gogo:plan; also runs
+  in-chat. Hard gate: never implement an unaccepted plan.
 ---
 
 # gogo-plan — phase ① (plan, then STOP for acceptance)
 
+This skill is the operating manual for the **`gogo-analyst`** agent — the phase-①
+specialist the orchestrator delegates to — and for the orchestrator when it plans
+in-context. It works either way. You are the *planner*; the **acceptance gate is a
+hard gate the orchestrator owns** — never implement an unaccepted plan.
+
 ## Preconditions
 - Config gate: `.gogo/knowledge/` must exist (else tell the user to run `/gogo:build`).
-- Read: `project-knowledge.md`, `tech-stack.md`, `non-functional-requirements.md`,
-  `coding-rules.md` (follow their `Source:` links for detail when needed).
+- **Read the named knowledge set** (follow each file's `Source:` links for detail):
+
+  | File | Why — for planning |
+  |---|---|
+  | `analysis.md` | **the analysis procedure** — how to analyze this feature before planning (start here) |
+  | `project-knowledge.md` | architecture, domains, and the key decisions the change sits within |
+  | `tech-stack.md` | how the project builds/runs/tests — the mechanics the plan must respect |
+  | `non-functional-requirements.md` | the standing bars (perf/security/a11y/reliability) to design **within** |
+  | `coding-rules.md` | the conventions the implementation will follow — plan reuse and shape accordingly |
+
+  If a file is a bare scaffold (`Confidence: low`, empty `Source:`), wire it (or run
+  `/gogo:build`) before relying on it.
 
 ## Steps
 1. **Slug + folder.** Derive a kebab-case slug from the goal. Create
    `.gogo/work/feature-<slug>/`. If it already exists, you are **revising** — read the
    existing `plan.md`/`adjustments.md`/`state.md`; don't overwrite blindly.
-2. **Analyse** the goal against the knowledge + the actual codebase (Glob/Grep/
-   Read the relevant code paths). Identify reuse, affected files, and edge cases.
+2. **Analyze — follow `analysis.md`'s procedure against the real codebase** (code =
+   source of truth). Working from the goal's nouns/verbs: restate the goal + its
+   acceptance signal; Glob/Grep/Read to the **entry points + the modules/files the
+   change touches**; **read the tests around those paths as the behavior spec**;
+   check **recent git history** on them (`git log`); identify **reuse + blast radius
+   + edge cases**; and surface the **risks/unknowns** that become the plan's
+   alternatives/decisions. **When a doc/knowledge claim conflicts with the tree, the
+   code wins** — verify against the code and note the drift.
+   - **External-specs hook (conditional, capability-detected).** If the feature
+     references an external spec/ticket **and** a docs capability is available (a
+     `notion`/`confluence`/`atlassian`/`jira` MCP or skill), consult it for the
+     spec, then reconcile against the code (the code wins for what exists today). If
+     none is available, proceed from the code + the user's description and record the
+     external ref as an assumption for the plan.
 3. **Write `plan.md`** with this shape:
    - **Goal**
    - **Context** — what exists; the key code paths

@@ -33,3 +33,6 @@ Load `gogo-implement` and follow it:
    fixes back into the issues list.
 3. **validate-out** — validate `charts/manifest.json` (and the updated issues
    list) against their schemas; write `implement/result.json`. Update `state.md`.
+
+Like every gogo command, this invokes the **orchestrator**, which delegates the
+phase to its specialist (gogo-developer) and owns any gates in chat.

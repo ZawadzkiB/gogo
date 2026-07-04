@@ -1,0 +1,8 @@
+{
+  "slug": "analyst-uat-and-cli-ops",
+  "updated": "2026-07-04",
+  "note": "Intended design, updated at report 5 to the as-built shape: (A) gogo-analyst agent driven by the new analysis.md knowledge file (named files, code=truth, external-docs hook) with the orchestrator-first architecture made explicit; (B) the UAT gate between go and done (awaiting-uat + uat.md; issues loop back into the SAME work item) INCLUDING the REV-004 mid-UAT lock (status waiting-for-user while the analyst re-plans; done AND go both refuse) and ## Custom sections build preserves 1:1; (C) CLI 0.11.0 ops: delete-to-trash + gogo trash, session log peek, --permission-mode auto launches (env tri-state), awaiting-uat badge + the TEST-004 classifier status-gate (ready = report AND awaiting-uat/legacy done). As-is baseline in charts/before/.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/pipeline-v2-flow.mmd", "title": "As-built: analyst-planned, UAT-gated pipeline (mid-UAT lock) + CLI ops" }
+  ]
+}

@@ -21,6 +21,7 @@ var (
 	dimText      = lipgloss.AdaptiveColor{Light: "#6b6b6b", Dark: "#9aa0aa"}
 	titleText    = lipgloss.AdaptiveColor{Light: "#111418", Dark: "#e6e9ef"}
 	waitAccent   = lipgloss.AdaptiveColor{Light: "#c0392b", Dark: "#ff6b6b"}
+	uatAccent    = lipgloss.AdaptiveColor{Light: "#8250df", Dark: "#b392f0"} // awaiting-uat — purple
 )
 
 // colStyleSet is the precomputed card/header frame styles for one column.
@@ -40,6 +41,7 @@ var (
 	sessionStyle = lipgloss.NewStyle().Bold(true).Foreground(sessionDot)
 	selMarkStyle = lipgloss.NewStyle().Bold(true).Foreground(selectAccent)
 	waitStyle    = lipgloss.NewStyle().Bold(true).Foreground(waitAccent)
+	uatStyle     = lipgloss.NewStyle().Bold(true).Foreground(uatAccent)
 	helpStyle    = lipgloss.NewStyle().Foreground(dimText)
 )
 

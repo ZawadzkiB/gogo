@@ -1,0 +1,8 @@
+{
+  "slug": "analyst-uat-and-cli-ops",
+  "updated": "2026-07-04",
+  "note": "As-is baseline (before): planning is orchestrator-in-chat with unspecific knowledge reading and no analysis procedure; report-complete goes straight to shippable with no user verification; build has no user-owned preserved section; CLI launches prompt for approvals and the board has no delete or log-peek. Copied into the report bundle from charts/before/ (source: charts/before/current-loop.mmd); file path rewritten to the report/before/ location and renamed to the kind stem flow.mmd so before/after pair by filename in the viewer.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/before/flow.mmd", "title": "Before: no analyst, no UAT gate, nagging launches" }
+  ]
+}

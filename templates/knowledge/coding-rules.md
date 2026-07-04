@@ -35,3 +35,8 @@ rules; framework idioms — filled from the linked source or the codebase>
   **only** sanctioned write outside `.gogo/` is an extracted **standalone** skill's
   `.claude/skills/<slug>/` dir — and only when the user approves that candidate as
   standalone (never automatic). Everything else still honors `.gogo/`-only.
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

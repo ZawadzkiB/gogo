@@ -74,6 +74,15 @@ func (f *Feature) Column() string { return Column(f.Class) }
 // WaitingForUser reports whether the feature is parked on a decision gate.
 func (f *Feature) WaitingForUser() bool { return f.Status == "waiting-for-user" }
 
+// AwaitingUAT reports whether the feature is parked at the UAT gate — where
+// phase ⑤ now leaves a report-complete feature in 0.11.0 (status awaiting-uat).
+// Such a feature classifies ready-to-ship (§3); the CLI paints an awaiting-uat
+// badge on its ready card. During a mid-UAT re-plan the status flips off
+// awaiting-uat (to waiting-for-user, then implementing/…) — so the feature drops
+// OUT of ready-to-ship back to in-progress (readyToShipStatus, TEST-004), and
+// its badge takes waiting-for-user priority (docs/cli-contract.md §2/§3).
+func (f *Feature) AwaitingUAT() bool { return f.Status == "awaiting-uat" }
+
 // EventsPhase maps a state.md phase name to the events.jsonl phase vocabulary.
 // The two agree everywhere except the fifth phase, which state.md labels
 // "knowledge" and events.jsonl labels "report" (docs/cli-contract.md §2/§5).
@@ -190,7 +199,9 @@ func loadFeature(dir, slug string) *Feature {
 }
 
 // classify applies the work-index classifier (docs/cli-contract.md §3),
-// first-matching-rule-wins, and fills ReportPath / ChangelogPath.
+// first-matching-rule-wins, and fills ReportPath / ChangelogPath. ready-to-ship
+// requires a report AND a ship-gate status (awaiting-uat or legacy done) — a
+// stale report left behind by a UAT rerun does not qualify (readyToShipStatus).
 func classify(f *Feature, cl []*ChangelogEntry) {
 	// A changelog entry ships this slug when its folder is <date>-<slug> with a
 	// report.md, OR the slug appears in a manifest members[] array.
@@ -205,13 +216,24 @@ func classify(f *Feature, cl []*ChangelogEntry) {
 	switch {
 	case f.Status == "shipped" || f.ChangelogPath != "":
 		f.Class = ClassShipped
-	case f.ReportPath != "":
+	case f.ReportPath != "" && readyToShipStatus(f.Status):
 		f.Class = ClassReadyToShip
 	case inProgressPhaseOrStatus(f.Phase, f.Status):
 		f.Class = ClassInProgress
 	default:
 		f.Class = ClassUnfinished
 	}
+}
+
+// readyToShipStatus reports whether a report-complete feature is genuinely
+// parked at the ship gate — status awaiting-uat (0.11.0's phase-⑤ landing) or a
+// legacy done (pre-0.11). A report on disk alone no longer qualifies: a UAT
+// rerun re-runs ②→⑤ on the SAME feature without clearing the prior report/, so
+// during that window a mid-pipeline feature (status implementing / plan-accepted
+// / waiting-for-user) carries a STALE report — and must NOT show as ready-to-ship.
+// The in-progress rule catches it instead (docs/cli-contract.md §3, TEST-004).
+func readyToShipStatus(status string) bool {
+	return status == "awaiting-uat" || status == "done"
 }
 
 // detectReport returns the absolute report.md path that makes a feature

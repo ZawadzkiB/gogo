@@ -29,6 +29,10 @@ func send(m Model, msg tea.Msg) Model {
 
 func runes(s string) tea.KeyMsg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)} }
 
+// right moves one column right via the arrow key. Column-right is arrow-only
+// since `l` became the log-peek key (FR7); `h`/`j`/`k` stay as vim aliases.
+func right(m Model) Model { return send(m, tea.KeyMsg{Type: tea.KeyRight}) }
+
 func TestBoardColumnsPopulated(t *testing.T) {
 	m := newModel(t)
 	// plan=3 (unfinished, aborted, malformed), in-progress=1, ready=2, changelog=3
@@ -55,8 +59,8 @@ func TestNavigation(t *testing.T) {
 	if m.colIdx != 0 {
 		t.Fatalf("start colIdx = %d", m.colIdx)
 	}
-	m = send(m, runes("l")) // right
-	m = send(m, runes("l"))
+	m = right(m) // right (arrow — `l` is now peek)
+	m = right(m)
 	if m.colIdx != 2 {
 		t.Errorf("after 2×right colIdx = %d, want 2", m.colIdx)
 	}
@@ -111,8 +115,8 @@ func TestSelectionOnlyReady(t *testing.T) {
 		t.Errorf("no bounce status, got %q", m.status)
 	}
 	// move to ready column, select a card.
-	m = send(m, runes("l"))
-	m = send(m, runes("l"))
+	m = right(m)
+	m = right(m)
 	m = send(m, tea.KeyMsg{Type: tea.KeySpace})
 	if len(m.selectedSlugs()) != 1 {
 		t.Errorf("ready selection = %v, want 1", m.selectedSlugs())

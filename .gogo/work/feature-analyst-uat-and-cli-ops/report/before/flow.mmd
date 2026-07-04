@@ -1,0 +1,12 @@
+flowchart TD
+  P["/gogo:plan (orchestrator in-chat,\nvague 'read the knowledge')"]:::proc --> ACC{"user accepts"}:::gate
+  ACC --> GO["/gogo:go (2)(3)(4)(5)"]:::proc
+  GO --> D["state: done -> classifier: ready-to-ship\n(NO user verification step)"]:::art
+  D --> DONE["/gogo:done ships immediately"]:::out
+  B["/gogo:build re-run"]:::proc --> OV["preserves 'gogo overrides' only\n(no user-owned Custom convention)"]:::art
+  CLI["gogo CLI 0.10.0"]:::proc --> NAG["launched sessions prompt for\nscript approvals nobody sees"]:::gate
+  CLI --> NOOPS["no delete - attach is the only\nway to see a session"]:::art
+  classDef proc fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef art fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gate fill:#ffe0e6,stroke:#d98aa0,color:#111
+  classDef out fill:#e6f5e6,stroke:#86b886,color:#111

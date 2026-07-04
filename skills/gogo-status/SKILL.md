@@ -35,8 +35,8 @@ board** (Stage B) and roadmap #7's commenter. It **reads only**.
 | Class | Rule |
 |---|---|
 | **shipped** | `state.md` `status: shipped`, **or** a `.gogo/changelog/*-<slug>/` entry with a `report.md` exists for this slug, **or** this slug appears in any `.gogo/changelog/*/manifest.json` `members` array (a merged release entry named after the release) |
-| **ready-to-ship** | not shipped, **and** a final report exists (`report/report.md`, or a legacy root `report.md`) |
-| **in-progress** | no report, **and** `phase` is one of `implement` / `review` / `test` (or `status` is `implementing` / `reviewing` / `testing`) |
+| **ready-to-ship** | not shipped, a final report exists (`report/report.md`, or a legacy root `report.md`), **and** `status` is a ship gate — `awaiting-uat` (0.11.0) **or** a legacy `done` (pre-0.11). A **stale** report left behind by a UAT rerun (status `implementing` / `plan-accepted` / `waiting-for-user`) does **not** qualify — it falls through to **in-progress** |
+| **in-progress** | `phase` is one of `implement` / `review` / `test` (or `status` is `implementing` / `reviewing` / `testing`) — e.g. a UAT rerun re-implementing the same feature, **even with a stale `report/` still on disk** |
 | **unfinished** | anything else — early/`plan` phase, planned but not built, no report |
 
 Notes: a feature that has a report **and** a matching changelog entry — matched by
@@ -44,6 +44,23 @@ folder slug **or** by `manifest.json` `members` — is **shipped** (the changelo
 over ready-to-ship). Set `changelog_path` to the entry dir that ships it (its own
 `<date>-<slug>/`, or the merged `<date>-<name>/` whose `members` list it). `aborted`
 features report as **unfinished** (flag the `aborted` status in the record).
+
+**`awaiting-uat` classifies ready-to-ship (from 0.11.0).** Phase ⑤ now ends at
+`status: awaiting-uat` (the UAT gate) rather than `done`, and such a feature always has
+a `report/report.md` — so the ready-to-ship rule catches it (not shipped + report present
++ ship-gate status). No new class: the classes stay the four stable ones (frozen-contract
+additive). A consumer that wants to surface the pending sign-off can read the raw
+`status` (`awaiting-uat`) and show an **`awaiting-uat` badge** on the ready column — but
+**that badge is a CLI concern (Stage C / the 0.11.0 CLI)**; the classifier itself only
+labels the four classes.
+
+**A stale report during a UAT rerun does NOT re-open ready-to-ship.** The UAT loop
+re-runs ②→⑤ on the **same** feature and never clears the prior `report/`, so between
+re-acceptance and the next ⑤ the feature is mid-pipeline (`implementing` / `plan-accepted`
+/ `waiting-for-user`) with a **pre-feedback** report still on disk. Report-presence alone
+therefore no longer decides ready-to-ship — the `status` ship-gate check above (`awaiting-uat`
+or legacy `done`) is what distinguishes a genuine ship gate from a stale-report rerun, which
+classifies **in-progress** so it is never shippable from the board until ⑤ lands again.
 
 ### Output shape (the documented contract the board + status consume)
 

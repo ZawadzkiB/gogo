@@ -1,9 +1,9 @@
 {
   "name": "gogo",
-  "version": "0.10.0",
-  "description": "Generic, knowledge-grounded dev pipeline: plan → implement → review → test → report. Configure per-project with /gogo:build.",
+  "version": "0.11.0",
+  "description": "Knowledge-grounded dev pipeline for Claude Code: analyst-planned -> implement -> review -> test -> report, gated by plan acceptance and a human UAT step. Typed contracts + live events telemetry, synthesized changelog releases, and the native `gogo` TUI cockpit (board, viewers, Claude-launching moves). Configure per-project with /gogo:build.",
   "author": {
-    "name": "Bartłomiej Zawadzki",
+    "name": "Bart\u0142omiej Zawadzki",
     "email": "zawadzkibartek@gmail.com"
   },
   "homepage": "https://github.com/ZawadzkiB/gogo",

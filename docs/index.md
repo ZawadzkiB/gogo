@@ -79,14 +79,16 @@ The whole lifecycle is four commands:
 |---|---|---|
 | **`/gogo:build`** | Discovers your existing docs, wires the `.gogo/knowledge/` config, and **verifies the distilled facts against your actual code** (code wins on conflict). | the `.gogo/knowledge/*` config — see [Discovery](discovery.md) |
 | **`/gogo:plan "…"`** | Analyses the goal against your knowledge + code; writes an accept-pending plan and **stops** for you (a hard gate — no code until you accept). | `.gogo/work/feature-<slug>/plan.md` + the intended-design and as-is `before/` diagrams — see [Flow ①](flow.md) |
-| **`/gogo:go`** | Runs **② implement → ③ review → ④ test → ⑤ report**, looping fixes back into implement and **pausing only at real decisions**. | the code, the living `review/` + `test/` issues, and the as-built `report/` bundle (`report.md` + UML) — see [Flow](flow.md) · [Agents](agents.md) |
-| **`/gogo:done`** | The explicit "this is shipped" gate — ship one report-complete feature, or several as ONE merged release entry (no slug opens the work board). | **Synthesizes** a high-level entry (`report.md` **written**, not copied) into `.gogo/changelog/<date>-<name>/` and **builds an interactive viewer page, printing its `file://` link** — see [Commands](commands.md) |
+| **`/gogo:go`** | Runs **② implement → ③ review → ④ test → ⑤ report**, looping fixes back into implement and **pausing only at real decisions**; ends at the **UAT gate** (`awaiting-uat`) for you to verify. | the code, the living `review/` + `test/` issues, and the as-built `report/` bundle (`report.md` + UML) — see [Flow](flow.md) · [Agents](agents.md) |
+| **`/gogo:done`** | The explicit "this is shipped" gate — running it **is the UAT acceptance** (no extra question). Ship one report-complete feature, or several as ONE merged release entry (no slug opens the work board). | Records the UAT accept in `uat.md`, then **synthesizes** a high-level entry (`report.md` **written**, not copied) into `.gogo/changelog/<date>-<name>/` and **builds an interactive viewer page, printing its `file://` link** — see [Commands](commands.md) |
 
 Review and test issues loop back into implement automatically; any genuine fork
-**pauses for your decision**, then resumes. Open any finished report as an
-interactive, offline page with **`/gogo:view`** (draggable diagrams, before/after
-compare). Full per-command detail: [Commands](commands.md); the phase mechanics:
-[Flow](flow.md).
+**pauses for your decision**, then resumes. When `/gogo:go` finishes, the feature sits
+at the **UAT gate** (`awaiting-uat`) — you verify the work; `/gogo:done` accepts it, or
+your feedback loops back into planning on the **same work item** (recorded in `uat.md`).
+Open any finished report as an interactive, offline page with **`/gogo:view`** (draggable
+diagrams, before/after compare). Full per-command detail: [Commands](commands.md); the
+phase mechanics: [Flow](flow.md).
 
 ## Documentation map
 

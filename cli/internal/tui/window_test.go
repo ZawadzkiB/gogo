@@ -118,9 +118,9 @@ func smallBoard(t *testing.T) Model {
 	t.Helper()
 	m := newModel(t)
 	m = send(m, tea.WindowSizeMsg{Width: 200, Height: 13})
-	m = send(m, runes("l")) // → in progress
-	m = send(m, runes("l")) // → ready
-	m = send(m, runes("l")) // → changelog (focused)
+	m = right(m) // → in progress (arrow — `l` is now peek)
+	m = right(m) // → ready
+	m = right(m) // → changelog (focused)
 	if m.colIdx != 3 {
 		t.Fatalf("did not focus changelog, colIdx=%d", m.colIdx)
 	}

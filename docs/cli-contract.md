@@ -36,6 +36,53 @@ run per line. Forward-compatibility relies on the **consumer** parsing leniently
 schema — a strict validation of a future v2 line (new field) would wrongly reject
 it and drop a real transition.
 
+### Changed in 0.11.0 (all additive — no key removed or renamed)
+
+The **UAT gate** and the `## Custom` knowledge convention extend the surface without
+breaking any existing consumer:
+
+- **`state.md` `status` enum** gains `awaiting-uat` (§2) — where phase ⑤ now leaves a
+  feature (was `done`). A pre-0.11 feature still on `done` is unchanged; the classifier
+  treats both as **ready-to-ship** (§3), and the four classes/columns are unchanged.
+  **Ready-to-ship clarification (§3):** ready-to-ship now gates on a report **and** a
+  ship-gate `status` (`awaiting-uat` or legacy `done`) — not report-presence alone — so a
+  UAT rerun's **stale** `report/` (status `implementing` / `plan-accepted` /
+  `waiting-for-user`) classifies **in-progress**, never ready-to-ship. Additive
+  clarification of an existing rule; the four classes/columns are unchanged.
+- **`events.jsonl` `event` enum** gains `uat-opened`, `uat-passed`, `uat-failed` (§5) —
+  the UAT loop's telemetry. A lenient consumer already skips unknown events, so older
+  readers are unaffected.
+- **`uat.md`** — a new optional work-folder file (§1), the UAT gate log (prose, not
+  schematized).
+- **`## Custom` sections in `.gogo/knowledge/*`** — a user-owned, copied-1:1 knowledge
+  convention (like `## gogo overrides`); `/gogo:build` and phase ⑤ preserve it verbatim.
+  **Not part of the CLI read path** (the CLI does not parse knowledge files) — listed
+  here only because it ships in the same versioned plugin bump.
+- **`.gogo/trash/`** — a new top-level dir (sibling of `work/` and `changelog/`) the CLI
+  **writes** when a board card is deleted (`x`): the work folder moves to
+  `.gogo/trash/<compact-ts>-<slug>/` (recoverable — never `rm`). This is the CLI's **one
+  write outside `.gogo/resources/`**. `gogo trash` lists it; `gogo trash restore <entry>`
+  moves it back to `.gogo/work/feature-<slug>/` (refused if that name already exists). The
+  timestamp is a filesystem-safe compact UTC form (`20060102T150405Z`, no `:`), and since
+  it carries no `-`, the first `-` in an entry name splits the timestamp from the slug.
+  Changelog-column (shipped) cards are the append-only archive and are **never** deletable.
+- **Board-launched sessions run in an auto (classifier) permission mode.** A `/gogo:go` or
+  `/gogo:done` launch passes `claude --permission-mode auto` (verified against
+  `claude --help`) so the skills' safe file steps do not nag inside an unwatched session —
+  NOT a full bypass. `GOGO_CLAUDE_PERMISSION_MODE` overrides the value verbatim (any
+  `claude --permission-mode` value); the **empty string** omits the flag entirely (claude
+  prompts normally). The flag + value are always separate argv elements (a slug never
+  reaches a shell). Presentation/launch concern only — not part of the file read contract.
+- **Board session-log peek (`l`).** The board's `l` key opens a **read-only** snapshot of a
+  card's live session pane (`tmux capture-pane -p`, never an attach — `a` still attaches);
+  with no live tmux session it falls back to tailing that card's background `claude -p` log
+  under `.gogo/resources/cli/logs/`. Presentation/launch concern only — reads no `.gogo/`
+  contract file and writes nothing (like the permission-mode bullet, listed here only
+  because it ships in the same versioned plugin bump).
+
+A reader that ignores what it does not recognize (the stability rule above) keeps working
+against a 0.11.0 tree with no changes.
+
 ## 1. The `.gogo/` layout a consumer reads
 
 Two roots matter: **work** (one folder per feature, the live pipeline state +
@@ -53,6 +100,7 @@ once that phase has run:
 | `state.md` | Current phase / status / iteration counters / resume hint. The human resume file; its bolded lines are the contract (§2). | **Guaranteed** (from plan ①) |
 | `decisions.md` | Open/closed forks that needed the user + gogo's recommendation + the resolution. | **Guaranteed** (from plan ①) |
 | `adjustments.md` | Running log of user-requested changes/clarifications during planning. | **Guaranteed** (from plan ①) |
+| `uat.md` | The UAT gate log (0.11.0): one round per user check after ⑤ — a `/gogo:done` accept line, or an analyst-authored issues round (verbatim input + analysis + plan delta + disposition + verdict) when feedback loops back. Prose, not schematized. | Optional (from the UAT gate; absent pre-0.11) |
 | `charts/` | Plan's intended-design diagrams: `*.mmd` + `manifest.json` + offline `diagrams.html` + `before/` (the plan-time as-is baseline). Implement ② overwrites with the as-built flow/sequence/class/activity set. | Optional (absent for a pure-process feature) |
 | `events.jsonl` | Append-only telemetry — one JSON object per line, appended at every phase/status transition (§5). | **Optional** (new in 0.10.0; absent on older features) |
 | `review/issues.json` | The living, typed review findings (§4). | Optional (from review ③) |
@@ -76,6 +124,17 @@ Written by `/gogo:done`. `<name>` is the **slug** for a single-feature entry or 
 **release name** for a merged entry; the date is the newest member's
 `completed:`. Shape in §6.
 
+### `.gogo/trash/<compact-ts>-<slug>/` — deleted work (0.11.0, recoverable)
+
+Written by the CLI when a board card is deleted (`x`): the whole
+`.gogo/work/feature-<slug>/` folder is **moved** here (never `rm`), so a delete is
+reversible. `<compact-ts>` is a filesystem-safe UTC timestamp (`20060102T150405Z`) with no
+`:` and no `-`, so the first `-` in the entry name separates the timestamp from the slug.
+`gogo trash` lists entries (when, slug, the trashed `state.md`'s phase/status, entry
+handle); `gogo trash restore <entry>` moves the folder back to
+`.gogo/work/feature-<slug>/` (refused if that name already exists). This is the CLI's only
+write outside `.gogo/resources/`. Changelog entries are append-only and never trashed.
+
 ## 2. `state.md` line grammar
 
 `state.md` opens with an HTML-comment block (a file-list legend) that a reader
@@ -93,7 +152,7 @@ ignore anything else and tolerate extra bolded lines a future version adds.
 |---|---|---|
 | `feature` | one-line title | free text |
 | `phase` | `plan` \| `implement` \| `review` \| `test` \| `knowledge` \| `done` | the fifth phase is `knowledge` here (skill name); events call it `report` (§5) |
-| `status` | `awaiting-plan-acceptance` \| `plan-accepted` \| `implementing` \| `reviewing` \| `testing` \| `waiting-for-user` \| `done` \| `shipped` \| `aborted` | mirrors `events.status` |
+| `status` | `awaiting-plan-acceptance` \| `plan-accepted` \| `implementing` \| `reviewing` \| `testing` \| `waiting-for-user` \| `awaiting-uat` \| `done` \| `shipped` \| `aborted` | mirrors `events.status`; `awaiting-uat` (added 0.11.0) is where ⑤ now leaves a feature — the UAT gate; a legacy `done` predates it |
 | `created` | `YYYY-MM-DD` | |
 | `completed` | `YYYY-MM-DD` | optional; present on shipped/done features — the source `/gogo:done` reads to date a changelog entry |
 | `branch` | git branch \| `n/a` | |
@@ -115,8 +174,8 @@ is the **authoritative table**, quoted verbatim from
 | Class | Rule |
 |---|---|
 | **shipped** | `state.md` `status: shipped`, **or** a `.gogo/changelog/*-<slug>/` entry with a `report.md` exists for this slug, **or** this slug appears in any `.gogo/changelog/*/manifest.json` `members` array (a merged release entry named after the release) |
-| **ready-to-ship** | not shipped, **and** a final report exists (`report/report.md`, or a legacy root `report.md`) |
-| **in-progress** | no report, **and** `phase` is one of `implement` / `review` / `test` (or `status` is `implementing` / `reviewing` / `testing`) |
+| **ready-to-ship** | not shipped, a final report exists (`report/report.md`, or a legacy root `report.md`), **and** `status` is a ship gate — `awaiting-uat` (0.11.0) **or** a legacy `done` (pre-0.11). A **stale** report left by a UAT rerun (status `implementing` / `plan-accepted` / `waiting-for-user`) does **not** qualify; it falls through to **in-progress** |
+| **in-progress** | `phase` is one of `implement` / `review` / `test` (or `status` is `implementing` / `reviewing` / `testing`) — including a UAT rerun re-implementing the same feature **with a stale `report/` still on disk** |
 | **unfinished** | anything else — early/`plan` phase, planned but not built, no report |
 
 Notes carried from the classifier: a feature that has a report **and** a matching
@@ -138,6 +197,23 @@ named after the release, so its member slugs are only discoverable through
 The classifier's in-memory record shape (`slug`, `title`, `phase`, `status`,
 `class`, `report_path`, `changelog_path`, `iterations`, `resume`) is documented
 in `skills/gogo-status/SKILL.md`; it is computed on demand, not a file on disk.
+
+**`awaiting-uat` → still `ready-to-ship` (0.11.0).** Phase ⑤ now leaves a feature at
+`status: awaiting-uat` (the UAT gate) instead of `done`, and such a feature always has a
+report — so it classifies **ready-to-ship**; **the four classes and columns are unchanged**
+(frozen-contract additive). A CLI may read the raw `status` and paint an **`awaiting-uat`
+badge** on a ready card to flag the pending user sign-off — an additive, optional
+presentation concern (the 0.11.0 CLI); the classifier still emits only the four classes.
+
+**Ready-to-ship gates on the ship-gate status, not report-presence alone (0.11.0
+clarification).** The UAT loop re-runs ②→⑤ on the **same** feature and does not clear the
+prior `report/`, so between re-acceptance and the next ⑤ a mid-pipeline feature
+(`implementing` / `plan-accepted` / `waiting-for-user`) still carries a **pre-feedback**
+report on disk. Ready-to-ship therefore requires a report **and** a ship-gate `status`
+(`awaiting-uat`, or a legacy `done`); a stale-report rerun classifies **in-progress** and
+is not shippable from the board until ⑤ lands again. This is an **additive clarification**
+of an existing rule (report-presence was always meant to signal a *completed* pass), not a
+new class — the four classes/columns are unchanged.
 
 ## 4. The typed JSON artifacts
 
@@ -171,7 +247,8 @@ Fields: `ts` (**RFC3339** — a strict ISO-8601 profile, UTC, e.g.
 `2026-07-03T14:05:00Z`; pinned to `time.RFC3339` so a Go reader can parse it, and
 `format: date-time` in the schema; required), `event` (required enum: `phase-started` ·
 `plan-accepted` · `phase-done` · `round-opened` · `issues-found` · `fix-round` ·
-`gate-opened` · `gate-resolved` · `shipped`), `phase` (required enum: `plan` ·
+`gate-opened` · `gate-resolved` · `uat-opened` · `uat-passed` · `uat-failed` ·
+`shipped`), `phase` (required enum: `plan` ·
 `implement` · `review` · `test` · `report` · `done`), `status` (required — mirrors
 `state.md` status), `round` (optional integer), `note` (optional line), `slug`
 (optional — self-describes a copied-out line).
@@ -200,6 +277,9 @@ gate events**. There is no double emission — no event is written by two owners
 | `phase-done`/report | `gogo-knowledge` (⑤) | the report bundle is written + `state.md` set |
 | `gate-opened` | `gogo` (orchestrator) | a decision gate opens (`waiting-for-user`) |
 | `gate-resolved` | `gogo` (orchestrator) | the user answers and the phase resumes |
+| `uat-opened` | `gogo` (orchestrator) | the user routes awaiting-uat feedback to the analyst (the UAT loop opens; `phase: report`) |
+| `uat-failed` | `gogo` (orchestrator) | a re-planned UAT round is re-accepted and `/gogo:go` is about to rerun ②→⑤ (round summary in `note`; `phase: report`) |
+| `uat-passed` | `gogo-done` | the UAT gate is accepted by `/gogo:done`, emitted just before `shipped` (`phase: done`) |
 | `shipped`/done | `gogo-done` | a member's changelog entry is archived (**terminal** for done — no `phase-done`/done; changelog path / members in `note`) |
 
 The two gate events carry the *resume* phase in `phase`, mapped to the **events**
@@ -213,6 +293,14 @@ for the current phase; `events.jsonl` adds only the *timeline and rounds*
 state.md cannot carry. `ts` gives ordering; the last event is the most recent
 transition. Note the `knowledge` (state.md) vs `report` (events) naming for the
 fifth phase.
+
+**Producer discipline for `ts`.** An emitter must stamp `ts` with the **real
+current UTC time at the moment of emission** (`date -u +%Y-%m-%dT%H:%M:%SZ`) —
+never an estimated, rounded, or back-dated time — so a feature's stream stays
+**monotonic in append order**. The file is **append-only**: never rewrite a
+historical line. Because emission is best-effort a reader must not *assume*
+monotonicity — if `ts` is ever non-monotonic, **file (append) order is
+authoritative**, not `ts` sort order.
 
 ## 6. Changelog entry shape
 

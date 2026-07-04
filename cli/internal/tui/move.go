@@ -100,7 +100,8 @@ func (m *Model) confirmSummary(intent launch.Intent) string {
 	if !m.hasTmux {
 		where = "background (claude -p + log)"
 	}
-	return "will run: claude \"" + intent.Command + "\"  in " + where
+	// FR8: state the effective permission mode the launch runs under.
+	return "will run: claude \"" + intent.Command + "\"  in " + where + "  · " + launch.PermissionSummary()
 }
 
 // doLaunch rebuilds the intent with the (possibly edited) release name and

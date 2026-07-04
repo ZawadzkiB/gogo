@@ -31,3 +31,8 @@ Generated-by: /gogo:build (scaffold)
 ## Done bar
 Build clean AND all unit AND all e2e green, PLUS hands-on exploration of the
 actual change (not just green tests).
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

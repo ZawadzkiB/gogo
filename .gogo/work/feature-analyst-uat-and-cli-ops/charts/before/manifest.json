@@ -1,0 +1,8 @@
+{
+  "slug": "analyst-uat-and-cli-ops",
+  "updated": "2026-07-04",
+  "note": "As-is baseline (before): planning is orchestrator-in-chat with unspecific knowledge reading and no analysis procedure; report-complete goes straight to shippable with no user verification; build has no user-owned preserved section; CLI launches prompt for approvals and the board has no delete or log-peek.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/before/current-loop.mmd", "title": "Before: no analyst, no UAT gate, nagging launches" }
+  ]
+}

@@ -68,7 +68,12 @@ emits neither.
 
 1. **Finalize the plan.** Update `.gogo/work/feature-<slug>/plan.md` to the as-built
    state (what actually shipped vs the original).
-   - **Strict (green run):** set `state.md` phase=done, status=done, resume=none.
+   - **Strict (green run):** set `state.md` phase=done, **status=awaiting-uat** (the
+     UAT gate — the plan-gate symmetry, from 0.11.0: ⑤ no longer ends at `done`, it
+     hands the work to the user to verify), resume=`awaiting UAT — verify the work;
+     /gogo:done accepts, or describe issues to loop back`. Running `/gogo:done` is the
+     acceptance and is what flips the feature to `shipped` (via `gogo-done`); UAT
+     feedback instead re-plans the SAME item (see `gogo`'s UAT loop) and reruns ②→⑤.
    - **Lenient (past/broken run):** don't pretend a clean release. Write the report
      (so `/gogo:done` and `/gogo:view` can find it), but keep `state.md` honest by
      **leaving `phase` and `status` at their real pre-report values** — a broken run
@@ -177,12 +182,19 @@ emits neither.
      project's CLAUDE.md, README, etc.). If a change really belongs upstream,
      don't rewrite it silently — add a note and **surface a suggestion** to the
      user: "Consider adding X to CLAUDE.md."
+   - **Never touch a `## Custom` section** (any mode). It is user-owned and copied
+     1:1 — the same rule `/gogo:build` follows for `## gogo overrides`. Leave it
+     byte-for-byte; only ever edit gogo-authored regions.
    - The only files you may write are under `.gogo/` (config in `.gogo/knowledge/`, work in `.gogo/work/`).
 5. **Summarise to the user:** what was planned, what was implemented, what review
    found and how it resolved, what was tested (UI/CLI/API), and which knowledge
    docs you updated. Point them at `report/report.md` and `report/diagrams.html`.
    List any "consider upstreaming" suggestions and any follow-ups. The feature is
-   now report-complete — the user can run `/gogo:done` to ship it to the changelog.
+   now report-complete and sits at the **UAT gate** (`status: awaiting-uat`): tell
+   the user to **verify the work**, then either run `/gogo:done` (which IS the
+   acceptance — it ships to the changelog) **or** describe any issues/questions to
+   loop back into planning (the orchestrator's UAT loop re-plans the SAME item via
+   `uat.md` and reruns ②→⑤).
 
 ## validate-out (FR3)
 
@@ -194,14 +206,15 @@ carried over verbatim — decision D5, no schema change). Then write `report/res
 (`phase: report`, `status: ok`, `inputs`, `outputs`, `validated_in: true`,
 `validated_out: true`, `summary`). `report/report.md` is a prose artifact; the
 result record is the machine state for chaining. Set `state.md` per Step 1: a
-clean run → phase=done, status=done, resume=none; a lenient/past-broken run →
-leave `phase`/`status` at their real pre-report values (never `done`) and update
-only `resume:` with an honest report-only + gaps note. In lenient mode,
-`result.json`'s `summary` should name the gaps.
+clean run → phase=done, **status=awaiting-uat**, resume=the UAT hint; a
+lenient/past-broken run → leave `phase`/`status` at their real pre-report values
+(never `done` and never `awaiting-uat`) and update only `resume:` with an honest
+report-only + gaps note. In lenient mode, `result.json`'s `summary` should name
+the gaps.
 
 **Append the phase-done event (telemetry).** Beside that `state.md` write, append
 one line to `.gogo/work/feature-<slug>/events.jsonl` (best-effort, per
 `events.schema.json`) mirroring the status just written — clean green run →
-`{"ts":"<RFC3339>","event":"phase-done","phase":"report","status":"done","slug":"<slug>"}`;
+`{"ts":"<RFC3339>","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"<slug>"}`;
 a lenient/past-broken run → the same with `status` set to the honest pre-report
-value (never `done`).
+value (never `done`, never `awaiting-uat`).

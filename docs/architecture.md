@@ -15,7 +15,7 @@ the command list, see the [Home](index.md) page (or the
 gogo runs every non-trivial change through five fixed phases:
 
 ```
-goal → ① PLAN → ② IMPLEMENT → ③ REVIEW → ④ TEST → ⑤ REPORT → done
+goal → ① PLAN → ② IMPLEMENT → ③ REVIEW → ④ TEST → ⑤ REPORT → UAT gate → shipped
 ```
 
 **The flow ships with the plugin. The rules are yours.** The phases never change
@@ -38,6 +38,7 @@ Each phase reads only the knowledge it needs:
 
 | Knowledge file | What it holds | Read in phase | Typical mode |
 |---|---|---|---|
+| `analysis.md` | how to analyze a feature before planning (procedure + which files to read; code = truth) | plan | owned |
 | `project-knowledge.md` | architecture, domains, glossary, key decisions | plan | proxy |
 | `tech-stack.md` | languages, frameworks, build/run/test commands | plan · implement · test | proxy |
 | `non-functional-requirements.md` | standing perf/security/a11y/reliability bars | plan · review · test | owned |
@@ -53,6 +54,13 @@ link to your real doc (an existing `CLAUDE.md`, `README`, Copilot/Cursor/Windsur
 Codex config, manifest, test config). Where no doc exists, gogo authors the file
 (**owned**). Re-running `/gogo:build` reconciles — picks up new docs, refreshes
 summaries, and **preserves** every `## gogo overrides` section and owned body.
+
+**Two kinds of never-rewritten section.** A knowledge file can carry a gogo-authored
+`## gogo overrides` block (gogo's own notes, kept across re-runs) **and** a user-owned
+**`## Custom`** section — anything *you* write there. `/gogo:build` re-runs and phase-⑤
+reconciles **copy every `## Custom` section 1:1** (byte-for-byte) and never rewrite it
+(build reports what it preserved). The distinction: **overrides = gogo-authored;
+Custom = yours, untouchable.**
 
 ## 2. The knowledge-vs-on-demand-skills split
 
@@ -74,8 +82,10 @@ into **on-demand skills** that load only when a task actually needs them.
 | OVER | `>400` | too big — extract to get back under budget (target `<200`) |
 
 Defaults are overridable (`/gogo:skills --warn N --max N`). For a proxy file, only
-the gogo-owned summary is measured — never the linked upstream. `/gogo:build`
-prints a nudge when a file passes the warn line.
+the gogo-owned summary is measured — never the linked upstream. A user-owned
+`## Custom` section is likewise excluded from the measured body and is never an
+extraction candidate (`/gogo:skills` never proposes or rewrites it — mirroring
+`## gogo overrides`). `/gogo:build` prints a nudge when a file passes the warn line.
 
 **Two kinds of extracted skill.** `/gogo:skills` classifies each candidate and the
 user confirms per candidate at an approval gate (it proposes, then STOPS — nothing
@@ -116,9 +126,9 @@ gogo/
 │   ├── gogo-skills/          #   audit knowledge budget + extract on-demand skills
 │   ├── gogo-contracts/       #   validate-in / validate-out at every hand-off
 │   └── gogo-mermaid/         #   diagram generation + offline viewer
-├── agents/                   # gogo, gogo-developer, gogo-reviewer, gogo-tester
+├── agents/                   # gogo, gogo-analyst, gogo-developer, gogo-reviewer, gogo-tester
 ├── templates/
-│   ├── knowledge/            #   the 9 knowledge-file scaffolds
+│   ├── knowledge/            #   the 10 knowledge-file scaffolds
 │   ├── contracts/            #   JSON Schemas for the typed artifacts + README
 │   ├── skill.template.md     #   scaffold for an extracted skill
 │   ├── skills-index.template.md  # scaffold for .gogo/skills/index.md
@@ -153,7 +163,7 @@ gogo/
 ```
 your-project/
 ├── .gogo/
-│   ├── knowledge/            # your config — 9 files (see the table in §1)
+│   ├── knowledge/            # your config — 10 files (see the table in §1)
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
@@ -165,6 +175,7 @@ your-project/
 │           ├── adjustments.md     # log of changes/clarifications during planning                 [① writes]
 │           ├── state.md           # current phase/status/iterations — lets work resume            [every phase]
 │           ├── decisions.md       # forks that needed your call + recommendation + answer          [gates]
+│           ├── uat.md             # the UAT gate log — one round per user check after ⑤ (/gogo:done accept, or an analyst issues round)  [UAT gate]
 │           ├── events.jsonl       # append-only progress telemetry — one JSON line per phase transition (read by the gogo CLI)  [every transition]
 │           ├── review/issues.json # living, typed review findings (the contract)                  [③ writes, ② reads]
 │           ├── review-NN.md        # each review round's rendered snapshot                          [③ writes]
@@ -180,9 +191,11 @@ your-project/
 
 **Who reads/writes what, by phase:**
 
-- **① Plan** (orchestrator, in chat) — reads `project-knowledge`, `tech-stack`,
-  `non-functional-requirements`; creates the feature folder; writes `plan.md`,
-  `state.md`, the intended-design `charts/`. **Stops for your acceptance.**
+- **① Plan** (`gogo-analyst`, delegated by the orchestrator) — reads `analysis.md`
+  (the procedure), `project-knowledge`, `tech-stack`, `non-functional-requirements`,
+  `coding-rules`; analyses the goal against the actual codebase (**code = source of
+  truth**); creates the feature folder; writes `plan.md`, `state.md`, the
+  intended-design `charts/`. **The orchestrator owns the acceptance gate in chat.**
 - **② Implement** (`gogo-developer`) — reads `plan.md`, `coding-rules`,
   `tech-stack`; writes code, the as-built `charts/`, `implement/result.json`; in
   fix-mode reads/writes `*/issues.json`.

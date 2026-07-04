@@ -25,6 +25,7 @@ yours/gogo's and is **preserved** across `/gogo:build` re-runs.
 
 | File | Purpose | Read in phase | Typical mode |
 |---|---|---|---|
+| `analysis.md` | how to analyze a feature before planning (procedure + which files to read; code = truth) | plan | owned |
 | `project-knowledge.md` | architecture, domains, glossary, key decisions | plan | proxy |
 | `tech-stack.md` | languages, frameworks, build/run/test commands | plan, implement, test | proxy |
 | `non-functional-requirements.md` | standing perf/security/a11y/reliability/limits bars | plan, review, test | owned |
@@ -39,3 +40,8 @@ yours/gogo's and is **preserved** across `/gogo:build` re-runs.
 - **Functional** (what a specific change must do) → live in that feature's
   `.gogo/work/feature-<slug>/plan.md`, **not** here.
 - **Non-functional** (standing project bars) → `non-functional-requirements.md`.
+
+## Custom
+<!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
+     reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any
+     project notes gogo should read but never touch here — safe to edit or delete. -->

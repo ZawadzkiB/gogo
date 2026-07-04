@@ -9,7 +9,7 @@ ACTUAL work; link the audit-trail files (../decisions.md, ../review-NN.md,
 ../test-NN.md) rather than repeating them. -->
 
 - **feature:** <one-line title>
-- **status:** done   <!-- a past/broken run: "report-only (incomplete run)" -->
+- **status:** awaiting-uat   <!-- a past/broken run: "report-only (incomplete run)"; a legacy pre-0.11 run: "done" -->
 - **completed:** <YYYY-MM-DD>
 - **branch / commits:** <branch | commit range | n/a>
 

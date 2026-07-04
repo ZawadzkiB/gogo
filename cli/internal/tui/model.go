@@ -81,10 +81,21 @@ type Model struct {
 	dark          bool              // terminal background, detected ONCE before the program starts
 
 	// form
-	form        *huh.Form
-	pending     launch.Intent
-	pendingShip bool
-	binding     *formBinding // heap-stable targets for the live huh fields
+	form          *huh.Form
+	pending       launch.Intent
+	pendingShip   bool
+	pendingDelete *contract.Feature // FR6: the card a confirmed `x` moves to trash
+	binding       *formBinding      // heap-stable targets for the live huh fields
+
+	// peek (FR7): a read-only session-log viewer reusing the async viewer.
+	peeking     bool   // the open viewer is a session-log peek (r re-captures)
+	peekSlug    string // the card being peeked
+	peekSession string // live tmux session name, or "" for a background-log peek
+	peekLog     string // background -p log path, or ""
+
+	// capturer snapshots a session's pane for a peek. A seam (defaults to
+	// launch.CapturePane) so peek can be driven in tests without real tmux.
+	capturer func(session string, lines int) (string, error)
 
 	// launcher spawns a confirmed intent. A seam (defaults to launch.Launch) so
 	// the form lifecycle can be driven with a fake in tests — never nil once a
@@ -111,6 +122,7 @@ func New(root string) Model {
 		hasClaude:   launch.HasClaude(),
 		hasGlow:     launch.HasGlow(),
 		launcher:    launch.Launch,
+		capturer:    launch.CapturePane,
 		reloadCh:    make(chan struct{}, 1),
 		viewport:    viewport.New(0, 0),
 		spinner:     sp,
@@ -212,8 +224,12 @@ func matchFilter(f *contract.Feature, q string) bool {
 // badge returns the card's live status badge. Precedence:
 //
 //  1. waiting-for-user — a parked decision gate (state.md status) always wins.
+//     During a mid-UAT re-plan the status IS waiting-for-user (REV-004), so this
+//     wins over any awaiting-uat badge for that stretch.
 //  2. running — a live tmux/claude session for this slug.
-//  3. state.md is the current-phase source of truth (it drives the card's
+//  3. awaiting-uat — the UAT gate (0.11.0): phase ⑤ left the feature ready but
+//     unshipped, pending the user's sign-off (state.md status awaiting-uat).
+//  4. state.md is the current-phase source of truth (it drives the card's
 //     column). The latest events.jsonl line only ENRICHES the badge with a
 //     round, and only when its phase agrees with state.md's current phase
 //     (mapping state.md's fifth phase "knowledge" → events' "report"). When the
@@ -229,6 +245,9 @@ func badge(f *contract.Feature, sessions []string) string {
 	}
 	if hasLiveSession(f.Slug, sessions) {
 		return "running"
+	}
+	if f.AwaitingUAT() {
+		return "awaiting-uat"
 	}
 	phase := f.Phase
 	if phase == "" {
@@ -260,12 +279,7 @@ func phaseRound(phase string, round int, hasRound bool) string {
 }
 
 func hasLiveSession(slug string, sessions []string) bool {
-	for _, s := range sessions {
-		if strings.Contains(s, slug) {
-			return true
-		}
-	}
-	return false
+	return liveSessionFor(slug, sessions) != ""
 }
 
 func clamp(v, lo, hi int) int {
