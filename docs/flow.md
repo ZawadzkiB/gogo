@@ -46,11 +46,14 @@ the orchestrator owns that gate.** Changes or clarifications are logged to
 `adjustments.md`, then the plan is revised and re-presented. **Do not implement
 until the user accepts — a hard gate.**
 
-### ② Implement — skill `gogo-implement` (delegate to `gogo-developer`)
+### ② Implement — skill `gogo-implement` (orchestrator runs it in-context)
 
 Build the accepted `plan.md` following `coding-rules.md`; keep changes scoped;
-keep build / typecheck / unit green; emit the as-built diagram set. Re-enter here
-to apply review/test fixes (`--issues` mode).
+keep build / typecheck / unit green; emit the as-built diagram set. On `/gogo:go`
+the **orchestrator runs this in-context** (warm across the fix loop, so it never
+re-explores the tree between rounds); `gogo-developer` backs standalone
+`/gogo:implement` + hands-off. Re-enter here to apply review/test fixes
+(`--issues` mode).
 
 ### ③ Review — skill `gogo-review` (delegate to `gogo-reviewer`)
 
@@ -167,16 +170,18 @@ page from the vendored `.gogo/resources/` assets (no network, no build), and ope
 
 ## Who runs each phase
 
-**Commands invoke the orchestrator; the orchestrator delegates every phase to its
-specialist agent and owns the gates in chat.**
+**Commands invoke the orchestrator; it runs ② implement in-context and delegates
+the fresh-eyes phases (①③④) to specialist agents, owning the gates in chat.**
 
 - **The orchestrator** owns the *interactive gates* in chat: the ① plan-acceptance
   gate, every decision gate, and the ⑤ report step.
-- It **delegates every phase** via the `Task` tool, each to a fresh-context
-  specialist: ① -> `gogo-analyst`, ② -> `gogo-developer`, ③ -> `gogo-reviewer`,
-  ④ -> `gogo-tester`. A delegated worker that hits a real fork **returns** it to
-  the orchestrator, which handles the gate and re-delegates with the answer. See
-  [Agents](agents.md) for the full I/O reference.
+- It **runs ② implement in-context** (kept warm across the implement↔review↔test
+  fix loop, so it never re-explores the codebase between rounds) and **delegates
+  the fresh-context phases** via the `Task` tool: ① -> `gogo-analyst`, ③ ->
+  `gogo-reviewer`, ④ -> `gogo-tester` (③/④ need unbiased eyes; `gogo-developer`
+  still backs standalone `/gogo:implement` + hands-off). A delegated worker that
+  hits a real fork **returns** it to the orchestrator, which handles the gate and
+  re-delegates with the answer. See [Agents](agents.md) for the full I/O reference.
 
 If browser/agent tooling is unavailable, the orchestrator may run a phase's skill
 itself in-context — the phase skills run either way.

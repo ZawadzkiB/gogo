@@ -205,9 +205,10 @@ written until you accept.
 
 **`/gogo:go [feature-slug]`**
 
-Implements the accepted plan through the implement → review → test → report loop,
-delegating to the specialist agents and pausing only at real decisions. Refuses to
-start until a plan is accepted.
+Implements the accepted plan through the implement → review → test → report loop —
+the orchestrator **runs ② implement in-context** (warm across the fix loop) and
+**delegates the fresh-eyes phases** (③ review, ④ test) to the specialist agents,
+pausing only at real decisions. Refuses to start until a plan is accepted.
 
 The implement → review → test → report phases are **also runnable on their own**
 — each is a thin, idempotent entry point to its phase skill that **validates its
@@ -377,12 +378,15 @@ glamour view is the fallback). Keymap: `←→`/`h` columns · `↑↓`/`jk` car
 
 ## Agents
 
-- **`gogo`** — the orchestrator: owns the flow/loop, knows what to run when, and
-  delegates to the specialists. Also usable hands-off ("build X end-to-end").
+- **`gogo`** — the orchestrator: owns the flow/loop, knows what to run when, **runs
+  ② implement in-context** (warm across the fix loop), and delegates the fresh-eyes
+  phases (①③④) to the specialists. Also usable hands-off ("build X end-to-end").
 - **`gogo-analyst`** — phase ① specialist: reads `analysis.md` + the named knowledge
   set, analyses the goal against the actual code, and writes the plan (and re-analyses
   UAT feedback into a plan delta on the same work item).
 - **`gogo-developer`** — implements the accepted plan and applies review/test fixes.
+  Backs standalone `/gogo:implement` + hands-off runs (on `/gogo:go` the orchestrator
+  implements in-context instead).
 - **`gogo-reviewer`** — fresh-eyes, adversarial code review.
 - **`gogo-tester`** — e2e/UI testing via the bundled Playwright MCP.
 

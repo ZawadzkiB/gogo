@@ -108,23 +108,32 @@ loop back into planning on the **same work item** (see *The UAT gate* below).
 
 ## Who runs each phase
 
-**Commands invoke the orchestrator; the orchestrator delegates every phase to its
-specialist agent and owns the gates in chat.** Concretely:
+**Commands invoke the orchestrator; it runs ② implement in-context and delegates
+the fresh-eyes phases (①③④) to specialist agents, owning the gates in chat.**
+Concretely:
 
 - **You (the orchestrator) own the gates in chat** — the plan-acceptance gate after
   ①, every decision gate, and the ⑤ report step.
-- You **delegate every heads-down phase** via the `Task` tool, each to a
-  fresh-context specialist:
+- **② implement → you run it yourself, in-context** (follow the `gogo-implement`
+  skill). Keep this context **warm across the whole implement↔review↔test fix
+  loop** — that is the point: a re-spawned developer would re-read `plan.md` and
+  re-explore the codebase from scratch every round; running ② in-context means you
+  read the tree once and apply later review/test fixes **without re-exploring**.
+- You **delegate the fresh-eyes phases** via the `Task` tool, each to a
+  **fresh-context** specialist (fresh context = unbiased eyes, which ①③④ need):
   - ① plan → **`gogo-analyst`** agent (follows the `gogo-plan` skill) — reads the
     named knowledge set incl. `analysis.md`, analyses the goal against the real
     codebase (**code = source of truth**), drafts `plan.md` + the intended-design
     charts, and STOPs for acceptance (you own that gate).
-  - ② implement → **`gogo-developer`** agent (follows the `gogo-implement` skill)
-  - ③ review → **`gogo-reviewer`** agent (follows the `gogo-review` skill)
-  - ④ test → **`gogo-tester`** agent (follows the `gogo-test` skill)
+  - ③ review → **`gogo-reviewer`** agent (follows the `gogo-review` skill) — it must
+    NOT have written the code it reviews.
+  - ④ test → **`gogo-tester`** agent (follows the `gogo-test` skill) — a fresh
+    perspective plus the bundled Playwright MCP.
   - ⑤ report → you run the `gogo-knowledge` skill in chat.
 - A delegated worker that hits a real fork **returns** it to you; you handle the
   gate (below) and re-delegate with the answer.
+- `gogo-developer` still backs **standalone `/gogo:implement`** and **hands-off**
+  runs — only the orchestrator's *default routing* for ② is in-context.
 
 If browser/agent tooling is unavailable, you may run a phase's skill yourself
 in-context instead of delegating — the phase skills are written to run either way.
@@ -142,9 +151,12 @@ acceptance** — you (the orchestrator) own that gate. Changes/clarification →
 `adjustments.md`, revise, re-present. **Do not implement until the user accepts.**
 Hard gate.
 
-### ② Implement → skill `gogo-implement` (delegate to `gogo-developer`)
+### ② Implement → skill `gogo-implement` (you run it in-context)
 Build the accepted `plan.md` following `coding-rules.md`; keep changes scoped;
-keep build/typecheck/unit green. Re-enter here to apply review/test fixes.
+keep build/typecheck/unit green. **Run this yourself, in-context** — do not delegate
+to a fresh `gogo-developer`, so your understanding of the code carries across the
+loop. Re-enter here to apply review/test fixes **without re-exploring the tree**.
+(`gogo-developer` still backs standalone `/gogo:implement` and hands-off runs.)
 
 ### ③ Review → skill `gogo-review` (delegate to `gogo-reviewer`)
 Review the diff against `code-review-standards.md` + `non-functional-requirements.md`.
@@ -275,9 +287,11 @@ from the vendored `.gogo/resources/` assets, and opens it.
 ## Loops & bounds
 
 - **implement ↔ review**: loop until review is clean; bound ~3 rounds on the same
-  finding → escalate it as a decision.
-- **test → implement → review → test**: a test issue re-enters implementation,
-  then re-review, then re-test.
+  finding → escalate it as a decision. You hold the implement context **warm**
+  across these rounds (no re-spawn, no re-read); the ~3-round bound doubles as a
+  guard on orchestrator context growth (rely on auto-compaction beyond it).
+- **test → implement → review → test**: a test issue re-enters implementation
+  (still in-context), then re-review (fresh subagent), then re-test (fresh subagent).
 - Track rounds in `state.md` `iterations:`.
 
 ## Pipeline telemetry — events.jsonl

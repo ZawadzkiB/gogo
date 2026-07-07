@@ -196,7 +196,9 @@ your-project/
   `coding-rules`; analyses the goal against the actual codebase (**code = source of
   truth**); creates the feature folder; writes `plan.md`, `state.md`, the
   intended-design `charts/`. **The orchestrator owns the acceptance gate in chat.**
-- **② Implement** (`gogo-developer`) — reads `plan.md`, `coding-rules`,
+- **② Implement** (the **orchestrator, in-context** on `/gogo:go` — kept warm
+  across the fix loop so it never re-explores the tree; `gogo-developer` backs
+  standalone `/gogo:implement` + hands-off) — reads `plan.md`, `coding-rules`,
   `tech-stack`; writes code, the as-built `charts/`, `implement/result.json`; in
   fix-mode reads/writes `*/issues.json`.
 - **③ Review** (`gogo-reviewer`) — reads the diff, `code-review-standards`,

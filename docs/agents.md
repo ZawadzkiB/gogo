@@ -5,10 +5,11 @@ nav_order: 4
 
 # Agents — the I/O reference
 
-gogo delegates each phase to a fresh-context specialist agent. This is the
-reference for **what each agent consumes and produces** — the knowledge files it
-reads and the typed artifacts it reads or writes. Source of truth: `agents/*.md`,
-the phase skills, and the [contracts](contracts.md).
+gogo runs ② implement in the orchestrator's own context and delegates the
+fresh-eyes phases (①③④) to specialist agents. This is the reference for **what
+each agent consumes and produces** — the knowledge files it reads and the typed
+artifacts it reads or writes. Source of truth: `agents/*.md`, the phase skills,
+and the [contracts](contracts.md).
 
 Knowledge files are proxies into your real docs (see [Discovery](discovery.md));
 the typed artifacts (`*/issues.json`, `charts/manifest.json`, `*/result.json`,
@@ -30,7 +31,7 @@ flowchart LR
 
     ORCH(["gogo (orchestrator)"]):::orch
     ANALYST(["gogo-analyst ①"]):::analyst
-    DEV(["gogo-developer ②"]):::dev
+    DEV(["② implement — orchestrator, in-context"]):::orch
     REV(["gogo-reviewer ③"]):::rev
     TEST(["gogo-tester ④"]):::test
 
@@ -83,23 +84,24 @@ flowchart LR
 *Solid arrows into an agent = consumes; thick arrows out = produces; the dotted
 arrows feed an issues list back to the developer in fix mode.*
 
-**Commands invoke the orchestrator; the orchestrator delegates every phase to its
-specialist agent (① analyst · ② developer · ③ reviewer · ④ tester · ⑤ orchestrator +
-`gogo-knowledge`) and owns the gates in chat.**
+**Commands invoke the orchestrator; it runs ② implement in-context and delegates
+the fresh-eyes phases to specialist agents (① analyst · ③ reviewer · ④ tester; ⑤
+orchestrator + `gogo-knowledge`), owning the gates in chat.**
 
 ## `gogo` — the orchestrator
 
 Owns the flow, the loops, and the decision gates; owns the interactive gates (the
 plan-acceptance gate, every decision gate, the ⑤ report step, and the **UAT gate** after
-⑤), and **delegates every phase to its specialist agent**. It does not write product code
-— it coordinates and surfaces genuine decisions. At the UAT gate it emits
+⑤). It **runs ② implement in-context** (the one phase it writes product code in — kept
+warm across the fix loop) and **delegates the fresh-eyes phases** (① analyst · ③ reviewer
+· ④ tester). It surfaces genuine decisions rather than guessing. At the UAT gate it emits
 `uat-opened`/`uat-failed` and drives the loop (delegates the analysis to `gogo-analyst`,
 gates the re-acceptance, reruns `/gogo:go`); `/gogo:done` owns the acceptance path.
 
 | Direction | Artifacts |
 |---|---|
 | Consumes | `.gogo/knowledge/*` (esp. `project-knowledge`, `tech-stack`, `non-functional-requirements`); `state.md`; `decisions.md`; `uat.md`; each specialist's `result.json` / issues list |
-| Produces | the feature folder (via ①); `state.md` (kept current); `decisions.md` entries; the UAT loop's `uat-opened`/`uat-failed` events; at ⑤ the `report/` bundle (`report/report.md` + the as-built UML set + `diagrams.html`), and updated gogo-owned knowledge summaries |
+| Produces | the feature folder (via ①); **② code changes + the as-built `charts/` set + `implement/result.json` (implement is in-context)**; `state.md` (kept current); `decisions.md` entries; the UAT loop's `uat-opened`/`uat-failed` events; at ⑤ the `report/` bundle (`report/report.md` + the as-built UML set + `diagrams.html`), and updated gogo-owned knowledge summaries |
 
 ## `gogo-analyst` — phase ① plan
 
@@ -121,8 +123,11 @@ a `uat.md` round (verbatim input + analysis + plan delta + a disposition per poi
 
 ## `gogo-developer` — phase ② implement
 
-Implements the accepted plan and applies review/test fixes. Scoped to the plan;
-keeps the tree green. Does not make user decisions — it returns forks to the
+The implementer manual made concrete. **On the interactive `/gogo:go` path the
+orchestrator runs ② in-context (it stays warm across the fix loop); this agent
+backs standalone `/gogo:implement <slug>` and hands-off runs.** Either way it
+implements the accepted plan and applies review/test fixes, scoped to the plan,
+keeps the tree green, and does not make user decisions — it returns forks to the
 orchestrator.
 
 | Direction | Artifacts |

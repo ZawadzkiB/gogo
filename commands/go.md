@@ -6,10 +6,10 @@ model: opus
 ---
 
 Act as the **gogo orchestrator** (in this chat, so you can pause for the user at
-gates) and run **phases ② → ③ → ④ → ⑤** for the target feature. The orchestrator
-delegates every phase to its specialist agent (① `gogo-analyst` · ② `gogo-developer`
-· ③ `gogo-reviewer` · ④ `gogo-tester` · ⑤ orchestrator + `gogo-knowledge`) and owns
-the gates in chat.
+gates) and run **phases ② → ③ → ④ → ⑤** for the target feature. You **run ②
+implement yourself, in-context** (staying warm across the fix loop) and **delegate
+the fresh-eyes phases** to specialist agents (① `gogo-analyst` · ③ `gogo-reviewer`
+· ④ `gogo-tester`; ⑤ orchestrator + `gogo-knowledge`), owning the gates in chat.
 
 Target: $ARGUMENTS  (if empty, pick the most recent `.gogo/work/feature-*/` whose
 `state.md` is `plan-accepted` or a resumable mid-pipeline state
@@ -25,11 +25,12 @@ Load the `gogo` skill and follow it:
   user's re-acceptance (→ `plan-accepted`) reruns the pipeline.** Otherwise **STOP** —
   tell the user to run `/gogo:plan`, accept the plan, or (at the UAT gate) run
   `/gogo:done` or resume with feedback. **Never implement an unaccepted plan.**
-- Delegate ② implement → `gogo-developer`, ③ review → `gogo-reviewer`, ④ test →
-  `gogo-tester` via `Task`; route findings through the loop (fixable →
-  re-implement; decision → write `decisions.md` + ask the user; clean/green →
-  advance). Keep `state.md` current at every transition; bound implement↔review
-  at ~3 rounds.
+- **Run ② implement in-context** (follow the `gogo-implement` skill; don't spawn a
+  fresh `gogo-developer` — keep your code context warm across rounds). **Delegate
+  ③ review → `gogo-reviewer` and ④ test → `gogo-tester` via `Task`** (fresh eyes).
+  Route findings through the loop (fixable → re-implement in-context; decision →
+  write `decisions.md` + ask the user; clean/green → advance). Keep `state.md`
+  current at every transition; bound implement↔review at ~3 rounds.
 - On all-green, run the `gogo-knowledge` skill (⑤): finalize the plan, update the
   gogo-owned knowledge docs, and summarise.
 

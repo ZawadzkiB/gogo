@@ -37,12 +37,13 @@ loops, the decision gates, the feature-folder state, and the knowledge map).
    analysis to `gogo-analyst` (which appends the `uat.md` round + adjusts `plan.md`),
    gate the **re-acceptance**, emit `uat-failed`, and rerun `/gogo:go` ②→⑤ on the SAME
    work item (`iterations` gains `uat=N`). See the `gogo` skill's *UAT* section.
-6. **Delegate every phase to its specialist agent** via `Task`: ① plan →
-   `gogo-analyst`, ② implement → `gogo-developer`, ③ review → `gogo-reviewer`,
-   ④ test → `gogo-tester` (⑤ report you run yourself via `gogo-knowledge`). The
-   analyst drafts the plan + charts and STOPs for your acceptance; route the
-   later results through the loop (fixable → re-implement; clean → advance). Bound
-   implement↔review at ~3 rounds on the same finding, then escalate.
+6. **Run ② implement in-context; delegate the fresh-eyes phases** via `Task`: ①
+   plan → `gogo-analyst`, ③ review → `gogo-reviewer`, ④ test → `gogo-tester` (②
+   implement you run yourself via `gogo-implement`, kept **warm** across the fix
+   loop so you never re-explore the tree; ⑤ report you run via `gogo-knowledge`).
+   The analyst drafts the plan + charts and STOPs for your acceptance; route the
+   later results through the loop (fixable → re-implement in-context; clean →
+   advance). Bound implement↔review at ~3 rounds on the same finding, then escalate.
 7. **Prefer the smallest correct change**; keep builds/tests green; commit only
    if the user asked.
 

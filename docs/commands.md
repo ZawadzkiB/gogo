@@ -10,10 +10,10 @@ just invokes a skill and passes arguments. The logic lives in the skills (the
 "operating manuals"). Source of truth: `commands/*.md` and the `skills/*/SKILL.md`
 they invoke.
 
-**Architecture:** commands invoke the **orchestrator**; the orchestrator delegates
-every phase to its specialist agent (① `gogo-analyst` · ② `gogo-developer` ·
-③ `gogo-reviewer` · ④ `gogo-tester` · ⑤ orchestrator + `gogo-knowledge`) and owns
-the gates in chat.
+**Architecture:** commands invoke the **orchestrator**; it runs ② implement
+in-context and delegates the fresh-eyes phases to specialist agents (① `gogo-analyst`
+· ③ `gogo-reviewer` · ④ `gogo-tester`; ⑤ orchestrator + `gogo-knowledge`), owning the
+gates in chat. (`gogo-developer` backs standalone `/gogo:implement` + hands-off runs.)
 
 There are **12** commands in four groups: **orchestration** (`build`, `plan`,
 `go`, `status`, `resume`), the **standalone phase commands** (`implement`,
@@ -67,10 +67,11 @@ in chat, so it can pause at gates.
   `waiting-for-user` are not runnable** — `awaiting-uat` is the user's UAT gate and a
   mid-UAT re-plan sits at `waiting-for-user` until re-acceptance) and the relevant
   knowledge.
-- **Delegates:** ② implement -> `gogo-developer`, ③ review -> `gogo-reviewer`,
-  ④ test -> `gogo-tester`; routes findings through the loop (fixable ->
-  re-implement; decision -> ask the user; clean/green -> advance) and keeps
-  `state.md` current. Bounds implement<->review at ~3 rounds.
+- **Runs ② implement in-context** (warm across the fix loop, no re-spawn/re-read)
+  and **delegates** ③ review -> `gogo-reviewer`, ④ test -> `gogo-tester`; routes
+  findings through the loop (fixable -> re-implement in-context; decision -> ask the
+  user; clean/green -> advance) and keeps `state.md` current. Bounds
+  implement<->review at ~3 rounds.
 - The four phase commands below are the same steps it chains.
 
 ### `/gogo:status`
