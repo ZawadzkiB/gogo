@@ -1,0 +1,12 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "updated": "2026-07-11",
+  "note": "As-is baseline (before): the Go per-phase orchestrator loop (gogo run + contract.Route re-routing) and the board-launch remain-on-exit leak with no reaper.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Current per-phase Go loop (orchestrator.Run + contract.Route) + the board-launch remain-on-exit orphan leak"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "updated": "2026-07-12",
+  "note": "As-built (0.15.0): the gogo CLI reworked into a persistent-session lifecycle manager over the one /gogo:go skill — owner lock (lockfile + PID/tmux liveness), extended session registry, headless-p exit classification, reap + gogo sweep, and the --attach path. before/ holds the plan-time as-is baseline (the deleted per-phase Go loop) for before/after compare.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "gogo go/plan control flow — lock guard (incl. untracked board racer) → launch-or-resume the persistent claude -p → classify exit → reap/sweep"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "Two orchestrators over one skill — CLI session manager spawns claude -p '/gogo:go', the skill runs implement in-context + Task review/test + report"
+    },
+    {
+      "kind": "activity",
+      "file": "activity.mmd",
+      "title": "Session lifecycle — none → running → parked/awaiting-uat (resume) → shipped/orphaned → reaped"
+    },
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "As-built structure — Session manager + Registry/PersistentSession, Lock/Owner, Sweeper, and the injectable SessionRunner/AttachFn/LivenessFn/Lister seams"
+    }
+  ]
+}

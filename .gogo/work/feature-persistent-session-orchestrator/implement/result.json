@@ -1,0 +1,29 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "phase": "implement",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-persistent-session-orchestrator/plan.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md"
+  ],
+  "outputs": [
+    "cli/internal/launch/launch.go",
+    "cli/internal/orchestrator/registry.go",
+    "cli/internal/orchestrator/lock.go",
+    "cli/internal/orchestrator/orchestrator.go",
+    "cli/internal/orchestrator/sweep.go",
+    "cli/internal/orchestrator/orchestrator_test.go",
+    "cli/go.go",
+    "cli/go_e2e_test.go",
+    "cli/main.go",
+    ".claude-plugin/plugin.json",
+    "docs/cli-contract.md",
+    "README.md",
+    ".gogo/work/feature-persistent-session-orchestrator/charts/class.mmd"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Built the persistent-session foundation (0.14.0 -> 0.15.0). Reworked the CLI from a Go per-phase loop into a session-lifecycle manager: `gogo go`/`gogo plan` launch-or-`--resume` ONE persistent claude -p session running the /gogo:go / /gogo:plan skill (Session.LaunchOrResume + Reap + exit classification in cli/internal/orchestrator/orchestrator.go). Deleted contract/route.go + route_test.go and the whole Go loop (D3=A). Added the one-owner lock (lock.go: lockfile + PID/tmux liveness cross-check, refuse/reclaim/takeover, D1=C/D6=A), extended the session registry (registry.go: per-leg persistent session + status + timestamps + telemetry, back-compat load), the reaper + orphan-sweep (sweep.go: kill-at-ship + orphan gogo-* sessions by exact SessionMatchesSlug, TTL backstop, --dry-run; launch.KillSession/PidAlive), and the --attach path (launch.LaunchPersistent, no remain-on-exit -> no orphan by construction, D4=C). `gogo run` is now a deprecating alias (D2=A/FR11). Bumped plugin.json + main.go Version to 0.15.0; additive docs/cli-contract.md 0.15.0 section + README subcommand list. Tests: rewrote orchestrator_test.go (resolver, lock refuse/reclaim/takeover, registry round-trip, reap, orphan-sweep incl. TEST-005, exit classification) + go_e2e_test.go (hermetic stub-claude e2e for gogo go argv + resume + is_error halt + run-alias). gofmt clean, go vet clean, go test -race ./... green. FR10 honored: skills/commands/templates untouched. The real end-to-end (a live claude -p driving /gogo:go) is a hands-on check for phase 4."
+}

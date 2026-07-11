@@ -8,6 +8,7 @@ package launch
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,6 +25,7 @@ type Action string
 
 const (
 	ActionGo     Action = "go"     // plan→implement / resume in-progress → /gogo:go
+	ActionPlan   Action = "plan"   // plan a feature → /gogo:plan (persistent-session gogo plan leg)
 	ActionDone   Action = "done"   // ready→changelog (single or merged) → /gogo:done
 	ActionResume Action = "resume" // answer a paused decision gate → /gogo:resume (orchestrator --attach)
 	ActionAccept Action = "accept" // clear the plan-acceptance gate → /gogo:accept (board `m` on a plan-pending card)
@@ -123,18 +125,22 @@ func ClaudePrintArgs(command string) []string {
 	return append(args, "-p", command)
 }
 
-// --- CLI process-orchestrator: per-phase `claude -p` runs (gogo run) -----------
+// --- persistent-session runner: the one `claude -p` run of the whole skill -----
 //
-// The orchestrator (cli/internal/orchestrator) drives ②→③→④ by running each phase
-// as its own `claude -p` session and WAITING for it to exit — the developer session
-// kept warm across fix rounds via --resume, review/test spawned fresh. These are the
-// session-aware argv builder + the foreground wait-for-exit runner it uses; they are
-// separate from Launch (which backgrounds an attachable session for the board).
+// The orchestrator (cli/internal/orchestrator) launches ONE persistent session per
+// feature leg — `claude -p "/gogo:go <slug>"` (or `/gogo:plan`) running the entire
+// skill (implement in-context + Task review/test + report) — and WAITS for it to
+// exit (the race-free leg-done signal). A first leg starts a NEW session
+// (--session-id <uuid>); a later leg RESUMES the same warm session (--resume
+// <uuid>). These are the session-aware argv builder + the foreground
+// wait-for-exit runner it uses; they are separate from Launch (which backgrounds
+// an attachable session for the board) and from LaunchPersistent (the --attach
+// path).
 
-// PhaseOpts configures one orchestrator phase invocation over `claude -p`. At most
-// one of SessionID (start a NEW session with a pre-assigned uuid — fresh eyes / the
-// first dev build) or Resume (continue a WARM session — dev fix rounds) is set;
-// both empty is a plain one-shot (e.g. ⑤ report).
+// PhaseOpts configures one persistent-session invocation over `claude -p`. At most
+// one of SessionID (start a NEW session with a pre-assigned uuid — the first leg)
+// or Resume (continue the WARM session — a later leg / gate resume) is set; both
+// empty is a plain one-shot.
 type PhaseOpts struct {
 	SessionID string // --session-id <uuid>
 	Resume    string // --resume <uuid>
@@ -145,7 +151,7 @@ type PhaseOpts struct {
 // are always SEPARATE argv elements (injection-safe, matching PermissionArgs); the
 // command is the single final element after -p, never a shell string. Resume wins
 // over SessionID if both are set (you can't pre-assign an id to an existing session).
-// Pure — the unit-tested core of the phase runner.
+// Pure — the unit-tested core of the session runner.
 func PhaseArgs(command string, opts PhaseOpts) []string {
 	args := append([]string(nil), PermissionArgs()...)
 	switch {
@@ -161,8 +167,8 @@ func PhaseArgs(command string, opts PhaseOpts) []string {
 }
 
 // RunResult is the parsed `--output-format json` envelope of a finished `claude -p`
-// phase run (only the fields the orchestrator uses; unknown fields are ignored,
-// forward-compatible). Verified against claude 2.1.206 (spike).
+// persistent-session run (only the fields the orchestrator uses; unknown fields are
+// ignored, forward-compatible). Verified against claude 2.1.206 (spike).
 type RunResult struct {
 	SessionID  string  `json:"session_id"`
 	CostUSD    float64 `json:"total_cost_usd"`
@@ -173,10 +179,10 @@ type RunResult struct {
 
 // RunPhase spawns `claude -p "<command>"` with opts, BLOCKS until it exits, and
 // parses the `--output-format json` envelope. This is the foreground, wait-for-exit
-// primitive the orchestrator uses to detect phase completion (D2: `-p` exit is the
-// race-free phase-done signal); warm continuity survives the exit because claude
-// persists the session by uuid (spike-proven). Anchored to root (TEST-013). It
-// always requests JSON so the envelope (session_id, cost) is capturable.
+// primitive the orchestrator uses to detect the persistent session's leg completion
+// (D2: `-p` exit is the race-free leg-done signal); warm continuity survives the
+// exit because claude persists the session by uuid (spike-proven). Anchored to root
+// (TEST-013). It always requests JSON so the envelope (session_id, cost) is capturable.
 func RunPhase(root, command string, opts PhaseOpts) (RunResult, error) {
 	if !HasClaude() {
 		return RunResult{}, fmt.Errorf("claude CLI not found on PATH — cannot run %q", command)
@@ -260,6 +266,16 @@ func BuildIntent(action Action, slugs []string, release string) Intent {
 		}
 		in.Command = "/gogo:go " + slug
 		in.Session = sessionName("go", slug)
+	case ActionPlan:
+		// The persistent-session `gogo plan` leg: launch-or-resume ONE session
+		// running the /gogo:plan skill. Its own tracked session, distinct from the
+		// feature's `go` leg (they are separate legs of the same feature's work).
+		slug := ""
+		if len(slugs) > 0 {
+			slug = slugs[0]
+		}
+		in.Command = "/gogo:plan " + slug
+		in.Session = sessionName("plan", slug)
 	case ActionAccept:
 		// Clear the plan-acceptance gate from the board: a thin launched
 		// /gogo:accept presents the plan and records acceptance through gogo-plan's
@@ -320,7 +336,7 @@ func sanitizeLabel(label string) string {
 // slug "waiting-card"; TEST-005).
 func SessionMatchesSlug(session, slug string) bool {
 	sanitized := sanitizeLabel(slug)
-	for _, action := range []Action{ActionGo, ActionDone, ActionAccept} {
+	for _, action := range []Action{ActionGo, ActionPlan, ActionDone, ActionAccept} {
 		base := "gogo-" + string(action) + "-" + sanitized
 		if session == base {
 			return true
@@ -464,6 +480,80 @@ func Launch(root string, in Intent) (Result, error) {
 		return Result{}, fmt.Errorf("claude -p failed to start: %w", err)
 	}
 	return Result{Mode: "background", LogPath: logPath, PID: cmd.Process.Pid, Command: in.Command}, nil
+}
+
+// --- reaper + liveness (persistent-session lifecycle, FR6/FR8) ----------------
+
+// KillSession stops a tmux session by name (`tmux kill-session -t <name>`,
+// best-effort — single argv, no shell, injection-safe). The reaper (`gogo sweep`
+// + the opportunistic reap) uses it to kill a tracked or orphaned `gogo-*`
+// session so panes never pile up — the remain-on-exit leak the incident hit
+// (7 orphaned sessions) is what this repairs (FR8). No tmux, no such session, or
+// an empty name → a returned error; never a panic.
+func KillSession(name string) error {
+	if name == "" {
+		return fmt.Errorf("empty tmux session name")
+	}
+	if !HasTmux() {
+		return fmt.Errorf("tmux not installed")
+	}
+	return exec.Command("tmux", "kill-session", "-t", name).Run()
+}
+
+// PidAlive reports whether a process is alive via signal 0 (no signal is
+// delivered — the call only probes whether the pid is signalable). The owner
+// lock's liveness cross-check uses it (FR6): a lock whose recorded PID no longer
+// answers signal-0 AND has no matching live `gogo-*` tmux session is stale and
+// reclaimable. A non-positive pid is never alive; EPERM (exists but not ours to
+// signal) still counts as alive.
+func PidAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	err := syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
+// TmuxPersistentArgs builds the tmux argv for the `--attach` persistent session:
+// `tmux new-session -d -s <name> -c root claude [--resume <uuid>|--session-id <uuid>] [perm] <command>`.
+// The session flag + value are separate argv elements (injection-safe, like
+// PermissionArgs); the slash command is the single final element. Unlike the
+// board's TmuxNewSessionArgs this drives an INTERACTIVE claude (no `-p`) so the
+// user can answer gates live in the warm session, and the caller never sets
+// remain-on-exit — the pane closes when claude exits (no orphan by construction).
+func TmuxPersistentArgs(root string, in Intent, opts PhaseOpts) []string {
+	args := []string{"new-session", "-d", "-s", in.Session, "-c", root, "claude"}
+	switch {
+	case opts.Resume != "":
+		args = append(args, "--resume", opts.Resume)
+	case opts.SessionID != "":
+		args = append(args, "--session-id", opts.SessionID)
+	}
+	args = append(args, PermissionArgs()...)
+	return append(args, in.Command)
+}
+
+// LaunchPersistent starts a feature's ONE persistent session as a detached,
+// attachable tmux session running interactive `claude` (the `--attach` path,
+// D4=C): the user attaches to answer decision/UAT gates live in the warm session.
+// It resumes the tracked uuid (opts.Resume) or starts a fresh one
+// (opts.SessionID). Unlike the board's Launch it NEVER sets remain-on-exit, so
+// when claude exits the pane closes and the session is gone by construction —
+// the leak the incident hit is absent on this path (FR8). Needs tmux (that is
+// what "attach" means); without it, drop `--attach` for the headless `-p` path.
+func LaunchPersistent(root string, in Intent, opts PhaseOpts) (Result, error) {
+	if !HasClaude() {
+		return Result{}, fmt.Errorf("claude CLI not found on PATH — cannot launch %q", in.Command)
+	}
+	if !HasTmux() {
+		return Result{}, fmt.Errorf("tmux not installed — --attach needs tmux (drop --attach to run headless -p)")
+	}
+	session := uniqueSession(in.Session)
+	in.Session = session
+	if err := exec.Command("tmux", TmuxPersistentArgs(root, in, opts)...).Run(); err != nil {
+		return Result{}, fmt.Errorf("tmux new-session failed: %w", err)
+	}
+	return Result{Mode: "tmux", Session: session, Command: in.Command}, nil
 }
 
 func backgroundLogPath(root string, in Intent) (string, error) {

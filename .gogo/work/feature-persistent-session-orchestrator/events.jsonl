@@ -1,0 +1,15 @@
+{"ts":"2026-07-11T15:18:57Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T15:25:24Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T15:31:57Z","event":"phase-started","phase":"implement","status":"implementing","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T15:50:46Z","event":"phase-done","phase":"implement","status":"implementing","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T16:09:12Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T16:09:12Z","event":"phase-done","phase":"implement","status":"implementing","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T16:23:48Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T16:23:48Z","event":"issues-found","phase":"test","status":"testing","round":1,"note":"1 major (needs-user-decision: blocked true-e2e hands-on check)","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T16:23:48Z","event":"gate-opened","phase":"test","status":"waiting-for-user","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T16:58:49Z","event":"gate-resolved","phase":"test","status":"testing","note":"D7","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T22:39:24Z","event":"phase-done","phase":"test","status":"testing","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T22:39:50Z","event":"phase-started","phase":"report","status":"testing","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T22:43:56Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T22:53:12Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"persistent-session-orchestrator"}
+{"ts":"2026-07-11T22:53:12Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-12-persistent-session-orchestrator/","slug":"persistent-session-orchestrator"}

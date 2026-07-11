@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams (before) — persistent-session-orchestrator</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams (before / as-is) — <code>persistent-session-orchestrator</code></h1>
+    <p class="hint">Offline viewer · the baseline this change replaces · mermaid vendored (no network, no CLI).</p>
+  </header>
+
+  <h2>Before — the Go per-phase loop + the board-launch orphan leak</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  A["gogo run slug"] --> B["orchestrator.Run() — the Go per-phase loop"]
+  B --> C["spawn dev: claude -p --session-id (fresh build ②)"]
+  C --> D["spawn review: claude -p --session-id (fresh ③)"]
+  D --> E{"contract.Route(review) — 2nd copy of the routing rule"}
+  E -- "ReImplement" --> F["claude -p --resume dev-uuid (warm fix)"]
+  F --> D
+  E -- "Gate" --> G["gate → waiting-for-user (bounds also gate)"]
+  E -- "Advance" --> H["spawn test: claude -p --session-id (fresh ④)"]
+  H --> I{"contract.Route(test)"}
+  I -- "ReImplement" --> F
+  I -- "Gate" --> G
+  I -- "Advance" --> J["spawn report: claude -p (⑤)"]
+  J --> K["awaiting-uat"]
+  BD["board move (tui/move.go)"] --> LN["launch.Launch → tmux new-session"]
+  LN --> RE["set-option remain-on-exit ON (launch.go:443)"]
+  RE --> OR["NO reaper anywhere → gogo-* tmux sessions pile up as orphans"]
+  </pre></div>
+
+  <script src="../../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

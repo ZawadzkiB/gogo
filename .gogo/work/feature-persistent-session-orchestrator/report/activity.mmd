@@ -1,0 +1,19 @@
+stateDiagram-v2
+  [*] --> None
+  None: No session tracked
+  Running: Persistent claude -p session running the skill
+  Parked: Exited at a decision gate (waiting-for-user)
+  AwaitingUAT: Report green, waiting at the UAT gate
+  Shipped: gogo done archived the entry
+  Orphaned: Crash or lost owner, lock stale
+  Reaped: Session and tmux killed
+  None --> Running: gogo go or gogo plan starts a session
+  Running --> Parked: p exits at waiting-for-user
+  Parked --> Running: gogo go resumes the warm UUID
+  Running --> AwaitingUAT: p exits at awaiting-uat
+  AwaitingUAT --> Running: UAT feedback, re-accept, rerun
+  AwaitingUAT --> Shipped: user runs gogo done
+  Shipped --> Reaped: reap at ship
+  Running --> Orphaned: crash or lost owner
+  Orphaned --> Reaped: gogo sweep kills the tmux
+  Reaped --> [*]

@@ -2,350 +2,442 @@ package orchestrator_test
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/launch"
 	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
 )
 
-// scriptedPhase is what a fake phase run "produces" when the loop invokes it: the
-// contract files it writes (open issue count / result status) and the cost it books.
-type scriptedPhase struct {
-	open     int
-	severity string // finding severity for review/test; "" → "major"
-	needsDec bool
-	status   string // result.json status; "" → "ok"
-	noOutput bool   // simulate a phase that wrote NO contract files
-	isError  bool   // simulate a `claude -p` run finishing with is_error=true
-	cost     float64
-}
-
 // fakeRunner stands in for spawning `claude -p`: it records every Invocation and,
-// per the script, writes the contract files the real phase session would, so the
-// loop's real read+route path is exercised without spawning claude.
+// per its script, rewrites the feature's state.md to the status the real session
+// would leave — so the manager's real read+classify path runs without claude.
 type fakeRunner struct {
-	t          *testing.T
-	root, slug string
-	script     []scriptedPhase
-	calls      []orchestrator.Invocation
+	root, slug  string
+	writeStatus string // status to leave in state.md after the run ("" → leave as-is)
+	res         launch.RunResult
+	err         error
+	calls       []orchestrator.Invocation
 }
 
 func (f *fakeRunner) Run(inv orchestrator.Invocation) (launch.RunResult, error) {
-	i := len(f.calls)
 	f.calls = append(f.calls, inv)
-	if i >= len(f.script) {
-		f.t.Fatalf("phase call #%d unexpected (script has %d entries): %+v", i, len(f.script), inv)
+	if f.writeStatus != "" {
+		writeState(nil, f.root, f.slug, f.writeStatus)
 	}
-	sp := f.script[i]
-	status := sp.status
-	if status == "" {
-		status = "ok"
-	}
-	fdir := filepath.Join(f.root, ".gogo", "work", "feature-"+f.slug)
-	if !sp.noOutput {
-		switch inv.Kind {
-		case "implement":
-			writeResultFile(f.t, fdir, "implement", status, 0)
-		case "review", "test":
-			writeIssuesFile(f.t, fdir, inv.Kind, sp.open, sp.severity, sp.needsDec)
-			writeResultFile(f.t, fdir, inv.Kind, status, sp.open)
+	res := f.res
+	if res.SessionID == "" {
+		res.SessionID = inv.SessionID
+		if inv.Resume != "" {
+			res.SessionID = inv.Resume
 		}
 	}
-	uuid := inv.SessionID
-	if inv.Resume != "" {
-		uuid = inv.Resume
-	}
-	return launch.RunResult{CostUSD: sp.cost, SessionID: uuid, IsError: sp.isError}, nil
+	return res, f.err
 }
 
-func writeResultFile(t *testing.T, fdir, track, status string, open int) {
-	t.Helper()
-	dir := filepath.Join(fdir, track)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	body := fmt.Sprintf(`{"slug":"s","phase":%q,"status":%q,"inputs":[],"outputs":[],"validated_in":true,"validated_out":true,"open_issues":%d,"summary":"x"}`, track, status, open)
-	if err := os.WriteFile(filepath.Join(dir, "result.json"), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func writeIssuesFile(t *testing.T, fdir, track string, open int, severity string, needsDec bool) {
-	t.Helper()
-	if severity == "" {
-		severity = "major"
-	}
-	dir := filepath.Join(fdir, track)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	var items []string
-	for i := 0; i < open; i++ {
-		ps := "apply the fix"
-		if needsDec && i == 0 {
-			ps = "NEEDS-USER-DECISION: choose an approach"
-		}
-		items = append(items, fmt.Sprintf(`{"id":"REV-%03d","title":"t","description":"d","proposed_solution":%q,"severity":%q,"priority":"P1","status":"open","origin":%q,"found_in_round":1}`, i+1, ps, severity, track))
-	}
-	body := fmt.Sprintf(`{"slug":"s","track":%q,"round":1,"issues":[%s]}`, track, strings.Join(items, ","))
-	if err := os.WriteFile(filepath.Join(dir, "issues.json"), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
+// writeState writes a minimal, grammar-valid state.md for a feature (t may be nil
+// when called from the fake runner, where a failure just surfaces downstream).
+func writeState(t *testing.T, root, slug, status string) {
+	dir := filepath.Join(root, ".gogo", "work", "feature-"+slug)
+	_ = os.MkdirAll(dir, 0o755)
+	body := "# State — feature `" + slug + "`\n\n" +
+		"- **feature:** unit-test scratch\n" +
+		"- **phase:** implement\n" +
+		"- **status:** " + status + "\n" +
+		"- **created:** 2026-07-11\n" +
+		"- **open-decision:** none\n"
+	if err := os.WriteFile(filepath.Join(dir, "state.md"), []byte(body), 0o644); err != nil && t != nil {
+		t.Fatalf("write state.md: %v", err)
 	}
 }
 
-func newOrch(t *testing.T, fake *fakeRunner, maxRounds int, ceiling float64) (*orchestrator.Orchestrator, *bytes.Buffer) {
+func newSession(root, slug string, runner *fakeRunner) (*orchestrator.Session, *bytes.Buffer) {
 	buf := &bytes.Buffer{}
-	o := &orchestrator.Orchestrator{
-		Root:        fake.root,
-		Slug:        fake.slug,
-		Runner:      fake,
-		Reg:         orchestrator.LoadRegistry(fake.root, fake.slug),
-		Out:         buf,
-		MaxRounds:   maxRounds,
-		CostCeiling: ceiling,
-	}
-	return o, buf
+	return &orchestrator.Session{
+		Root:   root,
+		Slug:   slug,
+		Kind:   "go",
+		Reg:    orchestrator.LoadRegistry(root, slug),
+		Runner: runner,
+		Out:    buf,
+		Killer: func(string) error { return nil },
+		Lister: func() []string { return nil }, // hermetic: no tmux shell-out by default
+	}, buf
 }
 
-// TestHappyPath: clean review + clean test → report → awaiting-uat. Asserts the
-// dev session is fresh (--session-id, no --resume), review/test are fresh, and
-// report is a one-shot with no session flags.
-func TestHappyPath(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{}, {open: 0}, {open: 0}, {}}}
-	o, _ := newOrch(t, fake, 3, 0)
+// --- 1. launch-or-resume resolver (pure) -------------------------------------
 
-	out, err := o.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.Result != orchestrator.ResultAwaitingUAT {
-		t.Fatalf("outcome = %+v, want awaiting-uat", out)
-	}
-	kinds := callKinds(fake.calls)
-	if got := strings.Join(kinds, ","); got != "implement,review,test,report" {
-		t.Fatalf("phase order = %s", got)
-	}
-	if fake.calls[0].SessionID == "" || fake.calls[0].Resume != "" {
-		t.Errorf("initial dev build must be a fresh --session-id, not a resume: %+v", fake.calls[0])
-	}
-	if fake.calls[1].SessionID == "" || fake.calls[1].Resume != "" {
-		t.Errorf("review must be a fresh session: %+v", fake.calls[1])
-	}
-	report := fake.calls[3]
-	if report.SessionID != "" || report.Resume != "" {
-		t.Errorf("report must be a one-shot (no session flags): %+v", report)
-	}
-}
-
-// TestWarmResumeOnFix: review round 1 has an open fixable finding → the dev is
-// RESUMED (same uuid) to fix it, and round-2 review gets a NEW fresh uuid.
-func TestWarmResumeOnFix(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{}, {open: 1}, {}, {open: 0}, {open: 0}, {}}}
-	o, _ := newOrch(t, fake, 3, 0)
-
-	out, err := o.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.Result != orchestrator.ResultAwaitingUAT {
-		t.Fatalf("outcome = %+v, want awaiting-uat", out)
-	}
-	// After the warm fix, review runs AGAIN (fresh eyes verify the fix) before test.
-	if got := strings.Join(callKinds(fake.calls), ","); got != "implement,review,implement,review,test,report" {
-		t.Fatalf("phase order = %s", got)
-	}
-	dev := fake.calls[0].SessionID
-	fix := fake.calls[2]
-	if fix.Kind != "implement" || fix.Resume != dev || fix.SessionID != "" {
-		t.Errorf("the fix must RESUME the warm dev (uuid %s), not start fresh: %+v", dev, fix)
-	}
-	rev1, rev2 := fake.calls[1], fake.calls[3]
-	if rev1.SessionID == rev2.SessionID {
-		t.Errorf("re-review must use a NEW fresh uuid (fresh eyes); both were %s", rev1.SessionID)
-	}
-	if rev2.Resume != "" {
-		t.Errorf("review is never resumed: %+v", rev2)
-	}
-}
-
-// TestGateOnNeedsUserDecision: a needs-user-decision finding pauses the loop and
-// spawns no further phases.
-func TestGateOnNeedsUserDecision(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{}, {open: 1, needsDec: true}}}
-	o, buf := newOrch(t, fake, 3, 0)
-
-	out, err := o.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.Result != orchestrator.ResultGated {
-		t.Fatalf("outcome = %+v, want gated", out)
-	}
-	if len(fake.calls) != 2 {
-		t.Errorf("must pause after review (no test/report): got %d calls", len(fake.calls))
-	}
-	if !strings.Contains(buf.String(), "paused") {
-		t.Errorf("gate must notify the user; output: %q", buf.String())
-	}
-}
-
-// TestRoundBoundGates: a finding that never resolves gates after MaxRounds fixes.
-func TestRoundBoundGates(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{}, {open: 1}, {}, {open: 1}, {}, {open: 1}}}
-	o, _ := newOrch(t, fake, 2, 0)
-
-	out, err := o.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.Result != orchestrator.ResultGated || !strings.Contains(out.Gate, "fix-round budget") {
-		t.Fatalf("outcome = %+v, want gated on the round bound", out)
-	}
-	// build + (review, fix)×2 + a final review = 6 calls, then the 3rd fix gates.
-	if len(fake.calls) != 6 {
-		t.Errorf("expected 6 calls before the bound gates, got %d", len(fake.calls))
-	}
-}
-
-// TestCostCeilingGates: crossing the cost ceiling gates rather than looping on.
-func TestCostCeilingGates(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{cost: 0.1}, {open: 1, cost: 0.1}, {cost: 0.1}}}
-	o, _ := newOrch(t, fake, 5, 0.25) // high round cap so the ceiling bites first
-
-	out, err := o.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.Result != orchestrator.ResultGated || !strings.Contains(out.Gate, "cost ceiling") {
-		t.Fatalf("outcome = %+v, want gated on the cost ceiling", out)
-	}
-}
-
-// TestPhaseErrorHalts: a `claude -p` run that finishes with is_error must halt the
-// run (not march on a failed phase as if green) — REV-002.
-func TestPhaseErrorHalts(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{}, {isError: true, cost: 0.2}}}
-	o, _ := newOrch(t, fake, 3, 0)
-
-	if _, err := o.Run(); err == nil {
-		t.Fatal("a phase reporting is_error must halt the run with an error")
-	}
-	if len(fake.calls) != 2 {
-		t.Errorf("must halt at the failed review, got %d calls", len(fake.calls))
-	}
-	// The failed run's cost is still booked, not discarded (REV-006).
-	if o.Reg.CostUSD < 0.2 {
-		t.Errorf("errored run's cost must be booked before the halt, got $%.2f", o.Reg.CostUSD)
-	}
-}
-
-// TestNoOutputGates: a review that writes no result.json/issues.json must gate, not
-// be treated as clean-and-advance — REV-002.
-func TestNoOutputGates(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{}, {noOutput: true}}}
-	o, buf := newOrch(t, fake, 3, 0)
-
-	out, err := o.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.Result != orchestrator.ResultGated {
-		t.Fatalf("a review with no output must gate, not advance: %+v", out)
-	}
-	if len(fake.calls) != 2 {
-		t.Errorf("must not advance to test/report: got %d calls", len(fake.calls))
-	}
-	if !strings.Contains(buf.String(), "no result.json") {
-		t.Errorf("gate message should explain the missing output: %q", buf.String())
-	}
-}
-
-// TestPreflightCostGateNoSpend: a re-run whose loaded cost already exceeds the
-// ceiling gates immediately, spawning NOTHING (no money sink) — REV-003.
-func TestPreflightCostGateNoSpend(t *testing.T) {
+func TestResolveInvocation(t *testing.T) {
 	root := t.TempDir()
-	pre := &orchestrator.Registry{Slug: "feat", DevUUID: "dev-x", CostUSD: 99.0}
-	if err := pre.Save(root); err != nil {
+	// First run: empty registry → a fresh --session-id, no --resume.
+	empty := orchestrator.LoadRegistry(root, "feat")
+	inv := orchestrator.ResolveInvocation(empty, "go", "feat")
+	if inv.SessionID == "" || inv.Resume != "" {
+		t.Errorf("first run must be a fresh --session-id, got %+v", inv)
+	}
+	if inv.Command != "/gogo:go feat" {
+		t.Errorf("go command = %q, want /gogo:go feat", inv.Command)
+	}
+	// Re-run: a tracked uuid → --resume it, no --session-id.
+	reg := &orchestrator.Registry{Slug: "feat", Persistent: map[string]*orchestrator.PersistentSession{
+		"go": {Kind: "go", UUID: "warm-123"},
+	}}
+	inv = orchestrator.ResolveInvocation(reg, "go", "feat")
+	if inv.Resume != "warm-123" || inv.SessionID != "" {
+		t.Errorf("re-run must --resume the warm uuid, got %+v", inv)
+	}
+	// plan leg uses its own command + its own tracked session.
+	planInv := orchestrator.ResolveInvocation(reg, "plan", "feat")
+	if planInv.Command != "/gogo:plan feat" || planInv.SessionID == "" {
+		t.Errorf("plan leg = %+v, want a fresh /gogo:plan invocation", planInv)
+	}
+}
+
+// --- 2. lock refusal / reclaim / takeover ------------------------------------
+
+func seedLock(t *testing.T, root, slug string, owner orchestrator.Owner) {
+	t.Helper()
+	path := orchestrator.LockPath(root, slug)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	fake := &fakeRunner{t: t, root: root, slug: "feat", script: nil}
-	o, _ := newOrch(t, fake, 3, 1.0) // ceiling 1.0, already spent 99
+	data, _ := json.Marshal(owner)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
 
-	out, err := o.Run()
+func TestLockRefusesLiveOwner(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	seedLock(t, root, "feat", orchestrator.Owner{PID: 4242, Tmux: "gogo-go-feat", Kind: "go"})
+
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "awaiting-uat"}
+	sess, buf := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return true } // owner is LIVE
+
+	out, err := sess.LaunchOrResume()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Result != orchestrator.ResultGated || !strings.Contains(out.Gate, "cost ceiling") {
-		t.Fatalf("must pre-flight gate on the loaded cost, got %+v", out)
+	if out.Result != orchestrator.ResultRefused {
+		t.Fatalf("a live owner must refuse, got %+v", out)
 	}
 	if len(fake.calls) != 0 {
-		t.Errorf("pre-flight cost gate must spawn NOTHING, got %d calls", len(fake.calls))
+		t.Errorf("refusal must launch NOTHING, got %d calls", len(fake.calls))
+	}
+	if !strings.Contains(buf.String(), "already owned by a live session") {
+		t.Errorf("refusal must name the live owner; output: %q", buf.String())
 	}
 }
 
-// TestReviewBatchesMinor: a lone open MINOR on review is batched (gogo-review §④) —
-// advance to test, never a re-implement round — REV-001.
-func TestReviewBatchesMinor(t *testing.T) {
-	fake := &fakeRunner{t: t, root: t.TempDir(), slug: "feat",
-		script: []scriptedPhase{{}, {open: 1, severity: "minor"}, {open: 0}, {}}}
-	o, _ := newOrch(t, fake, 3, 0)
+func TestLockReclaimsStaleOwner(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	seedLock(t, root, "feat", orchestrator.Owner{PID: 999999, Kind: "go"}) // headless, no tmux
 
-	out, err := o.Run()
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "awaiting-uat"}
+	sess, _ := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return false } // owner is DEAD → reclaim
+
+	out, err := sess.LaunchOrResume()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if out.Result != orchestrator.ResultAwaitingUAT {
-		t.Fatalf("outcome = %+v, want awaiting-uat", out)
+		t.Fatalf("a stale lock must be reclaimed + launched, got %+v", out)
 	}
-	if got := strings.Join(callKinds(fake.calls), ","); got != "implement,review,test,report" {
-		t.Fatalf("an open minor must be batched (no re-implement); order = %s", got)
+	if len(fake.calls) != 1 {
+		t.Errorf("stale reclaim must launch exactly once, got %d", len(fake.calls))
 	}
 }
 
-func callKinds(calls []orchestrator.Invocation) []string {
-	out := make([]string, len(calls))
-	for i, c := range calls {
-		out[i] = c.Kind
+func TestLockTakeoverSeizesAndReaps(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	seedLock(t, root, "feat", orchestrator.Owner{PID: 4242, Tmux: "gogo-go-feat", Kind: "go"})
+
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "awaiting-uat"}
+	sess, _ := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return true } // owner is LIVE
+	sess.Takeover = true
+	var killed []string
+	sess.Killer = func(n string) error { killed = append(killed, n); return nil }
+
+	out, err := sess.LaunchOrResume()
+	if err != nil {
+		t.Fatal(err)
 	}
-	return out
+	if out.Result != orchestrator.ResultAwaitingUAT || len(fake.calls) != 1 {
+		t.Fatalf("--takeover must seize + launch once, got %+v / %d calls", out, len(fake.calls))
+	}
+	if len(killed) != 1 || killed[0] != "gogo-go-feat" {
+		t.Errorf("--takeover must reap the prior owner's tmux, killed = %v", killed)
+	}
 }
+
+func TestLockRefusesUntrackedBoardSession(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	// No lockfile at all — but a live gogo-* session holds the slug (a board-launched
+	// racer that never wrote our lock). The lock must still refuse it (D1=C / FR6).
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "awaiting-uat"}
+	sess, buf := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return true } // a live session exists for the slug
+	sess.Lister = func() []string { return []string{"gogo-go-feat"} }
+
+	out, err := sess.LaunchOrResume()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Result != orchestrator.ResultRefused {
+		t.Fatalf("a live untracked board session must refuse, got %+v", out)
+	}
+	if len(fake.calls) != 0 {
+		t.Errorf("refusal must launch NOTHING, got %d calls", len(fake.calls))
+	}
+	if !strings.Contains(buf.String(), "untracked live session") {
+		t.Errorf("refusal must name the untracked board session; output: %q", buf.String())
+	}
+	// The just-created lockfile is removed — we do not own the work.
+	if _, err := os.Stat(orchestrator.LockPath(root, "feat")); !os.IsNotExist(err) {
+		t.Errorf("a refused untracked acquire must leave no lockfile (err=%v)", err)
+	}
+}
+
+func TestTakeoverReapsBoardSessionBySlug(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "awaiting-uat"}
+	sess, _ := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return true }
+	sess.Takeover = true
+	// A collision-suffixed / board session that the lockfile's base name would miss —
+	// reap must go BY SLUG (REV-002).
+	sess.Lister = func() []string { return []string{"gogo-go-feat-2", "gogo-done-other"} }
+	var killed []string
+	sess.Killer = func(n string) error { killed = append(killed, n); return nil }
+
+	out, err := sess.LaunchOrResume()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Result != orchestrator.ResultAwaitingUAT || len(fake.calls) != 1 {
+		t.Fatalf("--takeover must seize + launch once, got %+v / %d calls", out, len(fake.calls))
+	}
+	if len(killed) != 1 || killed[0] != "gogo-go-feat-2" {
+		t.Errorf("--takeover must reap the matching session by slug (not the unrelated one), killed = %v", killed)
+	}
+}
+
+// --- 3. registry round-trip --------------------------------------------------
 
 func TestRegistryRoundTrip(t *testing.T) {
 	root := t.TempDir()
-	reg := &orchestrator.Registry{Slug: "feat", DevUUID: "dev-123", Round: 2, CostUSD: 1.5}
-	if err := reg.Save(root); err != nil {
+	writeState(t, root, "feat", "plan-accepted")
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "waiting-for-user"}
+	sess, _ := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return false }
+
+	if _, err := sess.LaunchOrResume(); err != nil {
 		t.Fatal(err)
 	}
-	got := orchestrator.LoadRegistry(root, "feat")
-	if got.DevUUID != "dev-123" || got.Round != 2 {
-		t.Errorf("reload = %+v, want dev-123/round 2", got)
+	firstUUID := fake.calls[0].SessionID
+	if firstUUID == "" {
+		t.Fatal("first run must assign a --session-id")
 	}
-	// A missing registry degrades to a fresh (empty) one, never a crash.
-	fresh := orchestrator.LoadRegistry(root, "nope")
-	if fresh.DevUUID != "" {
-		t.Errorf("missing registry should be fresh, got %+v", fresh)
+
+	// Reload from disk: the persistent session's uuid survives, and a re-run resumes
+	// the SAME uuid (warm), not a fresh one.
+	reg := orchestrator.LoadRegistry(root, "feat")
+	if reg.Get("go") == nil || reg.Get("go").UUID != firstUUID {
+		t.Fatalf("registry did not persist the go session uuid %q: %+v", firstUUID, reg.Get("go"))
 	}
-	// A garbled registry also degrades to fresh.
+	inv := orchestrator.ResolveInvocation(reg, "go", "feat")
+	if inv.Resume != firstUUID {
+		t.Errorf("re-run must --resume %q, got %+v", firstUUID, inv)
+	}
+
+	// A garbled registry degrades to fresh, never a crash.
 	path := orchestrator.RegistryPath(root, "bad")
 	_ = os.MkdirAll(filepath.Dir(path), 0o755)
 	_ = os.WriteFile(path, []byte("{not json"), 0o644)
-	if orchestrator.LoadRegistry(root, "bad").DevUUID != "" {
-		t.Errorf("garbled registry should degrade to fresh")
+	if orchestrator.LoadRegistry(root, "bad").Get("go") != nil {
+		t.Error("garbled registry should degrade to fresh")
 	}
 }
 
-func TestRunnableStatus(t *testing.T) {
+// --- 4. reap kills the tracked session + tmux --------------------------------
+
+func TestReapKillsTrackedTmux(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "shipped")
+	reg := &orchestrator.Registry{Slug: "feat", Persistent: map[string]*orchestrator.PersistentSession{
+		"go": {Kind: "go", UUID: "u-1", Tmux: "gogo-go-feat", Status: orchestrator.SessRunning},
+	}}
+	if err := reg.Save(root); err != nil {
+		t.Fatal(err)
+	}
+	seedLock(t, root, "feat", orchestrator.Owner{PID: 4242, Tmux: "gogo-go-feat"})
+
+	var killed []string
+	sess := &orchestrator.Session{
+		Root: root, Slug: "feat", Kind: "go",
+		Reg:    orchestrator.LoadRegistry(root, "feat"),
+		Killer: func(n string) error { killed = append(killed, n); return nil },
+		Out:    &bytes.Buffer{},
+	}
+	sess.Reap()
+
+	if len(killed) != 1 || killed[0] != "gogo-go-feat" {
+		t.Errorf("reap must KillSession the tracked tmux, killed = %v", killed)
+	}
+	reg2 := orchestrator.LoadRegistry(root, "feat")
+	if reg2.Get("go") == nil || reg2.Get("go").Status != orchestrator.SessReaped {
+		t.Errorf("reap must mark the registry reaped, got %+v", reg2.Get("go"))
+	}
+	if _, err := os.Stat(orchestrator.LockPath(root, "feat")); !os.IsNotExist(err) {
+		t.Errorf("reap must release the lock, lockfile still present (err=%v)", err)
+	}
+}
+
+// --- 5. orphan-sweep (with exact SessionMatchesSlug attribution, TEST-005) ----
+
+func TestSweepReapsOrphansAndTerminal(t *testing.T) {
+	root := t.TempDir()
+	repo := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "a", Status: "testing"},
+		{Slug: "b", Status: "shipped"},
+		{Slug: "oauth", Status: "testing"},
+		{Slug: "auth", Status: "testing"},
+		{Slug: "waiting-card", Status: "implementing"},
+	}}
+	sessions := []string{
+		"gogo-go-a",               // a is live/in-progress → spare
+		"gogo-done-b",             // b is shipped → reap (kill-at-ship)
+		"gogo-go-orphan",          // no feature "orphan" → reap
+		"gogo-go-oauth",           // matches oauth (not auth) → spare
+		"gogo-done-awaiting-card", // no feature "awaiting-card"; must NOT match "waiting-card" → reap
+	}
+	var killed []string
+	sw := &orchestrator.Sweeper{
+		Root: root, Repo: repo,
+		List: func() []string { return sessions },
+		Kill: func(n string) error { killed = append(killed, n); return nil },
+		Out:  &bytes.Buffer{},
+	}
+	got := sw.Sweep()
+
+	want := map[string]bool{"gogo-done-b": true, "gogo-go-orphan": true, "gogo-done-awaiting-card": true}
+	if len(got) != len(want) {
+		t.Fatalf("sweep killed %v, want exactly %v", got, keys(want))
+	}
+	for _, s := range got {
+		if !want[s] {
+			t.Errorf("sweep killed %q which should have been spared", s)
+		}
+	}
+	// gogo-go-a and gogo-go-oauth (live, non-terminal) must be spared.
+	for _, spared := range []string{"gogo-go-a", "gogo-go-oauth"} {
+		if contains(killed, spared) {
+			t.Errorf("sweep reaped %q but its feature is live/non-terminal (attribution bug)", spared)
+		}
+	}
+}
+
+func TestSweepDryRunKillsNothing(t *testing.T) {
+	repo := &contract.Repo{Features: []*contract.Feature{{Slug: "b", Status: "shipped"}}}
+	var killed []string
+	sw := &orchestrator.Sweeper{
+		Root: t.TempDir(), Repo: repo, DryRun: true,
+		List: func() []string { return []string{"gogo-done-b", "gogo-go-orphan"} },
+		Kill: func(n string) error { killed = append(killed, n); return nil },
+		Out:  &bytes.Buffer{},
+	}
+	got := sw.Sweep()
+	if len(got) != 2 {
+		t.Errorf("dry-run must report 2 would-reap, got %v", got)
+	}
+	if len(killed) != 0 {
+		t.Errorf("dry-run must kill NOTHING, killed = %v", killed)
+	}
+}
+
+// --- 6. exit classification --------------------------------------------------
+
+func TestExitClassifyAwaitingUAT(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "awaiting-uat"}
+	sess, buf := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return false }
+
+	out, err := sess.LaunchOrResume()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Result != orchestrator.ResultAwaitingUAT || out.Status != "awaiting-uat" {
+		t.Fatalf("green leg must classify awaiting-uat, got %+v", out)
+	}
+	if !strings.Contains(buf.String(), "/gogo:done feat") {
+		t.Errorf("awaiting-uat surface must point at /gogo:done; output: %q", buf.String())
+	}
+	if ps := orchestrator.LoadRegistry(root, "feat").Get("go"); ps == nil || ps.Status != orchestrator.SessAwaitingUAT {
+		t.Errorf("registry status must be awaiting-uat, got %+v", ps)
+	}
+	// The lock is released once the -p child exits.
+	if _, err := os.Stat(orchestrator.LockPath(root, "feat")); !os.IsNotExist(err) {
+		t.Errorf("headless leg must release the lock at exit (err=%v)", err)
+	}
+}
+
+func TestExitClassifyWaitingForUser(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	fake := &fakeRunner{root: root, slug: "feat", writeStatus: "waiting-for-user"}
+	sess, buf := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return false }
+
+	out, err := sess.LaunchOrResume()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Result != orchestrator.ResultParked {
+		t.Fatalf("a gate exit must classify parked, got %+v", out)
+	}
+	if !strings.Contains(buf.String(), "waiting-for-user") || !strings.Contains(buf.String(), "resume the warm session") {
+		t.Errorf("parked surface must explain the gate + resume; output: %q", buf.String())
+	}
+}
+
+func TestExitIsErrorHalts(t *testing.T) {
+	root := t.TempDir()
+	writeState(t, root, "feat", "plan-accepted")
+	fake := &fakeRunner{root: root, slug: "feat", res: launch.RunResult{IsError: true, CostUSD: 0.2}}
+	sess, _ := newSession(root, "feat", fake)
+	sess.Live = func(orchestrator.Owner, string) bool { return false }
+
+	if _, err := sess.LaunchOrResume(); err == nil {
+		t.Fatal("an is_error envelope must halt with an error, never a false green")
+	}
+	// REV-006 parity: the errored run's cost is still booked before the halt.
+	reg := orchestrator.LoadRegistry(root, "feat")
+	if reg.CostUSD < 0.2 {
+		t.Errorf("errored run's cost must be booked, got $%.2f", reg.CostUSD)
+	}
+	// The lock is still released even on a halt.
+	if _, err := os.Stat(orchestrator.LockPath(root, "feat")); !os.IsNotExist(err) {
+		t.Errorf("halt must still release the lock (err=%v)", err)
+	}
+}
+
+// --- status gate predicates --------------------------------------------------
+
+func TestStatusGates(t *testing.T) {
 	runnable := []string{"plan-accepted", "implementing", "reviewing", "testing"}
 	notRunnable := []string{"awaiting-plan-acceptance", "awaiting-uat", "waiting-for-user", "done", "shipped", ""}
 	for _, s := range runnable {
@@ -358,4 +450,37 @@ func TestRunnableStatus(t *testing.T) {
 			t.Errorf("%q should NOT be runnable", s)
 		}
 	}
+	// plan is permitted for a new/non-terminal feature, refused once shipped.
+	for _, s := range []string{"", "awaiting-plan-acceptance", "plan-accepted", "waiting-for-user"} {
+		if !orchestrator.PlannableStatus(s) {
+			t.Errorf("%q should be plannable", s)
+		}
+	}
+	for _, s := range []string{"shipped", "aborted", "done"} {
+		if orchestrator.PlannableStatus(s) {
+			t.Errorf("%q should NOT be plannable", s)
+		}
+		if !orchestrator.TerminalStatus(s) {
+			t.Errorf("%q should be terminal", s)
+		}
+	}
+}
+
+// --- small helpers -----------------------------------------------------------
+
+func contains(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
+func keys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

@@ -1,0 +1,27 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "updated": "2026-07-11",
+  "note": "As-built: the CLI as a persistent-session lifecycle manager over the one /gogo:go skill, with the owner lock, session registry, reap/sweep, and the shipped cli/internal/orchestrator type structure.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "gogo go/plan control flow — lock guard → launch-or-resume the persistent claude -p → classify exit → reap/sweep"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "Two orchestrators over one skill — CLI session manager spawns claude -p '/gogo:go', the skill runs implement in-context + Task review/test + report"
+    },
+    {
+      "kind": "activity",
+      "file": "activity.mmd",
+      "title": "Session lifecycle — none → running → parked/awaiting-uat (resume) → shipped/orphaned → reaped"
+    },
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "As-built structure — Session manager + Registry/PersistentSession, Lock/Owner, Sweeper, and the injectable SessionRunner/AttachFn/LivenessFn seams"
+    }
+  ]
+}

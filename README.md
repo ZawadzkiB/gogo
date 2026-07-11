@@ -382,17 +382,23 @@ cd cli && go build -o gogo .
   an explicit confirm (recoverable, never `rm`); changelog cards are append-only
   and bounce. `gogo trash` lists deleted work; `gogo trash restore <entry>` puts
   it back.
-- **Process-orchestrator (`gogo run [<slug>]`)** — a **second orchestrator** that drives
-  the ②→③→④(→⑤) loop from the CLI by spawning each phase as its own `claude -p` session:
-  the **developer session is kept warm across fix rounds via `--resume`** (never re-reads
-  the codebase) while **review and test spawn fresh** (fresh eyes). It coexists with the
-  in-chat `/gogo:go` — same phase skills, same typed contracts, one routing rule — and
-  stops at `awaiting-uat`. Bounds gate rather than abort (`GOGO_RUN_MAX_ROUNDS`,
-  `GOGO_RUN_COST_CEILING`); `--attach` opens an interactive `/gogo:resume` on a gate.
-  Its per-feature session bookkeeping lives under `.gogo/resources/cli/sessions/` (CLI-owned;
-  never pipeline state). Needs `claude` on PATH.
+- **Persistent-session orchestrator (`gogo go [<slug>]` · `gogo plan <slug>`)** — the CLI as a
+  **session-lifecycle manager over the one skill**: `gogo go` **launches or `--resume`s ONE
+  persistent `claude -p` session** running the existing `/gogo:go` skill for the whole feature
+  (**implement warm in-context** + **review/test as nested `Task` subagents** + report), and the
+  CLI only manages that session's lifecycle — no phase loop, no routing in Go (the single routing
+  rule lives in the skill). It enforces the same acceptance gate `/gogo:go` does, and on the
+  child's exit surfaces the outcome (`awaiting-uat` → run `/gogo:done`; a decision gate → the
+  parked question + resume hint; an error → halt). `gogo plan` is the same machinery for a
+  `/gogo:plan` leg. A **one-owner lock** (lockfile + PID/tmux liveness cross-check) refuses a
+  second session racing the same feature (`--takeover` to seize); a **session registry +
+  `gogo sweep`** reap sessions at ship instead of leaking orphaned panes. `--attach` runs an
+  attachable interactive session (answer gates live, reaped at close). Bookkeeping lives under
+  `.gogo/resources/cli/` (CLI-owned; never pipeline state). `gogo run` is a deprecated alias for
+  `gogo go`. Needs `claude` on PATH; `--attach` needs `tmux`.
 - **Scriptable** — `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
-  `gogo events <slug>`, `gogo run [<slug>] [--attach]`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
+  `gogo events <slug>`, `gogo go [<slug>] [--attach] [--takeover]`, `gogo plan <slug>`,
+  `gogo sweep [--dry-run]`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
 
 **Soft deps** (detected at use, graceful fallback): `tmux` (else backgrounded
 `claude -p` + log), `claude` (needed only to launch), `glow` (the built-in

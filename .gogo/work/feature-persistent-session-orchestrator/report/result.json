@@ -1,0 +1,30 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "phase": "report",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-persistent-session-orchestrator/plan.md",
+    ".gogo/work/feature-persistent-session-orchestrator/decisions.md",
+    ".gogo/work/feature-persistent-session-orchestrator/review/issues.json",
+    ".gogo/work/feature-persistent-session-orchestrator/test/issues.json",
+    ".gogo/work/feature-persistent-session-orchestrator/charts/manifest.json",
+    ".gogo/work/feature-persistent-session-orchestrator/charts/before/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-persistent-session-orchestrator/report/report.md",
+    ".gogo/work/feature-persistent-session-orchestrator/report/manifest.json",
+    ".gogo/work/feature-persistent-session-orchestrator/report/flow.mmd",
+    ".gogo/work/feature-persistent-session-orchestrator/report/sequence.mmd",
+    ".gogo/work/feature-persistent-session-orchestrator/report/activity.mmd",
+    ".gogo/work/feature-persistent-session-orchestrator/report/class.mmd",
+    ".gogo/work/feature-persistent-session-orchestrator/report/diagrams.html",
+    ".gogo/work/feature-persistent-session-orchestrator/report/before/flow.mmd",
+    ".gogo/work/feature-persistent-session-orchestrator/report/before/manifest.json",
+    ".gogo/knowledge/project-knowledge.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "As-built report for the persistent-session CLI orchestrator (0.15.0). Clean green run: plan reconciled to as-built, as-built UML set (flow/sequence/activity/class) + before/after compare written to report/, project-knowledge.md gogo overrides updated. Review 2 rounds APPROVE (REV-001..004 verified), test GREEN (149/149 + hands-on; TEST-001 verified by a live gogo plan smoke, D7). Set state.md to awaiting-uat."
+}

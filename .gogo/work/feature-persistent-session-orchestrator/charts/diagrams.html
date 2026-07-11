@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — persistent-session-orchestrator</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>persistent-session-orchestrator</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Control flow — lock guard → launch-or-resume the persistent claude -p → classify exit → reap/sweep</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  A["gogo go / gogo plan slug"] --> B{"status runnable?<br/>RunnableStatus"}
+  B -- "no" --> R["refuse + runnableHint"]
+  B -- "yes" --> L{"owner lock free?<br/>lockfile + PID/tmux liveness"}
+  L -- "live owner" --> X["refuse (or --takeover: reap prior)"]
+  L -- "stale / none" --> M["acquire lock · registry books session UUID"]
+  M --> N{"session already tracked?"}
+  N -- "no (first leg)" --> P1["claude -p '/gogo:go slug'<br/>--session-id uuid --output-format json"]
+  N -- "yes (warm)" --> P2["claude -p '/gogo:go slug'<br/>--resume uuid"]
+  P1 --> S["persistent claude -p session runs the skill<br/>(implement in-context + Task review/test + report)"]
+  P2 --> S
+  S --> E{"child exits: read state.md"}
+  E -- "awaiting-uat" --> U["surface: run /gogo:done slug"]
+  E -- "waiting-for-user" --> G["surface parked gate + resume hint"]
+  E -- "is_error" --> H["halt (non-zero exit)"]
+  U --> RL["release lock · record registry status"]
+  G --> RL
+  RL --> Z["opportunistic reap if feature terminal"]
+  SW["gogo sweep"] --> K["KillSession: tmux kill-session + mark reaped"]
+  K --> Z2["reaps terminal-feature sessions + orphan gogo-* sessions"]
+  </pre></div>
+
+  <h2>Two orchestrators over one skill — the runtime sequence</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant CLI as gogo CLI (session manager)
+  participant Lock as lock + registry
+  participant P as claude -p session (by UUID)
+  participant Skill as /gogo:go skill
+  participant Sub as Task subagents (reviewer / tester)
+  User->>CLI: gogo go slug
+  CLI->>Lock: acquire owner lock · resolve first-vs-resume UUID
+  CLI->>P: claude -p '/gogo:go slug' (--session-id or --resume)
+  P->>Skill: run implement in-context (warm)
+  Skill->>Sub: Task(gogo-reviewer) / Task(gogo-tester) — fresh eyes
+  Sub-->>Skill: findings → review/test issues.json
+  Skill->>Skill: warm fix loop, then report ⑤
+  P-->>CLI: process exit + JSON envelope (session_id, total_cost_usd)
+  CLI->>Lock: record status (parked / awaiting-uat) · release lock
+  CLI-->>User: surface awaiting-uat (run /gogo:done) or the parked gate
+  Note over User,P: later leg — gogo go slug --resume recalls the SAME warm UUID (cost model: transcript re-sent)
+  </pre></div>
+
+  <h2>Session lifecycle — states and reap</h2>
+  <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  [*] --> None
+  None: No session tracked
+  Running: Persistent claude -p session running the skill
+  Parked: Exited at a decision gate (waiting-for-user)
+  AwaitingUAT: Report green, waiting at the UAT gate
+  Shipped: gogo done archived the entry
+  Orphaned: Crash or lost owner, lock stale
+  Reaped: Session and tmux killed
+  None --> Running: gogo go or gogo plan starts a session
+  Running --> Parked: p exits at waiting-for-user
+  Parked --> Running: gogo go resumes the warm UUID
+  Running --> AwaitingUAT: p exits at awaiting-uat
+  AwaitingUAT --> Running: UAT feedback, re-accept, rerun
+  AwaitingUAT --> Shipped: user runs gogo done
+  Shipped --> Reaped: reap at ship
+  Running --> Orphaned: crash or lost owner
+  Orphaned --> Reaped: gogo sweep kills the tmux
+  Reaped --> [*]
+  </pre></div>
+
+  <h2>As-built structure — the session-manager types (cli/internal/orchestrator)</h2>
+  <div class="diagram"><pre class="mermaid">
+classDiagram
+  class Session {
+    +Root string
+    +Slug string
+    +Kind string
+    +Attach bool
+    +Takeover bool
+    +LaunchOrResume() Outcome
+    +Reap()
+  }
+  class SessionRunner {
+    &lt;&lt;interface&gt;&gt;
+    +Run(Invocation) RunResult
+  }
+  class ClaudeRunner {
+    +Root string
+    +Run(Invocation) RunResult
+  }
+  class AttachFn {
+    &lt;&lt;func&gt;&gt;
+    LaunchPersistent
+  }
+  class Registry {
+    +Slug string
+    +Persistent map~kind~PersistentSession
+    +Sessions []SessionInfo
+    +Get(kind) PersistentSession
+    +Ensure(kind) PersistentSession
+  }
+  class PersistentSession {
+    +Kind string
+    +UUID string
+    +Tmux string
+    +Status string
+    +CostUSD float64
+  }
+  class Owner {
+    +PID int
+    +UUID string
+    +Tmux string
+    +Host string
+  }
+  class Lock {
+    +Path string
+    +Owner Owner
+    +Release() error
+  }
+  class LivenessFn {
+    &lt;&lt;func&gt;&gt;
+    PID signal-0 OR live gogo-* tmux
+  }
+  class Sweeper {
+    +Root string
+    +DryRun bool
+    +Sweep() []string
+  }
+  class Invocation {
+    +Kind string
+    +Command string
+    +SessionID string
+    +Resume string
+  }
+  SessionRunner &lt;|.. ClaudeRunner
+  Session --> SessionRunner : Runner
+  Session --> AttachFn : Attacher (--attach)
+  Session --> Registry : Reg
+  Session ..> Lock : Acquire / Release
+  Session ..> LivenessFn : Live (cross-check)
+  Session ..> Invocation : ResolveInvocation
+  Registry "1" o-- "*" PersistentSession : per leg kind (go|plan)
+  Registry "1" o-- "*" SessionInfo : append-only telemetry
+  Lock *-- Owner
+  Sweeper ..> Registry : reads + marks reaped
+  Sweeper ..> LivenessFn : stale-lock heal
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

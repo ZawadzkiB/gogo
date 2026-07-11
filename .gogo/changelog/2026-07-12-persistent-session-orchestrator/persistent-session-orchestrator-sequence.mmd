@@ -1,0 +1,18 @@
+sequenceDiagram
+  actor User
+  participant CLI as gogo CLI (session manager)
+  participant Lock as lock + registry
+  participant P as claude -p session (by UUID)
+  participant Skill as /gogo:go skill
+  participant Sub as Task subagents (reviewer / tester)
+  User->>CLI: gogo go slug
+  CLI->>Lock: acquire owner lock · resolve first-vs-resume UUID
+  CLI->>P: claude -p '/gogo:go slug' (--session-id or --resume)
+  P->>Skill: run implement in-context (warm)
+  Skill->>Sub: Task(gogo-reviewer) / Task(gogo-tester) — fresh eyes
+  Sub-->>Skill: findings → review/test issues.json
+  Skill->>Skill: warm fix loop, then report ⑤
+  P-->>CLI: process exit + JSON envelope (session_id, total_cost_usd)
+  CLI->>Lock: record status (parked / awaiting-uat) · release lock
+  CLI-->>User: surface awaiting-uat (run /gogo:done) or the parked gate
+  Note over User,P: later leg — gogo go slug --resume recalls the SAME warm UUID (cost model: transcript re-sent)

@@ -1,0 +1,12 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "updated": "2026-07-12",
+  "members": ["persistent-session-orchestrator"],
+  "note": "Shipped changelog entry (0.15.0): the gogo CLI reworked into a persistent-session lifecycle manager over the one /gogo:go skill. Synthesized from .gogo/work/feature-persistent-session-orchestrator/report/. flow = the gogo go/plan control flow (lock guard incl. untracked board racer -> launch-or-resume the persistent claude -p -> classify exit -> reap/sweep); sequence = two orchestrators over one skill; activity = the session lifecycle; class = the shipped Go structure. before/ holds the plan-time as-is baseline (the deleted per-phase Go loop + the board-launch remain-on-exit leak) for before/after compare.",
+  "diagrams": [
+    { "kind": "flow", "file": "persistent-session-orchestrator-flow.mmd", "title": "persistent-session-orchestrator: gogo go/plan control flow - lock guard (incl. untracked board racer) → launch-or-resume the persistent claude -p → classify exit → reap/sweep" },
+    { "kind": "sequence", "file": "persistent-session-orchestrator-sequence.mmd", "title": "persistent-session-orchestrator: Two orchestrators over one skill - CLI session manager spawns claude -p '/gogo:go', the skill runs implement in-context + Task review/test + report" },
+    { "kind": "activity", "file": "persistent-session-orchestrator-activity.mmd", "title": "persistent-session-orchestrator: Session lifecycle - none → running → parked/awaiting-uat (resume) → shipped/orphaned → reaped" },
+    { "kind": "class", "file": "persistent-session-orchestrator-class.mmd", "title": "persistent-session-orchestrator: As-built structure - Session manager + Registry/PersistentSession, Lock/Owner, Sweeper, and the injectable SessionRunner/AttachFn/LivenessFn/Lister seams" }
+  ]
+}

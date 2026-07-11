@@ -1,0 +1,17 @@
+flowchart TD
+  A["gogo run slug"] --> B["orchestrator.Run() — the Go per-phase loop"]
+  B --> C["spawn dev: claude -p --session-id (fresh build ②)"]
+  C --> D["spawn review: claude -p --session-id (fresh ③)"]
+  D --> E{"contract.Route(review) — 2nd copy of the routing rule"}
+  E -- "ReImplement" --> F["claude -p --resume dev-uuid (warm fix)"]
+  F --> D
+  E -- "Gate" --> G["gate → waiting-for-user (bounds also gate)"]
+  E -- "Advance" --> H["spawn test: claude -p --session-id (fresh ④)"]
+  H --> I{"contract.Route(test)"}
+  I -- "ReImplement" --> F
+  I -- "Gate" --> G
+  I -- "Advance" --> J["spawn report: claude -p (⑤)"]
+  J --> K["awaiting-uat"]
+  BD["board move (tui/move.go)"] --> LN["launch.Launch → tmux new-session"]
+  LN --> RE["set-option remain-on-exit ON (launch.go:443)"]
+  RE --> OR["NO reaper anywhere → gogo-* tmux sessions pile up as orphans"]

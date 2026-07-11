@@ -216,6 +216,28 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   bounced into a `/gogo:go` that refuses (the CLI still never mutates pipeline state).
   Slash command set now **13** (adds `accept`); frozen contract stays additive
   (presentation-only); version **0.14.0**.
+- **Persistent-session CLI orchestrator (0.15.0):** the Go CLI orchestrator is
+  reworked from the 0.13.0 **per-phase loop** into a **session-lifecycle manager**
+  over the one skill. `gogo go <slug>` / `gogo plan <slug>` **launch-or-`--resume`
+  ONE persistent `claude -p` session** running the existing `/gogo:go` / `/gogo:plan`
+  skill (implement in-context + `Task` review/test + report); the CLI runs **no phase
+  loop and no routing in Go** — the single routing rule lives in the skill, so the
+  drift-bug class is gone. The **Go per-phase loop + `contract.Route`** (and the dead
+  `contract.ReadResult`) are **deleted**. Two incident fixes land with it: a
+  **one-owner-per-work-item lock** (`.gogo/resources/cli/locks/<slug>.lock`: PID + tmux
+  liveness cross-check via exact `SessionMatchesSlug`, atomic `O_EXCL` acquire,
+  **refuse-by-default** / `--takeover` / stale-reclaim, and refusal over a live
+  *untracked* board session), and an **extended session registry + reaper** — per-leg
+  (`go`|`plan`) `PersistentSession` state/telemetry at `.gogo/resources/cli/sessions/`,
+  plus **`gogo sweep`** (kill orphaned/terminal-feature `gogo-*` sessions, `--dry-run`)
+  and opportunistic kill-at-ship; the `--attach` path never sets `remain-on-exit` (no
+  orphan by construction). `gogo run` becomes a **deprecated alias** for `gogo go`; a
+  slug **write-scope guard** (`validSlug`) keeps a `..` slug from escaping
+  `.gogo/resources/`. Exit is classified from `state.md` (awaiting-uat → run
+  `/gogo:done`; waiting-for-user → parked; `is_error` → halt). The CLI is still a
+  deterministic, LLM-free reader that never mutates pipeline state; the frozen contract
+  stays additive (§0.15.0). Slash command set unchanged at **13** (`gogo go`/`plan`/`sweep`
+  are CLI-binary subcommands); version **0.15.0**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

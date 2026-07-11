@@ -117,6 +117,45 @@ the class→column mapping (§3) are **unchanged**:
   the launched session performs the `state.md` write. Presentation/launch concern only —
   no `.gogo/` file-read-contract change.
 
+### Changed in 0.15.0 (all additive — no key removed or renamed; all CLI-owned, not pipeline state)
+
+The CLI's process-orchestrator is reworked from a Go per-phase loop into a **persistent-
+session lifecycle manager**: `gogo go <slug>` / `gogo plan <slug>` **launch-or-`--resume`
+ONE persistent `claude -p` session** running the existing `/gogo:go` / `/gogo:plan` skill
+(implement warm in-context + review/test as nested `Task` subagents + report). The CLI runs
+**no phase loop and no routing in Go** — the single routing rule lives in the skill. All of
+the following live under the CLI's sanctioned `.gogo/resources/` write root, **never** in
+`.gogo/work/feature-*/`, and the `state.md` status enum (§2), the four classes, and the
+class→column mapping (§3) are **unchanged**. A reader that ignores what it does not
+recognize keeps working against a 0.14.0 tree with no changes.
+
+- **The one-owner lock (`.gogo/resources/cli/locks/<slug>.lock`).** Before launching/resuming,
+  `gogo go`/`gogo plan` acquire an exclusive owner lock for the slug (JSON: owner PID, session
+  uuid, tmux name if any, host, started-at). "Live" is cross-checked against **both** signal-0
+  on the PID **and** a matching live `gogo-*` tmux session (exact `SessionMatchesSlug` parse —
+  never substring). A live owner is **refused** by default (or seized with `--takeover`, reaping
+  the prior); a **stale** lock (both signals dead) is silently reclaimed. CLI-owned state; the
+  lock is released when the invocation's `-p` child exits (headless) or at reap (`--attach`).
+- **The extended session registry (`.gogo/resources/cli/sessions/<slug>.json`).** The 0.11.0
+  registry gains a `persistent` block keyed by leg kind (`go` | `plan`) recording the persistent
+  session's uuid (so a re-launch `--resume`s the SAME warm session), tmux name, last PID, a
+  lifecycle status (`running` | `parked` | `awaiting-uat` | `shipped` | `reaped`), timestamps, and
+  per-leg cost/turns telemetry. Shape may change between CLI versions; a missing/garbled/legacy
+  (`gogo run`, `dev_uuid`) file degrades to a fresh run — never a crash.
+- **`gogo go` / `gogo plan` — the persistent-session launch verbs.** `gogo go` enforces the SAME
+  acceptance gate `/gogo:go` uses (`plan-accepted` / mid-pipeline; refuses `awaiting-uat` /
+  `waiting-for-user` / terminal). On the `-p` child's exit it reads `state.md` and surfaces the
+  leg's outcome (`awaiting-uat` → run `/gogo:done`; `waiting-for-user` → the parked gate + resume
+  hint; an `is_error` envelope → halt). `--attach` runs an interactive claude in an attachable
+  tmux session (no `remain-on-exit`; reaped at close). These are **delegated launches: the CLI
+  never mutates pipeline state** — the launched session performs every `state.md`/contract write.
+- **`gogo sweep` — the orphan-reaper + kill-at-ship backstop.** Reaps `gogo-*` tmux sessions
+  whose owning feature is terminal, and orphans (a live `gogo-*` session with no live, non-terminal
+  owning feature), plus a TTL backstop; `--dry-run` lists without killing. `gogo go`/`gogo plan`
+  also reap opportunistically when they see the target feature is terminal. Attribution is by exact
+  `SessionMatchesSlug` (never substring).
+- **`gogo run` is now a deprecated alias** that prints a notice and forwards to `gogo go`.
+
 ## 1. The `.gogo/` layout a consumer reads
 
 Two roots matter: **work** (one folder per feature, the live pipeline state +

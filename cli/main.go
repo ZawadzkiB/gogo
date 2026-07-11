@@ -16,7 +16,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.14.0"
+const Version = "0.15.0"
 
 func main() {
 	args := os.Args[1:]
@@ -26,8 +26,14 @@ func main() {
 	switch args[0] {
 	case "--version", "-v", "version":
 		fmt.Printf("gogo %s\n", Version)
+	case "go":
+		os.Exit(cmdGo(args[1:]))
+	case "plan":
+		os.Exit(cmdPlan(args[1:]))
+	case "sweep":
+		os.Exit(cmdSweep(args[1:]))
 	case "run":
-		os.Exit(cmdRun(args[1:]))
+		os.Exit(cmdRun(args[1:])) // deprecated alias → gogo go (FR11)
 	case "status":
 		os.Exit(cmdStatus(args[1:]))
 	case "view":
@@ -65,17 +71,24 @@ func printHelp() {
 
 usage:
   gogo                 open the kanban board (plan | in progress | ready | changelog)
-  gogo run [<slug>]    orchestrate ②→③→④(→⑤) over claude -p — dev warm via --resume, review/test fresh
+  gogo go [<slug>]     launch-or-resume the feature's persistent /gogo:go session (implement + review/test + report)
+  gogo plan <slug>     launch-or-resume the feature's persistent /gogo:plan session
+  gogo sweep           reap orphaned / shipped persistent sessions (kill-at-ship backstop)
   gogo status          print the work-index classifier table
   gogo view <target>   view a plan/report — glamour in the terminal, or --web for the browser
   gogo events <slug>   print a feature's events.jsonl timeline
   gogo trash           list .gogo/trash/ entries (deleted work, recoverable)
   gogo trash restore <entry>   move a trashed entry back to .gogo/work/
+  gogo run [<slug>]    DEPRECATED alias for "gogo go" (forwards; will be removed)
   gogo --version       print the version (mirrors the plugin)
 
-gogo run flags:
-  --attach             on a decision gate, launch an interactive /gogo:resume session
-  (env: GOGO_RUN_MAX_ROUNDS, GOGO_RUN_COST_CEILING — bounds that gate; see "gogo run --help")
+gogo go / gogo plan flags:
+  --attach             launch an attachable tmux session (interactive claude) to answer gates live
+  --takeover           seize the owner lock from a live session (the prior is reaped)
+  (env: GOGO_CLAUDE_PERMISSION_MODE — permission mode for the spawned session; see "gogo go --help")
+
+gogo sweep flags:
+  --dry-run            list what would be reaped without killing anything
 
 view targets:
   <slug>               the feature's report if it exists, else its plan

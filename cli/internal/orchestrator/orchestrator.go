@@ -1,12 +1,13 @@
-// Package orchestrator is the CLI process-orchestrator (gogo run): a deterministic
-// Go sequencer that drives ②→③→④(→⑤) by spawning each phase as its own `claude -p`
-// session — the DEVELOPER session kept warm across fix rounds via --resume (never
-// re-reads the codebase), REVIEW and TEST spawned fresh (fresh eyes). It coexists
-// with the in-chat `/gogo:go` orchestrator over the ONE shared core (the phase
-// skills + the typed contracts); it re-implements no phase logic and reads the same
-// issues.json/result.json to route (contract.Route). All judgment and every decision
-// gate stay with the claude phase-sessions + the human — this package only
-// sequences, resumes, routes, bounds, and books its own session registry.
+// Package orchestrator is the CLI's persistent-session lifecycle manager. It does
+// NOT re-implement the pipeline loop: `gogo go <slug>` / `gogo plan <slug>`
+// launch-or-`--resume` ONE persistent `claude -p` session running the existing
+// `/gogo:go` / `/gogo:plan` skill (implement warm in-context + review/test as
+// nested Task subagents + report), and this package only manages that session's
+// lifecycle — guard the one-owner lock, resolve fresh-vs-resume from the session
+// registry, classify the child's exit, book telemetry, and reap. There is exactly
+// ONE routing rule and it lives in the skill (deleting the drift bug the old Go
+// per-phase loop + contract.Route created). All judgment and every decision gate
+// stay with the claude session + the human.
 package orchestrator
 
 import (
@@ -14,59 +15,53 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strconv"
+	"time"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/launch"
 )
 
-// Result classifies how a `gogo run` finished.
+// Leg outcome results (FR4). The cmd layer maps these to exit codes.
 const (
-	ResultAwaitingUAT = "awaiting-uat" // green through ⑤ → the user's UAT gate
-	ResultGated       = "gated"        // paused for a human decision (FR8)
+	ResultAwaitingUAT = "awaiting-uat" // green through ⑤ → the user's UAT gate (exit 0)
+	ResultParked      = "parked"       // exited at a decision gate / waiting-for-user (exit 2)
+	ResultRefused     = "refused"      // a live owner already holds the lock (exit 1)
+	ResultAttached    = "attached"     // --attach: an attachable session was launched (exit 0)
+	ResultTerminal    = "terminal"     // feature already shipped/aborted — nothing to run (exit 0)
+	ResultOther       = "other"        // exited at some other status (surfaced; exit 2)
 )
 
-// Outcome is what Run returns: a terminal result plus, when gated, the reason.
+// Outcome is what LaunchOrResume returns: the leg result + the state.md status
+// observed at exit (FR4).
 type Outcome struct {
 	Result string
-	Gate   string
+	Status string
 }
 
-// Default loop bounds (FR7); overridable via env (see ConfigFromEnv).
-const (
-	DefaultMaxRounds   = 3    // implement↔review fix rounds on the same finding (mirrors the in-chat bound)
-	DefaultCostCeiling = 10.0 // per-feature USD ceiling; 0 disables
-)
-
-// Env knobs for the bounds (FR7 / D6).
-const (
-	EnvMaxRounds   = "GOGO_RUN_MAX_ROUNDS"
-	EnvCostCeiling = "GOGO_RUN_COST_CEILING"
-)
-
-// Invocation is one phase run the orchestrator hands to the runner. Exactly one of
-// SessionID (a NEW session with a pre-assigned uuid) or Resume (continue a WARM
-// session) is set; both empty is a one-shot (⑤ report).
+// Invocation is one persistent-session launch the manager hands to the runner.
+// Exactly one of SessionID (a NEW session, pre-assigned uuid — the first leg) or
+// Resume (continue the WARM session) is set.
 type Invocation struct {
-	Kind      string // implement | review | test | report (telemetry + label)
-	Command   string // the full slash command, e.g. "/gogo:implement my-slug --in-session"
+	Kind      string // go | plan (telemetry + label)
+	Command   string // the full slash command, e.g. "/gogo:go my-slug"
 	SessionID string // --session-id <uuid>
 	Resume    string // --resume <uuid>
 }
 
-// PhaseRunner runs one phase invocation and blocks until it exits. The production
-// runner spawns `claude -p` (ClaudeRunner); tests inject a fake so the loop is
-// asserted without spawning claude.
-type PhaseRunner interface {
+// SessionRunner runs one headless `-p` persistent-session invocation and BLOCKS
+// until it exits (the race-free leg-complete signal, D2). Production =
+// ClaudeRunner; tests inject a fake so the manager is asserted without spawning
+// claude.
+type SessionRunner interface {
 	Run(inv Invocation) (launch.RunResult, error)
 }
 
-// ClaudeRunner is the production PhaseRunner: it spawns `claude -p` via launch and
-// waits for the process to exit (the race-free phase-done signal, D2).
+// ClaudeRunner is the production SessionRunner: it spawns `claude -p` via launch
+// and waits for the process to exit.
 type ClaudeRunner struct{ Root string }
 
-// Run spawns the phase over `claude -p` and returns its parsed json envelope.
+// Run spawns the persistent session over `claude -p` and returns its parsed json
+// envelope.
 func (r ClaudeRunner) Run(inv Invocation) (launch.RunResult, error) {
 	return launch.RunPhase(r.Root, inv.Command, launch.PhaseOpts{
 		SessionID: inv.SessionID,
@@ -74,60 +69,28 @@ func (r ClaudeRunner) Run(inv Invocation) (launch.RunResult, error) {
 	})
 }
 
-// Orchestrator drives one feature's ②→③→④(→⑤) loop.
-type Orchestrator struct {
-	Root        string
-	Slug        string
-	Runner      PhaseRunner
-	Reg         *Registry
-	Out         io.Writer // notices + gate messages (os.Stdout in production)
-	MaxRounds   int
-	CostCeiling float64 // 0 = no ceiling
-	Attach      bool    // D3 opt-in: on a gate, launch an interactive /gogo:resume session
+// AttachFn launches the persistent session as an attachable tmux session (the
+// --attach path). Production = launch.LaunchPersistent.
+type AttachFn func(root string, in launch.Intent, opts launch.PhaseOpts) (launch.Result, error)
+
+// Session is the lifecycle manager for one feature leg (`go` | `plan`).
+type Session struct {
+	Root     string
+	Slug     string
+	Kind     string // "go" | "plan"
+	Reg      *Registry
+	Runner   SessionRunner // headless -p runner (blocks); nil → ClaudeRunner
+	Attacher AttachFn      // --attach launcher; nil → launch.LaunchPersistent
+	Killer   func(name string) error
+	Lister   func() []string // list live gogo-* sessions; nil → launch.ListSessions
+	Live     LivenessFn      // liveness cross-check; nil → DefaultLiveness
+	Out      io.Writer
+	Attach   bool
+	Takeover bool
 }
 
-// New builds an Orchestrator with a production ClaudeRunner and the feature's
-// registry loaded (FR9 — resumes the same warm dev session on a re-run).
-func New(root, slug string, cfg Config) *Orchestrator {
-	return &Orchestrator{
-		Root:        root,
-		Slug:        slug,
-		Runner:      ClaudeRunner{Root: root},
-		Reg:         LoadRegistry(root, slug),
-		Out:         cfg.Out,
-		MaxRounds:   cfg.MaxRounds,
-		CostCeiling: cfg.CostCeiling,
-		Attach:      cfg.Attach,
-	}
-}
-
-// Config carries the resolved run configuration.
-type Config struct {
-	Out         io.Writer
-	MaxRounds   int
-	CostCeiling float64
-	Attach      bool
-}
-
-// ConfigFromEnv resolves the loop bounds from the environment, falling back to the
-// defaults, and directs output to out (FR7 / D6).
-func ConfigFromEnv(out io.Writer, attach bool) Config {
-	cfg := Config{Out: out, MaxRounds: DefaultMaxRounds, CostCeiling: DefaultCostCeiling, Attach: attach}
-	if v := os.Getenv(EnvMaxRounds); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			cfg.MaxRounds = n
-		}
-	}
-	if v := os.Getenv(EnvCostCeiling); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f >= 0 {
-			cfg.CostCeiling = f
-		}
-	}
-	return cfg
-}
-
-// RunnableStatus reports whether a feature's state.md status permits `gogo run` —
-// the SAME acceptance gate `/gogo:go` enforces (FR1). `awaiting-uat` and
+// RunnableStatus reports whether a feature's state.md status permits `gogo go` —
+// the SAME acceptance gate `/gogo:go` enforces (FR3). `awaiting-uat` and
 // `waiting-for-user` are NOT runnable (the user's UAT gate / a paused decision).
 func RunnableStatus(status string) bool {
 	switch status {
@@ -137,288 +100,398 @@ func RunnableStatus(status string) bool {
 	return false
 }
 
-// Run drives the loop and returns the Outcome. It never invents a decision: a fork
-// surfaced by a phase (result.status waiting-for-user, a needs-user-decision
-// finding, or a blown bound/ceiling) returns a gated Outcome for the human.
-func (o *Orchestrator) Run() (Outcome, error) {
-	// Pre-flight the COST ceiling: if a prior run already spent it, gate immediately
-	// — re-running can only spend more, never less, so spawning a session just to
-	// re-gate is a money sink (REV-003). The round bound is deliberately NOT
-	// pre-flighted: a re-run lets review re-check, so a human who resolved the
-	// findings can complete without any more fixes; only if MORE fixes are needed
-	// does the exhausted round budget re-gate (with a raise-the-budget hint).
-	if over, why := o.overBudget(); over {
-		return o.gateBudget(why), nil
-	}
-
-	// ① Ensure a warm developer build exists. First ever run → fresh dev session;
-	//    a re-run (registry has the dev uuid) skips straight to review (the dev is
-	//    already warm and will be --resumed on the next fix).
-	if o.Reg.DevUUID == "" {
-		o.Reg.DevUUID = newUUID()
-		if _, err := o.exec(Invocation{
-			Kind:      "implement",
-			Command:   o.cmd("/gogo:implement", "--in-session"),
-			SessionID: o.Reg.DevUUID,
-		}); err != nil {
-			return Outcome{}, err
-		}
-		if gated, why := o.implementGate(); gated {
-			return o.gateDecision(why), nil
-		}
-		if over, why := o.overBudget(); over {
-			return o.gateBudget(why), nil
-		}
-	}
-
-	// ② review ↔ implement ↔ test loop.
-	for {
-		// review sub-loop: review (fresh) until clean or gated, re-implementing (warm) on fixables.
-		for {
-			if _, err := o.exec(Invocation{
-				Kind:      "review",
-				Command:   o.cmd("/gogo:review"),
-				SessionID: newUUID(),
-			}); err != nil {
-				return Outcome{}, err
-			}
-			if over, why := o.overBudget(); over {
-				return o.gateBudget(why), nil
-			}
-			issues, result, err := o.readTrack(contract.TrackReview)
-			if err != nil {
-				return Outcome{}, err
-			}
-			if result == nil && issues == nil {
-				return o.gateDecision("review produced no result.json or issues.json — cannot confirm it ran; treating as a failure, not a pass"), nil
-			}
-			switch contract.Route(contract.TrackReview, result, issues) {
-			case contract.Gate:
-				return o.gateDecision("review raised a finding that needs your decision"), nil
-			case contract.ReImplement:
-				if out, err := o.reImplement(contract.TrackReview); err != nil {
-					return Outcome{}, err
-				} else if out != nil {
-					return *out, nil
-				}
-				continue // re-review (fresh eyes) after the warm fix
-			case contract.Advance:
-			}
-			break // review clean → test
-		}
-
-		// test (fresh) → route.
-		if _, err := o.exec(Invocation{
-			Kind:      "test",
-			Command:   o.cmd("/gogo:test"),
-			SessionID: newUUID(),
-		}); err != nil {
-			return Outcome{}, err
-		}
-		if over, why := o.overBudget(); over {
-			return o.gateBudget(why), nil
-		}
-		issues, result, err := o.readTrack(contract.TrackTest)
-		if err != nil {
-			return Outcome{}, err
-		}
-		if result == nil && issues == nil {
-			return o.gateDecision("test produced no result.json or issues.json — cannot confirm it ran; treating as a failure, not a pass"), nil
-		}
-		switch contract.Route(contract.TrackTest, result, issues) {
-		case contract.Gate:
-			return o.gateDecision("test raised a finding (or a blocked hands-on check) that needs your decision"), nil
-		case contract.ReImplement:
-			if out, err := o.reImplement(contract.TrackTest); err != nil {
-				return Outcome{}, err
-			} else if out != nil {
-				return *out, nil
-			}
-			continue // a test fix re-enters the review sub-loop, then re-tests
-		case contract.Advance:
-		}
-
-		// ③ all green → report (fresh one-shot) → stop at the UAT gate.
-		if _, err := o.exec(Invocation{
-			Kind:    "report",
-			Command: o.cmd("/gogo:report"),
-		}); err != nil {
-			return Outcome{}, err
-		}
-		o.printf("✓ %s — pipeline green; report written, stopped at awaiting-uat. Run `/gogo:done %s` to ship.\n", o.Slug, o.Slug)
-		return Outcome{Result: ResultAwaitingUAT}, nil
-	}
+// PlannableStatus reports whether `gogo plan` may run for a feature at this status
+// (FR3). Planning creates or revises a plan, so it is permitted for a brand-new
+// feature ("") and any non-terminal one; a shipped/aborted feature has nothing to
+// plan.
+func PlannableStatus(status string) bool {
+	return !TerminalStatus(status)
 }
 
-// reImplement runs a WARM dev fix round (--resume) for a track's open issues, after
-// enforcing the round bound (FR7). It returns a non-nil *Outcome (a gate, with the
-// right kind + message already applied) when the loop must stop, or (nil,nil) to
-// continue. The round bound is a TOTAL fix-round budget per feature (not per finding
-// — see FR7 note / REV-005); it errs safe, gating to a human rather than looping.
-func (o *Orchestrator) reImplement(track string) (*Outcome, error) {
-	if o.Reg.Round >= o.MaxRounds {
-		out := o.gateBudget(fmt.Sprintf("the fix-round budget (%d total for this feature) is exhausted and findings remain", o.MaxRounds))
-		return &out, nil
+// TerminalStatus reports whether a feature is in a terminal (no-live-session)
+// state — the kill-at-ship trigger for the opportunistic reap + sweep (FR8/FR9).
+func TerminalStatus(status string) bool {
+	switch status {
+	case "shipped", "aborted", "done":
+		return true
 	}
-	o.Reg.Round++
-	issuesRel := o.relPath(track, "issues.json")
-	if _, e := o.exec(Invocation{
-		Kind:    "implement",
-		Command: o.cmd("/gogo:implement", "--issues", issuesRel, "--in-session"),
-		Resume:  o.Reg.DevUUID,
-	}); e != nil {
-		return nil, e
-	}
-	// A warm fix round can itself stop at a fork (blocked / waiting-for-user) — check
-	// it here too, not only after the first build (REV-002). That is a DECISION gate.
-	if g, w := o.implementGate(); g {
-		out := o.gateDecision(w)
-		return &out, nil
-	}
-	if over, w := o.overBudget(); over {
-		out := o.gateBudget(w)
-		return &out, nil
-	}
-	return nil, nil
+	return false
 }
 
-// exec runs one invocation via the runner, records its telemetry into the registry,
-// and persists the registry (best-effort). The registry is the CLI's own bookkeeping
-// under .gogo/resources/ — never pipeline state.
-func (o *Orchestrator) exec(inv Invocation) (launch.RunResult, error) {
-	o.printf("→ %s\n", inv.Command)
-	res, err := o.Runner.Run(inv)
+// LaunchOrResume is the whole `gogo go`/`gogo plan` action (FR1/FR2/FR4/FR5/FR8):
+// opportunistic-reap-if-terminal → acquire the owner lock (refuse / reclaim /
+// takeover) → resolve fresh-vs-resume from the registry → run the persistent
+// session (headless `-p`, or launch an attachable tmux with --attach) → classify
+// the exit → book telemetry + update the registry → release the lock.
+func (s *Session) LaunchOrResume() (Outcome, error) {
+	s.defaults()
+
+	// Opportunistic reap: a terminal feature keeps no live session. Reap any
+	// tracked/leftover one and refuse to launch (FR8 — kill-at-ship backstop).
+	if feat := s.feature(); feat != nil && TerminalStatus(feat.Status) {
+		s.reapTracked()
+		s.printf("… %s is %s — nothing to run; reaped any tracked session.\n", s.Slug, feat.Status)
+		return Outcome{Result: ResultTerminal, Status: feat.Status}, nil
+	}
+
+	inv := ResolveInvocation(s.Reg, s.Kind, s.Slug)
+	me := Owner{
+		PID:       os.Getpid(),
+		UUID:      invUUID(inv),
+		Host:      hostname(),
+		Kind:      s.Kind,
+		StartedAt: now(),
+	}
+	if s.Attach {
+		me.Tmux = s.intent().Session // provisional base name; SetTmux records the real one after launch
+	}
+
+	lock, taken, prior, err := Acquire(s.Root, s.Slug, me, s.Takeover, s.Live)
 	if err != nil {
-		return res, err
+		return Outcome{}, fmt.Errorf("acquire owner lock for %q: %w", s.Slug, err)
 	}
-	// Book this run's telemetry BEFORE any halt: a run that finished but reported
-	// is_error still spent tokens, so the cost accounting (and REV-003's cost
-	// pre-flight) must see it (REV-006).
-	uuid := inv.SessionID
-	if inv.Resume != "" {
-		uuid = inv.Resume
+	if taken {
+		s.printRefusal(prior)
+		return Outcome{Result: ResultRefused, Status: ""}, nil
 	}
-	o.Reg.Phase = inv.Kind
-	o.Reg.record(SessionInfo{
+	if prior != nil {
+		// Reclaimed-stale, seized-via-takeover, or seized-over-an-untracked-board
+		// session → reap the prior. Reap BY SLUG (every live gogo-* session for the
+		// slug, exact SessionMatchesSlug) so a collision-suffixed or lockless
+		// board session is killed, not the stale base name alone (REV-002).
+		s.reapMatchingSessions(s.Slug)
+		if prior.Tmux != "" {
+			_ = s.Killer(prior.Tmux)
+		}
+	}
+
+	// Book the persistent session (uuid, kind, status running) BEFORE launching, so
+	// a crash mid-run still leaves the resume uuid on disk.
+	ps := s.Reg.Ensure(s.Kind)
+	ps.UUID = me.UUID
+	ps.PID = me.PID
+	ps.Status = SessRunning
+	if ps.StartedAt == "" {
+		ps.StartedAt = me.StartedAt
+	}
+	ps.UpdatedAt = now()
+	if s.Attach {
+		ps.Tmux = me.Tmux
+	}
+	s.save()
+
+	if s.Attach {
+		return s.launchAttached(inv, lock)
+	}
+	return s.runHeadless(inv, lock)
+}
+
+// runHeadless spawns the blocking `claude -p` session, books its telemetry (even
+// on error — the cost was spent), releases the lock (the child has exited, this
+// process no longer owns the feature), then classifies the exit.
+func (s *Session) runHeadless(inv Invocation, lock *Lock) (Outcome, error) {
+	s.printf("→ claude -p %q  (%s)\n", inv.Command, resumeOrFresh(inv))
+	res, runErr := s.Runner.Run(inv)
+	s.book(inv, res)
+	_ = lock.Release()
+
+	if runErr != nil {
+		s.markStatus(SessParked)
+		s.save()
+		return Outcome{}, runErr
+	}
+	if res.IsError {
+		// The `claude -p` run finished but reported an internal error. Halt rather
+		// than march a failed leg on as if it were green (FR4).
+		s.markStatus(SessParked)
+		s.save()
+		return Outcome{}, fmt.Errorf("the persistent session for %q reported an error (claude is_error) — halting; not advancing a failed leg as green", s.Slug)
+	}
+	out := s.classifyExit()
+	s.save()
+	return out, nil
+}
+
+// launchAttached starts the attachable tmux session (--attach), records the real
+// (collision-suffixed) tmux name, and DELIBERATELY does not release the lock: the
+// session lives on in tmux and the lock's tmux-liveness signal must keep the
+// feature owned until it is reaped (`gogo sweep` / opportunistic).
+func (s *Session) launchAttached(inv Invocation, lock *Lock) (Outcome, error) {
+	res, err := s.Attacher(s.Root, s.intent(), launch.PhaseOpts{SessionID: inv.SessionID, Resume: inv.Resume})
+	if err != nil {
+		_ = lock.Release()
+		s.markStatus(SessParked)
+		s.save()
+		return Outcome{}, err
+	}
+	ps := s.Reg.Ensure(s.Kind)
+	ps.Tmux = res.Session // the real name reap will kill
+	ps.Status = SessRunning
+	ps.UpdatedAt = now()
+	s.save()
+	_ = lock.SetTmux(res.Session) // record the REAL (post-collision) name in the lock (REV-002)
+	s.printf("▶ %s — attachable warm session launched: %s (%s)\n", s.Slug, res.Session, resumeOrFresh(inv))
+	s.printf("   attach to drive it live:  tmux %s\n", joinArgs(launch.AttachArgs(res.Session)))
+	s.printf("   it is reaped at close (no lingering pane); `gogo sweep` cleans up an orphan.\n")
+	return Outcome{Result: ResultAttached, Status: "running"}, nil
+}
+
+// classifyExit reads state.md (the deterministic reader) after the `-p` child has
+// exited and surfaces the leg's outcome (FR4).
+func (s *Session) classifyExit() Outcome {
+	feat := s.feature()
+	status := ""
+	if feat != nil {
+		status = feat.Status
+	}
+	switch status {
+	case "awaiting-uat":
+		s.markStatus(SessAwaitingUAT)
+		s.printf("✓ %s — pipeline green; stopped at awaiting-uat. Run `/gogo:done %s` to ship.\n", s.Slug, s.Slug)
+		return Outcome{Result: ResultAwaitingUAT, Status: status}
+	case "waiting-for-user":
+		s.markStatus(SessParked)
+		s.printParkedGate(feat)
+		return Outcome{Result: ResultParked, Status: status}
+	case "shipped", "aborted", "done":
+		s.markStatus(SessShipped)
+		s.reapTracked()
+		s.printf("… %s is %s.\n", s.Slug, status)
+		return Outcome{Result: ResultTerminal, Status: status}
+	default:
+		// The leg ended without reaching a gate (e.g. interrupted mid-phase, or the
+		// plan leg left it awaiting-plan-acceptance). Surface the raw status + how to
+		// resume the warm session; never claim green.
+		s.markStatus(SessParked)
+		s.printf("• %s — session ended at status %q. Re-run `gogo %s %s` to resume the warm session.\n", s.Slug, status, s.Kind, s.Slug)
+		return Outcome{Result: ResultOther, Status: status}
+	}
+}
+
+// Reap kills this feature's tracked session (tmux + registry mark) and releases
+// its lock (FR8). Best-effort; safe when nothing is tracked.
+func (s *Session) Reap() {
+	s.defaults()
+	s.reapTracked()
+}
+
+// reapMatchingSessions kills every live gogo-* tmux session that attributes to the
+// slug by the exact convention parse (launch.SessionMatchesSlug — never substring,
+// TEST-005). This is the robust reap the prior-owner path uses: it catches a
+// collision-suffixed attach session and a lockless board-launched racer alike,
+// where the lockfile's recorded name would be wrong or absent (REV-002).
+func (s *Session) reapMatchingSessions(slug string) {
+	for _, name := range s.Lister() {
+		if launch.SessionMatchesSlug(name, slug) {
+			_ = s.Killer(name)
+		}
+	}
+}
+
+// reapTracked kills every tracked persistent session's tmux (if any), marks them
+// reaped, releases the lock, and persists. The headless `-p` path has no tmux to
+// kill — there the mark + lock release is what matters.
+func (s *Session) reapTracked() {
+	for _, ps := range s.Reg.Persistent {
+		if ps == nil {
+			continue
+		}
+		if ps.Tmux != "" && ps.Status != SessReaped {
+			_ = s.Killer(ps.Tmux)
+		}
+		ps.Status = SessReaped
+		ps.UpdatedAt = now()
+	}
+	_ = releaseLock(s.Root, s.Slug)
+	s.save()
+}
+
+// --- resolver (pure — the FR1/FR2 launch-or-resume decision) ------------------
+
+// ResolveInvocation decides the fresh-vs-resume launch for a leg from the
+// registry: no tracked persistent session for the kind → a fresh --session-id with
+// a new uuid; a tracked one → --resume its uuid. This is the pure resolver the
+// tests table-drive.
+func ResolveInvocation(reg *Registry, kind, slug string) Invocation {
+	cmd := commandFor(kind, slug)
+	if ps := reg.Get(kind); ps != nil && ps.UUID != "" {
+		return Invocation{Kind: kind, Command: cmd, Resume: ps.UUID}
+	}
+	return Invocation{Kind: kind, Command: cmd, SessionID: newUUID()}
+}
+
+func commandFor(kind, slug string) string {
+	if kind == "plan" {
+		return "/gogo:plan " + slug
+	}
+	return "/gogo:go " + slug
+}
+
+// --- telemetry + status bookkeeping ------------------------------------------
+
+func (s *Session) book(inv Invocation, res launch.RunResult) {
+	s.Reg.record(SessionInfo{
 		Kind:       inv.Kind,
-		UUID:       uuid,
-		Round:      o.Reg.Round,
+		UUID:       invUUID(inv),
 		Resumed:    inv.Resume != "",
 		CostUSD:    res.CostUSD,
 		NumTurns:   res.NumTurns,
 		DurationMS: res.DurationMS,
 	})
-	o.save()
-	if res.IsError {
-		// The `claude -p` run finished but reported an internal error (is_error=true).
-		// Halt rather than march on a failed phase as if it were green (REV-002).
-		return res, fmt.Errorf("phase %q reported an error (claude is_error) — halting; not advancing on a failed phase", inv.Kind)
+	if ps := s.Reg.Get(s.Kind); ps != nil {
+		ps.CostUSD += res.CostUSD
+		ps.NumTurns += res.NumTurns
+		ps.UpdatedAt = now()
 	}
-	return res, nil
 }
 
-// implementGate reports whether the initial build stopped short (result.status
-// blocked / waiting-for-user) so the loop gates instead of reviewing a non-build.
-func (o *Orchestrator) implementGate() (bool, string) {
-	res, err := contract.ReadResult(filepath.Join(o.featureDir(), "implement", "result.json"))
-	if err != nil || res == nil {
-		return false, ""
+func (s *Session) markStatus(st string) {
+	if ps := s.Reg.Get(s.Kind); ps != nil {
+		ps.Status = st
+		ps.UpdatedAt = now()
 	}
-	switch res.Status {
-	case "blocked":
-		return true, "implement is blocked (a gate failed and could not be repaired)"
-	case "waiting-for-user":
-		return true, "implement stopped at a decision that needs you"
-	}
-	return false, ""
 }
 
-// readTrack reads a review/test track's issues.json + result.json (both optional;
-// absent → nil, routed defensively).
-func (o *Orchestrator) readTrack(track string) (*contract.IssuesList, *contract.PhaseResult, error) {
-	issues, err := contract.ReadIssues(filepath.Join(o.featureDir(), track, "issues.json"))
-	if err != nil {
-		return nil, nil, err
-	}
-	result, err := contract.ReadResult(filepath.Join(o.featureDir(), track, "result.json"))
-	if err != nil {
-		return nil, nil, err
-	}
-	return issues, result, nil
-}
+// --- surfaces ----------------------------------------------------------------
 
-// overBudget reports whether the summed session cost crossed the ceiling (FR7).
-func (o *Orchestrator) overBudget() (bool, string) {
-	if o.CostCeiling > 0 && o.Reg.CostUSD > o.CostCeiling {
-		return true, fmt.Sprintf("cost ceiling $%.2f exceeded (spent $%.2f)", o.CostCeiling, o.Reg.CostUSD)
-	}
-	return false, ""
-}
-
-// gateDecision pauses for a genuine fork (a needs-user-decision finding, a phase
-// that stopped at waiting-for-user/blocked, or a phase that produced no output). The
-// human resolves it — via /gogo:resume, or with --attach an interactive session
-// (reusing the existing attachable-tmux path) — then re-runs `gogo run` to continue
-// the warm session (FR8 / D3).
-func (o *Orchestrator) gateDecision(why string) Outcome {
-	o.save()
-	o.printf("\n⏸  gogo run paused — %s\n", why)
-	o.printf("   the feature is parked; see %s/decisions.md.\n", o.featureRel())
-	if o.Attach && launch.HasTmux() && launch.HasClaude() {
-		if res, err := launch.Launch(o.Root, launch.ResumeIntent(o.Slug)); err == nil {
-			o.printf("   attach to answer:  tmux %s\n", joinArgs(launch.AttachArgs(res.Session)))
-			return Outcome{Result: ResultGated, Gate: why}
+func (s *Session) printRefusal(prior *Owner) {
+	s.printf("✗ %s is already owned by a live session — refusing (D6: refuse-by-default).\n", s.Slug)
+	switch {
+	case prior == nil:
+	case prior.Kind == "untracked":
+		// A live gogo-* session holds the slug but wrote no lockfile — a board-launched
+		// racer. Name it so the user can attach or takeover.
+		if name := s.matchingSession(); name != "" {
+			s.printf("   owner: an untracked live session (likely board-launched): %s\n", name)
+			s.printf("   attach:  tmux %s\n", joinArgs(launch.AttachArgs(name)))
+		} else {
+			s.printf("   owner: an untracked live session (likely board-launched).\n")
+		}
+	default:
+		s.printf("   owner: %s (pid %d", orDefault(prior.Kind, "session"), prior.PID)
+		if prior.Tmux != "" {
+			s.printf(", tmux %s", prior.Tmux)
+		}
+		if prior.Host != "" {
+			s.printf(", host %s", prior.Host)
+		}
+		s.printf(", since %s)\n", prior.StartedAt)
+		if prior.Tmux != "" {
+			s.printf("   attach:  tmux %s\n", joinArgs(launch.AttachArgs(prior.Tmux)))
 		}
 	}
-	o.printf("   resolve it (e.g. `/gogo:resume %s` in a Claude session), then re-run `gogo run %s` to continue the warm session.\n", o.Slug, o.Slug)
-	return Outcome{Result: ResultGated, Gate: why}
+	s.printf("   re-run with --takeover to seize it (the prior is reaped), or `gogo sweep` if it is stale.\n")
 }
 
-// gateBudget pauses because the loop's own budget is spent (the round bound or the
-// cost ceiling). Unlike a decision gate, re-running as-is cannot make progress on
-// the same findings: the human must raise the budget or resolve the findings — so
-// the hint is different (REV-003), never the misleading "re-run to continue".
-func (o *Orchestrator) gateBudget(why string) Outcome {
-	o.save()
-	o.printf("\n⏸  gogo run paused — %s\n", why)
-	o.printf("   the loop budget for this feature is spent. Raise %s / %s and re-run,\n", EnvMaxRounds, EnvCostCeiling)
-	o.printf("   or resolve the open findings first (see %s/review and %s/test).\n", o.featureRel(), o.featureRel())
-	return Outcome{Result: ResultGated, Gate: why}
+// matchingSession returns the first live gogo-* session that attributes to this
+// feature's slug, or "" — used to name an untracked (board-launched) owner.
+func (s *Session) matchingSession() string {
+	for _, name := range s.Lister() {
+		if launch.SessionMatchesSlug(name, s.Slug) {
+			return name
+		}
+	}
+	return ""
 }
 
-// --- small helpers -----------------------------------------------------------
-
-// cmd builds a slash command string: "/gogo:<verb> <slug> [extra...]".
-func (o *Orchestrator) cmd(verb string, extra ...string) string {
-	s := verb + " " + o.Slug
-	for _, e := range extra {
-		s += " " + e
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
 	}
 	return s
 }
 
-func (o *Orchestrator) featureRel() string { return ".gogo/work/feature-" + o.Slug }
-func (o *Orchestrator) featureDir() string {
-	return filepath.Join(o.Root, ".gogo", "work", "feature-"+o.Slug)
+func (s *Session) printParkedGate(feat *contract.Feature) {
+	dec := ""
+	if feat != nil {
+		dec = feat.OpenDecision
+	}
+	s.printf("⏸  %s — parked for you (waiting-for-user).\n", s.Slug)
+	if dec != "" && dec != "none" {
+		s.printf("   open decision: %s — see %s/decisions.md.\n", dec, s.featureRel())
+	} else {
+		s.printf("   see %s/decisions.md for the parked decision.\n", s.featureRel())
+	}
+	s.printf("   resolve it (`/gogo:resume %s`), then re-run `gogo %s %s` to resume the warm session.\n", s.Slug, s.Kind, s.Slug)
 }
 
-// relPath is a repo-relative path (forward-slashed) to a track file, safe to pass
-// in a slash command since the phase session runs with cwd=root.
-func (o *Orchestrator) relPath(track, file string) string {
-	return o.featureRel() + "/" + track + "/" + file
-}
+// --- small helpers -----------------------------------------------------------
 
-func (o *Orchestrator) save() {
-	if o.Reg != nil {
-		_ = o.Reg.Save(o.Root) // best-effort; CLI-only bookkeeping
+func (s *Session) defaults() {
+	if s.Reg == nil {
+		s.Reg = LoadRegistry(s.Root, s.Slug)
+	}
+	if s.Kind == "" {
+		s.Kind = "go"
+	}
+	if s.Runner == nil {
+		s.Runner = ClaudeRunner{Root: s.Root}
+	}
+	if s.Attacher == nil {
+		s.Attacher = launch.LaunchPersistent
+	}
+	if s.Killer == nil {
+		s.Killer = launch.KillSession
+	}
+	if s.Lister == nil {
+		s.Lister = launch.ListSessions
+	}
+	if s.Live == nil {
+		s.Live = DefaultLiveness
 	}
 }
 
-func (o *Orchestrator) printf(format string, a ...any) {
-	if o.Out != nil {
-		fmt.Fprintf(o.Out, format, a...)
+// feature reloads the feature from the deterministic reader (state.md), or nil.
+func (s *Session) feature() *contract.Feature {
+	repo, err := contract.LoadRepo(s.Root)
+	if err != nil || repo == nil {
+		return nil
+	}
+	return repo.Feature(s.Slug)
+}
+
+func (s *Session) intent() launch.Intent {
+	action := launch.ActionGo
+	if s.Kind == "plan" {
+		action = launch.ActionPlan
+	}
+	return launch.BuildIntent(action, []string{s.Slug}, "")
+}
+
+func (s *Session) featureRel() string { return ".gogo/work/feature-" + s.Slug }
+
+func (s *Session) save() {
+	if s.Reg != nil {
+		_ = s.Reg.Save(s.Root) // best-effort; CLI-only bookkeeping
 	}
 }
+
+func (s *Session) printf(format string, a ...any) {
+	if s.Out != nil {
+		fmt.Fprintf(s.Out, format, a...)
+	}
+}
+
+func invUUID(inv Invocation) string {
+	if inv.Resume != "" {
+		return inv.Resume
+	}
+	return inv.SessionID
+}
+
+func resumeOrFresh(inv Invocation) string {
+	if inv.Resume != "" {
+		return "resume warm session"
+	}
+	return "fresh session"
+}
+
+func hostname() string {
+	h, _ := os.Hostname()
+	return h
+}
+
+func now() string { return time.Now().UTC().Format(time.RFC3339) }
 
 // newUUID returns a random RFC-4122 v4 UUID (stdlib-only, no new dependency).
 func newUUID() string {

@@ -1,0 +1,20 @@
+flowchart TD
+  A["gogo go / gogo plan slug"] --> B{"status runnable?<br/>RunnableStatus"}
+  B -- "no" --> R["refuse + runnableHint"]
+  B -- "yes" --> L{"owner lock free?<br/>lockfile + PID/tmux liveness"}
+  L -- "live owner" --> X["refuse (or --takeover: reap prior)"]
+  L -- "stale / none" --> M["acquire lock · registry books session UUID"]
+  M --> N{"session already tracked?"}
+  N -- "no (first leg)" --> P1["claude -p '/gogo:go slug'<br/>--session-id uuid --output-format json"]
+  N -- "yes (warm)" --> P2["claude -p '/gogo:go slug'<br/>--resume uuid"]
+  P1 --> S["persistent claude -p session runs the skill<br/>(implement in-context + Task review/test + report)"]
+  P2 --> S
+  S --> E{"child exits: read state.md"}
+  E -- "awaiting-uat" --> U["surface: run /gogo:done slug"]
+  E -- "waiting-for-user" --> G["surface parked gate + resume hint"]
+  E -- "is_error" --> H["halt (non-zero exit)"]
+  U --> RL["release lock · record registry status"]
+  G --> RL
+  RL --> Z["opportunistic reap if feature terminal"]
+  SW["gogo sweep"] --> K["KillSession: tmux kill-session + mark reaped"]
+  K --> Z2["reaps terminal-feature sessions + orphan gogo-* sessions"]

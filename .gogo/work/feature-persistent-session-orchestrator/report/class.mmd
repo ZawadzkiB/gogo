@@ -1,0 +1,74 @@
+classDiagram
+  class Session {
+    +Root string
+    +Slug string
+    +Kind string
+    +Attach bool
+    +Takeover bool
+    +LaunchOrResume() Outcome
+    +Reap()
+  }
+  class SessionRunner {
+    <<interface>>
+    +Run(Invocation) RunResult
+  }
+  class ClaudeRunner {
+    +Root string
+    +Run(Invocation) RunResult
+  }
+  class AttachFn {
+    <<func>>
+    LaunchPersistent
+  }
+  class Registry {
+    +Slug string
+    +Persistent map~kind~PersistentSession
+    +Sessions []SessionInfo
+    +Get(kind) PersistentSession
+    +Ensure(kind) PersistentSession
+  }
+  class PersistentSession {
+    +Kind string
+    +UUID string
+    +Tmux string
+    +Status string
+    +CostUSD float64
+  }
+  class Owner {
+    +PID int
+    +UUID string
+    +Tmux string
+    +Host string
+  }
+  class Lock {
+    +Path string
+    +Owner Owner
+    +Release() error
+  }
+  class LivenessFn {
+    <<func>>
+    PID signal-0 OR live gogo-* tmux
+  }
+  class Sweeper {
+    +Root string
+    +DryRun bool
+    +Sweep() []string
+  }
+  class Invocation {
+    +Kind string
+    +Command string
+    +SessionID string
+    +Resume string
+  }
+  SessionRunner <|.. ClaudeRunner
+  Session --> SessionRunner : Runner
+  Session --> AttachFn : Attacher (--attach)
+  Session --> Registry : Reg
+  Session ..> Lock : Acquire / Release
+  Session ..> LivenessFn : Live (cross-check)
+  Session ..> Invocation : ResolveInvocation
+  Registry "1" o-- "*" PersistentSession : per leg kind (go|plan)
+  Registry "1" o-- "*" SessionInfo : append-only telemetry
+  Lock *-- Owner
+  Sweeper ..> Registry : reads + marks reaped
+  Sweeper ..> LivenessFn : stale-lock heal

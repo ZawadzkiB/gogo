@@ -1,0 +1,60 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "track": "review",
+  "round": 2,
+  "updated": "2026-07-11",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "gogo plan derives filesystem paths from an unvalidated slug — `..` can escape .gogo/resources/ (write-scope invariant)",
+      "description": "`cmdPlan` (cli/go.go) accepts any slug: for a not-yet-existing feature PlannableStatus(\"\") is true, so it launches with Session{Slug: rawSlug}. The slug then flows unvalidated into LockPath (lock.go) and RegistryPath (registry.go), which filepath.Join it into `.gogo/resources/cli/{locks,sessions}/<slug>.{lock,json}`, and writeLock does MkdirAll+WriteFile there. filepath.Join cleans the path, but a slug with enough `..` climbs out of `.gogo/resources/` and writes outside `.gogo/` — a breach of the hard write-scope invariant. `gogo plan` is the live vector (accepts a brand-new slug).",
+      "proposed_solution": "AGENT-FIXABLE. Validate the slug against `^[a-z0-9]+(-[a-z0-9]+)*$` in cmdPlan (and defensively in cmdGo) before constructing any path or command; refuse with a clear message.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Added `validSlug` (regexp `^[a-z0-9]+(-[a-z0-9]+)*$`) in cli/go.go and guarded BOTH cmdGo (when a slug is given) and cmdPlan (required) before any path/command is built — refuses with `invalid slug %q — expected kebab-case [a-z0-9-] (no path separators)`, exit 1. Tests: TestValidSlug (valid/invalid table incl. `../foo`, `..`, `a/b`) + TestCmdRejectsTraversalSlug (cmdGo/cmdPlan reject `../../../../tmp/pwn` before findRoot/launch). VERIFIED round 2: read cli/go.go:20-22,100-103,161-164 — the validSlug guard sits BEFORE findRoot() and any path build in both cmdGo and cmdPlan; the regexp anchors `^...$` so `..`, `/`, and empty are rejected. cmdRun forwards through cmdGo, so the alias is covered too. TestValidSlug + TestCmdRejectsTraversalSlug pass fresh (-count=1 -race). Write-scope invariant restored."
+    },
+    {
+      "id": "REV-002",
+      "title": "--takeover/stale-reclaim reaps the prior owner by the lockfile's pre-collision base tmux name, not the real session name",
+      "description": "In LaunchOrResume the reap of a displaced/stale prior was `s.Killer(prior.Tmux)`, where prior.Tmux came from the lockfile, which recorded the PRE-collision base name (`me.Tmux = s.intent().Session`). The real attach session created by LaunchPersistent may be uniqueSession-suffixed (`...-2`), so a later takeover/reclaim killed the wrong/nonexistent name and orphaned the very session the lock meant to seize. A lockless board racer was likewise unreapable.",
+      "proposed_solution": "AGENT-FIXABLE. Reap the prior BY SLUG (launch.ListSessions + SessionMatchesSlug), and/or record the real (post-uniqueSession) tmux name into the lock after LaunchPersistent.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Both remedies applied. (1) reap-prior now calls reapMatchingSessions(slug) — kills EVERY live gogo-* session matching the slug via exact launch.SessionMatchesSlug (TEST-005), catching a collision-suffixed attach session AND a lockless board racer — plus a best-effort Killer(prior.Tmux). (2) launchAttached now calls lock.SetTmux(res.Session) to record the REAL post-collision name in the lockfile (new Lock.SetTmux). Added an injectable Session.Lister seam (default launch.ListSessions). Test: TestTakeoverReapsBoardSessionBySlug asserts a `gogo-go-feat-2` is reaped and an unrelated `gogo-done-other` is spared. VERIFIED round 2: read orchestrator.go:157-166,219-237,278-289. reapMatchingSessions uses exact SessionMatchesSlug (no substring cross-attribution — confirmed against SessionMatchesSlug in launch.go:337-351); Killer(prior.Tmux) fires only when prior.Tmux != \"\" (untrackedOwner has Tmux=\"\" so no spurious kill), and any overlap with reapMatchingSessions is a harmless best-effort double-call on the same exact name. SetTmux is a defence-in-depth secondary remedy (its error is ignored, but reap-by-slug still catches the real name). TestTakeoverReapsBoardSessionBySlug passes fresh."
+    },
+    {
+      "id": "REV-003",
+      "title": "Owner-lock Acquire is a non-atomic read-check-write (TOCTOU) — a narrow simultaneous double-launch window",
+      "description": "Acquire read the lockfile, evaluated liveness, then writeLock overwrote — no atomic create. Two near-simultaneous first-launches of the same fresh slug could both observe 'no prior lock', both write, and both launch in the sub-millisecond window before either PID/tmux became observable.",
+      "proposed_solution": "AGENT-FIXABLE. For the create-when-absent path, open with O_CREATE|O_EXCL|O_WRONLY; on success write the owner, on EEXIST fall back to the read + liveness-check branch.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Acquire now does an ATOMIC os.OpenFile(path, O_CREATE|O_EXCL|O_WRONLY) for the fresh case (writeOwner into the open handle); only one of two racers wins the create, the loser sees EEXIST and falls to the read+liveness branch (reclaim/refuse/takeover). Also closed a related gap the review did not flag: even after a clean create, a live gogo-* session for the slug with NO lockfile (a board racer) is now refused too (bare `live(Owner{}, slug)` check) — the exact incident the lock exists to catch (D1=C). Tests: TestLockRefusesUntrackedBoardSession + existing refuse/reclaim/takeover still green. VERIFIED round 2: read lock.go:81-123. The O_CREATE|O_EXCL create is atomic; non-EEXIST create errors surface; EEXIST falls to the read+liveness branch. Confirmed the new bare `live(Owner{}, slug)` untracked-refuse does NOT break a legitimate headless resume: PidAlive(0) is false (launch.go:509-515 guards pid<=0), a headless `-p` run opens no tmux session (RunPhase execs claude directly), and on re-run the untracked check only fires on a CLEAN create (no lockfile) — the --attach path keeps its lockfile so its re-run hits the read branch, not the untracked check. A refused untracked-acquire os.Removes the just-created lockfile (TestLockRefusesUntrackedBoardSession asserts the lockfile is gone). Degrades gracefully with no tmux (ListSessions → nil). All lock tests pass fresh."
+    },
+    {
+      "id": "REV-004",
+      "title": "Dead reader + stale comments describing the deleted per-phase loop / contract.Route (review-standard #1)",
+      "description": "After D3=A deleted the Go per-phase loop + contract.Route, two remnants described the removed architecture: (1) contract/result.go — PhaseResult + ReadResult had ZERO callers and a doc referencing `gogo run` chaining + `Route`; (2) launch.go's RunPhase/PhaseOpts/RunResult comment block still described the deleted warm-dev/fresh-review per-phase model.",
+      "proposed_solution": "AGENT-FIXABLE. Delete contract/result.go (no CLI consumer reads result.json now) or rewrite its comment; refresh the launch.go comments to the single persistent-session model.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Deleted cli/internal/contract/result.go entirely (verified zero callers of PhaseResult/ReadResult; IssuesList/ReadIssues live in artifacts.go and are untouched). Rewrote the launch.go section header + PhaseOpts/RunResult/RunPhase doc-comments to describe the ONE persistent-session run of the whole skill (first leg --session-id, later leg --resume) instead of the deleted per-phase warm-dev/fresh-review loop. `go vet` + build confirm no dangling references. VERIFIED round 2: `git status` shows result.go as ` D` (deleted); repo-wide grep for PhaseResult/ReadResult across *.go = zero hits; IssuesList/ReadIssues confirmed still in artifacts.go. launch.go:128-202 doc-comments now accurately describe the persistent-session model. The one remaining `contract.Route` string is a comment in orchestrator.go:9 that explicitly describes what was REMOVED (\"the drift bug the old Go per-phase loop + contract.Route created\") — legitimate historical context, not stale live code. gofmt clean, go vet clean, go build passes."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "slug": "persistent-session-orchestrator",
+  "track": "test",
+  "round": 1,
+  "updated": "2026-07-12",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "True end-to-end (real claude -p driving the persistent-session CLI) — hands-on user-decision gate",
+      "description": "A real persistent-session launch driving a real `claude -p` cannot be run by the tester unattended: it is non-deterministic, billable, and needs a live model session. The CI-runnable proxy IS covered and green: `TestGoE2EStubClaude` in cli/go_e2e_test.go crosses the real exec.Command boundary with a stub `claude` on PATH and asserts first-launch argv (--session-id, -p \"/gogo:go <slug>\", --permission-mode, --output-format json), a warm --resume on re-run, and an is_error envelope halting with exit 1. What the stub cannot reach is the CLI's behaviour against a LIVE model (real exec + JSON-envelope parse, real state.md exit classification, lock release + registry booking).",
+      "proposed_solution": "NEEDS-USER-DECISION (D7). Resolved: the user chose a light real smoke — one live `gogo plan <throwaway>` leg (the change under test is the CLI session-manager; the /gogo:go skill is unchanged, FR10, so a real launch of any leg exercises exactly the new code).",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "VERIFIED via a live smoke (D7 → light real smoke, orchestrator-run 2026-07-12): `gogo plan psorch-smoke` launched a REAL `claude -p \"/gogo:plan psorch-smoke\"` (fresh --session-id, resolved by ResolveInvocation), the real gogo-plan skill ran and parked at awaiting-plan-acceptance, and the CLI classified the exit correctly — printed `• psorch-smoke — session ended at status \"awaiting-plan-acceptance\". Re-run gogo plan psorch-smoke to resume the warm session.` and exited 2 (ResultOther). Side effects verified: registry .gogo/resources/cli/sessions/psorch-smoke.json booked a persistent.plan entry with a real uuid (de41be53-...), status=parked, pid, started/updated timestamps, and REAL telemetry from the live JSON envelope (cost_usd 4.69, num_turns 11, duration_ms 745565) plus the append-only sessions[] record; the owner lockfile was released (no psorch-smoke.lock). This exercises the full new CLI session-manager path against a live model: Acquire (lock) -> ResolveInvocation (fresh) -> RunPhase (real exec + envelope parse) -> classifyExit (reads state.md) -> registry write + lock release. Throwaway psorch-smoke cleaned up after."
+    }
+  ]
+}
