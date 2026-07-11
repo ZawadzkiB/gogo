@@ -1,0 +1,12 @@
+{
+  "slug": "cli-orchestrator",
+  "updated": "2026-07-10",
+  "members": ["cli-orchestrator"],
+  "note": "Shipped changelog entry for Slice 1 of the CLI process-orchestrator (gogo run). Synthesized from .gogo/work/feature-cli-orchestrator/report/. flow = the Go loop; shared-core = two orchestrators over one core; sequence = warm resume vs fresh eyes; class = the shipped Go structure. before/ holds the plan-time baseline for before/after compare.",
+  "diagrams": [
+    { "kind": "flow", "file": "cli-orchestrator-flow.mmd", "title": "cli-orchestrator: The Go orchestrator loop: warm dev resume, fresh review/test, issues.json routing" },
+    { "kind": "flow", "file": "cli-orchestrator-shared-core.mmd", "title": "cli-orchestrator: Two orchestrators over one shared core (skills + typed contracts + the one routing rule)" },
+    { "kind": "sequence", "file": "cli-orchestrator-sequence.mmd", "title": "cli-orchestrator: Warm developer resume across fix rounds vs fresh-eyes review/test" },
+    { "kind": "class", "file": "cli-orchestrator-class.mmd", "title": "cli-orchestrator: As-built (Slice 1): the orchestrator package + launch.RunPhase/PhaseOpts + contract.Route" }
+  ]
+}

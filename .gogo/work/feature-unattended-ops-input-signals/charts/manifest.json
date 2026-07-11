@@ -1,0 +1,10 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "updated": "2026-07-11",
+  "note": "As-built (matches the accepted plan). state = the pipeline status lifecycle with the three user gates (⏸USER) that Feature.WaitingForInput() flags, vs the auto transitions (incl. /gogo:done's mechanical steps that Slice A makes prompt-free; plan acceptance now reachable from the board via Slice C). flow = the as-built read+display path: contract.Feature.WaitingForInput() read by three read-only display sites — renderCard's ⏸ cue (cardBadgeText + badgeStyleFor), gogo status' waitMarker WAIT column, and viewBoard's interleaveSeparators │ column borders. control-surface = Slice C: move.go attemptAction routes each card class/status to a delegated launch (launch.ActionAccept/-Go/-Done), the new ActionAccept filling the plan-acceptance gap via a launched /gogo:accept (skill gogo-accept) that records through gogo-plan's recording; the CLI never mutates state. Slice A (skill-bash safety, guarded scoped-find rewrites + the TestSkillsBashNoUnsafeRm lint) is textual, no structural diagram.",
+  "diagrams": [
+    { "kind": "activity", "file": "charts/state.mmd", "title": "Status lifecycle: which gates are waiting-for-input vs auto transitions" },
+    { "kind": "flow", "file": "charts/flow.mmd", "title": "One WaitingForInput() predicate -> three read-only display sites + bordered columns" },
+    { "kind": "flow", "file": "charts/control-surface.mmd", "title": "Board control surface: move-guard -> delegated launch; ActionAccept fills the plan-acceptance gap (Slice C)" }
+  ]
+}

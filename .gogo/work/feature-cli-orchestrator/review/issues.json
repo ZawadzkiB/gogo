@@ -1,0 +1,86 @@
+{
+  "slug": "cli-orchestrator",
+  "track": "review",
+  "round": 2,
+  "updated": "2026-07-11",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "contract.Route re-implements on ANY open/new issue, diverging from gogo-review's 'batch the minors' rule it cites as authority",
+      "description": "cli/internal/contract/route.go OpenIssueCount counted every open/new regardless of severity, so Route returned ReImplement for a lone open minor — but gogo-review/SKILL.md §④ routes only on open/new blockers/majors and batches minors, while gogo-test §④ routes on any open/new. One shared function could not match both tracks.",
+      "proposed_solution": "NEEDS-USER-DECISION: decide the canonical rule for minors/nits under `gogo run` (batch-minors like gogo-review, or count>0). Reconcile the doc-comment, plan FR6, and the skill.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Made contract.Route TRACK-AWARE (new signature Route(track, result, issues) + routableOpen): review counts only open/new blocker|major (batches minors) per gogo-review §④; test counts any open/new per gogo-test §④. Corrected the route.go doc-comment (no false parity claim) and plan FR6. Added route + orchestrator tests (TestReviewBatchesMinor). RESOLVED DETERMINISTICALLY per the accepted plan's constraint 3 (the skills are the canonical authority; FR6's 'count>0' was an imprecise paraphrase). NOTE for the user: if `gogo run` should instead be deliberately STRICTER than /gogo:go on minors, this is the one place to flip. · VERIFIED r2: routableOpen counts open/new blocker|major for review (batches minor/nit) and any open/new for test; severity strings match the schema enum exactly (blocker/major/minor/nit); both callers in orchestrator.go pass the right track; doc-comment + plan FR6 corrected. TestReviewBatchesMinor + the route-table minor/nit/severity cases pass. The deterministic resolution is sound — gogo-review §④ ('batch the minors') is the cited authority."
+    },
+    {
+      "id": "REV-002",
+      "title": "A failed / blocked / no-output phase is routed as a false green: is_error is ignored and Route(nil,nil)=Advance",
+      "description": "launch.RunResult.IsError was parsed but never inspected; readTrack returning (nil,nil) plus Route(nil,nil)=Advance meant a review/test session that produced no typed output marched on as clean; implementGate (blocked/waiting-for-user) was checked only on the first build, not warm fix rounds.",
+      "proposed_solution": "AGENT-FIXABLE: check is_error; require positive evidence before Advance; re-check implementGate on fix rounds; add tests.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "exec now treats RunResult.IsError as a phase failure (returns an error → halts). Before Advance, the loop requires positive evidence: if BOTH result.json and issues.json are absent it gates (gateDecision), never Advance. implementGate is now checked after every warm fix round in reImplement, not only the first build. Added TestPhaseErrorHalts + TestNoOutputGates. · VERIFIED r2: exec halts on IsError (TestPhaseErrorHalts, 2 calls then stop); review AND test gate when result.json+issues.json are both absent (TestNoOutputGates), and a clean phase that writes result.json but no issues.json is NOT mis-gated (the gate requires BOTH nil); implementGate re-checked in reImplement after the warm fix. One side-effect of the IsError early-return — it discards that run's cost — is filed as REV-006."
+    },
+    {
+      "id": "REV-003",
+      "title": "Persisted Round/CostUSD bounds never reset, so a re-run after a bound/cost gate re-gates (and a cost re-gate first spends a paid session)",
+      "description": "Registry.Round/CostUSD accumulate and persist; overBudget was only checked after a phase ran, so a cost re-gate paid for one more session first; the gate footer's 're-run to continue' was misleading for budget gates since the orchestrator (correctly) leaves state.md runnable.",
+      "proposed_solution": "AGENT-FIXABLE: pre-flight the bounds so a re-run never spends just to re-gate; give budget gates a recovery hint that works; consider resetting Round on a clean re-entry.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Added a pre-flight COST-ceiling guard at the top of Run() (a re-run already over budget gates immediately, spawning nothing — TestPreflightCostGateNoSpend). Split gates: gateDecision ('resolve + re-run') vs gateBudget ('raise GOGO_RUN_MAX_ROUNDS / GOGO_RUN_COST_CEILING'). Deliberately did NOT auto-reset Round on clean review (that would let a perpetually-failing test dodge the bound); instead the round bound is documented as a total-per-feature budget and a re-run still completes when no further fixes are needed. The cost is pre-flighted; the round bound is not (a re-run must be allowed to re-check review). · VERIFIED r2: pre-flight overBudget at the top of Run() gates spawning NOTHING (TestPreflightCostGateNoSpend asserts 0 calls); gateBudget vs gateDecision emit distinct, correct hints. Not resetting Round is sound: a re-run still re-runs review, so a feature whose findings the human resolved completes; only if MORE fixes are needed does the exhausted round budget re-gate. The single review a re-run spends is necessary re-verification work (fresh eyes must re-check), not a money sink."
+    },
+    {
+      "id": "REV-004",
+      "title": "needs-user-decision detection scans only proposed_solution; the tester agent does not pin the tag to that field",
+      "description": "hasOpenNeedsUserDecision looked only in proposed_solution; the tester agent is not strict about where it writes the NEEDS-USER-DECISION tag, so a test decision could be missed and auto-fixed.",
+      "proposed_solution": "AGENT-FIXABLE: scan title + description + proposed_solution.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "hasOpenNeedsUserDecision now scans title + description + proposed_solution (uppercased). Added TestNeedsUserDecisionScansAllFields covering the marker in title and in description. · VERIFIED r2: the concatenated blob is uppercased before the substring match; TestNeedsUserDecisionScansAllFields (title + description) and the route-table 'needs-decision even in a batched minor → gate' case both pass."
+    },
+    {
+      "id": "REV-005",
+      "title": "Round bound is a single global counter across review+test, not the 'same finding ~3 rounds' bound FR7/the skills specify",
+      "description": "Reg.Round is a per-feature total-fix-rounds counter, not a per-finding-id budget as FR7/gogo-review §④ state. It errs safe (gates a human, never loops) but can gate earlier than a reader of FR7 expects.",
+      "proposed_solution": "AGENT-FIXABLE (or accept-as-documented): track rounds per issue id, or document plainly that gogo run bounds TOTAL fix rounds per feature.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Accept-as-documented: kept the global counter (per-id tracking deferred) and documented it plainly as a TOTAL fix-round budget per feature in route.go/orchestrator.go doc-comments, plan FR7, and `gogo run --help` (GOGO_RUN_MAX_ROUNDS). Errs safe; a future slice can make it per-id. · VERIFIED r2: the total-per-feature budget is documented in orchestrator.go reImplement doc-comment, `gogo run --help` ('TOTAL fix-round budget per feature'), and plan FR7. (Minor doc nit: the fix_summary's 'route.go doc-comment' claim is off — route.go carries no round-bound text — but the documentation is present in the load-bearing places, so the finding is adequately addressed.)"
+    },
+    {
+      "id": "REV-006",
+      "title": "is_error phase halt discards the run's cost — the spend escapes the registry and the cost ceiling",
+      "description": "cli/internal/orchestrator/orchestrator.go exec() returns the is_error halt error (added for REV-002, ~line 297) BEFORE Reg.record()/save(), so the failed run's res.CostUSD is never booked. A phase that finishes with is_error=true still incurred a real claude cost; a deterministically-erroring phase that a user re-runs repeatedly spends an unaccounted session each time, and REV-003's cost pre-flight never trips because the spend was never persisted. Low impact (halts loudly with exit 1; user-driven, not an automatic loop) but it undercuts the cost-accounting invariant the round-2 fixes strengthen.",
+      "proposed_solution": "AGENT-FIXABLE: book the SessionInfo telemetry (cost/turns/duration) into the registry and save() BEFORE returning the is_error halt error, so incurred spend still counts toward the ceiling and telemetry. Keep the halt behaviour and its test unchanged.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 2,
+      "fix_summary": "exec() now books the run SessionInfo telemetry (cost/turns/duration) into the registry and save()s BEFORE returning the is_error halt error, so incurred spend counts toward the cost ceiling / pre-flight. Halt behaviour unchanged. TestPhaseErrorHalts now also asserts the errored run cost is booked (Reg.CostUSD >= the failed session cost). gofmt/vet/test -race green."
+    }
+  ]
+}

@@ -109,9 +109,9 @@ pointer, and `.gogo/skills/index.md` registers every extraction.
 
 ```
 gogo/
-├── commands/                 # ultra-thin entry points — 12 slash commands
-│   ├── build.md  plan.md  go.md  implement.md  review.md  test.md
-│   ├── report.md  done.md  view.md  status.md  resume.md  skills.md
+├── commands/                 # ultra-thin entry points — 13 slash commands
+│   ├── build.md  plan.md  go.md  accept.md  implement.md  review.md
+│   ├── test.md  report.md  done.md  view.md  status.md  resume.md  skills.md
 ├── skills/                   # the operating manuals (all the logic)
 │   ├── gogo/                 #   orchestrator: phases, loops, decision gates
 │   ├── gogo-build/           #   wire/refresh .gogo/knowledge config
@@ -123,6 +123,7 @@ gogo/
 │   ├── gogo-done/            #   ship: synthesize high-level entry (single or merged) → .gogo/changelog/ + build/print viewer link; no-slug work board cockpit (view/ship/merge/go/filter intents + relaunch loop)
 │   ├── gogo-view/            #   interactive viewer for plans + reports (rich draggable nodes + before/after compare)
 │   ├── gogo-status/          #   read-only overview + the shared work-index classifier (shipped/ready/in-progress/unfinished)
+│   ├── gogo-accept/          #   accept a plan from the board (records via gogo-plan's single-owner recording; Slice C)
 │   ├── gogo-skills/          #   audit knowledge budget + extract on-demand skills
 │   ├── gogo-contracts/       #   validate-in / validate-out at every hand-off
 │   └── gogo-mermaid/         #   diagram generation + offline viewer

@@ -2,6 +2,12 @@ package tui
 
 import "github.com/charmbracelet/lipgloss"
 
+// waitingMarker is the leading glyph on a card that is WaitingForInput() — an
+// unmissable "blocked on you" cue (matches the intended-design ⏸USER states,
+// FR-B2). One rune, like the existing ●/○/✓ card markers, so truncate's
+// rune-count math is unaffected.
+const waitingMarker = "⏸"
+
 // TONE palette — per-column accents ported from the xplan/web tones, as lipgloss
 // adaptive colors so light terminals stay readable (TEST-007). All styles here
 // are precomputed ONCE (package init), never rebuilt per frame.
@@ -43,6 +49,7 @@ var (
 	waitStyle    = lipgloss.NewStyle().Bold(true).Foreground(waitAccent)
 	uatStyle     = lipgloss.NewStyle().Bold(true).Foreground(uatAccent)
 	helpStyle    = lipgloss.NewStyle().Foreground(dimText)
+	sepStyle     = lipgloss.NewStyle().Foreground(subtleBorder) // vertical column separators (FR-B4)
 )
 
 func init() {

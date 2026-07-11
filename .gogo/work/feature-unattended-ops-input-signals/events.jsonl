@@ -1,0 +1,21 @@
+{"ts":"2026-07-11T09:10:00Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T10:44:51Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T13:00:00Z","event":"phase-started","phase":"implement","status":"implementing","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T13:20:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T13:30:00Z","event":"round-opened","phase":"review","status":"reviewing","note":"review round 1","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T13:45:00Z","event":"issues-found","phase":"review","status":"reviewing","note":"round 1: 1 major (REV-001) + 1 nit (REV-002); verdict CHANGES","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T13:35:00Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T13:36:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T14:05:00Z","event":"round-opened","phase":"review","status":"reviewing","note":"review round 2 (focused verification of REV-001, REV-002)","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T14:15:00Z","event":"phase-done","phase":"review","status":"testing","note":"round 2 APPROVE: REV-001 + REV-002 verified; no open issues","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T14:20:00Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T15:10:00Z","event":"issues-found","phase":"test","status":"testing","round":1,"note":"2 major (TEST-001, TEST-002) — both needs-user-decision, blocked hands-on/e2e checks per plan (live /gogo:done no-prompt run; live board-accept follow-through)","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T14:05:00Z","event":"gate-opened","phase":"test","status":"waiting-for-user","note":"D11 — Slice A live prompt-free /gogo:done (TEST-001)","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T14:05:01Z","event":"gate-opened","phase":"test","status":"waiting-for-user","note":"D12 — Slice C live board-accept follow-through (TEST-002)","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T15:20:00Z","event":"gate-resolved","phase":"test","status":"testing","note":"D11 resolved (user, A/skip): accept unattended evidence for the live /gogo:done no-prompt check","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T15:20:01Z","event":"gate-resolved","phase":"test","status":"testing","note":"D12 resolved (user, A/skip): accept unattended evidence for the live board-accept follow-through","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T15:20:02Z","event":"phase-done","phase":"test","status":"testing","note":"round 2: all-green (TEST-001/002 user-skipped/wontfix); no open issues; hand to report","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T15:25:00Z","event":"phase-started","phase":"report","status":"testing","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T15:40:00Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T12:16:49Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"unattended-ops-input-signals"}
+{"ts":"2026-07-11T12:16:49Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-11-unattended-ops-input-signals/","slug":"unattended-ops-input-signals"}

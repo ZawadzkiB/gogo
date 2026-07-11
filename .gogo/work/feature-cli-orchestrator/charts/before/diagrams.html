@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cli-orchestrator (before)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cli-orchestrator</code> (before / as-is)</h1>
+    <p class="hint">Offline viewer · the existing launcher this change extends · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Today's launcher (as-is)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  move["board move / g key<br/>cli/internal/tui/move.go"] --> intent["launch.BuildIntent(action, slugs, release)"]
+  intent -->|"ActionGo"| goCmd["Command = /gogo:go &lt;slug&gt;<br/>(WHOLE pipeline in one session)"]
+  intent -->|"ActionDone"| doneCmd["Command = /gogo:done a+b+c"]
+  goCmd --> launch["launch.Launch(root, intent)"]
+  doneCmd --> launch
+  launch -->|"tmux present"| tmux["tmux new-session -d -s gogo-go-&lt;slug&gt;<br/>claude --permission-mode auto /gogo:go &lt;slug&gt;<br/>(remain-on-exit on)"]
+  launch -->|"no tmux"| bg["background claude -p /gogo:go &lt;slug&gt;<br/>→ .gogo/resources/cli/logs/&lt;name&gt;.log"]
+  tmux --> attach["user attaches (a): AttachArgs → answer gates in-session"]
+  bg --> log["log peek (l) only — gates surfaced as 'waiting for user'"]
+  tmux -.->|"the claude session IS the orchestrator:<br/>runs ②→⑤ in-chat, re-spawns/re-reads per fix round"| tmux
+  </pre></div>
+
+  <script src="../../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

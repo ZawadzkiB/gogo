@@ -1,0 +1,34 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "track": "review",
+  "round": 2,
+  "updated": "2026-07-11",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "architecture.md command-file tree says \"13 slash commands\" but still lists only 12 (accept.md missing)",
+      "description": "docs/architecture.md:112 was updated to \"ultra-thin entry points — 13 slash commands\", but the file list immediately below (lines 113-114) still enumerates only 12 command files: build, plan, go, implement, review, test / report, done, view, status, resume, skills. The new commands/accept.md — the whole point of Slice C — is absent, so the count (13) contradicts the enumerated list (12) and the accept command is invisible in the architecture doc's tree. This is exactly the enumeration-sync class FR-C5 required (\"update every live enumeration ... Grep before finishing\") and code-review-standards flags as Major (\"an enumeration left out of sync\"; cf. the REV-001-in-0.8.0 doc-list slip). All other sites (docs/commands.md, README, project-knowledge.md, the count itself) were correctly synced — this is the one that slipped.",
+      "proposed_solution": "AGENT-FIXABLE. Add accept.md to the command-file tree in docs/architecture.md (e.g. append it to line 113 or 114, grouped naturally near go.md/plan.md) so the enumerated files count 13 and match the \"13 slash commands\" label.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Added accept.md to the command-file tree in docs/architecture.md (reflowed lines 113-114 to 6+7 = 13 files) and also added gogo-accept/ to the skills tree for full enumeration-sync; the enumerated files now count 13, matching the '13 slash commands' label."
+    },
+    {
+      "id": "REV-002",
+      "title": "Slice A before/ refresh only deletes *.mmd, so a non-.mmd file in before/ survives where the old rm -rf nuked it",
+      "description": "skills/gogo-done/SKILL.md:213-214 replaces `rm -rf \"$dst/before\"` with `find \"$dst/before\" -type f -name '*.mmd' -delete` + `rmdir \"$dst/before\" 2>/dev/null || true`. If before/ ever holds a non-.mmd file, those files are not deleted, the rmdir silently no-ops (dir not empty), and before/ persists with stale content — a divergence from the old rm -rf. Verified real: .gogo/changelog/2026-07-01-viewer-bundles-and-done-board/before/ contains a legacy manifest.json. In practice this is harmless: the current assembly (SKILL.md:218-225) only ever copies *.mmd into before/ and writes ONE top-level manifest.json (never before/manifest.json), so all current-format entries clear cleanly and equal rm -rf; the one stale before/manifest.json is on a terminal, already-shipped entry that is never re-assembled. It is also the exact idiom the plan's FR-A1 prescribed. Flagged for the record only.",
+      "proposed_solution": "AGENT-FIXABLE (optional; may be wontfix as plan-prescribed + harmless). For strict rm -rf parity, drop the `-name '*.mmd'` filter on the before/ delete so it clears any file type before rmdir: `find \"$dst/before\" -type f -delete 2>/dev/null || true` then `rmdir \"$dst/before\" 2>/dev/null || true`. This stays guarded/scoped (no glob, no bare-variable rm) and still passes the lint.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Dropped the `-name '*.mmd'` filter on the before/ delete only (skills/gogo-done/SKILL.md) — before/ now clears WHOLE (any file) then rmdir removes it, matching the old `rm -rf \"$dst/before\"` exactly; the top-level delete keeps its *.mmd filter so the entry's report.md/manifest.json survive. Still a scoped find under the guarded $dst (no glob-rm, no bare-variable rm); lint green. Verified in a scratch harness: a non-.mmd file in before/ is now removed and the dir dropped, while entry report.md/manifest.json survive."
+    }
+  ]
+}

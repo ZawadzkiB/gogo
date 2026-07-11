@@ -1,0 +1,43 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "phase": "test",
+  "status": "waiting-for-user",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-unattended-ops-input-signals/plan.md",
+    ".gogo/work/feature-unattended-ops-input-signals/review/issues.json",
+    ".gogo/work/feature-unattended-ops-input-signals/charts/manifest.json",
+    ".gogo/work/feature-unattended-ops-input-signals/implement/result.json",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    "cli/skills_lint_test.go",
+    "cli/internal/contract/waiting_test.go",
+    "cli/internal/tui/waiting_test.go",
+    "cli/internal/tui/accept_test.go",
+    "cli/internal/launch/accept_test.go",
+    "cli/testdata/status.golden",
+    "skills/gogo-done/SKILL.md",
+    "skills/gogo-build/SKILL.md",
+    "skills/gogo-plan/SKILL.md",
+    "skills/gogo-accept/SKILL.md",
+    "commands/accept.md",
+    "docs/cli-contract.md",
+    "docs/architecture.md",
+    "docs/commands.md",
+    "README.md",
+    ".claude-plugin/plugin.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-unattended-ops-input-signals/test/issues.json",
+    ".gogo/work/feature-unattended-ops-input-signals/test-01.md",
+    ".gogo/work/feature-unattended-ops-input-signals/test/result.json",
+    ".gogo/work/feature-unattended-ops-input-signals/state.md",
+    ".gogo/work/feature-unattended-ops-input-signals/events.jsonl"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 2,
+  "summary": "CI-runnable gate all green (gofmt/vet/go test -race -count=1 ./... across all 9 packages, every feature-specific test individually confirmed) and full hands-on exploration found zero code issues: gogo --version/--help/status hands-on on the real repo + a fixture proving all three WaitingForInput() states flag WAIT; a live tmux drive of the real Go TUI board confirmed the ⏸ cue, the │ column separators, and that m on an awaiting-plan-acceptance card opens the exact /gogo:accept confirm (while a plan-accepted card still routes to /gogo:go); an independent scratch-harness re-verification of the rewritten gogo-done bash idiom confirmed normal refresh, empty-$date/$name refusal (exit 1, filesystem untouched), idempotency, and the FR-A2 board cleanup; enumeration-sync (13 commands, version 0.14.0) and the gogo-accept/gogo-plan single-owner acceptance recording were cross-checked line-by-line. Recorded 2 needs-user-decision issues (TEST-001, TEST-002) for the two hands-on/e2e proofs the plan itself flags as requiring a live interactive claude session (a real /gogo:done zero-prompt run; a real board-accept follow-through flipping a plan-pending card to plan-accepted) — neither can be safely exercised unattended by this tester, so per gogo-test's blocked-hands-on rule the done-bar is not met and this is a user-decision gate, not a silent skip."
+}

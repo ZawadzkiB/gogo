@@ -1,0 +1,8 @@
+{
+  "slug": "cli-orchestrator",
+  "updated": "2026-07-10",
+  "note": "As-is baseline: today's launcher (cli/internal/launch) only spawns WHOLE-pipeline sessions (/gogo:go, /gogo:done). One claude session IS the orchestrator and re-reads the tree each fix round. No --session-id, no --resume, no per-phase decomposition. This is what the change extends.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/before/flow.mmd", "title": "Today's launcher: BuildIntent → Launch → one whole-pipeline claude session" }
+  ]
+}

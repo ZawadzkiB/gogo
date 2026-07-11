@@ -53,13 +53,23 @@ func FormatStatus(repo *contract.Repo) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "gogo — %d features  (shipped %d · ready %d · in-progress %d · unfinished %d)\n\n",
 		len(feats), counts[0], counts[1], counts[2], counts[3])
-	fmt.Fprintf(&b, "%-14s %-10s %-18s %-28s %s\n", "CLASS", "PHASE", "STATUS", "ITERATIONS", "SLUG")
-	b.WriteString(strings.Repeat("─", 96) + "\n")
+	fmt.Fprintf(&b, "%-5s %-14s %-10s %-18s %-28s %s\n", "WAIT", "CLASS", "PHASE", "STATUS", "ITERATIONS", "SLUG")
+	b.WriteString(strings.Repeat("─", 102) + "\n")
 	for _, f := range feats {
-		fmt.Fprintf(&b, "%-14s %-10s %-18s %-28s %s\n",
-			f.Class, dash(f.Phase), dash(f.Status), dash(f.Iterations), f.Slug)
+		fmt.Fprintf(&b, "%-5s %-14s %-10s %-18s %-28s %s\n",
+			waitMarker(f), f.Class, dash(f.Phase), dash(f.Status), dash(f.Iterations), f.Slug)
 	}
 	return b.String()
+}
+
+// waitMarker flags a feature parked at a genuine user gate (WaitingForInput) in
+// the status table's dedicated leading WAIT column — a greppable, golden-stable
+// signal that the item blocks on the user (FR-B3).
+func waitMarker(f *contract.Feature) string {
+	if f.WaitingForInput() {
+		return "WAIT"
+	}
+	return "-"
 }
 
 func dash(s string) string {

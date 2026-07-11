@@ -19,6 +19,12 @@ Two modes, same skill (idempotent, input-driven):
 - **`--issues <path>`** — fix the open issues in a typed issues list (a
   review/test loop-back) and write back what was fixed.
 
+**`--in-session`** (orthogonal flag): run this skill **in the current session,
+in-context** — do not delegate to a fresh `gogo-developer` `Task`. This is the mode
+the **CLI process-orchestrator** (`gogo run`) drives over `claude -p`, so it can
+`--resume` the SAME warm worker across fix rounds (a delegated inner `Task` would be a
+cold shell on resume). Same steps below; only the executor differs.
+
 ## Inputs (declared) and outputs (typed)
 
 | Direction | Artifact | Contract |

@@ -1,0 +1,11 @@
+flowchart TD
+  st["state.md status"] --> b["badge() precedence (model.go:242)"]
+  b --> w{"WaitingForUser()?"}
+  w -- yes --> wb["waiting-for-user badge (waitStyle, red)"]
+  w -- no --> u{"AwaitingUAT()?"}
+  u -- yes --> ub["awaiting-uat badge (uatStyle, purple)"]
+  u -- no --> pb["phase / round badge (column accent)"]
+  wb --> cols["viewBoard: 4 columns JoinHorizontal, edge-to-edge - NO borders"]
+  ub --> cols
+  pb --> cols
+  gap["GAPS today: awaiting-plan-acceptance has NO distinct cue - no WaitingForInput() union - gogo status has NO waiting column"]

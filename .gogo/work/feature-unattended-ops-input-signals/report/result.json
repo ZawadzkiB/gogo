@@ -1,0 +1,33 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-unattended-ops-input-signals/plan.md",
+    ".gogo/work/feature-unattended-ops-input-signals/state.md",
+    ".gogo/work/feature-unattended-ops-input-signals/decisions.md",
+    ".gogo/work/feature-unattended-ops-input-signals/review/issues.json",
+    ".gogo/work/feature-unattended-ops-input-signals/test/issues.json",
+    ".gogo/work/feature-unattended-ops-input-signals/charts/manifest.json",
+    ".gogo/work/feature-unattended-ops-input-signals/charts/before/manifest.json",
+    ".gogo/work/feature-unattended-ops-input-signals/implement/result.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-unattended-ops-input-signals/plan.md",
+    ".gogo/work/feature-unattended-ops-input-signals/report/report.md",
+    ".gogo/work/feature-unattended-ops-input-signals/report/flow.mmd",
+    ".gogo/work/feature-unattended-ops-input-signals/report/control-surface.mmd",
+    ".gogo/work/feature-unattended-ops-input-signals/report/activity.mmd",
+    ".gogo/work/feature-unattended-ops-input-signals/report/sequence.mmd",
+    ".gogo/work/feature-unattended-ops-input-signals/report/diagrams.html",
+    ".gogo/work/feature-unattended-ops-input-signals/report/manifest.json",
+    ".gogo/work/feature-unattended-ops-input-signals/report/before/flow.mmd",
+    ".gogo/work/feature-unattended-ops-input-signals/report/before/manifest.json",
+    ".gogo/work/feature-unattended-ops-input-signals/report/result.json",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/knowledge/coding-rules.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Phase ⑤ report for a clean green run. Finalized plan.md to as-built (noted the REV-002 before/ deviation + the D11/D12 user-skips). Wrote the report/ bundle: report.md (run-status/planned-vs-shipped/implementation + as-built changes table/decisions D1-D12/review+test outcomes/before-after comparison/knowledge updates/follow-ups/TL;DR), the as-built UML set — 2 flow (read+display, board control-surface), 1 activity (status lifecycle with the ⏸USER gates), 1 sequence (board-accept end to end) — plus report/before/ (the plan-time as-is flow, path-rewritten) and report/diagrams.html. Updated gogo-owned knowledge: project-knowledge.md (0.14.0 bullet already present from ②) and coding-rules.md (new durable classifier-safe skill-bash rule + the TestSkillsBashNoUnsafeRm pointer); docs/cli-contract.md carries the additive 0.14.0 note (from ②). Manifests validate against charts-manifest.schema.json. state.md set to phase=done, status=awaiting-uat (the UAT gate). No open issues; TEST-001/002 user-skipped (wontfix)."
+}

@@ -1,0 +1,11 @@
+{
+  "slug": "cli-orchestrator",
+  "updated": "2026-07-10",
+  "note": "Intended design (flow/shared-core/sequence) + the as-built class diagram added at ② implement. The plan-time flow diagram accurately depicts the shipped Slice-1 loop (the code was written to it); class = the concrete shipped Go structure (orchestrator package + launch/contract additions).",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/flow.mmd", "title": "The Go orchestrator loop: warm dev resume, fresh review/test, issues.json routing" },
+    { "kind": "flow", "file": "charts/shared-core.mmd", "title": "Two orchestrators over one shared core (skills + typed contracts + the one routing rule)" },
+    { "kind": "sequence", "file": "charts/sequence.mmd", "title": "Warm developer resume across fix rounds vs fresh-eyes review/test" },
+    { "kind": "class", "file": "charts/class.mmd", "title": "As-built (Slice 1): the orchestrator package + launch.RunPhase/PhaseOpts + contract.Route" }
+  ]
+}

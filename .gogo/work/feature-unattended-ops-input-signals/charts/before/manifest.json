@@ -1,0 +1,8 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "updated": "2026-07-11",
+  "note": "As-is baseline of the render path Slice B changes. Today badge()/renderCard check WaitingForUser() and AwaitingUAT() separately; awaiting-plan-acceptance gets no distinct cue; there is no WaitingForInput() union; columns join edge-to-edge with no borders; gogo status has no waiting column. Slice A (skill-bash) is textual with no structural before diagram.",
+  "diagrams": [
+    { "kind": "flow", "file": "charts/before/flow.mmd", "title": "Today: two separate status checks, no waiting-for-input union, no column borders" }
+  ]
+}

@@ -15,9 +15,9 @@ in-context and delegates the fresh-eyes phases to specialist agents (① `gogo-a
 · ③ `gogo-reviewer` · ④ `gogo-tester`; ⑤ orchestrator + `gogo-knowledge`), owning the
 gates in chat. (`gogo-developer` backs standalone `/gogo:implement` + hands-off runs.)
 
-There are **12** commands in four groups: **orchestration** (`build`, `plan`,
-`go`, `status`, `resume`), the **standalone phase commands** (`implement`,
-`review`, `test`, `report` — each a typed function with validate-in /
+There are **13** commands in four groups: **orchestration** (`build`, `plan`,
+`go`, `accept`, `status`, `resume`), the **standalone phase commands**
+(`implement`, `review`, `test`, `report` — each a typed function with validate-in /
 validate-out), **ship & view** (`done`, `view`), and **knowledge maintenance**
 (`skills`).
 
@@ -94,6 +94,23 @@ Resumes a feature that paused for your decision — including a feature at the *
   gate it folds your feedback into the loop — the orchestrator hands it to `gogo-analyst`,
   which records the `uat.md` round and adjusts `plan.md`; you re-accept and `/gogo:go`
   reruns ②→⑤ on the same work item (see [Flow → UAT](flow.md)).
+
+### `/gogo:accept <feature-slug>`
+
+Accept a plan at the **plan-acceptance gate** — the board-reachable acceptance,
+via `gogo-accept`. The Go board launches it when you press `m` on an
+`awaiting-plan-acceptance` card, so a plan-pending card the board now *shows* can
+also be *cleared* from the board (completing the control surface: `d` ships, `a`
+attaches, and now `m` accepts).
+
+- **Reads:** `state.md` (must be `awaiting-plan-acceptance` — refuses otherwise
+  with guidance) and `plan.md` + `decisions.md` (presented for you to eyeball).
+- **Writes:** on your confirmation, records acceptance **exactly as `gogo-plan`
+  does** — `state.md` → `plan-accepted`, the `Status: **accepted** (user, <date>)`
+  line on `plan.md`, `open-decision` cleared, and the single-owner `plan-accepted`
+  event. **Accept-only** — it does not chain into `/gogo:go` (the board's `m` on the
+  now-accepted card is the natural second step). The CLI never mutates state; only
+  the launched session does.
 
 ## Standalone phase commands
 

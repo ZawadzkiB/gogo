@@ -1,0 +1,23 @@
+sequenceDiagram
+  actor U as User
+  participant B as Go board (move.go)
+  participant L as launch pkg
+  participant TM as tmux / claude -p
+  participant A as /gogo:accept (gogo-accept)
+  participant P as gogo-plan recording
+  participant FS as state.md / plan.md / events.jsonl
+
+  U->>B: m on an awaiting-plan-acceptance card
+  B->>B: attemptAction — status==awaiting-plan-acceptance
+  B->>L: BuildIntent(ActionAccept, [slug])
+  L-->>B: Intent{Command:"/gogo:accept slug", Session:"gogo-accept-slug"}
+  B->>U: huh confirm — will run: claude "/gogo:accept slug"
+  U->>B: Launch (confirm)
+  B->>L: Launch(root, intent)  %% CLI never mutates state
+  L->>TM: attachable tmux session (or claude -p)
+  TM->>A: /gogo:accept slug
+  A->>A: gate: state.md == awaiting-plan-acceptance? present plan.md
+  U->>A: accept (in-session)
+  A->>P: record acceptance (single path)
+  P->>FS: state.md -> plan-accepted · Status:**accepted** line · one plan-accepted event
+  A-->>U: accepted — run /gogo:go (accept-only)

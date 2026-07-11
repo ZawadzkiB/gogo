@@ -1,0 +1,25 @@
+{
+  "slug": "cli-orchestrator",
+  "phase": "test",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    "plan.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    ".gogo/work/feature-cli-orchestrator/review/issues.json",
+    ".gogo/work/feature-cli-orchestrator/review/result.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-cli-orchestrator/test/issues.json",
+    ".gogo/work/feature-cli-orchestrator/test-01.md",
+    ".gogo/work/feature-cli-orchestrator/test/result.json",
+    "cli/run_e2e_test.go"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "All suites green (gofmt/vet/build/test -race, 9 packages). CLI hands-on: --help, nonexistent-slug refusal, acceptance-gate refusal (awaiting-uat + waiting-for-user), no-.gogo/ refusal, no-claude-on-PATH refusal — all correct, right exit codes. THE KEY e2e (stub-claude dry run, plan Tests D2) run manually across 3 scenarios (happy/warm-resume/is_error) and captured as a new hermetic Go test (cli/run_e2e_test.go, TestRunE2EStubClaude) exercising the real exec.Command(\"claude\",...) boundary. 0 findings; done-bar met."
+}

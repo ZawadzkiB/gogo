@@ -1,0 +1,34 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "track": "test",
+  "round": 2,
+  "updated": "2026-07-11",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "Real end-to-end /gogo:done run (Slice A's proof) needs a live claude session — blocked in this unattended test round",
+      "description": "The plan's Slice A acceptance signal requires a hands-on /gogo:done run advancing through changelog assembly + viewer build with zero permission prompts. This tester independently re-verified the underlying rewritten bash idiom in an isolated scratch harness (scratchpad/slice-a-harness, not committed): a normal refresh deletes only the entry's top-level *.mmd and clears before/ WHOLE (matching the old `rm -rf \"$dst/before\"` exactly, per REV-002's fix) while report.md/manifest.json survive; an empty $date or $name refuses with exit code 1 and leaves the filesystem byte-identical (verified via an md5 snapshot of every file before/after, including a canary .mmd file outside .gogo/); a second run on the same $dst is idempotent (exit 0, same contents); and the FR-A2 board-cleanup find only removes board-intent.json/board-exit.code, leaving board.py/work-index.json untouched. The CI-runnable regression lint (TestSkillsBashNoUnsafeRm) was also re-run with -count=1 (not the cached result) and passes. What could NOT be verified: actually invoking /gogo:done (the slash command) and observing Claude Code's real permission-prompt classifier stay silent through changelog assembly + viewer build. That requires a live, interactive claude session — this tester agent has no safe way to spawn/attach one to drive that check unattended. This is exactly the user-decision gate the plan's Tests section calls out verbatim: 'The real proof is a hands-on /gogo:done with no prompt — per gogo-test, if that can't be exercised unattended in CI it is a user-decision gate, never a silent skip.'",
+      "proposed_solution": "NEEDS-USER-DECISION. Options to unblock: (1) the user runs /gogo:done on a real report-complete feature (or a scratch one) in their own live session and confirms zero permission prompts through changelog assembly + viewer build, then this gate can be marked verified next round; (2) if a gogo-done-* tmux session is already live, the user attaches and drives it while watching for a prompt; (3) the user explicitly accepts the green regression lint (TestSkillsBashNoUnsafeRm, run with -count=1) plus this round's isolated bash-harness re-verification as sufficient proof and tells the orchestrator to skip the live hands-on check — only the user may make that call, never this agent.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "wontfix",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "USER-SKIPPED (D11 → A, 2026-07-11). The user accepted the unattended evidence as sufficient — the green regression lint TestSkillsBashNoUnsafeRm (proves no unsafe rm/glob shapes remain, the exact classifier trigger) plus the tester's isolated harness re-verification — and chose not to run the live prompt-free /gogo:done now; it will be confirmed organically at ship time. Not a code defect; closed by user decision."
+    },
+    {
+      "id": "TEST-002",
+      "title": "Real board accept follow-through (Slice C's proof): a live /gogo:accept session flipping a plan-pending card to plan-accepted — blocked in this unattended test round",
+      "description": "The plan's Slice C acceptance signal requires a hands-on board accept: `m` on an awaiting-plan-acceptance card launches /gogo:accept in an attachable session, and after the user confirms inside that session, the card flips to plan-accepted. This tester drove the real Go TUI live via tmux (session gogo-test-board-e2e, since killed) against a fixture repo (scratchpad/tmux-fixture, not committed) seeded with a genuine awaiting-plan-acceptance card. Verified live: the ⏸ waiting cue rendered on both the plan-pending card ('⏸ awaiting-plan-acceptance') and an awaiting-uat card ('⏸ awaiting-uat') while a done/plan-accepted/reviewing card carried none; the │ column separators rendered between all four columns (plan | in progress | ready | changelog); pressing `m` on the plan-pending card opened the confirm dialog reading exactly `will run: claude \"/gogo:accept planpending\" in tmux session gogo-accept-planpending · permission: auto (classifier)`; and, for contrast, `m` on a plan-accepted card in the same (ClassUnfinished) column still opened `will run: claude \"/gogo:go unfinished\"` — proving the guard branches on status, not class alone. Per the task's explicit instruction to never actually launch/confirm a claude session, the tester cancelled at both confirms and quit the board (session cleanly killed, no leftover tmux sessions). What could NOT be verified: the actual follow-through inside a launched /gogo:accept session — presenting the plan, the user's real confirmation, and state.md/plan.md/events.jsonl actually flipping to plan-accepted with exactly one new plan-accepted event. That requires a live, interactive claude session this tester cannot safely spawn/confirm unattended.",
+      "proposed_solution": "NEEDS-USER-DECISION. Options to unblock: (1) the user opens the real gogo board (`gogo`, no args) on a repo with a genuine awaiting-plan-acceptance feature, presses `m`, and lets the launched /gogo:accept <slug> session run to completion — then confirms state.md reads plan-accepted, plan.md carries the Status: **accepted** line, and events.jsonl gained exactly one new plan-accepted line; (2) the user accepts the unit-test coverage (TestAcceptMoveGuard, TestAcceptSessionAttribution, TestBuildIntentAccept, all green) plus this round's live-tmux-to-the-confirm proof above as sufficient and tells the orchestrator to skip the full live-session follow-through — only the user may make that call, never this agent.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "wontfix",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "USER-SKIPPED (D12 → A, 2026-07-11). The user accepted the unattended evidence — the move-guard / session-attribution / intent unit tests (all green) plus the tester's live-tmux drive to the real /gogo:accept confirm dialog — and chose not to run the full live board-accept follow-through now; the launched session's flip reuses gogo-plan's already-exercised acceptance recording. Not a code defect; closed by user decision."
+    }
+  ]
+}

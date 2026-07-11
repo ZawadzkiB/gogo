@@ -83,6 +83,23 @@ func (f *Feature) WaitingForUser() bool { return f.Status == "waiting-for-user" 
 // its badge takes waiting-for-user priority (docs/cli-contract.md §2/§3).
 func (f *Feature) AwaitingUAT() bool { return f.Status == "awaiting-uat" }
 
+// WaitingForInput reports whether the feature is parked at a genuine USER gate —
+// the union of the three statuses that block on the user: awaiting-plan-acceptance
+// (the plan-acceptance gate), waiting-for-user (a decision gate / mid-UAT re-plan
+// lock), and awaiting-uat (the UAT gate). Every other status flows unattended
+// (plan-accepted, implementing / reviewing / testing, shipped / done / aborted).
+// This is the single predicate the display layer reads to mark which cards need
+// the user vs which flow (docs/cli-contract.md §2/§3). WaitingForUser() and
+// AwaitingUAT() stay for the badge precedence each carries; WaitingForInput() is
+// the additive presentation union (unattended-ops-input-signals, FR-B1).
+func (f *Feature) WaitingForInput() bool {
+	switch f.Status {
+	case "awaiting-plan-acceptance", "waiting-for-user", "awaiting-uat":
+		return true
+	}
+	return false
+}
+
 // EventsPhase maps a state.md phase name to the events.jsonl phase vocabulary.
 // The two agree everywhere except the fifth phase, which state.md labels
 // "knowledge" and events.jsonl labels "report" (docs/cli-contract.md §2/§5).

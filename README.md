@@ -296,13 +296,24 @@ shippable.
 Resumes a feature that paused for your decision, folding your answer into
 `decisions.md` and continuing the loop.
 
+**`/gogo:accept <feature-slug>`**
+
+Accepts a plan at the **plan-acceptance gate** from the board — the CLI board
+launches it when you press `m` on an `awaiting-plan-acceptance` card, so a
+plan-pending card the board now *shows* can also be *cleared* from the board.
+It presents `plan.md` for you to eyeball, then on your confirmation records
+acceptance exactly as planning does (`state.md` → `plan-accepted`, the
+`Status: **accepted**` line, the single-owner `plan-accepted` event). **Accept-only**
+— it does not chain into `/gogo:go` (the board's `m` on the now-accepted card is the
+natural second step). The CLI never mutates state; only the launched session does.
+
 ## The gogo CLI
 
 An **instant, deterministic cockpit** for your pipeline — a native **`gogo`
 binary** (Go + Bubble Tea, in `cli/`) that opens a kanban board in milliseconds
 by **parsing the contract files the plugin already writes** ([the CLI
 contract](https://zawadzkib.github.io/gogo/cli-contract.html)) with **no LLM in
-the read path**. It is a companion binary, **not** a 13th slash command — the
+the read path**. It is a companion binary, **not** a 14th slash command — the
 slash commands stay the pipeline engine; the CLI is the read/launch cockpit.
 
 **Install** — grab the prebuilt binary from the GitHub release (no Go needed;
@@ -340,20 +351,24 @@ cd cli && go build -o gogo .
 **What it does:**
 
 - **Board** (`gogo`) — four columns **plan · in progress · ready · changelog**
-  from the ported work-index classifier; cards are your feature folders with a
-  live sub-phase badge (`review r2`, `waiting-for-user`, `awaiting-uat`,
-  `running`). `/` filters live; **fsnotify** refreshes the board while the
-  pipeline runs.
+  (with vertical separators between them) from the ported work-index classifier;
+  cards are your feature folders with a live sub-phase badge (`review r2`,
+  `waiting-for-user`, `awaiting-uat`, `awaiting-plan-acceptance`, `running`) and a
+  distinct **⏸ "waiting for input"** cue on any card blocked on you (the three user
+  gates). `gogo status` carries the same signal in a dedicated **WAIT** column. `/`
+  filters live; **fsnotify** refreshes the board while the pipeline runs.
 - **Drill-in** (`enter`) — browse a feature's files **in the terminal**:
   markdown via **glamour**, `issues.json` as a table, `events.jsonl` as a
   timeline, `.mmd` diagrams as ASCII (flowchart-family) or source; `w` builds
   the interactive HTML page natively (goldmark, before/after compare) and opens
   the browser; `G` opens the file in `glow` when installed.
-- **Moves launch Claude** — `m` on a plan/in-progress card runs
-  `claude "/gogo:go <slug>"`; selecting ready cards (`space`) and pressing `m`/`d`
-  runs `claude "/gogo:done a+b+c"` (multiple = ONE merged entry) — always behind a
-  confirmation, in an attachable **tmux** session (`a` attaches; gates stay
-  answerable). Launches run in claude's **auto (classifier) permission mode** so
+- **Moves launch Claude** — `m` on an `awaiting-plan-acceptance` card runs
+  `claude "/gogo:accept <slug>"` (accept the plan from the board — closing the dead
+  end where it used to bounce into a `/gogo:go` that refuses); on any other
+  plan/in-progress card `m` runs `claude "/gogo:go <slug>"`; selecting ready cards
+  (`space`) and pressing `m`/`d` runs `claude "/gogo:done a+b+c"` (multiple = ONE
+  merged entry) — always behind a confirmation, in an attachable **tmux** session
+  (`a` attaches; gates stay answerable). Launches run in claude's **auto (classifier) permission mode** so
   the skills' safe file steps don't nag inside an unwatched session (NOT a full
   bypass); set `GOGO_CLAUDE_PERMISSION_MODE` to override the value (any
   `claude --permission-mode` value; empty string omits the flag → claude prompts),
@@ -367,8 +382,17 @@ cd cli && go build -o gogo .
   an explicit confirm (recoverable, never `rm`); changelog cards are append-only
   and bounce. `gogo trash` lists deleted work; `gogo trash restore <entry>` puts
   it back.
+- **Process-orchestrator (`gogo run [<slug>]`)** — a **second orchestrator** that drives
+  the ②→③→④(→⑤) loop from the CLI by spawning each phase as its own `claude -p` session:
+  the **developer session is kept warm across fix rounds via `--resume`** (never re-reads
+  the codebase) while **review and test spawn fresh** (fresh eyes). It coexists with the
+  in-chat `/gogo:go` — same phase skills, same typed contracts, one routing rule — and
+  stops at `awaiting-uat`. Bounds gate rather than abort (`GOGO_RUN_MAX_ROUNDS`,
+  `GOGO_RUN_COST_CEILING`); `--attach` opens an interactive `/gogo:resume` on a gate.
+  Its per-feature session bookkeeping lives under `.gogo/resources/cli/sessions/` (CLI-owned;
+  never pipeline state). Needs `claude` on PATH.
 - **Scriptable** — `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
-  `gogo events <slug>`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
+  `gogo events <slug>`, `gogo run [<slug>] [--attach]`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
 
 **Soft deps** (detected at use, graceful fallback): `tmux` (else backgrounded
 `claude -p` + log), `claude` (needed only to launch), `glow` (the built-in

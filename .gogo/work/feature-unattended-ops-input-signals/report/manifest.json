@@ -1,0 +1,11 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "updated": "2026-07-11",
+  "note": "As-built. flow = the shipped read+display path: contract.Feature.WaitingForInput() read by three read-only display sites (renderCard ⏸ cue via cardBadgeText+badgeStyleFor, gogo status waitMarker WAIT column, viewBoard interleaveSeparators │ column borders). control-surface = the board move-guard (move.go attemptAction) routing each card class/status to a delegated launch (launch.ActionAccept/-Go/-Done), the new ActionAccept filling the plan-acceptance gap; the CLI never mutates state. activity = the pipeline status lifecycle with the three ⏸USER gates WaitingForInput() flags vs the auto transitions (incl. /gogo:done's Slice-A prompt-free mechanical steps). sequence = the shipped board-accept interaction end to end: m → BuildIntent(ActionAccept) → confirm → launch → /gogo:accept session → gogo-plan single-owner recording → state flip. Slice A (skill-bash safety, guarded scoped-find rewrites + the TestSkillsBashNoUnsafeRm lint) is textual, no structural diagram.",
+  "diagrams": [
+    { "kind": "flow", "file": "report/flow.mmd", "title": "One WaitingForInput() predicate -> three read-only display sites + bordered columns" },
+    { "kind": "flow", "file": "report/control-surface.mmd", "title": "Board control surface: move-guard -> delegated launch; ActionAccept fills the plan-acceptance gap (Slice C)" },
+    { "kind": "activity", "file": "report/activity.mmd", "title": "Status lifecycle: the three waiting-for-input gates vs the auto transitions" },
+    { "kind": "sequence", "file": "report/sequence.mmd", "title": "Board accept end to end: m -> ActionAccept -> launched /gogo:accept -> gogo-plan recording -> plan-accepted" }
+  ]
+}

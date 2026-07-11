@@ -1,0 +1,23 @@
+sequenceDiagram
+  actor U as User
+  participant G as gogo run (Go loop)
+  participant R as registry (.gogo/resources/cli/sessions)
+  participant D as dev session (claude -p, one uuid)
+  participant V as review session (fresh uuid/round)
+  participant T as test session (fresh uuid)
+
+  U->>G: gogo run <slug>
+  G->>R: read/create dev uuid
+  G->>D: claude -p --session-id DEV "/gogo:implement <slug> --in-session"
+  D-->>G: exit · implement/result.json + charts/ (warm context retained by claude)
+  G->>V: claude -p --session-id REV1 "/gogo:review <slug>"
+  V-->>G: exit · review/issues.json (2 open)
+  G->>D: claude -p --resume DEV "/gogo:implement <slug> --issues review/issues.json --in-session"
+  Note over D: NO codebase re-read — resumes warm
+  D-->>G: exit · issues.json fixed back
+  G->>V: claude -p --session-id REV2 "/gogo:review <slug>" (fresh eyes again)
+  V-->>G: exit · review clean
+  G->>T: claude -p --session-id TEST1 "/gogo:test <slug>"
+  T-->>G: exit · all green
+  G->>R: record costs/turns per session (--output-format json)
+  G-->>U: report written · state.md awaiting-uat (run /gogo:done to ship)

@@ -79,9 +79,43 @@ breaking any existing consumer:
   under `.gogo/resources/cli/logs/`. Presentation/launch concern only — reads no `.gogo/`
   contract file and writes nothing (like the permission-mode bullet, listed here only
   because it ships in the same versioned plugin bump).
+- **Process-orchestrator session registry (`gogo run`).** The CLI process-orchestrator
+  (`gogo run`) keeps per-feature bookkeeping — the warm developer session's uuid, the loop
+  round, and per-session cost/turns telemetry — at **`.gogo/resources/cli/sessions/<slug>.json`**.
+  This is **CLI-owned state, NOT part of the pipeline contract**: it lives under the CLI's
+  sanctioned `.gogo/resources/` write root (never in `.gogo/work/feature-*/`, which the CLI
+  must not mutate), its shape may change between CLI versions, and a missing or garbled file
+  degrades to a fresh run. The orchestrator only *reads* the pipeline's typed contracts
+  (`state.md`, `*/issues.json`, `*/result.json`) to route — it writes no pipeline state.
 
 A reader that ignores what it does not recognize (the stability rule above) keeps working
 against a 0.11.0 tree with no changes.
+
+### Changed in 0.14.0 (all additive — no key removed or renamed)
+
+The **"waiting for input" signal** and the **board accept action** extend the surface
+without touching the file read contract — the status enum (§2), the four classes, and
+the class→column mapping (§3) are **unchanged**:
+
+- **"Waiting for input" is a presentation union, not a new state or class.** A CLI may
+  read the raw `status` and flag a feature parked at any of the **three genuine user
+  gates** — `awaiting-plan-acceptance`, `waiting-for-user`, `awaiting-uat` (the
+  `contract.Feature.WaitingForInput()` predicate) — with a distinct card cue (a ⏸ marker,
+  including on an `awaiting-plan-acceptance` card, which carried none before) and a
+  dedicated **`WAIT`** column in the `gogo status` table. This is the same footing as the
+  0.11.0 `awaiting-uat` badge: an **additive, optional presentation concern**; each card
+  still sits in its existing phase column and the classifier still emits only the four
+  classes.
+- **Board column separators.** The board draws a one-cell vertical rule between the four
+  columns (plan · in progress · ready · changelog). Layout-only; the four columns and the
+  class→column mapping are unchanged.
+- **`/gogo:accept` — a new delegated-launch board action.** The board's `m` on an
+  `awaiting-plan-acceptance` card now launches `claude "/gogo:accept <slug>"` (the new
+  `launch.ActionAccept`) instead of the `/gogo:go` that refuses at that gate — a thin
+  session that records acceptance through gogo-plan's existing recording. Like `/gogo:go`
+  and `/gogo:done`, it is a **delegated launch: the CLI never mutates pipeline state**;
+  the launched session performs the `state.md` write. Presentation/launch concern only —
+  no `.gogo/` file-read-contract change.
 
 ## 1. The `.gogo/` layout a consumer reads
 

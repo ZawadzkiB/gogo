@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cli-orchestrator</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cli-orchestrator</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>The Go orchestrator loop</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  run["gogo run &lt;slug&gt;"] --> reg{"session registry<br/>.gogo/resources/cli/sessions/&lt;slug&gt;.json"}
+  reg -->|"dev uuid known"| resumeDev["claude -p --resume &lt;dev-uuid&gt;<br/>/gogo:implement &lt;slug&gt; --in-session"]
+  reg -->|"first run"| newDev["claude -p --session-id &lt;dev-uuid&gt;<br/>/gogo:implement &lt;slug&gt; --in-session"]
+  newDev --> devOut["implement/result.json + charts/<br/>state.md: implementing"]
+  resumeDev --> devOut
+  devOut --> review["claude -p --session-id &lt;fresh-uuid&gt;<br/>/gogo:review &lt;slug&gt; (fresh eyes)"]
+  review --> revOut["review/issues.json + result.json"]
+  revOut --> route1{"contract.Route(issues, result)"}
+  route1 -->|"open agent-fixable"| resumeDev
+  route1 -->|"needs-user-decision"| gate["pause queue → tmux attach gate<br/>(existing launch.AttachArgs)"]
+  route1 -->|"clean"| test["claude -p --session-id &lt;fresh-uuid&gt;<br/>/gogo:test &lt;slug&gt; (fresh eyes)"]
+  test --> testOut["test/issues.json + result.json"]
+  testOut --> route2{"contract.Route(issues, result)"}
+  route2 -->|"open agent-fixable"| resumeDev
+  route2 -->|"needs-user-decision / e2e-blocked"| gate
+  route2 -->|"all green"| report["claude -p /gogo:report &lt;slug&gt;<br/>(fresh one-shot)"]
+  report --> uat["state.md: awaiting-uat<br/>(UAT gate — the human's)"]
+  gate -.->|"human answers, state.md resumable"| run
+  route1 -.->|"same finding &gt; 3 rounds<br/>or cost ceiling hit"| gate
+  </pre></div>
+
+  <h2>Two orchestrators over one shared core</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  subgraph drivers["Two orchestrators (interchangeable drivers)"]
+    inchat["in-chat orchestrator<br/>skills/gogo (default, no deps)"]
+    cli["Go CLI orchestrator<br/>cli/internal/orchestrator (opt-in: tmux + claude)"]
+  end
+
+  subgraph core["ONE shared core (never duplicated)"]
+    cmds["phase commands + skills<br/>/gogo:implement · /gogo:review · /gogo:test · /gogo:report"]
+    contracts["typed contracts<br/>state.md · */issues.json · */result.json · events.jsonl"]
+    route["the ONE routing rule<br/>review/test '④ Route': open/new count + needs-user-decision"]
+  end
+
+  inchat -->|"Task subagents,<br/>orchestrator freezes while they run"| cmds
+  cli -->|"claude -p sessions,<br/>Go process never freezes"| cmds
+  cmds --> contracts
+  inchat -->|"applies (prose)"| route
+  cli -->|"applies (contract.Route, cites the skill)"| route
+  route --> contracts
+
+  cli -.->|"warm dev via --resume,<br/>fresh review/test via new --session-id"| sessions["phase-session registry<br/>.gogo/resources/cli/sessions/"]
+  </pre></div>
+
+  <h2>Warm dev resume across fix rounds</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor U as User
+  participant G as gogo run (Go loop)
+  participant R as registry (.gogo/resources/cli/sessions)
+  participant D as dev session (claude -p, one uuid)
+  participant V as review session (fresh uuid/round)
+  participant T as test session (fresh uuid)
+
+  U->>G: gogo run <slug>
+  G->>R: read/create dev uuid
+  G->>D: claude -p --session-id DEV "/gogo:implement <slug> --in-session"
+  D-->>G: exit · implement/result.json + charts/ (warm context retained by claude)
+  G->>V: claude -p --session-id REV1 "/gogo:review <slug>"
+  V-->>G: exit · review/issues.json (2 open)
+  G->>D: claude -p --resume DEV "/gogo:implement <slug> --issues review/issues.json --in-session"
+  Note over D: NO codebase re-read — resumes warm
+  D-->>G: exit · issues.json fixed back
+  G->>V: claude -p --session-id REV2 "/gogo:review <slug>" (fresh eyes again)
+  V-->>G: exit · review clean
+  G->>T: claude -p --session-id TEST1 "/gogo:test <slug>"
+  T-->>G: exit · all green
+  G->>R: record costs/turns per session (--output-format json)
+  G-->>U: report written · state.md awaiting-uat (run /gogo:done to ship)
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

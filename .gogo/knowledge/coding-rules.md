@@ -81,6 +81,18 @@ Generated-by: /gogo:build
   tool is absent.
 - Keep diffs minimal and scoped to the plan; match the surrounding file's tone.
 
+## Classifier-safe skill bash (since 0.14.0)
+- **Never author a skill-bash delete that trips Claude Code's "dangerous rm"
+  permission classifier** — gogo's own mechanical file steps (e.g. `/gogo:done`
+  changelog assembly / board cleanup) must run **prompt-free**. Forbidden shapes:
+  a **glob-`rm`** (`rm …/*`), **`rm -rf "$var…"`**, and **`rm -f "$var"`** on a bare
+  variable. Use a **guarded, scoped `find <dir> … -delete`** instead: prove the
+  variable is non-empty AND resolves under `.gogo/` (refuse + exit otherwise), then
+  delete via `find` (no glob, no bare-variable `rm`). Same idempotent effect, no
+  prompt, never escapes the guarded target. The `cli/` test
+  **`TestSkillsBashNoUnsafeRm`** greps every `skills/*/SKILL.md` and fails if any
+  forbidden shape reappears — it is the durable regression guard, so keep it green.
+
 ## gogo overrides
 <!-- Preserved across re-runs. -->
 

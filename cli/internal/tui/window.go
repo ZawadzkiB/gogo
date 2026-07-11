@@ -12,11 +12,14 @@ import "github.com/charmbracelet/lipgloss"
 
 // --- board layout math -------------------------------------------------------
 
-// boardColWidth is the per-column outer width (4 columns across the board).
+// boardColWidth is the per-column outer width (4 columns across the board). The
+// board also draws 3 one-cell vertical separators between the columns (FR-B4),
+// so those gutter cells are reserved out of the width budget before dividing by 4.
 func (m Model) boardColWidth() int {
-	colWidth := (boardWidth - 6) / 4
+	const gutters = 3 // one-cell separators between the 4 columns
+	colWidth := (boardWidth - 6 - gutters) / 4
 	if m.width > 0 {
-		colWidth = (m.width - 6) / 4
+		colWidth = (m.width - 6 - gutters) / 4
 	}
 	if colWidth < 20 {
 		colWidth = 20

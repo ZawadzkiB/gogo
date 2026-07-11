@@ -22,7 +22,7 @@ pipeline everywhere; the behaviour is configuration."
 Three layers, all plain markdown (+ a little bash and one vendored JS):
 
 - **`commands/*.md`** — ultra-thin entry points. Orchestration: `build|plan|go|
-  status|resume`. **Standalone phase commands** (since 0.2.0): `implement|review|
+  accept|status|resume`. **Standalone phase commands** (since 0.2.0): `implement|review|
   test|report` — each runnable alone, each a typed function (validate-in → work →
   validate-out). **Knowledge maintenance** (since 0.3.0): `skills` — audit the
   knowledge line budget + extract on-demand skills. No flow logic; each just
@@ -180,6 +180,42 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   empty→omit), `awaiting-uat` badge on ready cards (`waiting-for-user` wins
   mid-UAT). Agents **5**; knowledge files **10**; command set still **12**;
   version **0.11.0**.
+- **In-context implement + the CLI process-orchestrator (0.12.0 → 0.13.0):** there
+  are now **TWO orchestrators** over the one shared core (phase skills + typed
+  contracts). **0.12.0** — the in-chat `/gogo:go` orchestrator **runs ② implement
+  in its own context** (warm across the fix loop, no re-spawn/re-read); it delegates
+  only the fresh-eyes phases ③ review + ④ test (① plan stays `gogo-analyst`).
+  **0.13.0** — a **Go CLI orchestrator**, `gogo run [<slug>]` (`cli/internal/orchestrator`),
+  drives ②→③→④(→⑤) by spawning each phase as a `claude -p` session: the **developer
+  session kept warm across fix rounds via `claude -p --resume <session-id>`** (pre-assigned
+  UUIDs), **review/test spawned fresh** (new UUID, no resume). The Go loop is a dumb
+  deterministic sequencer — judgment + gates stay with the claude phase-sessions + the
+  human (via the attach path / `gogo run --attach`); routing is **one shared rule**
+  (`contract.Route`, track-aware: review batches minors per `gogo-review` §④, test routes
+  on any per `gogo-test` §④). Bounds (round budget + cost ceiling) **gate**, never abort;
+  a **CLI-owned session registry** lives at `.gogo/resources/cli/sessions/<slug>.json` (the
+  CLI still never mutates pipeline state). Needs `--in-session` on `/gogo:implement` so
+  `--resume` continues the real worker. The in-chat path stays the simple, dependency-free
+  default; `gogo run` is the opt-in power path (needs tmux+claude). This is **Slice 1** of
+  roadmap #11; multi-model (gemini/codex/opencode) is a later slice behind an agent-type
+  seam. Slash command set still **12** (`gogo run` is a **CLI-binary subcommand**, not a
+  13th slash command — like `status`/`view`/`events`/`trash`); version **0.13.0**.
+- **Unattended ops + input signals + board accept (0.14.0):** three linked fixes.
+  **(A)** gogo's own mechanical `/gogo:done` bash (changelog assembly + board
+  stale-file cleanup) is rewritten to **guarded scoped-`find … -delete`** (no
+  glob-`rm`, no bare-variable `rm`) so it stops tripping Claude Code's "dangerous rm"
+  permission classifier; a Go lint (`cli` suite, `TestSkillsBashNoUnsafeRm`) fails if
+  an unsafe shape reappears. **(B)** one `contract.Feature.WaitingForInput()`
+  predicate (union of `awaiting-plan-acceptance` + `waiting-for-user` + `awaiting-uat`)
+  is surfaced in three read-only display sites: a ⏸ card cue on the TUI board
+  (incl. plan-pending, which had none), a dedicated **WAIT** column in `gogo status`,
+  and **vertical separators** between the four board columns. **(C)** a new
+  **`launch.ActionAccept`** routes the board's `m` on an `awaiting-plan-acceptance`
+  card to a thin launched **`/gogo:accept <slug>`** (skill `gogo-accept`) that records
+  acceptance via gogo-plan's existing recording — closing the dead end where `m`
+  bounced into a `/gogo:go` that refuses (the CLI still never mutates pipeline state).
+  Slash command set now **13** (adds `accept`); frozen contract stays additive
+  (presentation-only); version **0.14.0**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

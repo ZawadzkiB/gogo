@@ -1,0 +1,23 @@
+{
+  "slug": "cli-orchestrator",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    "plan.md",
+    "decisions.md",
+    "review/issues.json",
+    "test/issues.json"
+  ],
+  "outputs": [
+    "report/report.md",
+    "report/flow.mmd",
+    "report/shared-core.mmd",
+    "report/sequence.mmd",
+    "report/class.mmd",
+    "report/before/flow.mmd",
+    "report/manifest.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "As-built report bundle for Slice 1 (the gogo run CLI process-orchestrator). Review APPROVE (0 open, 6 findings resolved), test done-bar met (suite + CLI guards + stub-claude e2e). Plan reconciled to as-built (track-aware routing, total-per-feature bound). Set state to awaiting-uat."
+}

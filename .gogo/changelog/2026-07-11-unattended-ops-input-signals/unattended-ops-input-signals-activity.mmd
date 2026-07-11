@@ -1,0 +1,22 @@
+stateDiagram-v2
+  state "awaiting-plan-acceptance ⏸USER" as APA
+  state "plan-accepted" as PA
+  state "implementing" as IMP
+  state "reviewing" as REV
+  state "testing" as TST
+  state "awaiting-uat ⏸USER" as UAT
+  state "waiting-for-user ⏸USER" as WFU
+  state "shipped" as SHIP
+
+  [*] --> APA
+  APA --> PA: user accepts (gate - now also from the board via /gogo:accept, Slice C)
+  PA --> IMP
+  IMP --> REV
+  REV --> TST
+  REV --> IMP: issues (auto loop)
+  TST --> IMP: issues (auto loop)
+  TST --> UAT: ⑤ report lands
+  UAT --> SHIP: /gogo:done — mechanical steps run UNATTENDED (Slice A)
+  UAT --> WFU: UAT feedback re-plans
+  WFU --> PA: user re-accepts (gate)
+  SHIP --> [*]

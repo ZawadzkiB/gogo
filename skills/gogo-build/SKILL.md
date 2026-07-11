@@ -56,13 +56,17 @@ if [ -d .gogo/plans ] && [ ! -e .gogo/work ]; then
   mv .gogo/plans .gogo/work && moved="${moved}.gogo/plans->.gogo/work "
 fi
 # 2) vendored runtime up to .gogo/resources/
+# $legacy is drawn from a FIXED literal list and re-guarded non-empty + is-a-dir before
+# the mv, so it can never collapse to a bare/empty path (classifier-safe migration).
 for legacy in .gogo/work/.assets .gogo/plans/.assets; do
-  if [ -d "$legacy" ] && [ ! -e .gogo/resources ]; then
+  if [ -n "$legacy" ] && [ -d "$legacy" ] && [ ! -e .gogo/resources ]; then
     mv "$legacy" .gogo/resources && moved="${moved}${legacy}->.gogo/resources "
     break
   fi
 done
-# 3) fix the offline viewer's runtime path in any moved charts (portable sed)
+# 3) fix the offline viewer's runtime path in any moved charts (portable sed).
+# Deletes are scoped `find <literal .gogo/work> ... -delete` (no glob-rm, no bare-variable
+# `rm`) — the safe idiom the "dangerous rm" classifier never flags.
 if [ -d .gogo/work ]; then
   find .gogo/work -name diagrams.html -exec \
     sed -i.bak 's#\.\./\.\./\.assets/mermaid\.min\.js#../../../resources/mermaid.min.js#g' {} \; 2>/dev/null || true

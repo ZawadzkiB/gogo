@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo report diagrams — unattended-ops-input-signals</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo report diagrams — <code>unattended-ops-input-signals</code></h1>
+    <p class="hint">As-built set · offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>One WaitingForInput() predicate → three read-only display sites + bordered columns (flow)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  st["state.md status (contract reader)"] --> pred{"Feature.WaitingForInput()"}
+  pred -- "awaiting-plan-acceptance / waiting-for-user / awaiting-uat" --> yes["waiting for input"]
+  pred -- "plan-accepted / implementing / reviewing / testing / shipped" --> no["flowing (auto)"]
+  yes --> cue["renderCard: ⏸ cue (cardBadgeText) + badgeStyleFor accent — focus-independent"]
+  yes --> col["gogo status FormatStatus: waitMarker → WAIT column"]
+  no --> ph["TUI: phase/round badge"]
+  cue --> board["viewBoard: interleaveSeparators → 4 columns with │ borders (sepStyle)"]
+  ph --> board
+  </pre></div>
+
+  <h2>Board control surface: move-guard → delegated launch; ActionAccept fills the plan-acceptance gap (flow)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  card["focused card (contract.Feature: Class + Status)"] --> guard{"move.go attemptAction"}
+  guard -- "awaiting-plan-acceptance (NEW, Slice C)" --> acc["ActionAccept - /gogo:accept slug"]
+  guard -- "plan-accepted / other unfinished · in-progress (m)" --> go["ActionGo - /gogo:go slug"]
+  guard -- "ready-to-ship (d / m+selection)" --> done["ActionDone - /gogo:done slug(+...)"]
+  guard -- "live gate session (a)" --> att["attach tmux - /gogo:resume"]
+  acc --> conf["huh confirm (unchanged)"]
+  go --> conf
+  done --> conf
+  conf --> launch["launch.Launch -> attachable tmux / claude -p"]
+  launch --> rec["/gogo:accept records via gogo-plan: state.md -> plan-accepted + single-owner plan-accepted event"]
+  </pre></div>
+
+  <h2>Status lifecycle: the three waiting-for-input gates vs the auto transitions (activity)</h2>
+  <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  state "awaiting-plan-acceptance ⏸USER" as APA
+  state "plan-accepted" as PA
+  state "implementing" as IMP
+  state "reviewing" as REV
+  state "testing" as TST
+  state "awaiting-uat ⏸USER" as UAT
+  state "waiting-for-user ⏸USER" as WFU
+  state "shipped" as SHIP
+
+  [*] --> APA
+  APA --> PA: user accepts (gate - now also from the board via /gogo:accept, Slice C)
+  PA --> IMP
+  IMP --> REV
+  REV --> TST
+  REV --> IMP: issues (auto loop)
+  TST --> IMP: issues (auto loop)
+  TST --> UAT: ⑤ report lands
+  UAT --> SHIP: /gogo:done — mechanical steps run UNATTENDED (Slice A)
+  UAT --> WFU: UAT feedback re-plans
+  WFU --> PA: user re-accepts (gate)
+  SHIP --> [*]
+  </pre></div>
+
+  <h2>Board accept end to end: m → ActionAccept → launched /gogo:accept → gogo-plan recording → plan-accepted (sequence)</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor U as User
+  participant B as Go board (move.go)
+  participant L as launch pkg
+  participant TM as tmux / claude -p
+  participant A as /gogo:accept (gogo-accept)
+  participant P as gogo-plan recording
+  participant FS as state.md / plan.md / events.jsonl
+
+  U->>B: m on an awaiting-plan-acceptance card
+  B->>B: attemptAction — status==awaiting-plan-acceptance
+  B->>L: BuildIntent(ActionAccept, [slug])
+  L-->>B: Intent{Command:"/gogo:accept slug", Session:"gogo-accept-slug"}
+  B->>U: huh confirm — will run: claude "/gogo:accept slug"
+  U->>B: Launch (confirm)
+  B->>L: Launch(root, intent)
+  L->>TM: attachable tmux session (or claude -p)
+  TM->>A: /gogo:accept slug
+  A->>A: gate: state.md == awaiting-plan-acceptance? present plan.md
+  U->>A: accept (in-session)
+  A->>P: record acceptance (single path)
+  P->>FS: state.md -> plan-accepted · Status:**accepted** line · one plan-accepted event
+  A-->>U: accepted — run /gogo:go (accept-only)
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+flowchart TD
+  subgraph drivers["Two orchestrators (interchangeable drivers)"]
+    inchat["in-chat orchestrator<br/>skills/gogo (default, no deps)"]
+    cli["Go CLI orchestrator<br/>cli/internal/orchestrator (opt-in: tmux + claude)"]
+  end
+
+  subgraph core["ONE shared core (never duplicated)"]
+    cmds["phase commands + skills<br/>/gogo:implement · /gogo:review · /gogo:test · /gogo:report"]
+    contracts["typed contracts<br/>state.md · */issues.json · */result.json · events.jsonl"]
+    route["the ONE routing rule<br/>review/test '④ Route': open/new count + needs-user-decision"]
+  end
+
+  inchat -->|"Task subagents,<br/>orchestrator freezes while they run"| cmds
+  cli -->|"claude -p sessions,<br/>Go process never freezes"| cmds
+  cmds --> contracts
+  inchat -->|"applies (prose)"| route
+  cli -->|"applies (contract.Route, cites the skill)"| route
+  route --> contracts
+
+  cli -.->|"warm dev via --resume,<br/>fresh review/test via new --session-id"| sessions["phase-session registry<br/>.gogo/resources/cli/sessions/"]

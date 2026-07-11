@@ -1,0 +1,32 @@
+{
+  "slug": "cli-orchestrator",
+  "phase": "implement",
+  "status": "ok",
+  "round": 2,
+  "inputs": [
+    "plan.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md"
+  ],
+  "outputs": [
+    "cli/run.go",
+    "cli/main.go",
+    "cli/internal/orchestrator/orchestrator.go",
+    "cli/internal/orchestrator/registry.go",
+    "cli/internal/orchestrator/orchestrator_test.go",
+    "cli/internal/contract/result.go",
+    "cli/internal/contract/route.go",
+    "cli/internal/contract/route_test.go",
+    "cli/internal/launch/launch.go",
+    "cli/internal/launch/phase_test.go",
+    "commands/implement.md",
+    "skills/gogo-implement/SKILL.md",
+    "README.md",
+    "docs/cli-contract.md",
+    ".claude-plugin/plugin.json",
+    ".gogo/work/feature-cli-orchestrator/charts/class.mmd"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Slice 1 walking skeleton + round-1 review fixes. Built: `gogo run [<slug>]` + cli/internal/orchestrator (warm dev via claude -p --resume, fresh review/test, contract.Route track-aware routing, total-per-feature round bound + cost ceiling that gate, CLI-owned registry, --attach) + launch.PhaseArgs/RunPhase + contract.ReadResult/Route + the FR11 --in-session flag. Fixed review round 1 (REV-001..005): track-aware Route (review batches minors, test any); is_error + no-output false-green guards; implementGate on warm fix rounds; pre-flight cost gate + split decision/budget gates; needs-user-decision scan across all fields; documented total-per-feature bound. All cli tests green with -race; gofmt + vet clean. FR10/FR12/FR13 deferred."
+}

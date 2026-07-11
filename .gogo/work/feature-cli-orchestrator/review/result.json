@@ -1,0 +1,35 @@
+{
+  "slug": "cli-orchestrator",
+  "phase": "review",
+  "status": "ok",
+  "round": 2,
+  "inputs": [
+    ".gogo/work/feature-cli-orchestrator/plan.md",
+    ".gogo/work/feature-cli-orchestrator/review/issues.json",
+    "cli/run.go",
+    "cli/main.go",
+    "cli/internal/orchestrator/orchestrator.go",
+    "cli/internal/orchestrator/registry.go",
+    "cli/internal/orchestrator/orchestrator_test.go",
+    "cli/internal/contract/route.go",
+    "cli/internal/contract/result.go",
+    "cli/internal/contract/route_test.go",
+    "cli/internal/contract/artifacts.go",
+    "cli/internal/launch/launch.go",
+    "cli/internal/launch/phase_test.go",
+    "commands/implement.md",
+    "skills/gogo-implement/SKILL.md",
+    "skills/gogo-review/SKILL.md",
+    "skills/gogo-test/SKILL.md",
+    "templates/contracts/issues-list.schema.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-cli-orchestrator/review/issues.json",
+    ".gogo/work/feature-cli-orchestrator/review/review-02.md",
+    ".gogo/work/feature-cli-orchestrator/review/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 1,
+  "summary": "Round 2: all 3 majors (REV-001 track-aware Route, REV-002 no false green, REV-003 pre-flighted bounds) + 2 minors (REV-004, REV-005) verified fixed; gates green and the new tests assert the fixed behaviour. One new minor (REV-006: is_error halt discards the run's cost) is non-blocking. Verdict APPROVE."
+}

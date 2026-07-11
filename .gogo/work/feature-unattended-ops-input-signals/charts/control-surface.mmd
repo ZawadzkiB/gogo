@@ -1,0 +1,11 @@
+flowchart LR
+  card["focused card (contract.Feature: Class + Status)"] --> guard{"move.go attemptAction"}
+  guard -- "awaiting-plan-acceptance (NEW, Slice C)" --> acc["ActionAccept - /gogo:accept slug"]
+  guard -- "plan-accepted / other unfinished · in-progress (m)" --> go["ActionGo - /gogo:go slug"]
+  guard -- "ready-to-ship (d / m+selection)" --> done["ActionDone - /gogo:done slug(+...)"]
+  guard -- "live gate session (a)" --> att["attach tmux - /gogo:resume"]
+  acc --> conf["huh confirm (unchanged)"]
+  go --> conf
+  done --> conf
+  conf --> launch["launch.Launch -> attachable tmux / claude -p"]
+  launch --> rec["/gogo:accept records via gogo-plan: state.md -> plan-accepted + single-owner plan-accepted event"]

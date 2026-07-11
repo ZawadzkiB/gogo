@@ -1,0 +1,16 @@
+{"ts":"2026-07-10T21:59:07Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T22:03:58Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T22:04:30Z","event":"phase-started","phase":"implement","status":"implementing","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T22:45:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T22:47:00Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"cli-orchestrator"}
+{"ts":"2026-07-10T22:55:00Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"3 majors, 2 minors (1 needs-user-decision)","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T23:15:00Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"cli-orchestrator"}
+{"ts":"2026-07-10T23:16:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T23:20:00Z","event":"round-opened","phase":"review","status":"reviewing","round":2,"slug":"cli-orchestrator"}
+{"ts":"2026-07-10T23:35:00Z","event":"phase-done","phase":"review","status":"reviewing","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T23:36:00Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"cli-orchestrator"}
+{"ts":"2026-07-10T23:55:00Z","event":"phase-done","phase":"test","status":"testing","slug":"cli-orchestrator"}
+{"ts":"2026-07-10T23:56:00Z","event":"phase-started","phase":"report","status":"reporting","slug":"cli-orchestrator"}
+{"ts":"2026-07-11T00:05:00Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"cli-orchestrator"}
+{"ts":"2026-07-11T06:51:44Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"cli-orchestrator"}
+{"ts":"2026-07-11T06:51:44Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-10-cli-orchestrator/","slug":"cli-orchestrator"}

@@ -1,13 +1,13 @@
 gogo — 9 features  (shipped 3 · ready 2 · in-progress 1 · unfinished 3)
 
-CLASS          PHASE      STATUS             ITERATIONS                   SLUG
-────────────────────────────────────────────────────────────────────────────────────────────────
-shipped        done       done               plan=1 · implement=2 · review=1 · test=1 · report=1 shipped-by-folder
-shipped        done       done               plan=1 · implement=1 · review=1 · test=1 · report=1 shipped-by-members
-shipped        done       shipped            plan=1 · implement=3 · review=2 · test=1 · report=1 shipped-status
-ready-to-ship  knowledge  done               plan=1 · implement=1 · review=1 · test=1 legacy-ready
-ready-to-ship  knowledge  done               plan=1 · implement=2 · review=1 · test=1 · report=1 ready
-in-progress    review     reviewing          plan=1 · implement=2 · review=2 · test=0 inprogress
-unfinished     plan       aborted            plan=1                       aborted
-unfinished     -          -                  -                            malformed
-unfinished     plan       plan-accepted      plan=1 · implement=0 · review=0 · test=0 unfinished
+WAIT  CLASS          PHASE      STATUS             ITERATIONS                   SLUG
+──────────────────────────────────────────────────────────────────────────────────────────────────────
+-     shipped        done       done               plan=1 · implement=2 · review=1 · test=1 · report=1 shipped-by-folder
+-     shipped        done       done               plan=1 · implement=1 · review=1 · test=1 · report=1 shipped-by-members
+-     shipped        done       shipped            plan=1 · implement=3 · review=2 · test=1 · report=1 shipped-status
+-     ready-to-ship  knowledge  done               plan=1 · implement=1 · review=1 · test=1 legacy-ready
+WAIT  ready-to-ship  knowledge  awaiting-uat       plan=1 · implement=2 · review=1 · test=1 · report=1 ready
+-     in-progress    review     reviewing          plan=1 · implement=2 · review=2 · test=0 inprogress
+-     unfinished     plan       aborted            plan=1                       aborted
+-     unfinished     -          -                  -                            malformed
+-     unfinished     plan       plan-accepted      plan=1 · implement=0 · review=0 · test=0 unfinished

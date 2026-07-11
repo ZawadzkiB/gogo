@@ -1,0 +1,50 @@
+classDiagram
+    class Orchestrator {
+        +Root string
+        +Slug string
+        +Runner PhaseRunner
+        +Reg Registry
+        +MaxRounds int
+        +CostCeiling float64
+        +Attach bool
+        +Run() Outcome
+        -reImplement(track) gated
+        -gate(why) Outcome
+    }
+    class PhaseRunner {
+        <<interface>>
+        +Run(Invocation) RunResult
+    }
+    class ClaudeRunner {
+        +Root string
+        +Run(Invocation) RunResult
+    }
+    class Invocation {
+        +Kind string
+        +Command string
+        +SessionID string
+        +Resume string
+    }
+    class Registry {
+        +DevUUID string
+        +Round int
+        +CostUSD float64
+        +Sessions SessionInfo[]
+        +Save(root) error
+    }
+    class RunResult {
+        +SessionID string
+        +CostUSD float64
+        +NumTurns int
+        +DurationMS int
+    }
+    class Route {
+        <<func: contract>>
+        +Route(result, issues) RouteDecision
+    }
+    PhaseRunner <|.. ClaudeRunner : claude -p (launch.RunPhase)
+    Orchestrator --> PhaseRunner : runs each phase
+    Orchestrator --> Registry : books sessions in .gogo/resources
+    Orchestrator ..> Invocation : builds per phase
+    ClaudeRunner ..> RunResult : parses --output-format json
+    Orchestrator ..> Route : routes review/test outcome (one shared rule)

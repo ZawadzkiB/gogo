@@ -1,0 +1,11 @@
+flowchart TD
+  move["board move / g key<br/>cli/internal/tui/move.go"] --> intent["launch.BuildIntent(action, slugs, release)"]
+  intent -->|"ActionGo"| goCmd["Command = /gogo:go &lt;slug&gt;<br/>(WHOLE pipeline in one session)"]
+  intent -->|"ActionDone"| doneCmd["Command = /gogo:done a+b+c"]
+  goCmd --> launch["launch.Launch(root, intent)"]
+  doneCmd --> launch
+  launch -->|"tmux present"| tmux["tmux new-session -d -s gogo-go-&lt;slug&gt;<br/>claude --permission-mode auto /gogo:go &lt;slug&gt;<br/>(remain-on-exit on)"]
+  launch -->|"no tmux"| bg["background claude -p /gogo:go &lt;slug&gt;<br/>→ .gogo/resources/cli/logs/&lt;name&gt;.log"]
+  tmux --> attach["user attaches (a): AttachArgs → answer gates in-session"]
+  bg --> log["log peek (l) only — gates surfaced as 'waiting for user'"]
+  tmux -.->|"the claude session IS the orchestrator:<br/>runs ②→⑤ in-chat, re-spawns/re-reads per fix round"| tmux

@@ -1,0 +1,9 @@
+flowchart TD
+  st["state.md status (contract reader)"] --> pred{"Feature.WaitingForInput()"}
+  pred -- "awaiting-plan-acceptance / waiting-for-user / awaiting-uat" --> yes["waiting for input"]
+  pred -- "plan-accepted / implementing / reviewing / testing / shipped" --> no["flowing (auto)"]
+  yes --> cue["renderCard: ⏸ cue (cardBadgeText) + badgeStyleFor accent — focus-independent"]
+  yes --> col["gogo status FormatStatus: waitMarker → WAIT column"]
+  no --> ph["TUI: phase/round badge"]
+  cue --> board["viewBoard: interleaveSeparators → 4 columns with │ borders (sepStyle)"]
+  ph --> board

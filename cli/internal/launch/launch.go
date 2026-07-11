@@ -7,6 +7,7 @@
 package launch
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,8 +23,10 @@ import (
 type Action string
 
 const (
-	ActionGo   Action = "go"   // plan→implement / resume in-progress → /gogo:go
-	ActionDone Action = "done" // ready→changelog (single or merged) → /gogo:done
+	ActionGo     Action = "go"     // plan→implement / resume in-progress → /gogo:go
+	ActionDone   Action = "done"   // ready→changelog (single or merged) → /gogo:done
+	ActionResume Action = "resume" // answer a paused decision gate → /gogo:resume (orchestrator --attach)
+	ActionAccept Action = "accept" // clear the plan-acceptance gate → /gogo:accept (board `m` on a plan-pending card)
 )
 
 // Intent is a fully-resolved, quoted plan for a launch — built purely from a
@@ -120,6 +123,78 @@ func ClaudePrintArgs(command string) []string {
 	return append(args, "-p", command)
 }
 
+// --- CLI process-orchestrator: per-phase `claude -p` runs (gogo run) -----------
+//
+// The orchestrator (cli/internal/orchestrator) drives ②→③→④ by running each phase
+// as its own `claude -p` session and WAITING for it to exit — the developer session
+// kept warm across fix rounds via --resume, review/test spawned fresh. These are the
+// session-aware argv builder + the foreground wait-for-exit runner it uses; they are
+// separate from Launch (which backgrounds an attachable session for the board).
+
+// PhaseOpts configures one orchestrator phase invocation over `claude -p`. At most
+// one of SessionID (start a NEW session with a pre-assigned uuid — fresh eyes / the
+// first dev build) or Resume (continue a WARM session — dev fix rounds) is set;
+// both empty is a plain one-shot (e.g. ⑤ report).
+type PhaseOpts struct {
+	SessionID string // --session-id <uuid>
+	Resume    string // --resume <uuid>
+	JSON      bool   // --output-format json (capture session_id + total_cost_usd + …)
+}
+
+// PhaseArgs builds the argv for `claude <flags> -p "<command>"`. Flag+value pairs
+// are always SEPARATE argv elements (injection-safe, matching PermissionArgs); the
+// command is the single final element after -p, never a shell string. Resume wins
+// over SessionID if both are set (you can't pre-assign an id to an existing session).
+// Pure — the unit-tested core of the phase runner.
+func PhaseArgs(command string, opts PhaseOpts) []string {
+	args := append([]string(nil), PermissionArgs()...)
+	switch {
+	case opts.Resume != "":
+		args = append(args, "--resume", opts.Resume)
+	case opts.SessionID != "":
+		args = append(args, "--session-id", opts.SessionID)
+	}
+	if opts.JSON {
+		args = append(args, "--output-format", "json")
+	}
+	return append(args, "-p", command)
+}
+
+// RunResult is the parsed `--output-format json` envelope of a finished `claude -p`
+// phase run (only the fields the orchestrator uses; unknown fields are ignored,
+// forward-compatible). Verified against claude 2.1.206 (spike).
+type RunResult struct {
+	SessionID  string  `json:"session_id"`
+	CostUSD    float64 `json:"total_cost_usd"`
+	NumTurns   int     `json:"num_turns"`
+	DurationMS int     `json:"duration_ms"`
+	IsError    bool    `json:"is_error"`
+}
+
+// RunPhase spawns `claude -p "<command>"` with opts, BLOCKS until it exits, and
+// parses the `--output-format json` envelope. This is the foreground, wait-for-exit
+// primitive the orchestrator uses to detect phase completion (D2: `-p` exit is the
+// race-free phase-done signal); warm continuity survives the exit because claude
+// persists the session by uuid (spike-proven). Anchored to root (TEST-013). It
+// always requests JSON so the envelope (session_id, cost) is capturable.
+func RunPhase(root, command string, opts PhaseOpts) (RunResult, error) {
+	if !HasClaude() {
+		return RunResult{}, fmt.Errorf("claude CLI not found on PATH — cannot run %q", command)
+	}
+	opts.JSON = true
+	cmd := exec.Command("claude", PhaseArgs(command, opts)...)
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		return RunResult{}, fmt.Errorf("claude -p %q failed: %w", command, err)
+	}
+	var r RunResult
+	if jerr := json.Unmarshal(out, &r); jerr != nil {
+		return RunResult{}, fmt.Errorf("parse claude json output for %q: %w", command, jerr)
+	}
+	return r, nil
+}
+
 // --- session log peek (FR7) --------------------------------------------------
 
 // PeekLines is how many lines of a session's pane (scrollback + screen) a peek
@@ -185,6 +260,16 @@ func BuildIntent(action Action, slugs []string, release string) Intent {
 		}
 		in.Command = "/gogo:go " + slug
 		in.Session = sessionName("go", slug)
+	case ActionAccept:
+		// Clear the plan-acceptance gate from the board: a thin launched
+		// /gogo:accept presents the plan and records acceptance through gogo-plan's
+		// existing recording (the CLI never mutates state itself). Same shape as go.
+		slug := ""
+		if len(slugs) > 0 {
+			slug = slugs[0]
+		}
+		in.Command = "/gogo:accept " + slug
+		in.Session = sessionName("accept", slug)
 	case ActionDone:
 		// Multiple ready picks = ONE merged entry: claude "/gogo:done a+b+c".
 		in.Command = "/gogo:done " + strings.Join(slugs, "+")
@@ -197,9 +282,21 @@ func BuildIntent(action Action, slugs []string, release string) Intent {
 	return in
 }
 
+// ResumeIntent builds the Intent for an interactive `/gogo:resume <slug>` session
+// — the opt-in `--attach` path the orchestrator uses to let a human answer a paused
+// decision gate live, reusing the same attachable-tmux machinery as a board launch.
+func ResumeIntent(slug string) Intent {
+	return Intent{
+		Action:  ActionResume,
+		Slugs:   []string{slug},
+		Command: "/gogo:resume " + slug,
+		Session: sessionName("resume", slug),
+	}
+}
+
 // sessionName builds "gogo-<action>-<sanitized>" (tmux-safe: lowercase,
 // [a-z0-9-] only). tmux forbids '.' and ':' in session names.
-func sessionName(action, label string) string {
+func sessionName(action string, label string) string {
 	return "gogo-" + action + "-" + sanitizeLabel(label)
 }
 
@@ -223,7 +320,7 @@ func sanitizeLabel(label string) string {
 // slug "waiting-card"; TEST-005).
 func SessionMatchesSlug(session, slug string) bool {
 	sanitized := sanitizeLabel(slug)
-	for _, action := range []Action{ActionGo, ActionDone} {
+	for _, action := range []Action{ActionGo, ActionDone, ActionAccept} {
 		base := "gogo-" + string(action) + "-" + sanitized
 		if session == base {
 			return true

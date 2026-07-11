@@ -229,6 +229,8 @@ func matchFilter(f *contract.Feature, q string) bool {
 //  2. running — a live tmux/claude session for this slug.
 //  3. awaiting-uat — the UAT gate (0.11.0): phase ⑤ left the feature ready but
 //     unshipped, pending the user's sign-off (state.md status awaiting-uat).
+//     3b. awaiting-plan-acceptance — the plan-acceptance gate: surfaced as its own
+//     state name so a plan-pending card reads as a gate, not "plan r1" (FR-B2).
 //  4. state.md is the current-phase source of truth (it drives the card's
 //     column). The latest events.jsonl line only ENRICHES the badge with a
 //     round, and only when its phase agrees with state.md's current phase
@@ -248,6 +250,12 @@ func badge(f *contract.Feature, sessions []string) string {
 	}
 	if f.AwaitingUAT() {
 		return "awaiting-uat"
+	}
+	// The plan-acceptance gate: surface its state name like the other two gates
+	// (it had no distinct badge before — FR-B2). Mutually exclusive with the
+	// statuses above, so this does not disturb their precedence.
+	if f.Status == "awaiting-plan-acceptance" {
+		return "awaiting-plan-acceptance"
 	}
 	phase := f.Phase
 	if phase == "" {

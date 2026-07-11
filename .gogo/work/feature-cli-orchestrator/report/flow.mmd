@@ -1,0 +1,20 @@
+flowchart TD
+  run["gogo run &lt;slug&gt;"] --> reg{"session registry<br/>.gogo/resources/cli/sessions/&lt;slug&gt;.json"}
+  reg -->|"dev uuid known"| resumeDev["claude -p --resume &lt;dev-uuid&gt;<br/>/gogo:implement &lt;slug&gt; --in-session"]
+  reg -->|"first run"| newDev["claude -p --session-id &lt;dev-uuid&gt;<br/>/gogo:implement &lt;slug&gt; --in-session"]
+  newDev --> devOut["implement/result.json + charts/<br/>state.md: implementing"]
+  resumeDev --> devOut
+  devOut --> review["claude -p --session-id &lt;fresh-uuid&gt;<br/>/gogo:review &lt;slug&gt; (fresh eyes)"]
+  review --> revOut["review/issues.json + result.json"]
+  revOut --> route1{"contract.Route(issues, result)"}
+  route1 -->|"open agent-fixable"| resumeDev
+  route1 -->|"needs-user-decision"| gate["pause queue → tmux attach gate<br/>(existing launch.AttachArgs)"]
+  route1 -->|"clean"| test["claude -p --session-id &lt;fresh-uuid&gt;<br/>/gogo:test &lt;slug&gt; (fresh eyes)"]
+  test --> testOut["test/issues.json + result.json"]
+  testOut --> route2{"contract.Route(issues, result)"}
+  route2 -->|"open agent-fixable"| resumeDev
+  route2 -->|"needs-user-decision / e2e-blocked"| gate
+  route2 -->|"all green"| report["claude -p /gogo:report &lt;slug&gt;<br/>(fresh one-shot)"]
+  report --> uat["state.md: awaiting-uat<br/>(UAT gate — the human's)"]
+  gate -.->|"human answers, state.md resumable"| run
+  route1 -.->|"same finding &gt; 3 rounds<br/>or cost ceiling hit"| gate

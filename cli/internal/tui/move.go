@@ -17,7 +17,7 @@ type launchDoneMsg struct{ status string }
 // attemptAction resolves the requested action into a launch intent or a bounce
 // reason (the status-line hint). Pure — the unit-tested move-guard core.
 //
-//	ship=false (m): plan/unfinished → go · in-progress → go(resume) · ready → done · shipped → bounce
+//	ship=false (m): plan-pending → accept · other unfinished (plan-accepted) → go · in-progress → go(resume) · ready → done · shipped → bounce
 //	ship=true  (d): ready(+selection) → done · everything else → bounce
 func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
 	sel := m.selectedSlugs()
@@ -39,7 +39,17 @@ func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
 	}
 
 	switch f.Class {
-	case contract.ClassUnfinished, contract.ClassInProgress:
+	case contract.ClassUnfinished:
+		// A plan-pending card's legal `m` move is ACCEPT — route it to the launched
+		// /gogo:accept (FR-C2), not the /gogo:go that bounces without plan-accepted
+		// (the dead end this closes). Every other unfinished card (incl. an accepted
+		// plan awaiting its first build) still goes. Branch on status, not class,
+		// because both share ClassUnfinished.
+		if f.Status == "awaiting-plan-acceptance" {
+			return launch.BuildIntent(launch.ActionAccept, []string{f.Slug}, ""), false, ""
+		}
+		return launch.BuildIntent(launch.ActionGo, []string{f.Slug}, ""), false, ""
+	case contract.ClassInProgress:
 		return launch.BuildIntent(launch.ActionGo, []string{f.Slug}, ""), false, ""
 	case contract.ClassReadyToShip:
 		return launch.BuildIntent(launch.ActionDone, []string{f.Slug}, ""), true, ""

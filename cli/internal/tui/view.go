@@ -40,7 +40,7 @@ func (m Model) viewBoard() string {
 	for i := 0; i < 4; i++ {
 		rendered = append(rendered, m.renderColumn(i, colWidth))
 	}
-	body := lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
+	body := lipgloss.JoinHorizontal(lipgloss.Top, interleaveSeparators(rendered)...)
 
 	status := m.status
 	if status == "" {
@@ -48,6 +48,40 @@ func (m Model) viewBoard() string {
 	}
 	help := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · / filter · q quit"
 	return strings.Join([]string{header, body, statusStyle(status), helpStyle.Render(help)}, "\n")
+}
+
+// interleaveSeparators inserts a full-height vertical rule between the rendered
+// columns so it is clear where each card sits (FR-B4). The separator is sized to
+// the tallest column so it spans the whole board body; its one-cell width per
+// gutter is already reserved out of the width budget (boardColWidth).
+func interleaveSeparators(cols []string) []string {
+	h := 0
+	for _, c := range cols {
+		if ch := lipgloss.Height(c); ch > h {
+			h = ch
+		}
+	}
+	sep := columnSeparator(h)
+	out := make([]string, 0, len(cols)*2-1)
+	for i, c := range cols {
+		if i > 0 {
+			out = append(out, sep)
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// columnSeparator builds a styled one-cell vertical rule `height` rows tall.
+func columnSeparator(height int) string {
+	if height < 1 {
+		height = 1
+	}
+	lines := make([]string, height)
+	for i := range lines {
+		lines[i] = "│"
+	}
+	return sepStyle.Render(strings.Join(lines, "\n"))
 }
 
 // boardStatusLine surfaces the attach hint for the focused card when it has a
@@ -160,7 +194,7 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 		head = mark + truncate(slug, width-len([]rune(mark))-len([]rune(dot))) + dot
 		titleLine = truncate(title, width)
-		badgeLine = truncate(b, width)
+		badgeLine = truncate(cardBadgeText(f, b), width)
 	} else {
 		mark := ""
 		if selected {
@@ -174,14 +208,8 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 		head = mark + slugStyle.Render(truncate(slug, width-4)) + dot
 		titleLine = dimStyle.Render(truncate(title, width))
-		bs := columnStyles[colIdx].badge
-		switch {
-		case f.WaitingForUser():
-			bs = waitStyle
-		case f.AwaitingUAT():
-			bs = uatStyle
-		}
-		badgeLine = bs.Render(truncate(b, width))
+		bs := badgeStyleFor(f, columnStyles[colIdx].badge)
+		badgeLine = bs.Render(truncate(cardBadgeText(f, b), width))
 	}
 
 	body := strings.Join([]string{head, titleLine, badgeLine}, "\n")
@@ -193,6 +221,29 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	default:
 		return columnStyles[colIdx].card.Width(width).Render(body)
 	}
+}
+
+// cardBadgeText prepends the waiting cue to a card's badge when it is
+// WaitingForInput() — the leading ⏸ marks a card that blocks on the user, shown
+// on both focused and unfocused cards so the signal never depends on focus (FR-B2).
+func cardBadgeText(f *contract.Feature, b string) string {
+	if f.WaitingForInput() {
+		return waitingMarker + " " + b
+	}
+	return b
+}
+
+// badgeStyleFor picks a waiting card's accent: uat purple for the UAT gate, the
+// wait red for a decision gate AND the plan-acceptance gate (which carried no
+// accent before — FR-B2); a flowing card keeps its column accent (base).
+func badgeStyleFor(f *contract.Feature, base lipgloss.Style) lipgloss.Style {
+	switch {
+	case f.AwaitingUAT():
+		return uatStyle
+	case f.WaitingForInput():
+		return waitStyle
+	}
+	return base
 }
 
 func (m Model) sessionsLine() string {

@@ -1,0 +1,12 @@
+{
+  "slug": "unattended-ops-input-signals",
+  "updated": "2026-07-11",
+  "members": ["unattended-ops-input-signals"],
+  "note": "v0.14.0 changelog entry. Three slices: (A) classifier-safe /gogo:done skill bash (guarded scoped-find rewrites + TestSkillsBashNoUnsafeRm lint, textual — no diagram); (B) one contract.Feature.WaitingForInput() predicate read by three read-only display sites (renderCard ⏸ cue, gogo status WAIT column, viewBoard │ column borders); (C) a thin launched /gogo:accept routed via launch.ActionAccept so the board's m clears the plan-acceptance gate. Diagrams carried over from the member's report/manifest.json, flattened to slug-prefixed filenames.",
+  "diagrams": [
+    { "kind": "flow", "file": "unattended-ops-input-signals-flow.mmd", "title": "unattended-ops-input-signals: One WaitingForInput() predicate -> three read-only display sites + bordered columns" },
+    { "kind": "flow", "file": "unattended-ops-input-signals-control-surface.mmd", "title": "unattended-ops-input-signals: Board control surface: move-guard -> delegated launch; ActionAccept fills the plan-acceptance gap (Slice C)" },
+    { "kind": "activity", "file": "unattended-ops-input-signals-activity.mmd", "title": "unattended-ops-input-signals: Status lifecycle: the three waiting-for-input gates vs the auto transitions" },
+    { "kind": "sequence", "file": "unattended-ops-input-signals-sequence.mmd", "title": "unattended-ops-input-signals: Board accept end to end: m -> ActionAccept -> launched /gogo:accept -> gogo-plan recording -> plan-accepted" }
+  ]
+}
