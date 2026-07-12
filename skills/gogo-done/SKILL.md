@@ -267,7 +267,32 @@ approval.
    file if absent; **best-effort** — never fail `/gogo:done` if the append fails
    (append-only telemetry; `state.md` stays the human resume file).
 
-6. **Build the interactive viewer page for the entry (FR10, best-effort).** Reuse the
+6. **Reap the shipped session(s) at ship (FR1/FR2 — best-effort, TARGETED).** Now that
+   every member is `shipped` (step 5 flipped its `state.md` first — order matters, so
+   the sweeper sees the feature as terminal), reap the live `gogo-*` tmux session(s)
+   that drove them so a just-shipped card never shows a phantom "● session running"
+   badge and nobody runs `gogo sweep` by hand. Run a **targeted** sweep — pass **the
+   shipped member slug(s)** as arguments so the reap touches **only this ship's own
+   cards**, never another feature's session. One best-effort, classifier-safe line
+   (substitute the actual member slugs — one for a single ship, all of them for a
+   merged entry):
+   ```bash
+   command -v gogo >/dev/null 2>&1 && gogo sweep <member-slug>... >/dev/null 2>&1 || true
+   ```
+   `gogo sweep <slug>...` (D4=B) restricts the reap to sessions attributing (exact
+   `SessionMatchesSlug` parse) to the named slug(s): because those members are already
+   terminal it kills their `gogo-go-<slug>` / `gogo-plan-<slug>` driving sessions —
+   and, thanks to the sweeper's **self-guard (FR3)**, never the `gogo-done-<slug>`
+   session hosting *this* `/gogo:done` (the board's `d`/`m` keys launch `/gogo:done`
+   into such a session). Passing the slugs (not a bare `gogo sweep`) is what stops a
+   ship from truncating a **different** feature's concurrent `/gogo:done` (REV-002) —
+   a bare whole-board `gogo sweep` stays the user's **manual** orphan cleanup, not the
+   ship path. **Best-effort (D3=A):** if `gogo` is not on PATH, tmux is absent, or the
+   sweep errors, the guard swallows it and the ship still proceeds — the standalone
+   `gogo sweep` / next-launch reap stays the backstop. Never fails a ship; writes
+   nothing itself under `.gogo/`.
+
+7. **Build the interactive viewer page for the entry (FR10, best-effort).** Reuse the
    **`gogo-view` build** — don't reimplement it — so the entry gets the same xplan-style
    interactive page (draggable token-styled node cards + owned edge layer + minimap for
    flowchart-family, pan/zoom fallback otherwise, and **before/after compare** when the
@@ -465,6 +490,10 @@ any time (it builds the page from the entry's `report.md` + `.mmd`).
   user cancel (stop, ship nothing); every other no-intent outcome routes to the
   fallback, never a silent no-op. The board is a convenience layered on top; the classify
   → select → merge gate → write result is identical for the ship path either way.
+- If the ship-reap step (step 6) can't run — no `gogo` on PATH, no tmux, or `gogo sweep`
+  errors — it is **skipped silently and the ship still completes** (D3=A). The session is
+  then reaped by the next `gogo sweep` or opportunistically on the next `gogo go`/`gogo
+  plan`; the badge self-corrects. Best-effort by design; a reap never gates a ship.
 - If a diagram artifact is absent (a pure-process feature drew nothing), the entry is
   still valid — a synthesized `report.md` alone is a complete entry. A `.mmd` glob that
   matches nothing is a no-op, not an error.

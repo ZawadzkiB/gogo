@@ -28,6 +28,22 @@ Generated-by: /gogo:build
    `Mode: owned` files.
 7. **Contract clarity (for pipeline changes).** Any artifact that flows between
    phases has a clear shape, and producers/consumers agree on it.
+8. **Go TUI: rendered, not just set (0.16.0).** For a `cli/internal/tui` change,
+   any user-visible field a handler sets (`m.status`, hints, confirmations) must
+   actually be **rendered by the mode's `View()`** — a new panel/mode has to
+   surface the status line the way `viewBoard` does. Flag a status/hint that no
+   `View()` path renders, and a test that asserts only `Model.status` (not the
+   `View()` output) for such a path — that gap shipped a silent no-op once
+   (the drill-card status line).
+9. **A "terminal" feature can still hold a transiently-live session (0.17.0).**
+   "Reaping a terminal feature's session is safe by definition" is **false**: a
+   just-shipped (terminal) feature can still hold a live `gogo-done-<slug>` session —
+   the one *running* `/gogo:done` mid-ship. So any **ship-time** reap must be BOTH
+   (a) **slug-targeted** (`gogo sweep <slug>` / `Sweeper.Only`), so it can't kill a
+   *different* feature's concurrent ship, AND (b) **self-guarded** (`Sweeper.Self`,
+   from `tmux display-message -p '#S'`), so it can't kill the session it runs in.
+   Flag a whole-board sweep invoked from a ship/skill path, or a reaper that trusts
+   `TerminalStatus` alone to decide a session is dead (REV-002, `immediate-kill-at-ship`).
 
 ## Severity guide
 - **Blocker** — breaks a hard invariant (writes outside `.gogo/`, implements

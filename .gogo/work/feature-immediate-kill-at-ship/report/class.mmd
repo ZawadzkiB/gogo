@@ -1,0 +1,40 @@
+classDiagram
+  direction LR
+
+  class Sweeper {
+    +Root string
+    +Repo *contract.Repo
+    +List() []string
+    +Kill(name) error
+    +Self string
+    +Only []string
+    +Out io.Writer
+    +DryRun bool
+    +Sweep() []string
+    -matchesOnly(sess) bool
+    -inScope(slug) bool
+    -owningFeature(sess) *Feature
+    -shouldReap(sess, feat) (bool, why)
+  }
+  note for Sweeper "FR3: Sweep() skips sess == Self BEFORE shouldReap (self-guard).\nD4=B: Only non-empty => TARGETED — matchesOnly()/inScope() restrict the\nscan + lock/registry cleanup to the named slugs, so a ship never touches\nanother feature's session (REV-002). Self/Only are seams — unit-testable."
+
+  class cmdSweep {
+    +run(args) int
+    parses [--dry-run] [<slug>...]
+    wires Self = launch.CurrentSession()
+    wires Only = validated slugs
+  }
+
+  class launch {
+    +CurrentSession() string
+    +SessionMatchesSlug(sess, slug) bool
+    +KillSession(name) error
+    +ListSessions() []string
+    +Launch(root, in) Result
+  }
+  note for launch "CurrentSession(): tmux display-message -p '#S' when $TMUX set, else \"\".\nLaunch(): remain-on-exit DROPPED (FR4) — board pane closes on claude exit,\nmatching LaunchPersistent / the -p path (no dead-pane leak)."
+
+  cmdSweep --> Sweeper : builds with Self + Only
+  cmdSweep ..> launch : Self = CurrentSession()
+  Sweeper ..> launch : List=ListSessions · Kill=KillSession
+  Sweeper ..> launch : matchesOnly/owningFeature use SessionMatchesSlug

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cockpit-cards-and-cli-awareness (before)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cockpit-cards-and-cli-awareness (before)</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Current drill-in (before) — file list only</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  ENTER["board card · press enter<br/>updateBoard: openDrill(f)"] --> LOAD["openDrill(f)"]
+  LOAD --> ART["m.artifacts = contract.Artifacts(f)<br/>(only files that exist)"]
+  ART --> VIEW["viewDrill(): FILE LIST ONLY<br/>title 'files — &lt;slug&gt;' + rows"]
+
+  VIEW --> KEYS{"drill keys"}
+  KEYS -- "up/down" --> NAV["move file cursor"]
+  KEYS -- "enter/v/right/l" --> OPEN["open artifact"]
+  KEYS -- "w" --> WEB["build web page"]
+  KEYS -- "G" --> GLOW["glow"]
+  KEYS -- "q/esc" --> BACK["back to board"]
+
+  NOTE["NO session list · NO status/description/folder<br/>NO kill/attach in the drill · events only as an openable file row"]:::gap
+  VIEW --- NOTE
+
+  classDef gap fill:#2a1416,stroke:#ffb4b4,color:#ffb4b4;
+</pre></div>
+
+  <script src="../../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

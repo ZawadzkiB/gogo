@@ -1,0 +1,23 @@
+{
+  "slug": "cockpit-cards-and-cli-awareness",
+  "updated": "2026-07-12",
+  "members": ["cockpit-cards-and-cli-awareness"],
+  "note": "Shipped 0.16.0 — (A) on-demand gogo-cli reference + lean pointer + four-source enumeration-sync lint; (B) rich board drill-in card (description/folder/status/sessions/events tail, a attach / K kill; LLM-free reads, injected killer/registry seams). before/ holds the plan-time file-list-only drill-in baseline for compare mode.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "cockpit-cards-and-cli-awareness-flow.mmd",
+      "title": "cockpit-cards-and-cli-awareness: Part B — board drill-in card: detail panel + attach/kill over registry + live-tmux (as-built, LLM-free read)"
+    },
+    {
+      "kind": "class",
+      "file": "cockpit-cards-and-cli-awareness-class.mmd",
+      "title": "cockpit-cards-and-cli-awareness: Part B — as-built structure: sessionRow + the Model drill fields/seams (killer, registry) → orchestrator.Registry"
+    },
+    {
+      "kind": "flow",
+      "file": "cockpit-cards-and-cli-awareness-flow-cli-awareness.mmd",
+      "title": "cockpit-cards-and-cli-awareness: Part A — plugin CLI-awareness: lean pointer → on-demand gogo-cli reference + enumeration-sync"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "slug": "immediate-kill-at-ship",
+  "updated": "2026-07-12",
+  "note": "As-built (implement ②, round 2 after D4->B): the shipped /gogo:done TARGETED ship->reap flow (gogo sweep <slug>...) with the best-effort guard, the self-guard, and the Only targeted-filter (a ship touches only its own slugs' sessions — REV-002 fix); the session lifecycle with the two shipped edges (immediate reap-at-ship; board pane closes on exit instead of leaking a remain-on-exit corpse); and the code structure (Sweeper.Self + Sweeper.Only seams + launch.CurrentSession + dropped remain-on-exit in Launch). REV-001 (own host lingers) accepted as works-as-designed.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Targeted ship -> reap flow — /gogo:done marks members shipped then runs gogo sweep <slug>...; matchesOnly spares other features' sessions (REV-002), the self-guard spares the hosting gogo-done session, and the named slug's driving gogo-go-<slug> is reaped"
+    },
+    {
+      "kind": "activity",
+      "file": "activity.mmd",
+      "title": "Session lifecycle — running -> exited/closed (no remain-on-exit, FR4) and running -> shipped -> reaped (immediate kill-at-ship, FR1)"
+    },
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "Code structure — Sweeper.Self self-guard + Sweeper.Only targeted filter in Sweep() (FR3 + D4=B), wired by cmdSweep from launch.CurrentSession + validated slugs, and launch.Launch with remain-on-exit dropped (FR4)"
+    }
+  ]
+}

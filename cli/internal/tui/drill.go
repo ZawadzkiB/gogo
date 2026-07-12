@@ -6,22 +6,139 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/diagram"
+	"github.com/ZawadzkiB/gogo/cli/internal/launch"
+	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
 	"github.com/ZawadzkiB/gogo/cli/internal/pages"
 	"github.com/ZawadzkiB/gogo/cli/internal/textfmt"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 )
 
-// openDrill enters the file list for a feature (only files that exist).
+// openDrill enters the file list for a feature (only files that exist) and
+// assembles the CARD detail panel (Slice B) that sits above it.
 func (m *Model) openDrill(f *contract.Feature) {
 	m.drill = f
 	m.artifacts = contract.Artifacts(f)
 	m.artIdx = 0
+	m.loadDrillCard(f)
 	m.mode = modeDrill
 	m.status = ""
+}
+
+// loadDrillCard (Slice B) assembles the card detail panel's deterministic data:
+// the feature's persistent-session rows (registry ⨯ live-tmux cross-check —
+// FR-B2/B5) and a compact recent-events tail (FR-B4). These are pure reads (no
+// launch, no registry write), so opening — or refreshing — a drill never mutates
+// state (FR-B5). Also called after a kill to refresh the panel in place.
+func (m *Model) loadDrillCard(f *contract.Feature) {
+	reg := m.registry(m.root, f.Slug)
+	m.drillSessions = sessionRows(reg, m.sessions, f.Slug)
+	m.drillEventsTail = eventsTail(contract.ReadEvents(filepath.Join(f.Dir, "events.jsonl")), 5)
+}
+
+// sessionRow is one line of the drill card's session panel (FR-B5): a tracked
+// registry leg or an untracked-but-live tmux session, carrying the live/stale +
+// tracked/untracked cross-check (D4) and per-leg cost/turns.
+type sessionRow struct {
+	Kind     string  // "go" | "plan" for a tracked leg; "" for an untracked live session
+	Status   string  // registry lifecycle status (running|parked|awaiting-uat|shipped|reaped); "" when untracked
+	Session  string  // tmux session name (the kill/attach target); "" for a headless tracked leg
+	Live     bool    // a live gogo-* tmux session backs this row right now
+	Tracked  bool    // present in the registry (vs an untracked board-launched racer)
+	CostUSD  float64 // summed cost for the leg (0 when untracked)
+	NumTurns int     // summed turns for the leg (0 when untracked)
+}
+
+// sessionRows maps (registry, live tmux sessions, slug) → display rows,
+// deterministically and LLM-free (FR-B5). Tracked legs (registry, kinds go then
+// plan) come first, each cross-checked against the slug's live sessions by EXACT
+// SessionMatchesSlug (never substring — oauth ≠ auth, waiting-card ≠ awaiting-card;
+// TEST-005) and flagged live/stale; any remaining live session for the slug with
+// no tracked leg is shown as an untracked-live row (a board-launched racer). A
+// missing/garbled registry (empty Persistent) with no live sessions yields no
+// rows — the caller renders "no tracked sessions" (never a crash).
+func sessionRows(reg *orchestrator.Registry, live []string, slug string) []sessionRow {
+	if reg == nil {
+		reg = &orchestrator.Registry{}
+	}
+	// The slug's own live sessions (exact convention parse) — a working set we
+	// consume as tracked legs claim their session.
+	mine := map[string]bool{}
+	var mineOrder []string
+	for _, s := range live {
+		if launch.SessionMatchesSlug(s, slug) && !mine[s] {
+			mine[s] = true
+			mineOrder = append(mineOrder, s)
+		}
+	}
+
+	var rows []sessionRow
+	for _, kind := range []string{"go", "plan"} {
+		ps := reg.Get(kind)
+		if ps == nil {
+			continue
+		}
+		row := sessionRow{
+			Kind:     kind,
+			Status:   ps.Status,
+			Session:  ps.Tmux,
+			Tracked:  true,
+			CostUSD:  ps.CostUSD,
+			NumTurns: ps.NumTurns,
+		}
+		// A tracked leg is live iff its recorded tmux session is live right now.
+		if ps.Tmux != "" && mine[ps.Tmux] {
+			row.Live = true
+			delete(mine, ps.Tmux) // claimed — don't also list it as untracked
+		}
+		rows = append(rows, row)
+	}
+	// Remaining live sessions for the slug had no tracked leg → untracked live.
+	for _, s := range mineOrder {
+		if mine[s] {
+			rows = append(rows, sessionRow{Session: s, Live: true})
+		}
+	}
+	return rows
+}
+
+// eventsTail renders the last n events as a compact inline tail for the drill
+// card (FR-B4 / D3): "hh:mm:ss event phase[ rN][ — note]". The FULL
+// textfmt.Timeline (what `gogo events` renders) stays reachable via the existing
+// events row — no duplicate renderer, just an at-a-glance tail. No events → "".
+func eventsTail(evs []contract.Event, n int) string {
+	if len(evs) == 0 {
+		return ""
+	}
+	if n > 0 && len(evs) > n {
+		evs = evs[len(evs)-n:]
+	}
+	var b strings.Builder
+	for i, e := range evs {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		ts := e.TSRaw
+		if e.TSValid {
+			ts = e.TS.Format("15:04:05")
+		}
+		line := ts + "  " + e.Event
+		if e.Phase != "" {
+			line += " " + e.Phase
+		}
+		if e.HasRound {
+			line += fmt.Sprintf(" r%d", e.Round)
+		}
+		if e.Note != "" {
+			line += " — " + e.Note
+		}
+		b.WriteString(line)
+	}
+	return b.String()
 }
 
 // quickView (v on the board) opens the DEFAULT file for the focused card's

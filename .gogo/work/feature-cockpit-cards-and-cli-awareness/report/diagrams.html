@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo as-built diagrams — cockpit-cards-and-cli-awareness</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo as-built diagrams — <code>cockpit-cards-and-cli-awareness</code></h1>
+    <p class="hint">Report ⑤ · the shipped design · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Part B — board drill-in card (flow, as-built)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  ENTER["board card · press enter<br/>updateBoard: openDrill(f)"] --> LOAD["openDrill assembles the card view"]
+
+  LOAD --> STATE[("state.md<br/>parseStateFile → Feature")]
+  LOAD --> REG[(".gogo/resources/cli/sessions/&lt;slug&gt;.json<br/>orchestrator.LoadRegistry")]
+  LOAD --> LIVE["launch.ListSessions() +<br/>SessionMatchesSlug (exact, TEST-005)"]
+  LOAD --> EV[("events.jsonl<br/>contract.ReadEvents")]
+  LOAD --> FILES["contract.Artifacts(f)<br/>(existing file list)"]
+
+  STATE --> PANEL["viewDrill: CARD DETAIL panel"]
+  REG --> SESS["sessionRows(reg, liveSessions)<br/>per-leg go|plan · status · live/stale · cost/turns"]
+  LIVE --> SESS
+  SESS --> PANEL
+  EV --> TAIL["compact recent-events tail<br/>(eventsTail)"]
+  TAIL --> PANEL
+
+  PANEL --> DESC["description = Feature.Title (state.md feature:)"]
+  PANEL --> FOLD["folder = feature-&lt;slug&gt;/ (filepath.Base f.Dir)"]
+  PANEL --> ST["status = Feature.Status (+ phase · iterations)"]
+  PANEL --> STATUS["m.status line (a/K hints · kill/detach confirms) — TEST-001"]
+
+  PANEL --> KEYS{"drill keys"}
+  KEYS -- "a" --> ATT["attachFeature → tea.ExecProcess(tmux AttachArgs(session))"]
+  KEYS -- "K (confirm)" --> KILL["killDrill → huh confirm → killer(session)<br/>(exact-match; k stays up-nav)"]
+  KEYS -- "up/down · enter" --> FILES
+  FILES --> OPEN["open artifact (glamour / issues / timeline / mmd)"]
+
+  ATT -.->|"never mutates pipeline state"| LIVE
+  KILL -.->|"never mutates pipeline state"| LIVE
+</pre></div>
+
+  <h2>Part B — as-built structure: sessionRow + Model drill seams (class)</h2>
+  <div class="diagram"><pre class="mermaid">
+classDiagram
+  class Model {
+    +drill *contract.Feature
+    +artifacts []contract.Artifact
+    +drillSessions []sessionRow
+    +drillEventsTail string
+    +pendingKill []string
+    +sessions []string
+    +killer func(session string) error
+    +registry func(root, slug string) *orchestrator.Registry
+    +openDrill(f)
+    +loadDrillCard(f)
+    +viewDrill() string
+    +updateDrill(msg)
+    +attachFeature(f)
+    +killDrill()
+    +finishKill()
+  }
+  class sessionRow {
+    +Kind string
+    +Status string
+    +Session string
+    +Live bool
+    +Tracked bool
+    +CostUSD float64
+    +NumTurns int
+  }
+  class Registry {
+    +Persistent map~string~PersistentSession
+    +Get(kind) *PersistentSession
+  }
+  class PersistentSession {
+    +Kind string
+    +Tmux string
+    +Status string
+    +CostUSD float64
+    +NumTurns int
+  }
+  Model --> "0..*" sessionRow : drillSessions
+  Model ..> Registry : registry() seam (default LoadRegistry)
+  Registry --> "0..*" PersistentSession : Persistent[go|plan]
+  sessionRow ..> PersistentSession : mapped from a tracked leg
+  Model ..> launch : killer (KillSession) · AttachArgs · SessionMatchesSlug
+  note for sessionRow "sessionRows(reg, live, slug): pure, LLM-free\ntracked legs (exact SessionMatchesSlug, live/stale)\n+ untracked-live racers"
+</pre></div>
+
+  <h2>Part A — plugin CLI-awareness (flow, as-built)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  CLAUDE["installed Claude in a gogo project"] --> SKILLLIST["skill list (always-loaded frontmatter)"]
+
+  SKILLLIST --> ORCH["skills/gogo/SKILL.md<br/>+ LEAN pointer: 'if gogo CLI on PATH → load gogo-cli'"]
+  SKILLLIST --> CLIREF["skills/gogo-cli/SKILL.md (on-demand)<br/>frontmatter description = the discoverability trigger"]
+
+  ORCH -. "when CLI is relevant<br/>(manage/view/launch existing work)" .-> CLIREF
+
+  CLIREF --> BODY["CANONICAL CLI companion reference (body, loaded on demand)"]
+  BODY --> B1["command surface: gogo · go/plan · status · view · events · sweep · trash · --version"]
+  BODY --> B2["persistent-session model: launch-or---resume ONE claude -p session; one-owner lock; kill-at-ship/sweep"]
+  BODY --> B3["conditional: gogo is a SEPARATE curl install, NOT bundled — 'if on PATH…'"]
+  BODY --> B4["coexistence: in-chat /gogo:* path unchanged (default, dependency-free)"]
+
+  BODY --> ACTIVE["later ACTIVE half (assistant DRIVES the CLI)<br/>extends THIS same source — no second copy"]
+
+  SYNC{{"enumeration-sync rule<br/>+ TestCLICommandEnumerationInSync greps all 4 sources"}}
+  MAIN["cli/main.go printHelp (runtime truth)"] --> SYNC
+  README["README ## The gogo CLI"] --> SYNC
+  CONTRACT["docs/cli-contract.md"] --> SYNC
+  BODY --> SYNC
+  SYNC -.->|"one surface change → update ALL"| BODY
+</pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

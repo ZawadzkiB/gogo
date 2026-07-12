@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — immediate-kill-at-ship</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>immediate-kill-at-ship</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Targeted ship → reap flow (as-built)</h2>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+  done["/gogo:done &lt;slug&gt;"] --> synth["synthesize changelog entry<br/>(report.md · .mmd · manifest.json)"]
+  synth --> mark["step 5: mark each member<br/>state.md → shipped"]
+  mark --> reap{"gogo on PATH?<br/>(best-effort guard)"}
+  reap -- no --> skip["skip reap silently<br/>(whole-board sweep / next-launch backstop)"]
+  reap -- yes --> sweep["gogo sweep &lt;member-slug&gt;...<br/>(TARGETED — only the shipped slugs)"]
+  sweep --> scan["Sweeper.Sweep():<br/>for each live gogo-* session"]
+  scan --> self{"session == Self?<br/>(current tmux session)"}
+  self -- yes --> spare["SPARE — never self-kill<br/>(gogo-done-&lt;slug&gt; hosting /gogo:done)"]
+  self -- no --> only{"session owns a named slug?<br/>(matchesOnly — targeted filter)"}
+  only -- no --> other["SPARE — another feature's session<br/>(e.g. a concurrent gogo-done-z ship) · REV-002 fix"]
+  only -- yes --> term{"owning feature terminal<br/>or orphan?"}
+  term -- yes --> kill["KillSession — reap<br/>gogo-go-&lt;slug&gt; driving session"]
+  term -- no --> keep["spare (live, non-terminal)"]
+  skip --> viewer["build viewer page · Return"]
+  spare --> viewer
+  other --> viewer
+  kill --> viewer
+  keep --> viewer
+  viewer --> badge["board badge truthful:<br/>no '● session running' on the shipped card's driving session"]
+</pre></div>
+<h2>Session lifecycle (as-built)</h2>
+<div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  [*] --> running : board Launch / gogo go -p
+  running --> parked : claude waits at a gate (pane alive — correct)
+  parked --> running : user attaches, answers
+  running --> exited : claude exits (leg done / quit)
+  exited --> closed : FR4 — no remain-on-exit, pane closes by construction
+  running --> shipped : /gogo:done flips state.md
+  shipped --> reaped : FR1 — gogo sweep kills gogo-go-<slug> immediately
+  note right of exited
+    was: remain-on-exit kept a DEAD pane ->
+    phantom "session running" badge (the leak)
+  end note
+  note right of shipped
+    self-guard (FR3): sweep spares the
+    gogo-done-<slug> session it runs in
+  end note
+  closed --> [*]
+  reaped --> [*]
+</pre></div>
+<h2>Code structure — Sweeper seams + launch changes (as-built)</h2>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  direction LR
+
+  class Sweeper {
+    +Root string
+    +Repo *contract.Repo
+    +List() []string
+    +Kill(name) error
+    +Self string
+    +Only []string
+    +Out io.Writer
+    +DryRun bool
+    +Sweep() []string
+    -matchesOnly(sess) bool
+    -inScope(slug) bool
+    -owningFeature(sess) *Feature
+    -shouldReap(sess, feat) (bool, why)
+  }
+  note for Sweeper "FR3: Sweep() skips sess == Self BEFORE shouldReap (self-guard).\nD4=B: Only non-empty => TARGETED — matchesOnly()/inScope() restrict the\nscan + lock/registry cleanup to the named slugs, so a ship never touches\nanother feature's session (REV-002). Self/Only are seams — unit-testable."
+
+  class cmdSweep {
+    +run(args) int
+    parses [--dry-run] [<slug>...]
+    wires Self = launch.CurrentSession()
+    wires Only = validated slugs
+  }
+
+  class launch {
+    +CurrentSession() string
+    +SessionMatchesSlug(sess, slug) bool
+    +KillSession(name) error
+    +ListSessions() []string
+    +Launch(root, in) Result
+  }
+  note for launch "CurrentSession(): tmux display-message -p '#S' when $TMUX set, else \"\".\nLaunch(): remain-on-exit DROPPED (FR4) — board pane closes on claude exit,\nmatching LaunchPersistent / the -p path (no dead-pane leak)."
+
+  cmdSweep --> Sweeper : builds with Self + Only
+  cmdSweep ..> launch : Self = CurrentSession()
+  Sweeper ..> launch : List=ListSessions · Kill=KillSession
+  Sweeper ..> launch : matchesOnly/owningFeature use SessionMatchesSlug
+</pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

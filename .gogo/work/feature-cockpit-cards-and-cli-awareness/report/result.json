@@ -1,0 +1,29 @@
+{
+  "slug": "cockpit-cards-and-cli-awareness",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    "plan.md",
+    "state.md",
+    "decisions.md",
+    "review/issues.json",
+    "test/issues.json",
+    "charts/manifest.json",
+    "charts/before/manifest.json"
+  ],
+  "outputs": [
+    "report/report.md",
+    "report/flow.mmd",
+    "report/class.mmd",
+    "report/flow-cli-awareness.mmd",
+    "report/diagrams.html",
+    "report/manifest.json",
+    "report/before/drill-in.mmd",
+    "report/before/manifest.json",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/code-review-standards.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Clean green run reported at 0.16.0. Plan finalized to as-built; report/ bundle written (report.md + as-built flow/class/flow-cli-awareness .mmd + diagrams.html + manifest, with the plan-time before set carried into report/before/ for compare). Both slices shipped as planned with three additive refinements (REV-002 printHelp in the lint, cli-contract command-surface anchor, REV-001 cancel-returns-to-drill, TEST-001 viewDrill renders status). Knowledge updated: test-strategy.md (assert View() output, not just Model.status) + code-review-standards.md (rendered-not-just-set reviewer check). All gates green; no open issues (TEST-002 user-skipped per D6). state.md → awaiting-uat."
+}

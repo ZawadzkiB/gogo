@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-cards-and-cli-awareness",
+  "updated": "2026-07-12",
+  "note": "As-is baseline (before): the board drill-in shows the FILE LIST only — no per-card sessions, status, description, folder, or kill/attach actions; events are reachable only as an openable file row. (Part A has no as-is flow — no canonical CLI reference exists today, only incidental mentions in skills/gogo/SKILL.md.)",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "drill-in.mmd",
+      "title": "Current drill-in (enter → contract.Artifacts file list only)"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "slug": "cockpit-cards-and-cli-awareness",
+  "phase": "implement",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    "plan.md",
+    "decisions.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md"
+  ],
+  "outputs": [
+    "skills/gogo-cli/SKILL.md",
+    "skills/gogo/SKILL.md",
+    "cli/cli_enum_test.go",
+    "cli/main.go",
+    ".claude-plugin/plugin.json",
+    "docs/cli-contract.md",
+    "README.md",
+    "cli/internal/tui/model.go",
+    "cli/internal/tui/drill.go",
+    "cli/internal/tui/view.go",
+    "cli/internal/tui/update.go",
+    "cli/internal/tui/card_test.go",
+    ".gogo/work/feature-cockpit-cards-and-cli-awareness/charts/card-structure.mmd",
+    ".gogo/work/feature-cockpit-cards-and-cli-awareness/charts/manifest.json",
+    ".gogo/work/feature-cockpit-cards-and-cli-awareness/charts/diagrams.html"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Built both slices at 0.16.0. Slice A (CLI-awareness): new on-demand skills/gogo-cli/SKILL.md canonical companion reference (command surface + persistent-session model + conditional framing + when-to-use + active-half note), a lean Load-when pointer in skills/gogo/SKILL.md, a command-surface enumeration anchor in docs/cli-contract.md + a README note, and the TestCLICommandEnumerationInSync lint that derives command verbs from main.go's dispatch and asserts each is mirrored in README / cli-contract / the reference. Slice B (rich drill-in card): openDrill now loads the registry (orchestrator.LoadRegistry seam) + a compact events tail and computes a pure sessionRows(registry ⨯ live-tmux, exact SessionMatchesSlug) reader; viewDrill renders a detail panel (description/folder/status/session rows/events tail) above the file list; updateDrill wires a=attach (shared attachFeature) and K=kill behind a huh confirm via an injected killer seam (k stays up-nav). main.go help + README keymap document a/K; version bumped to 0.16.0. New TUI tests (detail render, sessionRows table incl. TEST-005 exact-match + degrade, attach wiring, kill fire-exactly-once + cancel, no-sessions degradation). gofmt + go vet clean; go test -race ./... green."
+}

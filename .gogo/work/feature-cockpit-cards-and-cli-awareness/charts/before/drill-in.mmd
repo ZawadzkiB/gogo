@@ -1,0 +1,16 @@
+flowchart TD
+  ENTER["board card · press enter<br/>updateBoard: openDrill(f)"] --> LOAD["openDrill(f)"]
+  LOAD --> ART["m.artifacts = contract.Artifacts(f)<br/>(only files that exist)"]
+  ART --> VIEW["viewDrill(): FILE LIST ONLY<br/>title 'files — &lt;slug&gt;' + rows"]
+
+  VIEW --> KEYS{"drill keys"}
+  KEYS -- "up/down" --> NAV["move file cursor"]
+  KEYS -- "enter/v/right/l" --> OPEN["open artifact"]
+  KEYS -- "w" --> WEB["build web page"]
+  KEYS -- "G" --> GLOW["glow"]
+  KEYS -- "q/esc" --> BACK["back to board"]
+
+  NOTE["NO session list · NO status/description/folder<br/>NO kill/attach in the drill · events only as an openable file row"]:::gap
+  VIEW --- NOTE
+
+  classDef gap fill:#2a1416,stroke:#ffb4b4,color:#ffb4b4;

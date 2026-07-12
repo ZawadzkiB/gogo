@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — immediate-kill-at-ship (before)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>immediate-kill-at-ship</code> (before / as-is baseline)</h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Current ship + board-launch flow (the leak)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  subgraph ship["/gogo:done today (D5=A)"]
+    done["/gogo:done &lt;slug&gt;"] --&gt; synth["synthesize changelog entry"]
+    synth --&gt; mark["step 5: mark member<br/>state.md → shipped"]
+    mark --&gt; viewer["build viewer · Return"]
+    viewer --&gt; noreap["NO reap step —<br/>driving session left alive"]
+  end
+  subgraph board["board Launch() today"]
+    launch["Launch(): tmux new-session"] --&gt; ropt["set-option remain-on-exit on<br/>(launch.go:459)"]
+    ropt --&gt; claudeexit["claude exits"]
+    claudeexit --&gt; deadpane["DEAD pane lingers<br/>(remain-on-exit corpse)"]
+  end
+  noreap --&gt; orphan["gogo-go-&lt;slug&gt; session persists"]
+  deadpane --&gt; orphan
+  orphan --&gt; badge["board badge lies:<br/>'● session running' on a shipped/finished card"]
+  badge --&gt; manual["user must run<br/>gogo sweep by hand"]
+  </pre></div>
+
+  <script src="../../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

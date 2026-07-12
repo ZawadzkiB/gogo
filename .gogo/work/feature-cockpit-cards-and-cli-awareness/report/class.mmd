@@ -1,0 +1,44 @@
+classDiagram
+  class Model {
+    +drill *contract.Feature
+    +artifacts []contract.Artifact
+    +drillSessions []sessionRow
+    +drillEventsTail string
+    +pendingKill []string
+    +sessions []string
+    +killer func(session string) error
+    +registry func(root, slug string) *orchestrator.Registry
+    +openDrill(f)
+    +loadDrillCard(f)
+    +viewDrill() string
+    +updateDrill(msg)
+    +attachFeature(f)
+    +killDrill()
+    +finishKill()
+  }
+  class sessionRow {
+    +Kind string
+    +Status string
+    +Session string
+    +Live bool
+    +Tracked bool
+    +CostUSD float64
+    +NumTurns int
+  }
+  class Registry {
+    +Persistent map~string~PersistentSession
+    +Get(kind) *PersistentSession
+  }
+  class PersistentSession {
+    +Kind string
+    +Tmux string
+    +Status string
+    +CostUSD float64
+    +NumTurns int
+  }
+  Model --> "0..*" sessionRow : drillSessions
+  Model ..> Registry : registry() seam (default LoadRegistry)
+  Registry --> "0..*" PersistentSession : Persistent[go|plan]
+  sessionRow ..> PersistentSession : mapped from a tracked leg
+  Model ..> launch : killer (KillSession) · AttachArgs · SessionMatchesSlug
+  note for sessionRow "sessionRows(reg, live, slug): pure, LLM-free\ntracked legs (exact SessionMatchesSlug, live/stale)\n+ untracked-live racers"

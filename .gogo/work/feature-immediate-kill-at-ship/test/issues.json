@@ -1,0 +1,33 @@
+{
+  "slug": "immediate-kill-at-ship",
+  "track": "test",
+  "round": 1,
+  "updated": "2026-07-12",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "plan.md's Approach/Alternatives/Tests/Out-of-scope sections still describe the superseded D1=A (plain `gogo sweep`) design, not the shipped D4=B targeted sweep",
+      "description": "decisions.md records D4=B (2026-07-12) as overriding the plan's original D1=A: the ship-reap must be a TARGETED `gogo sweep <slug>...`, not plain `gogo sweep`. The shipped code matches D4=B exactly (Sweeper.Only, cmdSweep slug parsing, skills/gogo-done/SKILL.md step 6 running `gogo sweep <member-slug>...`) and docs/cli-contract.md is in sync. But plan.md itself was not updated: its 'Approach (recommended)' step 2, the 'Why plain `gogo sweep` in the skill' callout, the D1 entry under 'Alternatives considered', the Tests table's 'Shell / stub-claude' row, and the 'Out of scope' bullet ('A targeted `gogo sweep <slug>` CLI argument (D1=B) — not needed') all still present plain-sweep as the chosen/implemented design and targeted-sweep as an out-of-scope alternative. adjustments.md's 2026-07-12 entry explicitly claims 'Plan Approach / Changes checklist / Out-of-scope updated accordingly' — that update did not actually happen. A reader of plan.md alone (the contract document) would conclude the wrong design shipped.",
+      "proposed_solution": "Update plan.md's Approach step 2, the 'Why plain gogo sweep' callout, the D1 alternatives entry, the Tests table's shell/stub-claude row, and the Out-of-scope bullet to reflect D4=B (targeted `gogo sweep <slug>...` is what /gogo:done runs; plain `gogo sweep` is now the manual whole-board fallback, not the ship path) — mirroring the language already correct in docs/cli-contract.md and decisions.md. Purely a documentation-sync fix; no code change.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "FIXED (plan.md reconciled to as-built D4=B). Added an 'As-built adjustment (D4→B)' banner under the Status line; updated the acceptance signal (driving vs host session, REV-001 caveat), Approach step 2 (targeted `gogo sweep <member-slug>...`), the 'Why targeted gogo sweep' callout (was 'Why plain gogo sweep' — now explains REV-002 + D4→B), the D1 alternatives entry (accepted A at plan, CHANGED to B at review), the Changes checklist (Only seam + slug parse + enum sync + targeted test), the Tests table (added the targeted-sweep unit-test row; the hands-on row now records the live scratch-harness run), and the Out-of-scope bullet (targeted sweep struck through → moved into scope). adjustments.md corrected to record the reconciliation happened here at ④. Doc-only; no code change. (plan→as-built is normally ⑤'s job; done now so plan.md no longer misdescribes the shipped design.)"
+    },
+    {
+      "id": "TEST-002",
+      "title": "events.jsonl lines are not in chronological (ts-ordered) sequence",
+      "description": "Every line in .gogo/work/feature-immediate-kill-at-ship/events.jsonl is individually valid JSON with the required events.schema.json fields, but the append order does not match timestamp order in several places: (1) line 1 is phase-started/plan at 2026-07-12T02:00:00Z, followed by line 2 plan-accepted at 2026-07-11T23:57:04Z — about 2 hours EARLIER by clock time, appearing after; (2) round-opened/issues-found for review round 1 are timestamped 2026-07-12T10:31:22Z but appear in the file AFTER phase-started/phase-done for implement timestamped 12:10:00Z/12:20:00Z — i.e. review round 1's recorded timestamp predates implement even running, which isn't causally possible (review reads implement's output). This doesn't break the schema (each line still validates) and events.jsonl is documented as best-effort append-only telemetry, but a consumer that trusts ts for ordering/timeline display (the stated purpose per the schema description: 'Carries the stream's ordering + timing signal') would render a wrong/confusing history for this feature.",
+      "proposed_solution": "Not a defect in the code under test (sweep.go/launch.go/go.go) — the timestamps were written by earlier plan/implement/review phase runs, not by this feature's shipped change. Low priority: either backfill/correct this feature's own events.jsonl by hand (cosmetic, one file), or note it as a known telemetry-hygiene gap for whichever skill step emits these lines with an inaccurate/placeholder ts. No action required to pass this feature's done-bar.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "wontfix",
+      "origin": "test",
+      "found_in_round": 1,
+      "fix_summary": "WONTFIX (pre-existing + out of scope). The out-of-order lines were written by earlier plan/implement/review phase runs, not by this feature's shipped code (sweep.go/launch.go/go.go); events.jsonl is documented as best-effort append-only telemetry where a missing/garbled file is never an error, and the plan's Out-of-scope explicitly excludes 'any pre-existing doc drift unrelated to reap'. Rewriting historical append-only lines to reorder them would itself be dishonest to the append model. Noted as a telemetry-hygiene gap for whichever phase skill emits placeholder timestamps; no action for this feature's done-bar."
+    }
+  ]
+}

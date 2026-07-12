@@ -1,0 +1,22 @@
+{
+  "slug": "cockpit-cards-and-cli-awareness",
+  "updated": "2026-07-12",
+  "note": "As-built (report ⑤) — matches the intended design. Part B: openDrill → sessionRows(registry ⨯ live-tmux) → viewDrill detail panel + a attach / K kill (LLM-free read, injected killer/registry seams). Part A: the plugin CLI-awareness lean pointer → on-demand skills/gogo-cli reference + enumeration-sync lint. before/ holds the plan-time as-is baseline (file-list-only drill-in) for compare mode.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Part B — board drill-in card: detail panel + attach/kill over registry + live-tmux (as-built, LLM-free read)"
+    },
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "Part B — as-built structure: sessionRow + the Model drill fields/seams (killer, registry) → orchestrator.Registry"
+    },
+    {
+      "kind": "flow",
+      "file": "flow-cli-awareness.mmd",
+      "title": "Part A — plugin CLI-awareness: lean pointer → on-demand gogo-cli reference → shared with the later active half + enumeration-sync"
+    }
+  ]
+}

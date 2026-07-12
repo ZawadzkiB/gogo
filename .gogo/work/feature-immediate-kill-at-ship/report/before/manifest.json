@@ -1,0 +1,12 @@
+{
+  "slug": "immediate-kill-at-ship",
+  "updated": "2026-07-12",
+  "note": "As-is baseline (before), copied into the report bundle for a self-contained before/after compare: /gogo:done ships with NO reap step (driving session left alive) and the board's Launch() sets remain-on-exit on, leaving a dead pane after claude exits — both surface as a phantom '● session running' badge that only a manual gogo sweep clears.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Current ship + board-launch flow — /gogo:done never reaps and Launch() sets remain-on-exit, so the driving session persists and the badge lies until a manual gogo sweep"
+    }
+  ]
+}

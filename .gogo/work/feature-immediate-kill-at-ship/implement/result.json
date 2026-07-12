@@ -1,0 +1,35 @@
+{
+  "slug": "immediate-kill-at-ship",
+  "phase": "implement",
+  "status": "ok",
+  "round": 2,
+  "inputs": [
+    ".gogo/work/feature-immediate-kill-at-ship/plan.md",
+    ".gogo/work/feature-immediate-kill-at-ship/decisions.md",
+    ".gogo/work/feature-immediate-kill-at-ship/review/issues.json",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md",
+    "cli/internal/orchestrator/sweep.go",
+    "cli/internal/launch/launch.go",
+    "cli/go.go",
+    "skills/gogo-done/SKILL.md",
+    "docs/cli-contract.md"
+  ],
+  "outputs": [
+    "cli/internal/orchestrator/sweep.go",
+    "cli/internal/orchestrator/orchestrator_test.go",
+    "cli/go.go",
+    "skills/gogo-done/SKILL.md",
+    "docs/cli-contract.md",
+    ".gogo/work/feature-immediate-kill-at-ship/review/issues.json",
+    ".gogo/work/feature-immediate-kill-at-ship/charts/flow.mmd",
+    ".gogo/work/feature-immediate-kill-at-ship/charts/class.mmd",
+    ".gogo/work/feature-immediate-kill-at-ship/charts/manifest.json",
+    ".gogo/work/feature-immediate-kill-at-ship/charts/diagrams.html",
+    ".gogo/work/feature-immediate-kill-at-ship/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Round 2 (review fix, D4->B): REV-002 FIXED via targeted ship-reap. Added Sweeper.Only []string + matchesOnly()/inScope() (sweep.go) restricting the scan + lock/registry cleanup to named slugs; cmdSweep parses `gogo sweep [<slug>...]` (validSlug-guarded, sweepHelp updated); /gogo:done reap step now runs targeted `gogo sweep <member-slug>...`. Plain `gogo sweep` stays manual whole-board. REV-001 accepted (wontfix, WAD) + documented in cli-contract 0.17.0 self-guard note. New TestSweepTargetedOnlyNamedSlug green; whole-board TestSweepReapsOrphansAndTerminal + TestSweepSparesSelf + TestSkillsBashNoUnsafeRm green; gofmt/vet clean, go test -race ./... green; version stays 0.17.0. As-built charts (flow/class) + manifest refreshed. 0 open review issues."
+}

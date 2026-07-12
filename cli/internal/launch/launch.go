@@ -408,6 +408,23 @@ func ListSessions() []string {
 	return sessions
 }
 
+// CurrentSession returns the name of the tmux session this process is running
+// inside (via `tmux display-message -p '#S'`), or "" when not inside tmux or
+// tmux is absent. The sweeper's self-guard (FR3) uses it so `gogo sweep` never
+// reaps the very session it is hosted in — e.g. a board-launched
+// gogo-done-<slug> running /gogo:done, which flips its own member to shipped and
+// then sweeps.
+func CurrentSession() string {
+	if os.Getenv("TMUX") == "" || !HasTmux() {
+		return ""
+	}
+	out, err := exec.Command("tmux", "display-message", "-p", "#S").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // HasSession reports whether a tmux session with this exact name exists.
 func HasSession(name string) bool {
 	if !HasTmux() {
@@ -439,10 +456,14 @@ func AttachArgs(session string) []string {
 	return []string{"attach-session", "-t", session}
 }
 
-// Launch spawns the intent. With tmux → a detached, attachable session that
-// stays alive after the command exits (remain-on-exit) so the user can attach
-// to answer gates. Without tmux → a backgrounded `claude -p` writing to a log
-// under .gogo/resources/cli/logs/. NEVER call without a prior confirmation.
+// Launch spawns the intent. With tmux → a detached, attachable session running
+// interactive claude, which the user attaches to in order to answer gates: claude
+// stays alive (and the pane open) while parked at a gate, and when claude exits
+// the pane closes by construction — no remain-on-exit, matching LaunchPersistent
+// and the headless `-p` path, so a finished board launch leaves no dead pane
+// (FR4; the remain-on-exit leak the incident hit). Without tmux → a backgrounded
+// `claude -p` writing to a log under .gogo/resources/cli/logs/. NEVER call
+// without a prior confirmation.
 func Launch(root string, in Intent) (Result, error) {
 	if !HasClaude() {
 		return Result{}, fmt.Errorf("claude CLI not found on PATH — cannot launch %q", in.Command)
@@ -455,8 +476,6 @@ func Launch(root string, in Intent) (Result, error) {
 		if err := exec.Command("tmux", args...).Run(); err != nil {
 			return Result{}, fmt.Errorf("tmux new-session failed: %w", err)
 		}
-		// Keep the session alive after claude exits, so it stays attachable.
-		_ = exec.Command("tmux", "set-option", "-t", session, "remain-on-exit", "on").Run()
 		return Result{Mode: "tmux", Session: session, Command: in.Command}, nil
 	}
 

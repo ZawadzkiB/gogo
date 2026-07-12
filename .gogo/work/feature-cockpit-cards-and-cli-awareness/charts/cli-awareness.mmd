@@ -1,0 +1,22 @@
+flowchart TD
+  CLAUDE["installed Claude in a gogo project"] --> SKILLLIST["skill list (always-loaded frontmatter)"]
+
+  SKILLLIST --> ORCH["skills/gogo/SKILL.md<br/>+ LEAN pointer: 'if gogo CLI on PATH → load gogo-cli'"]
+  SKILLLIST --> CLIREF["skills/gogo-cli/SKILL.md (on-demand)<br/>frontmatter description = the discoverability trigger"]
+
+  ORCH -. "when CLI is relevant<br/>(manage/view/launch existing work)" .-> CLIREF
+
+  CLIREF --> BODY["CANONICAL CLI companion reference (body, loaded on demand)"]
+  BODY --> B1["command surface: gogo · go/plan · status · view · events · sweep · trash · --version"]
+  BODY --> B2["persistent-session model: launch-or---resume ONE claude -p session; one-owner lock; kill-at-ship/sweep"]
+  BODY --> B3["conditional: gogo is a SEPARATE curl install, NOT bundled — 'if on PATH…'"]
+  BODY --> B4["coexistence: in-chat /gogo:* path unchanged (default, dependency-free)"]
+
+  BODY --> ACTIVE["later ACTIVE half (assistant DRIVES the CLI)<br/>extends THIS same source — no second copy"]
+
+  SYNC{{"enumeration-sync rule<br/>+ CLI lint test greps all sources"}}
+  MAIN["cli/main.go printHelp (runtime truth)"] --> SYNC
+  README["README ## The gogo CLI"] --> SYNC
+  CONTRACT["docs/cli-contract.md"] --> SYNC
+  BODY --> SYNC
+  SYNC -.->|"one surface change → update ALL"| BODY

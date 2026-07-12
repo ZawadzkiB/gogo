@@ -1,0 +1,20 @@
+{"ts":"2026-07-11T23:19:00Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-11T23:20:51Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T12:00:00Z","event":"phase-started","phase":"implement","status":"implementing","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T12:30:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:00:00Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:05:00Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"1 minor, 1 nit (no blockers/majors)","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:06:00Z","event":"phase-done","phase":"review","status":"reviewing","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:05:00Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:06:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:10:00Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:45:00Z","event":"issues-found","phase":"test","status":"testing","round":1,"note":"1 major fixable (drill status hints unrendered) + 1 major needs-user-decision (Slice A hands-on CLI-awareness proof)","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:40:00Z","event":"fix-round","phase":"implement","status":"implementing","round":3,"slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:41:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:42:00Z","event":"gate-opened","phase":"test","status":"waiting-for-user","note":"D6 — Slice A hands-on proof: verify or skip","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:50:00Z","event":"gate-resolved","phase":"test","status":"testing","note":"D6 → skip (user)","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:51:00Z","event":"phase-done","phase":"test","status":"testing","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T13:55:00Z","event":"phase-started","phase":"report","status":"testing","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T14:10:00Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T14:20:00Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"cockpit-cards-and-cli-awareness"}
+{"ts":"2026-07-12T14:20:01Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-12-cockpit-cards-and-cli-awareness/","slug":"cockpit-cards-and-cli-awareness"}

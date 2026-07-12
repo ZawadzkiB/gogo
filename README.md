@@ -357,11 +357,15 @@ cd cli && go build -o gogo .
   distinct **⏸ "waiting for input"** cue on any card blocked on you (the three user
   gates). `gogo status` carries the same signal in a dedicated **WAIT** column. `/`
   filters live; **fsnotify** refreshes the board while the pipeline runs.
-- **Drill-in** (`enter`) — browse a feature's files **in the terminal**:
-  markdown via **glamour**, `issues.json` as a table, `events.jsonl` as a
-  timeline, `.mmd` diagrams as ASCII (flowchart-family) or source; `w` builds
-  the interactive HTML page natively (goldmark, before/after compare) and opens
-  the browser; `G` opens the file in `glow` when installed.
+- **Drill-in** (`enter`) — a **rich card**: a detail panel (short description,
+  work-folder name, status) over the feature's **session(s)** (registry ⨯
+  live-tmux, each flagged live/stale, plus any untracked-live racer), a
+  **recent-events tail**, then the browsable files — markdown via **glamour**,
+  `issues.json` as a table, `events.jsonl` as a full timeline, `.mmd` diagrams as
+  ASCII (flowchart-family) or source. `a` **attaches** the card's live session,
+  `K` **kills** it (behind a confirm — pipeline state untouched); `w` builds the
+  interactive HTML page natively (goldmark, before/after compare) and opens the
+  browser; `G` opens the file in `glow` when installed.
 - **Moves launch Claude** — `m` on an `awaiting-plan-acceptance` card runs
   `claude "/gogo:accept <slug>"` (accept the plan from the board — closing the dead
   end where it used to bounce into a `/gogo:go` that refuses); on any other
@@ -398,13 +402,19 @@ cd cli && go build -o gogo .
   `gogo go`. Needs `claude` on PATH; `--attach` needs `tmux`.
 - **Scriptable** — `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
   `gogo events <slug>`, `gogo go [<slug>] [--attach] [--takeover]`, `gogo plan <slug>`,
-  `gogo sweep [--dry-run]`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
+  `gogo sweep [--dry-run] [<slug>...]`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
 
 **Soft deps** (detected at use, graceful fallback): `tmux` (else backgrounded
 `claude -p` + log), `claude` (needed only to launch), `glow` (the built-in
 glamour view is the fallback). Keymap: `←→`/`h` columns · `↑↓`/`jk` cards ·
 `space` select · `enter` drill-in · `v` view · `w` web · `m` move · `d` ship ·
 `a` attach · `l` peek · `x` delete→trash · `/` filter · `G` glow · `q` quit.
+
+**CLI companion reference** — an installed Claude also carries an on-demand
+`gogo-cli` skill (`skills/gogo-cli/SKILL.md`) documenting the full command
+surface, the persistent-session model, and *when* to suggest the CLI vs the
+in-chat `/gogo:*` flow. It is kept in sync with this section, `cli/main.go` help,
+and the CLI contract by the `TestCLICommandEnumerationInSync` test.
 
 ## Agents
 

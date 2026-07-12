@@ -59,13 +59,20 @@ and stops for your acceptance. Needs the claude CLI on PATH; --attach needs tmux
 const sweepHelp = `gogo sweep — reap orphaned / shipped persistent sessions
 
 usage:
-  gogo sweep [--dry-run]
+  gogo sweep [--dry-run] [<slug>...]
 
-Kills (1) gogo-* tmux sessions whose owning feature is already terminal
-(shipped/aborted) — the kill-at-ship backstop — and (2) orphans: a live gogo-*
-session with no live, non-terminal owning feature. Attribution is by the exact
-gogo-<action>-<slug> convention (never substring). --dry-run lists what it would
-kill without touching anything. Also self-heals stale lockfiles.
+With no slug (whole-board), kills (1) gogo-* tmux sessions whose owning feature is
+already terminal (shipped/aborted) — the kill-at-ship backstop — and (2) orphans:
+a live gogo-* session with no live, non-terminal owning feature. Attribution is by
+the exact gogo-<action>-<slug> convention (never substring).
+
+With one or more <slug> args (TARGETED), restricts the reap to just those slugs'
+sessions (and their lock/registry cleanup) — this is what /gogo:done runs at ship
+so it reaps only the shipped card's own sessions and never a different feature's
+concurrent ship. The session hosting this sweep is always spared (no self-kill).
+
+--dry-run lists what it would kill without touching anything. Also self-heals stale
+lockfiles (scoped to the named slugs in targeted mode).
 `
 
 // parseSessionFlags pulls the shared flags (--attach / --takeover / slug) out of an
@@ -214,6 +221,7 @@ func runSession(sess *orchestrator.Session, cmd string) int {
 // persistent sessions.
 func cmdSweep(args []string) int {
 	dryRun := false
+	var only []string // targeted mode (D4=B): reap only these slugs' sessions
 	for _, a := range args {
 		switch {
 		case a == "--dry-run" || a == "-n":
@@ -225,8 +233,11 @@ func cmdSweep(args []string) int {
 			fmt.Fprintf(os.Stderr, "gogo sweep: unknown flag %q\n", a)
 			return 1
 		default:
-			fmt.Fprintf(os.Stderr, "gogo sweep: unexpected argument %q (sweep takes no slug)\n", a)
-			return 1
+			if !validSlug(a) {
+				fmt.Fprintf(os.Stderr, "gogo sweep: invalid slug %q\n", a)
+				return 1
+			}
+			only = append(only, a)
 		}
 	}
 
@@ -235,7 +246,13 @@ func cmdSweep(args []string) int {
 		return 1
 	}
 	repo, _ := contract.LoadRepo(root)
-	sw := &orchestrator.Sweeper{Root: root, Repo: repo, Out: os.Stdout, DryRun: dryRun}
+	// Self-guard (FR3): tell the sweeper which session it is itself running in so
+	// it never reaps its own host — makes `gogo sweep` safe to invoke from any
+	// context, including the /gogo:done ship-reap inside a gogo-done-<slug> session.
+	// Only (D4=B): with slug args, a TARGETED sweep that touches only those slugs'
+	// sessions (the ship-reap) — never another feature's concurrent ship (REV-002);
+	// with no slug, the whole-board manual cleanup.
+	sw := &orchestrator.Sweeper{Root: root, Repo: repo, Out: os.Stdout, DryRun: dryRun, Self: launch.CurrentSession(), Only: only}
 	killed := sw.Sweep()
 	if dryRun && len(killed) > 0 {
 		fmt.Printf("(dry-run) %d session(s) would be reaped — re-run without --dry-run to kill.\n", len(killed))

@@ -1,0 +1,35 @@
+{
+  "slug": "cockpit-cards-and-cli-awareness",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-12",
+  "comment": "Review round 1 verdict APPROVE (clean — no blockers/majors). The two low-severity findings below were fixed in-context in implement round 2 and re-verified (gofmt/vet/go test -race green; new regression assertions).",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "Cancelling the drill K kill-confirm with Esc/abort drops the user back on the board, not the drill card",
+      "description": "In cli/internal/tui/update.go the two cancel paths of the drill-in kill confirm diverge. Picking the \"Cancel\" button completes the huh form (huh.StateCompleted) -> finishKill(), which deliberately sets m.mode = modeDrill and refreshes the panel, so the user stays on the card they were inspecting. But pressing Esc (the early KeyEsc branch in updateForm) and a huh.StateAborted both call m.cancelForm(m.formPreservesSelection()), and cancelForm unconditionally sets m.mode = modeBoard. So Esc/abort out of the kill confirm bounces the user all the way back to the board and loses the drill context, contradicting the author's own intent in finishKill (which returns to the drill). This is a session-only, non-destructive path (kill never mutates pipeline state, and formPreservesSelection correctly keeps the ready-ship multi-selection), so it is purely a UX inconsistency, not a correctness/safety bug. Not covered by a test: TestDrillKillWiring only asserts the killer is not called on cancel, never the resulting mode.",
+      "proposed_solution": "AGENT-FIXABLE. Make the kill-confirm cancel return to the drill it was launched from. Simplest: in cancelForm, when m.pendingKill != nil (a drill-initiated form) set m.mode = modeDrill (and leave m.drill intact) instead of modeBoard; or route the kill form's Esc/abort through a small drill-returning cancel helper. Add an assertion to TestDrillKillWiring's esc/cancel-button subtests that mode == modeDrill afterwards so the two cancel paths stay consistent.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "cancelForm now returns to modeDrill (not modeBoard) when a kill confirm was in flight (m.pendingKill != nil && m.drill != nil), matching the Cancel-button/finishKill path; TestDrillKillWiring's esc and cancel-button subtests now assert mode == modeDrill."
+    },
+    {
+      "id": "REV-002",
+      "title": "Enumeration-sync lint never checks cli/main.go printHelp, one of the four named sync sources",
+      "description": "FR-A5 names four sources that must never drift: cli/main.go help (printHelp), README.md ## The gogo CLI, docs/cli-contract.md, and skills/gogo-cli/SKILL.md. TestCLICommandEnumerationInSync (cli/cli_enum_test.go) derives the canonical verbs from main.go's `switch args[0]` dispatch (a good, robust source) and asserts each appears in README, cli-contract, and the SKILL - but it never asserts the printHelp help text itself lists each verb. So the help block (the source the plan calls \"the runtime truth\") could silently drift from the dispatch (e.g. a case renamed or a verb dropped from printHelp) without failing the guard. All four are currently in sync, so impact today is low; the gap is only in future drift detection of the fourth source.",
+      "proposed_solution": "AGENT-FIXABLE. Add the printHelp output (or the raw help string in main.go) to the set the test greps, asserting each `gogo <verb>` (and `--version`) also appears there - closing the loop so the help text can't drift from the dispatch either.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "TestCLICommandEnumerationInSync now also greps cli/main.go (printHelp) for each `gogo <verb>`/`--version`, closing the loop so the help text can't drift from the dispatch — the fourth FR-A5 sync source is now checked. Still green."
+    }
+  ]
+}

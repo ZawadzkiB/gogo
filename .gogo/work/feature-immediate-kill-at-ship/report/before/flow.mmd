@@ -1,0 +1,16 @@
+flowchart TD
+  subgraph ship["/gogo:done today (D5=A)"]
+    done["/gogo:done &lt;slug&gt;"] --> synth["synthesize changelog entry"]
+    synth --> mark["step 5: mark member<br/>state.md → shipped"]
+    mark --> viewer["build viewer · Return"]
+    viewer --> noreap["NO reap step —<br/>driving session left alive"]
+  end
+  subgraph board["board Launch() today"]
+    launch["Launch(): tmux new-session"] --> ropt["set-option remain-on-exit on<br/>(launch.go:459)"]
+    ropt --> claudeexit["claude exits"]
+    claudeexit --> deadpane["DEAD pane lingers<br/>(remain-on-exit corpse)"]
+  end
+  noreap --> orphan["gogo-go-&lt;slug&gt; session persists"]
+  deadpane --> orphan
+  orphan --> badge["board badge lies:<br/>'● session running' on a shipped/finished card"]
+  badge --> manual["user must run<br/>gogo sweep by hand"]

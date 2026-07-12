@@ -1,0 +1,18 @@
+stateDiagram-v2
+  [*] --> running : board Launch / gogo go -p
+  running --> parked : claude waits at a gate (pane alive — correct)
+  parked --> running : user attaches, answers
+  running --> exited : claude exits (leg done / quit)
+  exited --> closed : FR4 — no remain-on-exit, pane closes by construction
+  running --> shipped : /gogo:done flips state.md
+  shipped --> reaped : FR1 — gogo sweep kills gogo-go-<slug> immediately
+  note right of exited
+    was: remain-on-exit kept a DEAD pane ->
+    phantom "session running" badge (the leak)
+  end note
+  note right of shipped
+    self-guard (FR3): sweep spares the
+    gogo-done-<slug> session it runs in
+  end note
+  closed --> [*]
+  reaped --> [*]

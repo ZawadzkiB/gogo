@@ -30,5 +30,5 @@
 - **accepted:** 2026-07-11 (user; D1-D6 all accepted as recommended: D1=C both-signal lock · D2=A gogo go · D3=A delete Route · D4=C -p+--attach · D5=A gogo sweep · D6=A refuse+--takeover)
 - **branch:** main
 - **iterations:** plan=1 · implement=2 · review=2 · test=1   <!-- add · uat=N once a UAT round loops back to planning -->
-- **resume:** none — shipped to .gogo/changelog/2026-07-12-persistent-session-orchestrator/ (UAT accepted via /gogo:done, 2026-07-12). All phases green: implement (2 rounds) · review (2 rounds APPROVE, REV-001..004 verified) · test (149/149 + TEST-001 verified by D7 live smoke) · report.
+- **resume:** none - shipped to .gogo/changelog/2026-07-12-persistent-session-orchestrator/ (UAT accepted via /gogo:done, 2026-07-12). All phases green: implement (2 rounds) · review (2 rounds APPROVE, REV-001..004 verified) · test (149/149 + TEST-001 verified by D7 live smoke) · report.
 - **open-decision:** none    <!-- D7 RESOLVED (user, 2026-07-11): light real smoke; D1..D6 resolved at acceptance -->

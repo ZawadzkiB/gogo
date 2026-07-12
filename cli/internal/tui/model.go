@@ -13,6 +13,7 @@ import (
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/launch"
+	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -70,6 +71,13 @@ type Model struct {
 	artifacts []contract.Artifact
 	artIdx    int
 
+	// drill-in CARD detail (Slice B — FR-B1/B2/B4): the card's session rows
+	// (registry ⨯ live-tmux cross-check) and a compact recent-events tail,
+	// (re)computed by openDrill/loadDrillCard. Description / folder / status are
+	// derived from m.drill at render time (no cache — they already live there).
+	drillSessions   []sessionRow
+	drillEventsTail string
+
 	// viewer
 	viewport      viewport.Model
 	viewerTitle   string
@@ -85,6 +93,7 @@ type Model struct {
 	pending       launch.Intent
 	pendingShip   bool
 	pendingDelete *contract.Feature // FR6: the card a confirmed `x` moves to trash
+	pendingKill   []string          // FR-B3: the drill card's live session(s) a confirmed `K` kills
 	binding       *formBinding      // heap-stable targets for the live huh fields
 
 	// peek (FR7): a read-only session-log viewer reusing the async viewer.
@@ -101,6 +110,14 @@ type Model struct {
 	// the form lifecycle can be driven with a fake in tests — never nil once a
 	// Model comes from New.
 	launcher func(root string, in launch.Intent) (launch.Result, error)
+
+	// killer kills a live tmux session by exact name (defaults to
+	// launch.KillSession) and registry loads a feature's persistent-session
+	// registry (defaults to orchestrator.LoadRegistry). Seams (FR-B3/B5) so the
+	// drill-in kill wiring + the session-row reader are asserted with fakes, no
+	// real tmux/registry file — never nil once a Model comes from New.
+	killer   func(session string) error
+	registry func(root, slug string) *orchestrator.Registry
 
 	hasTmux, hasClaude, hasGlow bool
 	reloadCh                    chan struct{}
@@ -123,6 +140,8 @@ func New(root string) Model {
 		hasGlow:     launch.HasGlow(),
 		launcher:    launch.Launch,
 		capturer:    launch.CapturePane,
+		killer:      launch.KillSession,
+		registry:    orchestrator.LoadRegistry,
 		reloadCh:    make(chan struct{}, 1),
 		viewport:    viewport.New(0, 0),
 		spinner:     sp,

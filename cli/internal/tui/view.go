@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
@@ -263,21 +264,106 @@ func (m Model) sessionsLine() string {
 	return "sessions: " + strings.Join(m.sessions, " · ")
 }
 
+// viewDrill renders the rich card detail panel (Slice B — FR-B1/B2/B4) above the
+// feature's file list: description / folder / status, the card's session rows
+// (registry ⨯ live-tmux), a compact recent-events tail, then the openable files.
 func (m Model) viewDrill() string {
-	title := colTitleStyle.Render("files — " + m.drill.Slug)
-	var lines []string
-	for i, a := range m.artifacts {
-		cursor := "  "
-		if i == m.artIdx {
-			cursor = "▸ "
+	f := m.drill
+	var b []string
+	b = append(b, colTitleStyle.Render("card — "+f.Slug), "")
+
+	// Detail (FR-B1): description / folder / status (enriched with phase + round).
+	desc := f.Title
+	if desc == "" {
+		desc = "(no description)"
+	}
+	statusLine := f.Status
+	if f.Phase != "" {
+		statusLine += " · " + f.Phase
+	}
+	if r := f.RoundFor(f.Phase); r > 0 {
+		statusLine += fmt.Sprintf(" r%d", r)
+	}
+	b = append(b,
+		dimStyle.Render("description  ")+desc,
+		dimStyle.Render("folder       ")+filepath.Base(f.Dir)+"/",
+		dimStyle.Render("status       ")+statusLine,
+	)
+
+	// Sessions (FR-B2): tracked legs (live/stale) + untracked-live racers.
+	b = append(b, "", colTitleStyle.Render("sessions"))
+	if len(m.drillSessions) == 0 {
+		b = append(b, dimStyle.Render("  no tracked sessions"))
+	} else {
+		for _, r := range m.drillSessions {
+			b = append(b, "  "+renderSessionRow(r))
 		}
-		lines = append(lines, cursor+a.Label)
 	}
-	if len(lines) == 0 {
-		lines = append(lines, "  (no files)")
+
+	// Recent events (FR-B4): the compact tail; the full timeline stays openable
+	// via the events row in the file list below.
+	b = append(b, "", colTitleStyle.Render("recent events"))
+	if m.drillEventsTail == "" {
+		b = append(b, dimStyle.Render("  no events recorded"))
+	} else {
+		for _, ln := range strings.Split(m.drillEventsTail, "\n") {
+			b = append(b, "  "+dimStyle.Render(ln))
+		}
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ files · enter open · G glow · w web · esc back")
-	return strings.Join([]string{title, "", strings.Join(lines, "\n"), "", help}, "\n")
+
+	// Files (existing openable list).
+	b = append(b, "", colTitleStyle.Render("files"))
+	if len(m.artifacts) == 0 {
+		b = append(b, "  (no files)")
+	} else {
+		for i, a := range m.artifacts {
+			cursor := "  "
+			if i == m.artIdx {
+				cursor = "▸ "
+			}
+			b = append(b, cursor+a.Label)
+		}
+	}
+
+	// Surface the transient status line here too (TEST-001): a/K hints ("no running
+	// session", "no live session to kill") and the kill-cancelled/succeeded/detach
+	// confirmations set m.status, but viewDrill — unlike viewBoard — never rendered
+	// it, so those actions looked like silent no-ops in the live TUI.
+	if m.status != "" {
+		b = append(b, "", statusStyle(m.status))
+	}
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓ files · enter open · a attach · K kill · G glow · w web · esc back")
+	b = append(b, "", help)
+	return strings.Join(b, "\n")
+}
+
+// renderSessionRow formats one session panel line (FR-B2): a live/stale dot, the
+// leg kind (or "untracked"), the live/stale flag, the registry lifecycle status,
+// the tmux session name (the kill/attach target), and per-leg cost/turns when
+// recorded. Styled via lipgloss — plain text under `go test` (no TTY), so the
+// panel stays substring-assertable.
+func renderSessionRow(r sessionRow) string {
+	dot, live := dimStyle.Render("○"), dimStyle.Render("stale")
+	if r.Live {
+		dot, live = sessionStyle.Render("●"), sessionStyle.Render("live")
+	}
+	kind := r.Kind
+	if !r.Tracked {
+		kind = "untracked"
+	}
+	parts := []string{dot, fmt.Sprintf("%-9s", kind), live}
+	if r.Status != "" {
+		parts = append(parts, r.Status)
+	}
+	if r.Session != "" {
+		parts = append(parts, slugStyle.Render(r.Session))
+	} else {
+		parts = append(parts, dimStyle.Render("(headless)"))
+	}
+	if r.NumTurns > 0 || r.CostUSD > 0 {
+		parts = append(parts, dimStyle.Render(fmt.Sprintf("$%.2f · %d turns", r.CostUSD, r.NumTurns)))
+	}
+	return strings.Join(parts, "  ")
 }
 
 func (m Model) viewViewer() string {

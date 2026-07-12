@@ -93,6 +93,14 @@ unit test had exercised. The strategy therefore has two mandatory layers:
   by Bubble Tea's stdin reader) while every unit test passed in ~4ms. Detect terminal
   properties ONCE before the TUI starts; never query the terminal from a render path;
   always include one live tmux drive before shipping a TUI change (TEST-003, 0.10.0).
+- **A model-level status assertion is NOT a render assertion (0.16.0 drill-card
+  finding).** The rich drill-in shipped with unit tests asserting `Model.status`
+  after `a`/`K` — all green — yet `viewDrill()` never rendered that status, so the
+  hints/confirmations were **silent no-ops in the live TUI** (a `View()` path the
+  unit tests never exercised; the live tmux drive caught it). Rule: whenever a key
+  handler sets `m.status` (or any user-visible field), add a test that asserts the
+  string appears in the relevant `View()` **output**, not just on the model — and
+  new mode/panel must render the status line the way `viewBoard` already does.
 
 ### State-machine / UAT-loop testing (since 0.11.0)
 The 0.11.0 UAT gate was verified by **spec-executing the state machine
@@ -113,6 +121,23 @@ state/gate change:
 - **Validate the emitted events line-by-line** against `events.schema.json`
   and check single-owner emission (each transition exactly once, by its owning
   skill) — a structural hand validator suffices when no jsonschema tool exists.
+
+### Reaper / `gogo sweep` testing is HOST-GLOBAL — never whole-board kill (since 0.17.0)
+`launch.ListSessions()` lists **every** `gogo-*` tmux session on the whole
+machine, not just the repo under test, and `owningFeature` attributes them against
+whatever repo the sweep runs in. So a **real killing whole-board `gogo sweep`
+(no slug) run from any test harness can reap the user's REAL in-flight sessions**
+(they look like orphans against a scratch repo's empty feature list) — including,
+potentially, the session driving the very pipeline doing the testing.
+- **Prove reaper behaviour with the *targeted* form** (`gogo sweep <scratch-slug>`,
+  0.17.0's `Sweeper.Only`): it is safe by construction — it only touches the named
+  slug's sessions. Use a clearly-scratch slug (e.g. `kastest-scratch-N`) that can't
+  collide with a real feature, create fake `tmux new-session -d -s gogo-go-<slug>`
+  sessions, run the targeted sweep, assert only that slug's session died, and
+  **`tmux kill-session` any scratch sessions you made** on the way out.
+- **Whole-board behaviour → `--dry-run` only** (lists candidates, kills nothing), or
+  the Go unit tests with injected `List`/`Kill` (no real tmux). Baseline the host
+  session list before/after every experiment (`immediate-kill-at-ship`, 0.17.0).
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

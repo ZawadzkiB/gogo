@@ -16,7 +16,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.15.0"
+const Version = "0.17.0"
 
 func main() {
 	args := os.Args[1:]
@@ -105,6 +105,10 @@ board keys:
   w web page · m move/launch (accepts a plan-pending card) · d ship · a attach session
   l peek log · x delete→trash · / filter · G glow · q quit
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
+
+drill-in keys (enter on a card — shows description / folder / status / sessions / events):
+  ↑↓/jk files · enter open file · a attach session · K kill session (confirm)
+  G glow · w web page · esc/q back
 
 launch permission mode (FR8): board-launched claude sessions run in auto
 (classifier) permission mode; set GOGO_CLAUDE_PERMISSION_MODE to override (any

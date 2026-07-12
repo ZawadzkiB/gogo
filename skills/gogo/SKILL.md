@@ -62,6 +62,13 @@ the always-read file lean). **Load a pointed skill only when the task actually
 touches it** — that's the whole point: keep always-read context small and pull in
 the detail on demand. `.gogo/skills/index.md` lists what exists.
 
+The optional **`gogo` CLI** (a companion binary — deterministic board/cockpit +
+persistent-session launcher) has its own on-demand plugin reference; keep this
+always-read manual lean and pull the detail only when it is relevant.
+**Load when:** the gogo CLI is relevant (the user asks to launch/attach/sweep
+sessions, manage/view existing work from the terminal, mentions `gogo` / the
+board, or you're weighing the CLI vs the in-chat flow) → `skills/gogo-cli`.
+
 ## Feature workspace
 
 Everything for one piece of work lives in **`.gogo/work/feature-<slug>/`** (kebab

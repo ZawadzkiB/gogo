@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
@@ -248,6 +250,13 @@ func (m Model) updateDrill(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.artIdx < len(m.artifacts) {
 			return m, m.openArtifact(m.artifacts[m.artIdx])
 		}
+	case "a":
+		// FR-B3: attach the drilled card's live session (same path as the board `a`).
+		return m.attachFeature(m.drill)
+	case "K":
+		// FR-B3: kill the drilled card's live session(s) behind a confirm. Capital
+		// K — `k` stays up-nav (D2).
+		return m.killDrill()
 	case "w":
 		return m, m.buildPageCmd()
 	case "G":
@@ -323,7 +332,7 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// nothing and a launch could feel un-escapable; ctrl+c still flows through
 	// the form and lands in StateAborted below.
 	if k, ok := msg.(tea.KeyMsg); ok && k.Type == tea.KeyEsc {
-		return m.cancelForm(m.pendingDelete != nil), nil
+		return m.cancelForm(m.formPreservesSelection()), nil
 	}
 	fm, cmd := m.form.Update(msg)
 	if f, ok := fm.(*huh.Form); ok {
@@ -335,11 +344,15 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingDelete != nil {
 			return m.finishDelete()
 		}
+		// A drill-in kill confirm (FR-B3) is its own completion path too.
+		if m.pendingKill != nil {
+			return m.finishKill()
+		}
 		if m.binding == nil || !m.binding.confirm {
 			// Completed on "Cancel" — same as an abort. Only a SHIP form reaches
-			// here (a delete form is handled above via finishDelete), so
-			// pendingDelete is nil and the selection is (correctly) cleared.
-			return m.cancelForm(m.pendingDelete != nil), nil
+			// here (delete/kill forms are handled above), so the pending targets are
+			// nil and the ready-ship selection is (correctly) cleared.
+			return m.cancelForm(m.formPreservesSelection()), nil
 		}
 		// Build the launch command NOW (it captures pending + the edited release
 		// name), then clear the consumed launch state on the model we return so a
@@ -353,9 +366,16 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = modeBoard
 		return m, launchCmd
 	case huh.StateAborted:
-		return m.cancelForm(m.pendingDelete != nil), nil
+		return m.cancelForm(m.formPreservesSelection()), nil
 	}
 	return m, cmd
+}
+
+// formPreservesSelection reports whether the active form is a delete or kill
+// confirm — both unrelated to the ready-ship selection, so cancelling them must
+// NOT wipe the user's multi-selection (only a SHIP form's cancel does). REV-012.
+func (m Model) formPreservesSelection() bool {
+	return m.pendingDelete != nil || m.pendingKill != nil
 }
 
 // cancelForm returns to the board and clears the in-flight form state. For a SHIP
@@ -366,7 +386,11 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 // delete, so it survives — an Esc-abort of a delete now matches the Cancel-button
 // (finishDelete) path instead of wiping the user's multi-selection (REV-012).
 func (m Model) cancelForm(preserveSelection bool) Model {
-	m.mode = modeBoard
+	// A kill confirm was launched FROM the drill card, so cancelling it (Esc /
+	// abort) returns to that card — matching the Cancel-button path (finishKill),
+	// not bouncing the user back to the board (REV-001). Every other form (ship /
+	// delete) cancels to the board as before.
+	wasKill := m.pendingKill != nil && m.drill != nil
 	m.status = "cancelled"
 	if !preserveSelection {
 		m.selected = map[string]bool{}
@@ -374,8 +398,14 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 		m.pendingShip = false
 	}
 	m.pendingDelete = nil
+	m.pendingKill = nil
 	m.binding = nil
 	m.form = nil
+	if wasKill {
+		m.mode = modeDrill
+	} else {
+		m.mode = modeBoard
+	}
 	return m
 }
 
@@ -386,10 +416,16 @@ func (m Model) quit() tea.Cmd {
 	return tea.Quit
 }
 
-// attachFocused suspends the TUI and attaches to the focused card's tmux
-// session (tea.ExecProcess), when one exists.
+// attachFocused suspends the TUI and attaches to the focused board card's tmux
+// session, when one exists.
 func (m Model) attachFocused() (tea.Model, tea.Cmd) {
-	f := m.focusedCard()
+	return m.attachFeature(m.focusedCard())
+}
+
+// attachFeature suspends the TUI and attaches to f's live tmux session
+// (tea.ExecProcess), when one exists. Shared by the board `a` (focused card) and
+// the drill-in `a` (the drilled card, FR-B3) — one attach path, no duplication.
+func (m Model) attachFeature(f *contract.Feature) (tea.Model, tea.Cmd) {
 	if f == nil {
 		return m, nil
 	}
@@ -408,6 +444,83 @@ func (m Model) attachFocused() (tea.Model, tea.Cmd) {
 	})
 }
 
+// killDrill (K in the drill — FR-B3) kills the drilled card's LIVE tmux
+// session(s) behind an explicit confirm. It targets only real live sessions
+// (exact-match attribution) and never touches pipeline state — killing a session
+// is not a state write.
+func (m Model) killDrill() (tea.Model, tea.Cmd) {
+	f := m.drill
+	if f == nil {
+		return m, nil
+	}
+	if !m.hasTmux {
+		m.status = "tmux not installed — no session to kill"
+		return m, nil
+	}
+	sessions := liveSessionsFor(f.Slug, m.sessions)
+	if len(sessions) == 0 {
+		m.status = "no live session to kill for " + f.Slug
+		return m, nil
+	}
+	m.startKillForm(f, sessions)
+	return m, m.form.Init()
+}
+
+// startKillForm opens the kill confirm. Defaults to Cancel (confirm=false) so
+// Enter is safe — the user must deliberately pick Kill.
+func (m *Model) startKillForm(f *contract.Feature, sessions []string) {
+	m.pendingKill = sessions
+	m.binding = &formBinding{confirm: false}
+	noun := "session"
+	if len(sessions) != 1 {
+		noun = "sessions"
+	}
+	title := "Kill " + f.Slug + "'s live " + noun + "?"
+	desc := "kills " + strings.Join(sessions, ", ") + " (tmux) — the pipeline state is untouched"
+	m.form = huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title(title).
+			Description(desc).
+			Affirmative("Kill").
+			Negative("Cancel").
+			Value(&m.binding.confirm),
+	))
+	m.mode = modeForm
+}
+
+// finishKill runs after a completed kill form. A confirmed form kills each live
+// session via the killer seam (the EXACT name — never a substring sibling) and
+// refreshes the drill panel in place; a cancelled one just returns to the drill.
+func (m Model) finishKill() (tea.Model, tea.Cmd) {
+	sessions := m.pendingKill
+	confirmed := m.binding != nil && m.binding.confirm
+	m.pendingKill = nil
+	m.binding = nil
+	m.form = nil
+	m.mode = modeDrill
+	if !confirmed || len(sessions) == 0 {
+		m.status = "cancelled"
+		return m, nil
+	}
+	killed, failed := 0, 0
+	for _, s := range sessions {
+		if err := m.killer(s); err != nil {
+			failed++
+		} else {
+			killed++
+		}
+	}
+	m.sessions = launch.ListSessions()
+	if m.drill != nil {
+		m.loadDrillCard(m.drill) // refresh live/stale rows after the kill
+	}
+	m.status = fmt.Sprintf("killed %d %s", killed, plural(killed, "session"))
+	if failed > 0 {
+		m.status += fmt.Sprintf(", %d failed", failed)
+	}
+	return m, nil
+}
+
 // liveSessionFor returns the running gogo-* tmux session launched for slug, or
 // "". It matches the session's sanitized-slug component EXACTLY (launch.
 // SessionMatchesSlug), never by substring — so one feature's session is never
@@ -419,6 +532,26 @@ func liveSessionFor(slug string, sessions []string) string {
 		}
 	}
 	return ""
+}
+
+// liveSessionsFor returns ALL running gogo-* tmux sessions launched for slug
+// (exact SessionMatchesSlug, TEST-005) — the kill targets for the drill `K`.
+func liveSessionsFor(slug string, sessions []string) []string {
+	var out []string
+	for _, s := range sessions {
+		if launch.SessionMatchesSlug(s, slug) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// plural returns noun or noun+"s" for a count.
+func plural(n int, noun string) string {
+	if n == 1 {
+		return noun
+	}
+	return noun + "s"
 }
 
 func maxInt(a, b int) int {

@@ -1,0 +1,25 @@
+{
+  "slug": "immediate-kill-at-ship",
+  "phase": "test",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-immediate-kill-at-ship/plan.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    "cli/internal/orchestrator/sweep.go",
+    "cli/internal/launch/launch.go",
+    "cli/go.go",
+    "skills/gogo-done/SKILL.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-immediate-kill-at-ship/test/issues.json",
+    ".gogo/work/feature-immediate-kill-at-ship/test/test-01.md",
+    ".gogo/work/feature-immediate-kill-at-ship/test/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Round 1 test GREEN, all hands-on run live (nothing blocked, tmux present). Go suite gofmt/vet/test-race clean incl. 5 named regression tests (TestSweepTargetedOnlyNamedSlug, TestSweepSparesSelf, TestSweepReapsOrphansAndTerminal, TestSweepDryRunKillsNothing, TestSkillsBashNoUnsafeRm). Safe scratch-tmux harness proved targeted `gogo sweep <slug>` reaps only its own driving session while sparing a concurrent different-feature gogo-done host + all 3 real host sessions (live REV-002 fix proof); --dry-run kills nothing; self-guard live-demoed from inside the host; FR4 remain-on-exit removal confirmed by grep + live pane-close demo; whole-board tested via --dry-run only (host-global safety). Artifacts conform; `sweep --help` + invalid-slug rejection (exit 1) match parsing. Two minor DOC-only findings, both resolved without code change: TEST-001 (plan.md reconciled to as-built D4=B) fixed; TEST-002 (pre-existing events.jsonl chronology nit, out of scope) wontfix. 0 open issues -> advance to report."
+}

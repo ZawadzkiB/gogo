@@ -1,0 +1,33 @@
+{
+  "slug": "immediate-kill-at-ship",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-immediate-kill-at-ship/plan.md",
+    ".gogo/work/feature-immediate-kill-at-ship/state.md",
+    ".gogo/work/feature-immediate-kill-at-ship/decisions.md",
+    ".gogo/work/feature-immediate-kill-at-ship/adjustments.md",
+    ".gogo/work/feature-immediate-kill-at-ship/review/issues.json",
+    ".gogo/work/feature-immediate-kill-at-ship/test/issues.json",
+    ".gogo/work/feature-immediate-kill-at-ship/charts/manifest.json",
+    ".gogo/work/feature-immediate-kill-at-ship/charts/before/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-immediate-kill-at-ship/plan.md",
+    ".gogo/work/feature-immediate-kill-at-ship/report/report.md",
+    ".gogo/work/feature-immediate-kill-at-ship/report/flow.mmd",
+    ".gogo/work/feature-immediate-kill-at-ship/report/activity.mmd",
+    ".gogo/work/feature-immediate-kill-at-ship/report/class.mmd",
+    ".gogo/work/feature-immediate-kill-at-ship/report/manifest.json",
+    ".gogo/work/feature-immediate-kill-at-ship/report/before/flow.mmd",
+    ".gogo/work/feature-immediate-kill-at-ship/report/before/manifest.json",
+    ".gogo/work/feature-immediate-kill-at-ship/report/diagrams.html",
+    ".gogo/work/feature-immediate-kill-at-ship/report/result.json",
+    ".gogo/knowledge/code-review-standards.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/work/feature-immediate-kill-at-ship/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Report ⑤ for immediate-kill-at-ship (0.17.0): reconciled plan.md to as-built (targeted D4=B ship-reap), wrote report/report.md + the as-built UML set (flow/activity/class) + before/after compare (copied before set), and updated two owned knowledge docs (code-review-standards: terminal-feature-can-be-transiently-live gotcha; test-strategy: host-global sweep testing safety). Review APPROVE (REV-002 verified, REV-001 wontfix, REV-003 fixed), test GREEN. state.md -> awaiting-uat."
+}

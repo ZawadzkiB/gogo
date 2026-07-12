@@ -1,0 +1,28 @@
+flowchart TD
+  ENTER["board card · press enter<br/>updateBoard: openDrill(f)"] --> LOAD["openDrill assembles the card view"]
+
+  LOAD --> STATE[("state.md<br/>parseStateFile → Feature")]
+  LOAD --> REG[(".gogo/resources/cli/sessions/&lt;slug&gt;.json<br/>orchestrator.LoadRegistry")]
+  LOAD --> LIVE["launch.ListSessions() +<br/>SessionMatchesSlug (exact, TEST-005)"]
+  LOAD --> EV[("events.jsonl<br/>contract.ReadEvents")]
+  LOAD --> FILES["contract.Artifacts(f)<br/>(existing file list)"]
+
+  STATE --> PANEL["viewDrill: CARD DETAIL panel"]
+  REG --> SESS["sessionRows(reg, liveSessions)<br/>per-leg go|plan · status · live/stale · cost/turns"]
+  LIVE --> SESS
+  SESS --> PANEL
+  EV --> TAIL["compact recent-events tail<br/>(textfmt)"]
+  TAIL --> PANEL
+
+  PANEL --> DESC["description = Feature.Title (state.md feature:)"]
+  PANEL --> FOLD["folder = feature-&lt;slug&gt;/ (filepath.Base f.Dir)"]
+  PANEL --> ST["status = Feature.Status (+ phase · iterations)"]
+
+  PANEL --> KEYS{"drill keys"}
+  KEYS -- "a" --> ATT["attach → tea.ExecProcess(tmux AttachArgs(session))"]
+  KEYS -- "K (confirm)" --> KILL["kill live session(s) → launch.KillSession<br/>(exact-match reap; registry mark best-effort)"]
+  KEYS -- "up/down · enter" --> FILES
+  FILES --> OPEN["open artifact (glamour / issues / timeline / mmd)"]
+
+  ATT -.->|"never mutates pipeline state"| LIVE
+  KILL -.->|"never mutates pipeline state"| LIVE

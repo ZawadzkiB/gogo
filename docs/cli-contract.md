@@ -36,6 +36,27 @@ run per line. Forward-compatibility relies on the **consumer** parsing leniently
 schema — a strict validation of a future v2 line (new field) would wrongly reject
 it and drop a real transition.
 
+## Command surface (enumeration-sync anchor)
+
+The CLI's command surface is defined in `cli/main.go` (the runtime truth) and
+enumerated in **four** places that must stay in lockstep — this contract,
+`cli/main.go` help, `README.md` `## The gogo CLI`, and the on-demand companion
+reference `skills/gogo-cli/SKILL.md`. Any change to the surface updates **all
+four**; the `cli` test `TestCLICommandEnumerationInSync` greps them against
+`main.go`'s dispatch so a missing or renamed command can't drift silently.
+
+| Command | Read (this contract) vs launch/other |
+|---|---|
+| `gogo` | opens the interactive board over the `.gogo/` surface (pure read). |
+| `gogo go [<slug>]` · `gogo plan <slug>` | persistent-session launch verbs — delegated launches (CLI never mutates pipeline state; see *Changed in 0.15.0*). |
+| `gogo sweep [--dry-run] [<slug>...]` | reaps `gogo-*` sessions (whole-board, or targeted to the given slug(s)); CLI-owned bookkeeping only. |
+| `gogo status` | prints the work-index classifier table (pure read). |
+| `gogo view <target>` | reads a plan/report bundle → terminal or `--web` HTML (pure read). |
+| `gogo events <slug>` | reads `events.jsonl` → timeline (pure read). |
+| `gogo trash [restore <entry>]` | lists / restores `.gogo/trash/` entries (file moves, recoverable). |
+| `gogo run [<slug>]` | DEPRECATED alias for `gogo go`. |
+| `gogo --version` | prints the version (mirrors this contract's plugin version). |
+
 ### Changed in 0.11.0 (all additive — no key removed or renamed)
 
 The **UAT gate** and the `## Custom` knowledge convention extend the surface without
@@ -155,6 +176,39 @@ recognize keeps working against a 0.14.0 tree with no changes.
   also reap opportunistically when they see the target feature is terminal. Attribution is by exact
   `SessionMatchesSlug` (never substring).
 - **`gogo run` is now a deprecated alias** that prints a notice and forwards to `gogo go`.
+
+### Changed in 0.17.0 (all additive — no key removed or renamed; immediate kill-at-ship, D5=B)
+
+Kill-at-ship becomes **immediate** rather than next-sweep/next-launch-only, and the board's
+interactive launcher stops leaking dead panes. No command or flag is added; a reader sees
+only truthful live-session state sooner.
+
+- **`gogo sweep` gains an optional slug argument (`gogo sweep [<slug>...]`) — targeted mode.**
+  With no slug it is the unchanged **whole-board** manual cleanup (orphans + every terminal
+  feature + TTL). With one or more slugs it is **targeted**: the reap and the lock/registry
+  cleanup are restricted to sessions/features attributing (exact `SessionMatchesSlug` parse)
+  to the named slug(s). A slug that fails the kebab-case validator is rejected. Additive — a
+  reader that ignores the argument sees the prior behavior.
+- **`/gogo:done` reaps its driving session at ship — targeted to the shipped slug(s).** After
+  it flips each member's `state.md` to `shipped`, `/gogo:done` runs a **best-effort**
+  `gogo sweep <member-slug>...` (guarded on `command -v gogo`; a missing CLI / absent tmux /
+  sweep error is silently skipped and the ship still completes). Because the members are
+  already terminal, that reaps their `gogo-go-<slug>` / `gogo-plan-<slug>` driving sessions
+  immediately — so a just-shipped card shows no phantom "● session running" badge. Passing the
+  slug(s) (not a bare `gogo sweep`) keeps a ship from truncating a **different** feature's
+  concurrent `/gogo:done`. The whole-board `gogo sweep` / opportunistic next-launch reap
+  remains the backstop.
+- **`gogo sweep` spares the session it runs in (self-guard).** The sweeper never reaps the
+  tmux session hosting it (resolved from `tmux display-message -p '#S'` when `$TMUX` is set),
+  so the ship-reap above cannot truncate a `/gogo:done` running inside a board-launched
+  `gogo-done-<slug>` session — and `gogo sweep` is safe to invoke from any session context.
+  (The shipped card's own `gogo-done-<slug>` host therefore lingers until the user quits it or
+  a later sweep — a known, cosmetic limitation of self-reaping.) All other attribution/TTL/
+  orphan rules (§ 0.15.0) are unchanged.
+- **The board's interactive `Launch()` no longer sets `remain-on-exit`.** A board-launched
+  `gogo-*` session now closes when claude exits (parking at a gate keeps claude — and the
+  pane — alive), exactly like the `--attach` / headless `-p` paths, so a finished launch
+  leaves no dead pane and `ListSessions()` (the badge source) stays truthful.
 
 ## 1. The `.gogo/` layout a consumer reads
 

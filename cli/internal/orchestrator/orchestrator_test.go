@@ -367,6 +367,78 @@ func TestSweepDryRunKillsNothing(t *testing.T) {
 	}
 }
 
+// TestSweepSparesSelf proves the FR3 self-guard: `gogo sweep` never kills the
+// session it is itself running in, even when that session's owning feature is
+// terminal. This is what makes the /gogo:done ship-reap (which runs plain
+// `gogo sweep` after flipping members to `shipped`) safe when /gogo:done is
+// hosted in a board-launched gogo-done-<slug> session — it reaps the driving
+// gogo-go-<slug> but spares its own host, so the ship is never truncated.
+func TestSweepSparesSelf(t *testing.T) {
+	root := t.TempDir()
+	repo := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "x", Status: "shipped"}, // terminal → its sessions are reap candidates
+	}}
+	sessions := []string{
+		"gogo-done-x", // == Self: the session hosting /gogo:done → SPARE (self-guard)
+		"gogo-go-x",   // x's driving session, x is shipped → reap
+	}
+	var killed []string
+	sw := &orchestrator.Sweeper{
+		Root: root, Repo: repo,
+		List: func() []string { return sessions },
+		Kill: func(n string) error { killed = append(killed, n); return nil },
+		Self: "gogo-done-x",
+		Out:  &bytes.Buffer{},
+	}
+	got := sw.Sweep()
+
+	if len(got) != 1 || got[0] != "gogo-go-x" {
+		t.Fatalf("sweep killed %v, want exactly [gogo-go-x] (driving session reaped)", got)
+	}
+	if contains(killed, "gogo-done-x") {
+		t.Errorf("sweep killed gogo-done-x — its own hosting session (self-guard breach)")
+	}
+}
+
+// TestSweepTargetedOnlyNamedSlug proves the D4=B targeted mode (REV-002 fix): a
+// slug-scoped sweep — what the /gogo:done ship-reap runs (`gogo sweep <slug>`) —
+// reaps ONLY the named slug's sessions. A DIFFERENT terminal feature's session
+// (e.g. another card's concurrent in-flight ship) and an orphan are BOTH spared,
+// so a ship can never truncate another feature's ship. The self-guard still
+// applies inside the targeted scan.
+func TestSweepTargetedOnlyNamedSlug(t *testing.T) {
+	root := t.TempDir()
+	repo := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "x", Status: "shipped"}, // the slug being shipped → its sessions are in scope
+		{Slug: "z", Status: "shipped"}, // a DIFFERENT terminal feature (concurrent ship) → out of scope
+	}}
+	sessions := []string{
+		"gogo-go-x",   // x's driving session, x named + terminal → reap
+		"gogo-done-x", // == Self: x's ship host → SPARE (self-guard)
+		"gogo-done-z", // z's concurrent ship host, terminal but NOT named → SPARE (targeted)
+		"gogo-go-orphan",
+	}
+	var killed []string
+	sw := &orchestrator.Sweeper{
+		Root: root, Repo: repo,
+		List: func() []string { return sessions },
+		Kill: func(n string) error { killed = append(killed, n); return nil },
+		Self: "gogo-done-x",
+		Only: []string{"x"},
+		Out:  &bytes.Buffer{},
+	}
+	got := sw.Sweep()
+
+	if len(got) != 1 || got[0] != "gogo-go-x" {
+		t.Fatalf("targeted sweep killed %v, want exactly [gogo-go-x]", got)
+	}
+	for _, spared := range []string{"gogo-done-z", "gogo-go-orphan", "gogo-done-x"} {
+		if contains(killed, spared) {
+			t.Errorf("targeted `gogo sweep x` reaped %q — a session outside slug x (REV-002 breach)", spared)
+		}
+	}
+}
+
 // --- 6. exit classification --------------------------------------------------
 
 func TestExitClassifyAwaitingUAT(t *testing.T) {

@@ -1,0 +1,20 @@
+flowchart TD
+  done["/gogo:done &lt;slug&gt;"] --> synth["synthesize changelog entry<br/>(report.md · .mmd · manifest.json)"]
+  synth --> mark["step 5: mark each member<br/>state.md → shipped"]
+  mark --> reap{"gogo on PATH?<br/>(best-effort guard)"}
+  reap -- no --> skip["skip reap silently<br/>(whole-board sweep / next-launch backstop)"]
+  reap -- yes --> sweep["gogo sweep &lt;member-slug&gt;...<br/>(TARGETED — only the shipped slugs)"]
+  sweep --> scan["Sweeper.Sweep():<br/>for each live gogo-* session"]
+  scan --> self{"session == Self?<br/>(current tmux session)"}
+  self -- yes --> spare["SPARE — never self-kill<br/>(gogo-done-&lt;slug&gt; hosting /gogo:done)"]
+  self -- no --> only{"session owns a named slug?<br/>(matchesOnly — targeted filter)"}
+  only -- no --> other["SPARE — another feature's session<br/>(e.g. a concurrent gogo-done-z ship) · REV-002 fix"]
+  only -- yes --> term{"owning feature terminal<br/>or orphan?"}
+  term -- yes --> kill["KillSession — reap<br/>gogo-go-&lt;slug&gt; driving session"]
+  term -- no --> keep["spare (live, non-terminal)"]
+  skip --> viewer["build viewer page · Return"]
+  spare --> viewer
+  other --> viewer
+  kill --> viewer
+  keep --> viewer
+  viewer --> badge["board badge truthful:<br/>no '● session running' on the shipped card's driving session"]
