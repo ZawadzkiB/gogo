@@ -1,0 +1,23 @@
+{
+  "slug": "immediate-kill-at-ship",
+  "updated": "2026-07-12",
+  "members": ["immediate-kill-at-ship"],
+  "note": "Shipped 0.17.0 — a TARGETED, best-effort /gogo:done ship->reap (gogo sweep <slug>...) that touches only the shipped slug(s): Sweeper.Only targeted filter (D4=B, the REV-002 fix) so a ship can never truncate another feature's in-flight /gogo:done; Sweeper.Self self-guard spares the hosting gogo-done session; the named slug's driving gogo-go-<slug> is reaped; board Launch() `remain-on-exit` dropped (FR4) so a finished pane closes. Review APPROVE (REV-002 verified fixed, REV-001 own-host-lingers accepted as works-as-designed, REV-003 doc-sync fixed), test GREEN. before/ holds the plan-time flow baseline for compare mode.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "immediate-kill-at-ship-flow.mmd",
+      "title": "Targeted ship -> reap flow — /gogo:done marks members shipped then runs gogo sweep <slug>...; matchesOnly spares other features' sessions (REV-002), the self-guard spares the hosting gogo-done session, and the named slug's driving gogo-go-<slug> is reaped"
+    },
+    {
+      "kind": "activity",
+      "file": "immediate-kill-at-ship-activity.mmd",
+      "title": "Session lifecycle — running -> exited/closed (no remain-on-exit, FR4) and running -> shipped -> reaped (immediate kill-at-ship, FR1)"
+    },
+    {
+      "kind": "class",
+      "file": "immediate-kill-at-ship-class.mmd",
+      "title": "Code structure — Sweeper.Self self-guard + Sweeper.Only targeted filter in Sweep() (FR3 + D4=B), wired by cmdSweep from launch.CurrentSession + validated slugs, and launch.Launch with remain-on-exit dropped (FR4)"
+    }
+  ]
+}

@@ -25,11 +25,11 @@
 
 - **feature:** immediate kill-at-ship — /gogo:done reaps its driving session at ship + board Launch() stops leaking (D5=B)
 - **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** awaiting-uat    <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
+- **status:** shipped    <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
 - **created:** 2026-07-12
 - **completed:** 2026-07-12
 - **accepted:** 2026-07-12 (user; D1-D3 accepted at plan; D4→B accepted 2026-07-12: targeted ship-reap supersedes D1=A)
 - **branch:** n/a
 - **iterations:** plan=1 · implement=3 · review=2 · test=1   <!-- add · uat=N once a UAT round loops back to planning -->
-- **resume:** awaiting UAT — verify the work; `/gogo:done immediate-kill-at-ship` accepts (ships to changelog), or describe issues to loop back into planning (same item, reruns ②→⑤). Report: report/report.md · report/diagrams.html.
+- **resume:** SHIPPED 2026-07-12 as v0.17.0 — changelog entry `.gogo/changelog/2026-07-12-immediate-kill-at-ship/` (report.md + slug-prefixed flow/activity/class .mmd + before/ + manifest). The frozen /gogo:done (stale-plugin dangerous-rm prompt) was finalized by hand after the ship session was killed; terminal (no further action).
 - **open-decision:** none    <!-- D1-D3 at plan; D4→B resolved 2026-07-12 -->
