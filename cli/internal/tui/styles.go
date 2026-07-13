@@ -28,7 +28,62 @@ var (
 	titleText    = lipgloss.AdaptiveColor{Light: "#111418", Dark: "#e6e9ef"}
 	waitAccent   = lipgloss.AdaptiveColor{Light: "#c0392b", Dark: "#ff6b6b"}
 	uatAccent    = lipgloss.AdaptiveColor{Light: "#8250df", Dark: "#b392f0"} // awaiting-uat — purple
+
+	// Redesign tokens (cockpit-redesign): the palette was already present; these
+	// are the few genuinely-new ones the mockup's new elements need.
+	secondaryText = lipgloss.AdaptiveColor{Light: "#3a4048", Dark: "#b7bdc9"} // light body on changelog/footer
+	faintText     = lipgloss.AdaptiveColor{Light: "#9aa0aa", Dark: "#5f6572"} // changelog dates
+	pendingDot    = lipgloss.AdaptiveColor{Light: "#c9cdd6", Dark: "#4a5060"} // pending phase glyph/segment
+
+	// Faint tinted chip backgrounds for the status pills — colored text on a faint
+	// accent wash (the mockup's rounded chips). No TTY under `go test` → lipgloss
+	// emits plain text, so the pill LABEL stays substring-assertable.
+	redTint    = lipgloss.AdaptiveColor{Light: "#fbe9e7", Dark: "#2a1719"}
+	amberTint  = lipgloss.AdaptiveColor{Light: "#fbf1e0", Dark: "#2a2113"}
+	purpleTint = lipgloss.AdaptiveColor{Light: "#f0e9fb", Dark: "#1f1830"}
+	dimTint    = lipgloss.AdaptiveColor{Light: "#eceef2", Dark: "#1b1f27"}
 )
+
+// Phase-progress colors (shared by the FR-4 dots and the FR-9 segmented bars —
+// one vector, two renderers): done = ready green, current = in-progress amber,
+// pending = the faint grey token.
+var (
+	phaseDoneStyle    = lipgloss.NewStyle().Foreground(columnAccent[2])
+	phaseCurrentStyle = lipgloss.NewStyle().Bold(true).Foreground(columnAccent[1])
+	phasePendingStyle = lipgloss.NewStyle().Foreground(pendingDot)
+
+	// Status-pill chips (FR-3) + gate-type pills (FR-8): colored label on a faint
+	// tinted wash. Padding(0,1) gives the rounded-chip breathing room.
+	pillRed    = lipgloss.NewStyle().Bold(true).Foreground(waitAccent).Background(redTint).Padding(0, 1)
+	pillAmber  = lipgloss.NewStyle().Bold(true).Foreground(columnAccent[1]).Background(amberTint).Padding(0, 1)
+	pillPurple = lipgloss.NewStyle().Bold(true).Foreground(uatAccent).Background(purpleTint).Padding(0, 1)
+	pillDim    = lipgloss.NewStyle().Foreground(dimText).Background(dimTint).Padding(0, 1)
+
+	secondaryStyle = lipgloss.NewStyle().Foreground(secondaryText)
+	faintStyle     = lipgloss.NewStyle().Foreground(faintText)
+	keyChipStyle   = lipgloss.NewStyle().Foreground(secondaryText).Background(focusBg).Padding(0, 1) // footer key-chips
+
+	// stripBoxStyle is the FR-8 needs-you inbox frame: a red-bordered box with a
+	// faint red wash — the answer-first attention surface above the board.
+	stripBoxStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(waitAccent).Background(stripBg).Padding(0, 1)
+)
+
+// stripBg is the faint wash behind the needs-you strip (mockup rgba(255,107,107,.05)).
+var stripBg = lipgloss.AdaptiveColor{Light: "#fdf3f2", Dark: "#171b24"}
+
+// gateBorder is the card border for a card that needs the user: a heavy `┃` left
+// edge (the mockup's left-accent stripe) recolored red (plan/decision) or purple
+// (uat) via BorderLeftForeground. The heavy glyph is what makes the stripe
+// substring-assertable (a flowing card keeps the plain `│`), independent of focus.
+var gateBorder = func() lipgloss.Border {
+	b := lipgloss.RoundedBorder()
+	b.Left = "┃"
+	return b
+}()
+
+// gateStripe is the left-stripe glyph a gate card carries (used by the test +
+// the assertable-element check); "" for a flowing card.
+const gateStripe = "┃"
 
 // colStyleSet is the precomputed card/header frame styles for one column.
 type colStyleSet struct {
@@ -36,7 +91,6 @@ type colStyleSet struct {
 	card         lipgloss.Style // normal (subtle border)
 	cardFocused  lipgloss.Style // full-card highlight: accent border + subtle bg
 	cardSelected lipgloss.Style // selected-for-ship: accent border
-	badge        lipgloss.Style
 }
 
 var (
@@ -47,7 +101,6 @@ var (
 	sessionStyle = lipgloss.NewStyle().Bold(true).Foreground(sessionDot)
 	selMarkStyle = lipgloss.NewStyle().Bold(true).Foreground(selectAccent)
 	waitStyle    = lipgloss.NewStyle().Bold(true).Foreground(waitAccent)
-	uatStyle     = lipgloss.NewStyle().Bold(true).Foreground(uatAccent)
 	helpStyle    = lipgloss.NewStyle().Foreground(dimText)
 	sepStyle     = lipgloss.NewStyle().Foreground(subtleBorder) // vertical column separators (FR-B4)
 )
@@ -61,7 +114,6 @@ func init() {
 			card:         base.BorderForeground(subtleBorder),
 			cardFocused:  base.BorderForeground(accent).Background(focusBg).Foreground(focusFg).Bold(true),
 			cardSelected: base.BorderForeground(selectAccent),
-			badge:        lipgloss.NewStyle().Foreground(accent),
 		}
 	}
 }

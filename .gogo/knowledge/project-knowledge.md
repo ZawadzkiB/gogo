@@ -238,6 +238,33 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   deterministic, LLM-free reader that never mutates pipeline state; the frozen contract
   stays additive (§0.15.0). Slash command set unchanged at **13** (`gogo go`/`plan`/`sweep`
   are CLI-binary subcommands); version **0.15.0**.
+- **Cockpit redesign — 1b + 1c board restyle (0.18.0):** the `gogo` TUI board
+  (`cli/internal/tui/`) is restyled to the Claude-Design **1b + 1c** mockup —
+  **presentation-only**, over the **same `contract.Repo`** (no contract change, no new
+  pipeline state; the CLI stays a deterministic, LLM-free reader). New per-card + board
+  elements: a **header attention summary** (`⏸ K need you` pill when K>0 · `● S session`),
+  **status pills** (`pillLabel`/`pillStyleFor` transform; `badge()` stays canonical),
+  **phase dots `①②③④⑤`** and a **segmented bar** — both rendering ONE shared
+  `phaseProgress(f) [5]phaseState` vector (dots on cards, bar on the strip), a left
+  **gate stripe** (heavy `┃` `gateBorder`, red plan/decision · purple uat, focus-independent),
+  **underlined column headers** (no `(N)`), a **collapsed changelog** list (`✓ slug … MM-DD`),
+  a **contextual footer** (focused card's key-chips + `[?] all keys`), and a top **needs-you
+  inbox strip** (`⏸ NEEDS YOU (N)`, one row per `WaitingForInput()` gate; gates ALSO stay in
+  their columns — a shortcut, not a move) with **`1..9` number-key answering** (jump-focus +
+  read plan/report) and a `?` full-help toggle; the strip **degrades to a one-line summary**
+  on a short terminal so the board never overflows (`colAvail` subtracts the strip height).
+  Slash command set unchanged; version **0.18.0** (bumped in `plugin.json` + `cli/main.go`).
+- **Running-vs-status decoupling + UAT re-plan label (0.19.0):** presentation-only follow-up
+  on the redesign. `badge()` no longer treats a live session as `"running"` — session
+  liveness is a **separate** signal (the green `●` name-row dot + the header `● N session`
+  count), so the status pill always shows the true `state.md` status. A `shipped` card whose
+  just-finished `gogo-done-<slug>` host still lingers reads **`shipped`** (not `running`) — the
+  documented self-reap limitation becomes cosmetically harmless — and an in-flight card reads
+  its phase (`review r2`) beside the `●` dot. `badge`/`pillLabel`/`pillStyleFor` drop the
+  now-unused `sessions` param; the dead `pillGreen`/`greenTint` styles are removed. A mid-UAT
+  re-plan (`waiting-for-user` carrying a `UAT round N` open-decision) reads **`⏸ re-planning ·
+  UAT N`** (a `uat re-plan` gate), distinct from a generic decision fork. No contract/classifier
+  change (docs/cli-contract.md §"Changed in 0.19.0"); version **0.19.0**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

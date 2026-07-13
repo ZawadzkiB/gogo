@@ -1,0 +1,25 @@
+{
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    "plan.md",
+    "state.md",
+    "decisions.md",
+    "review/issues.json",
+    "test/issues.json",
+    "charts/manifest.json",
+    "charts/before/manifest.json"
+  ],
+  "outputs": [
+    "report/report.md",
+    "report/flow.mmd",
+    "report/sequence.mmd",
+    "report/diagrams.html",
+    "report/manifest.json",
+    "report/before/flow.mmd",
+    "report/before/manifest.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "As-built report for the 1b+1c cockpit redesign (0.18.0): all phases green (review APPROVE, test GREEN), REV-001..003 + TEST-001 fixed in-context; as-built flow + FR-10 sequence drawn, before/after flow compared, project-knowledge.md updated. Feature parked at the UAT gate."
+}

@@ -1,0 +1,47 @@
+flowchart TD
+  repo[("contract.Repo\n(Features, Status, Phase, Iterations, sessions)")]
+  progress["model.go: phaseProgress(f) → [5]phaseState\n(done / current / pending)"]
+  pill["model.go: pillLabel(f) / pillStyleFor(f)\n(badge() stays canonical)"]
+
+  view["view.go: viewBoard()"]
+  header["FR-1 header: 'gogo cockpit  N features'\n+ right: ⏸ K need you (red pill) · ● S session"]
+  strip["FR-8 renderNeedsYouStrip: '⏸ NEEDS YOU (N)'\ngate-type pill + one-line + [n] answer  (1c)"]
+  cols["renderColumn(i) ×4"]
+  colhead["FR-2 columnHeader: underlined title + dim count (no (N))"]
+
+  card["renderCard() — richer card"]
+  cname["name (bright) + ● live session dot"]
+  cdesc["one-line desc (dim/secondary)"]
+  cpill["FR-3 status pill (tinted chip) via pillLabel"]
+  cdots["FR-4 phase dots ①②③④⑤ (green/amber/grey)"]
+  cbar["FR-9 5-segment bar (same vector)  (1c)"]
+  cstripe["FR-5 left accent stripe (red gate / purple uat)"]
+
+  chlog["FR-6 renderChangelogList: '✓ slug … MM-DD'\n(no boxes) + '↓ N more · enter to browse'"]
+  footer["FR-7 contextual footer: focused card key-chips\n+ [?] all keys"]
+
+  gates["model.go: gates() enumerator (stable order)"]
+  keys["update.go: 1..N answer gate · ? toggle full help (FR-10)"]
+
+  repo --> progress
+  repo --> pill
+  repo --> gates
+  repo --> view
+  view --> header
+  view --> strip
+  view --> cols
+  cols --> colhead
+  cols --> card
+  card --> cname
+  card --> cdesc
+  card --> cpill
+  card --> cdots
+  card --> cbar
+  card --> cstripe
+  cols --> chlog
+  view --> footer
+  progress --> cdots
+  progress --> cbar
+  pill --> cpill
+  gates --> strip
+  gates --> keys

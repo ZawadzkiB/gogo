@@ -1,0 +1,44 @@
+{
+  "slug": "cockpit-redesign",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-12",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "Decision-gate strip advertises `[g] resume`, but `g` is not a board key",
+      "description": "In model.go gateFor() the default (waiting-for-user / decision gate) branch sets answer=\"[g] resume\", which renderNeedsYouStrip prints as the gate row's answer affordance (`[N] read state · [g] resume`). But updateBoard (update.go) has no `g` case — `case \"g\"` only exists in updateViewer (viewport GotoTop). The actual resume/move key for a waiting-for-user card (ClassInProgress) is `m` (move.go: \"in-progress → go(resume)\"). So a decision-gate row tells the user to press `g`, which is a no-op on the board. Only the awaiting-uat and awaiting-plan-acceptance gates (answer `[d] ship` / `[m] accept`, both real board keys) are correct. This path is real (mid-UAT re-plan / parked decision) but has no fixture, so tests didn't catch it. The number-key jump still works (it focuses the card + opens the drill), so only the secondary answer-key label is wrong.",
+      "proposed_solution": "AGENT-FIXABLE: In model.go gateFor()'s default (decision) branch change answer from \"[g] resume\" to \"[m] resume\" (matching move.go's in-progress → go/resume via `m`). Optionally add a fixture with a waiting-for-user feature so the decision-gate row is asserted like the uat gate is in TestNeedsYouStripRender.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "fixed_in_round": 1,
+      "origin": "review",
+      "found_in_round": 1
+    },
+    {
+      "id": "REV-002",
+      "title": "Dead leftovers from the badge→pill migration (`uatStyle`, `colStyleSet.badge`)",
+      "description": "The implement round removed cardBadgeText/badgeStyleFor (superseded by pillLabel/pillStyleFor) but left their two collaborators orphaned: styles.go:107 `uatStyle` and the `badge` field of colStyleSet (declared in the struct, still assigned in init() at styles.go:121). Confirmed via grep that neither is read anywhere in cli/ anymore — `badgeStyleFor(f, columnStyles[colIdx].badge)` in the old view.go was their sole consumer (verified against HEAD). Go does not flag unused package vars / struct fields, so gofmt+vet stay green, but this is dead code that the coding-rules \"no dead or mocked-out code\" / \"keep diffs minimal\" bar asks to remove.",
+      "proposed_solution": "AGENT-FIXABLE: delete `uatStyle` from styles.go and remove the `badge lipgloss.Style` field from colStyleSet plus its assignment in init(). (uatAccent itself stays — it is still used by pillPurple and stripeAccent.)",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "fixed_in_round": 1,
+      "origin": "review",
+      "found_in_round": 1
+    },
+    {
+      "id": "REV-003",
+      "title": "gateNumberKey parses only 1–9; strip advertises `[N]` for N that can exceed 9",
+      "description": "gateNumberKey (update.go) accepts a single digit 1..9 (`len(s)==1 && '1'..'9'`). renderNeedsYouStrip labels each gate row `[%d]` = i+1 and the degraded summary says `press 1–%d to answer`, both of which can render `[10]`, `[11]`, … when more than nine cards are simultaneously WaitingForInput(). Those gates are then unreachable by number key (`10` is len 2 → rejected). Practical impact is very low (>9 concurrent user gates is unusual, and the strip would already be very tall / degraded), but the advertised affordance and the handler disagree.",
+      "proposed_solution": "AGENT-FIXABLE (optional): cap the per-row number affordance to the first 9 gates (show `[1]`..`[9]` and drop or plain-list the rest), or keep as-is and treat as wontfix given the negligible real-world frequency. No behavioural change is required to advance.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "fixed_in_round": 1,
+      "origin": "review",
+      "found_in_round": 1
+    }
+  ]
+}

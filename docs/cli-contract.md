@@ -203,12 +203,31 @@ only truthful live-session state sooner.
   so the ship-reap above cannot truncate a `/gogo:done` running inside a board-launched
   `gogo-done-<slug>` session — and `gogo sweep` is safe to invoke from any session context.
   (The shipped card's own `gogo-done-<slug>` host therefore lingers until the user quits it or
-  a later sweep — a known, cosmetic limitation of self-reaping.) All other attribution/TTL/
-  orphan rules (§ 0.15.0) are unchanged.
+  a later sweep — a known limitation of self-reaping. This is now **cosmetically harmless**:
+  the board's status pill is decoupled from session liveness, so the shipped card reads
+  `shipped` regardless of the lingering pane — never a "running" status. See the
+  running-vs-status decoupling in § 2.) All other attribution/TTL/orphan rules (§ 0.15.0) are
+  unchanged.
 - **The board's interactive `Launch()` no longer sets `remain-on-exit`.** A board-launched
   `gogo-*` session now closes when claude exits (parking at a gate keeps claude — and the
   pane — alive), exactly like the `--attach` / headless `-p` paths, so a finished launch
   leaves no dead pane and `ListSessions()` (the badge source) stays truthful.
+
+### Changed in 0.19.0 (all additive — presentation only; no key removed or renamed)
+
+- **`running` is a session-liveness signal, NOT a status.** The card's status pill always
+  shows the true pipeline state from `state.md` (`shipped`, `awaiting-uat`, `review r2`, …);
+  whether a `gogo-*` tmux session is live is a **separate** cue — the green `●` name-row dot,
+  the header `● N session` count, and the sessions status line. A live session therefore no
+  longer masquerades as a status, so a `shipped` card whose just-finished `gogo-done-<slug>`
+  host lingers reads `shipped` (not `running`), and an in-flight card reads its phase (e.g.
+  `review r2`) with the `●` dot beside its name. Purely how the reader renders existing
+  `state.md` + `ListSessions()` data — the status enum (§2) and classes (§3) are unchanged.
+- **A mid-UAT re-plan reads as `re-planning · UAT N`.** A `waiting-for-user` card whose
+  `open-decision` is `UAT round N` (the re-plan lock, `skills/gogo/SKILL.md`) is labelled a
+  `uat re-plan` gate — distinct from a generic decision fork — so the board says the analyst
+  is revising the plan rather than looking like a stuck decision. Derived from the already-read
+  `status` + `open-decision`; no new state.
 
 ## 1. The `.gogo/` layout a consumer reads
 

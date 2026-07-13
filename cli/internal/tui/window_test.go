@@ -112,17 +112,17 @@ func TestEmptyColumnWindow(t *testing.T) {
 
 // --- model / View integration (TEST-014) ------------------------------------
 
-// smallBoard focuses the changelog column on a short terminal so its 3 fixture
-// cards (5 rows each) must window: colAvail(13)=8 → one whole card + a ↓.
+// smallBoard focuses the PLAN column on a short terminal so its 3 fixture cards
+// (5 rows each) must window. At height 20 the needs-you strip (the fixture's one
+// awaiting-uat gate) takes 7 rows, leaving colAvail 8 → one whole card + a ↓.
+// (The changelog column is now a collapsed one-line list — FR-6 — so it no longer
+// windows as cards; its own overflow is covered by TestChangelogOverflowBrowseHint.)
 func smallBoard(t *testing.T) Model {
 	t.Helper()
 	m := newModel(t)
-	m = send(m, tea.WindowSizeMsg{Width: 200, Height: 13})
-	m = right(m) // → in progress (arrow — `l` is now peek)
-	m = right(m) // → ready
-	m = right(m) // → changelog (focused)
-	if m.colIdx != 3 {
-		t.Fatalf("did not focus changelog, colIdx=%d", m.colIdx)
+	m = send(m, tea.WindowSizeMsg{Width: 200, Height: 20})
+	if m.colIdx != 0 {
+		t.Fatalf("expected the plan column focused, colIdx=%d", m.colIdx)
 	}
 	return m
 }
@@ -139,15 +139,15 @@ func TestColumnWindowIndicatorsHiddenWhenFits(t *testing.T) {
 	}
 }
 
-// TestColumnWindowIndicatorsAndHint: when a column overflows it shows the ↓/↑
-// "N more" indicators AND a header position hint reflecting the visible range.
+// TestColumnWindowIndicatorsAndHint: when a WORK column overflows it shows the
+// ↓/↑ "N more" indicators AND a header position hint reflecting the visible range.
 func TestColumnWindowIndicatorsAndHint(t *testing.T) {
 	m := newModel(t)
-	m.height = 13 // colAvail = 8 → one 5-row card fits
-	m.colIdx = 3
+	m.height = 20 // colAvail = 8 (after the 7-row needs-you strip) → one 5-row card
+	m.colIdx = 0  // the plan column (3 five-row cards)
 
-	m.colOffset[3] = 0
-	top := m.renderColumn(3, m.boardColWidth())
+	m.colOffset[0] = 0
+	top := m.renderColumn(0, m.boardColWidth())
 	if !strings.Contains(top, "↓ 2 more") {
 		t.Errorf("top window missing ↓ indicator:\n%s", top)
 	}
@@ -158,8 +158,8 @@ func TestColumnWindowIndicatorsAndHint(t *testing.T) {
 		t.Errorf("top window wrongly showed a ↑ indicator:\n%s", top)
 	}
 
-	m.colOffset[3] = 2
-	bot := m.renderColumn(3, m.boardColWidth())
+	m.colOffset[0] = 2
+	bot := m.renderColumn(0, m.boardColWidth())
 	if !strings.Contains(bot, "↑ 2 more") {
 		t.Errorf("bottom window missing ↑ indicator:\n%s", bot)
 	}
@@ -176,9 +176,9 @@ func TestColumnWindowIndicatorsAndHint(t *testing.T) {
 // makes the last card reachable (the ↑ indicator appears once scrolled).
 func TestBoardWindowScrollIntoView(t *testing.T) {
 	m := smallBoard(t)
-	col := m.cols[3]
+	col := m.cols[0]
 	if len(col) < 3 {
-		t.Fatalf("changelog fixture has %d cards, need ≥3", len(col))
+		t.Fatalf("plan fixture has %d cards, need ≥3", len(col))
 	}
 
 	// At the top: the focused (first) card is visible, the last is hidden below.
@@ -210,32 +210,60 @@ func TestBoardWindowScrollIntoView(t *testing.T) {
 	}
 }
 
-// TestFilterResetClampsOffset: a filter that shrinks a scrolled column re-clamps
-// its offset into range (here down to 0 for a now single-card column).
+// TestFilterResetClampsOffset: a filter that shrinks a scrolled WORK column
+// re-clamps its offset into range (here down to 0 for a now single-card column).
 func TestFilterResetClampsOffset(t *testing.T) {
 	m := smallBoard(t)
-	// Scroll the changelog to the bottom.
-	for j := 1; j < len(m.cols[3]); j++ {
+	// Scroll the focused plan column to the bottom.
+	for j := 1; j < len(m.cols[0]); j++ {
 		m = send(m, runes("j"))
 	}
-	if m.colOffset[3] == 0 {
-		t.Fatalf("precondition: changelog should be scrolled (offset>0)")
+	if m.colOffset[0] == 0 {
+		t.Fatalf("precondition: the plan column should be scrolled (offset>0)")
 	}
 
-	// Filter down to a single changelog card.
+	// Filter down to a single plan card.
 	m = send(m, runes("/"))
-	for _, r := range "shipped-by-folder" {
+	for _, r := range "unfinished" {
 		m = send(m, runes(string(r)))
 	}
-	if len(m.cols[3]) != 1 {
-		t.Fatalf("filter left %d changelog cards, want 1", len(m.cols[3]))
+	if len(m.cols[0]) != 1 {
+		t.Fatalf("filter left %d plan cards, want 1", len(m.cols[0]))
 	}
-	if m.colOffset[3] != 0 {
-		t.Errorf("filter did not clamp the scroll offset: colOffset[3]=%d, want 0", m.colOffset[3])
+	if m.colOffset[0] != 0 {
+		t.Errorf("filter did not clamp the scroll offset: colOffset[0]=%d, want 0", m.colOffset[0])
 	}
 	// The lone card renders with no overflow noise.
-	if out := m.renderColumn(3, m.boardColWidth()); strings.Contains(out, "↑") || strings.Contains(out, "↓") {
+	if out := m.renderColumn(0, m.boardColWidth()); strings.Contains(out, "↑") || strings.Contains(out, "↓") {
 		t.Errorf("single-card column still shows overflow indicators:\n%s", out)
+	}
+}
+
+// TestChangelogCollapsedList (FR-6): the changelog column renders as a plain
+// `✓ slug … MM-DD` list (no card boxes), with an `N shipped` count in the header.
+func TestChangelogCollapsedList(t *testing.T) {
+	m := newModel(t)
+	out := m.renderColumn(3, m.boardColWidth())
+	for _, want := range []string{"changelog", "3 shipped", "✓ shipped-by-folder", "06-18"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("collapsed changelog missing %q:\n%s", want, out)
+		}
+	}
+	// No card boxes — the whole point of the collapse.
+	if strings.Contains(out, "╭") || strings.Contains(out, "╰") {
+		t.Errorf("changelog column should render no card boxes:\n%s", out)
+	}
+}
+
+// TestChangelogOverflowBrowseHint (FR-6): a changelog too tall for its window
+// shows `↓ N more · enter to browse` (the collapse's own overflow affordance).
+func TestChangelogOverflowBrowseHint(t *testing.T) {
+	m := newModel(t)
+	m.height = 9 // colAvail = 2 (degraded 2-row strip) → only one changelog row fits
+	m.colIdx = 3
+	out := m.renderColumn(3, m.boardColWidth())
+	if !strings.Contains(out, "↓ 2 more · enter to browse") {
+		t.Errorf("collapsed changelog overflow missing the browse hint:\n%s", out)
 	}
 }
 
@@ -269,7 +297,7 @@ func TestRefocusKeepsSlugUnderCursor(t *testing.T) {
 // re-windows without panicking and with valid offsets.
 func TestReloadReflowNoPanic(t *testing.T) {
 	m := smallBoard(t)
-	for j := 1; j < len(m.cols[3]); j++ {
+	for j := 1; j < len(m.cols[m.colIdx]); j++ {
 		m = send(m, runes("j"))
 	}
 	nm, _ := m.Update(reloadMsg{})

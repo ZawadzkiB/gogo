@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cockpit-redesign (before)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cockpit-redesign</code> (before / as-is baseline)</h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Before — current board render flow</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  repo[("contract.Repo\n(Features, Status, Phase, Iterations)")]
+  view["view.go: viewBoard()"]
+  header["header: 'gogo cockpit — N features'"]
+  cols["renderColumn(i) ×4"]
+  colhead["columnHeader: '▸ plan (3)'  (title + (N) count)"]
+  card["renderCard(): 3 rows"]
+  row1["row1: mark + slug + '● session'"]
+  row2["row2: title (dim)"]
+  row3["row3: badge text via cardBadgeText/badgeStyleFor\n(⏸ prefix when WaitingForInput)"]
+  chlog["changelog column: SAME renderCard boxes"]
+  status["boardStatusLine(): session hint"]
+  help["static help line: '←→ cols · space select · … · q quit'"]
+
+  repo --> view
+  view --> header
+  view --> cols
+  cols --> colhead
+  cols --> card
+  card --> row1
+  card --> row2
+  card --> row3
+  cols --> chlog
+  view --> status
+  view --> help
+  </pre></div>
+
+  <script src="../../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

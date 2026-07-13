@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-redesign",
+  "updated": "2026-07-12",
+  "note": "Intended design (plan ①): the redesigned board render flow (1b + 1c). New pure helpers — phaseProgress (one 5-slot done/current/pending vector powering both the FR-4 dots and the FR-9 bars), pillLabel/pillStyleFor (badge() stays canonical), and gates() (the needs-you strip + number-key answering) — feed the new elements over the SAME contract.Repo. The as-is baseline is charts/before/flow.mmd.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Redesigned board render flow (1b pills/dots/stripe/collapsed-changelog/footer + 1c needs-you strip/bars/number-keys)"
+    }
+  ]
+}

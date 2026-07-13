@@ -1,0 +1,25 @@
+flowchart TD
+  repo[("contract.Repo\n(Features, Status, Phase, Iterations)")]
+  view["view.go: viewBoard()"]
+  header["header: 'gogo cockpit — N features'"]
+  cols["renderColumn(i) ×4"]
+  colhead["columnHeader: '▸ plan (3)'  (title + (N) count)"]
+  card["renderCard(): 3 rows"]
+  row1["row1: mark + slug + '● session'"]
+  row2["row2: title (dim)"]
+  row3["row3: badge text via cardBadgeText/badgeStyleFor\n(⏸ prefix when WaitingForInput)"]
+  chlog["changelog column: SAME renderCard boxes"]
+  status["boardStatusLine(): session hint"]
+  help["static help line: '←→ cols · space select · … · q quit'"]
+
+  repo --> view
+  view --> header
+  view --> cols
+  cols --> colhead
+  cols --> card
+  card --> row1
+  card --> row2
+  card --> row3
+  cols --> chlog
+  view --> status
+  view --> help

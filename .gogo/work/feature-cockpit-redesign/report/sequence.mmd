@@ -1,0 +1,21 @@
+sequenceDiagram
+  actor U as User
+  participant B as update.go updateBoard
+  participant G as model.go gates()
+  participant Q as drill.go quickView
+  participant VP as viewer
+
+  Note over U,VP: FR-10 — answer a needs-you gate by its number key
+  U->>B: press "1".."9"
+  B->>B: gateNumberKey(key) → n
+  B->>G: gates() (WaitingForInput cards, board order)
+  G-->>B: []gate
+  alt n within range
+    B->>B: jumpToGate(n): focus gate.col/row + reflowColumns
+    B->>Q: quickView(gate.feature)
+    Q->>VP: open plan.md (plan gate) / report.md (uat gate)
+    VP-->>U: read-only view; esc returns to board, gate card focused
+    Note over U,B: then the board move key acts — [m] accept / [d] ship / [m] resume
+  else n out of range
+    B-->>U: status "no gate n — K need you (1..K)"
+  end

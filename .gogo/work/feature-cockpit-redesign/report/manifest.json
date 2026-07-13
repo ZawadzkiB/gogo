@@ -1,0 +1,17 @@
+{
+  "slug": "cockpit-redesign",
+  "updated": "2026-07-12",
+  "note": "As-built (report ⑤): the shipped board render flow (1b + 1c) plus the FR-10 number-key gate-answer interaction. The as-built matches the plan's intended design, with the D2 rendering split made concrete — the compact FR-4 dots ①②③④⑤ render on every board card, and the FR-9 segmented bar renders on the roomy needs-you strip gate rows ('bars where space allows'). Both call the one shared phaseProgress(f) [5]phaseState vector. The plan-time as-is baseline is in report/before/flow.mmd.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-built board render flow (1b pills/dots/┃-stripe/collapsed-changelog/footer + 1c needs-you strip/bars/number-keys)"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "FR-10 number-key gate answering: key → gates() → jumpToGate (focus + quickView read plan/report)"
+    }
+  ]
+}

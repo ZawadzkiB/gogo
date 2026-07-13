@@ -148,6 +148,10 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.filtering {
 		return m.updateFilter(msg)
 	}
+	// FR-10: 1..N jump to / read gate N from the needs-you strip.
+	if n, ok := gateNumberKey(msg.String()); ok {
+		return m.jumpToGate(n)
+	}
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, m.quit()
@@ -166,6 +170,9 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.filtering = true
 		m.status = "filter: type to narrow · enter keeps · esc clears"
+	case "?":
+		// FR-10: toggle the full key list (the pre-redesign long help line).
+		m.showAllKeys = !m.showAllKeys
 	case "enter":
 		if f := m.focusedCard(); f != nil {
 			m.openDrill(f)
@@ -191,6 +198,35 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// fully visible (scroll-into-view), and refresh each column's offset (TEST-014).
 	m.reflowColumns()
 	return m, nil
+}
+
+// gateNumberKey parses a single digit 1..9 into its gate index, or ok=false.
+func gateNumberKey(s string) (int, bool) {
+	if len(s) == 1 && s[0] >= '1' && s[0] <= '9' {
+		return int(s[0] - '0'), true
+	}
+	return 0, false
+}
+
+// jumpToGate (FR-10) answers strip gate N: it focuses that gate's card (so the
+// board move keys — [m] accept / [d] ship / [m] resume — act on it) and opens
+// its primary view via quickView ("read plan" for a plan gate, "read report" for
+// a uat gate). An out-of-range N is a status hint, no move.
+func (m Model) jumpToGate(n int) (tea.Model, tea.Cmd) {
+	gs := m.gates()
+	if n < 1 || n > len(gs) {
+		if len(gs) == 0 {
+			m.status = "no gates need you"
+		} else {
+			m.status = fmt.Sprintf("no gate %d — %d need you (1–%d)", n, len(gs), len(gs))
+		}
+		return m, nil
+	}
+	g := gs[n-1]
+	m.colIdx = g.col
+	m.cardIdx[g.col] = g.row
+	m.reflowColumns()
+	return m, m.quickView(g.feature)
 }
 
 // toggleSelect flips selection — ONLY for ready-to-ship cards (space guard).

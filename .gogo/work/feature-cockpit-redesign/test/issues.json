@@ -1,0 +1,20 @@
+{
+  "slug": "cockpit-redesign",
+  "track": "test",
+  "round": 1,
+  "updated": "2026-07-12",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "Stale doc-comment on jumpToGate still says `[g] resume` after REV-001's fix to `[m] resume`",
+      "description": "update.go:212-213, the comment above jumpToGate() reads: \"...the board move keys — [m] accept / [d] ship / [g] resume — act on it)...\". REV-001 (review round 1) changed gateFor()'s decision-gate answer text from \"[g] resume\" to \"[m] resume\" (model.go ~line 541, confirmed fixed and correct in the running code and in the live-TUI capture). The comment above jumpToGate was not updated to match, so it now documents the pre-fix, wrong key. Not user-facing (a code comment only — the actual rendered strip row correctly reads `[m] resume` in every render captured, including a live tmux drive), but it will mislead the next reader into thinking `g` is a real board key.",
+      "proposed_solution": "AGENT-FIXABLE: update the comment at update.go:212-213 to read \"...the board move keys — [m] accept / [d] ship / [m] resume — act on it)...\" (or reword to avoid repeating `[m]` twice, e.g. \"acts on it via the board's own key — [m] accept/go/resume, [d] ship\").",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "fixed_in_round": 2,
+      "origin": "test",
+      "found_in_round": 1
+    }
+  ]
+}

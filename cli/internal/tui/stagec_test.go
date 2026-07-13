@@ -15,22 +15,22 @@ import (
 func TestBadgeAwaitingUAT(t *testing.T) {
 	// A report-complete feature parked at the UAT gate → the awaiting-uat badge.
 	f := &contract.Feature{Slug: "uat-me", Phase: "knowledge", Status: "awaiting-uat"}
-	if got := badge(f, nil); got != "awaiting-uat" {
+	if got := badge(f); got != "awaiting-uat" {
 		t.Errorf("awaiting-uat badge = %q", got)
 	}
 
 	// Mid-UAT re-plan: the status flips to waiting-for-user, which MUST win over
 	// any awaiting-uat display (badge priority — REV-004).
 	mid := &contract.Feature{Slug: "uat-me", Phase: "plan", Status: "waiting-for-user"}
-	if got := badge(mid, nil); got != "waiting-for-user" {
+	if got := badge(mid); got != "waiting-for-user" {
 		t.Errorf("mid-UAT badge = %q, want waiting-for-user (priority)", got)
 	}
 
-	// A running session outranks the resting awaiting-uat badge (something is
-	// actively happening — e.g. a /gogo:done launch).
+	// A live session does NOT change the status: liveness is a separate signal (the
+	// ● dot), so a /gogo:done launch on an awaiting-uat card still reads awaiting-uat.
 	f2 := &contract.Feature{Slug: "uat-me", Status: "awaiting-uat"}
-	if got := badge(f2, []string{"gogo-done-uat-me"}); got != "running" {
-		t.Errorf("running should outrank awaiting-uat, got %q", got)
+	if got := badge(f2); got != "awaiting-uat" {
+		t.Errorf("badge must stay the status regardless of a live session, got %q", got)
 	}
 }
 

@@ -1,0 +1,44 @@
+flowchart TD
+  repo[("contract.Repo\n(Features, Status, Phase, Iterations, sessions)")]
+  progress["model.go: phaseProgress(f) → [5]phaseState\n(done / current / pending) — ONE shared vector (D2)"]
+  pill["model.go: pillLabel(f) / pillStyleFor(f)\n(badge() stays canonical)"]
+  gates["model.go: gates() → []gate\n(WaitingForInput cards, board order)"]
+  stripefn["model.go: stripeAccent(f)\n(red plan/decision · purple uat)"]
+
+  view["view.go: viewBoard()"]
+  header["FR-1 header: 'gogo cockpit  N features'\n+ right: ⏸ K need you (red pill, K>0) · ● S session"]
+  strip["FR-8 renderNeedsYouStrip: '⏸ NEEDS YOU (N)'\ngate pill + blocked line + [n] read · answer + FR-9 bar\nD3: degrades to a 1-line summary when short"]
+  cols["renderColumn(i) ×4"]
+  colhead["FR-2 columnHeader: underlined title + dim count (no (N))"]
+  chlog["FR-6 renderChangelogColumn: '✓ slug … MM-DD'\n(no boxes) + '↓ N more · enter to browse'"]
+  footer["FR-7 contextualFooter: focused card key-chips\n+ [?] all keys  (? toggles the full key list)"]
+
+  card["renderCard() — 3-row richer card"]
+  cname["row1: name (bright) + bare ● live-session dot"]
+  cdesc["row2: one-line desc (dim)"]
+  crow3["row3: FR-3 status pill (tinted chip) + FR-4 dots ①②③④⑤"]
+  cstripe["FR-5 heavy ┃ left stripe (gateBorder), focus-independent"]
+
+  keys["update.go: 1..9 jumpToGate → focus + quickView\n(read plan/report) · ? toggle full help (FR-10)"]
+
+  repo --> progress
+  repo --> pill
+  repo --> gates
+  repo --> view
+  view --> header
+  view --> strip
+  view --> cols
+  view --> footer
+  cols -->|work cols| card
+  cols -->|changelog| chlog
+  card --> cname
+  card --> cdesc
+  card --> crow3
+  card --> cstripe
+  progress --> crow3
+  progress --> strip
+  pill --> crow3
+  stripefn --> cstripe
+  gates --> strip
+  gates --> header
+  gates --> keys

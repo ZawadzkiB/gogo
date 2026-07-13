@@ -30,13 +30,13 @@ func (m Model) View() string {
 
 func (m Model) viewBoard() string {
 	total := len(m.repo.Features)
-	header := colTitleStyle.Render(fmt.Sprintf("gogo cockpit — %d features", total))
+	left := colTitleStyle.Render("gogo cockpit") + "  " + dimStyle.Render(fmt.Sprintf("%d features", total))
 	if m.filter != "" {
-		header += dimStyle.Render("  /" + m.filter)
+		left += dimStyle.Render("  /" + m.filter)
 	}
+	header := placeApart(left, m.attentionSummary(), m.boardBodyWidth())
 
 	colWidth := m.boardColWidth()
-
 	var rendered []string
 	for i := 0; i < 4; i++ {
 		rendered = append(rendered, m.renderColumn(i, colWidth))
@@ -47,8 +47,46 @@ func (m Model) viewBoard() string {
 	if status == "" {
 		status = m.boardStatusLine()
 	}
-	help := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · / filter · q quit"
-	return strings.Join([]string{header, body, statusStyle(status), helpStyle.Render(help)}, "\n")
+
+	// Header · (needs-you strip, 1c) · columns · status · contextual footer.
+	parts := []string{header}
+	if strip := m.renderNeedsYouStrip(); strip != "" {
+		parts = append(parts, strip)
+	}
+	parts = append(parts, body, statusStyle(status), m.contextualFooter())
+	return strings.Join(parts, "\n")
+}
+
+// placeApart lays a left and a right segment on one line `width` wide, padding
+// the gap between them — the FR-1 header (identity | attention summary) and the
+// FR-7 footer (card keys | [?] all keys) split.
+func placeApart(left, right string, width int) string {
+	if right == "" {
+		return left
+	}
+	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = 1
+	}
+	return left + strings.Repeat(" ", gap) + right
+}
+
+// attentionSummary is the FR-1 right-aligned header cue: a red `⏸ K need you`
+// pill (only when K>0), then a green `● S session` count (only when S>0).
+func (m Model) attentionSummary() string {
+	k := len(m.gates())
+	s := len(m.sessions)
+	var out string
+	if k > 0 {
+		out = pillRed.Render(fmt.Sprintf("%s %d need you", waitingMarker, k))
+	}
+	if s > 0 {
+		if out != "" {
+			out += "  "
+		}
+		out += sessionStyle.Render(fmt.Sprintf("● %d session", s))
+	}
+	return out
 }
 
 // interleaveSeparators inserts a full-height vertical rule between the rendered
@@ -96,6 +134,9 @@ func (m Model) boardStatusLine() string {
 }
 
 func (m Model) renderColumn(i, colWidth int) string {
+	if isChangelogCol(i) {
+		return m.renderChangelogColumn(i, colWidth) // FR-6: a collapsed list, not cards
+	}
 	col := m.cols[i]
 
 	if len(col) == 0 {
@@ -145,19 +186,93 @@ func (m Model) renderColumn(i, colWidth int) string {
 	return lipgloss.NewStyle().Width(colWidth).Render(strings.Join(parts, "\n"))
 }
 
-// columnHeader renders a column's title + count, the ▸ focus marker, and an
-// optional scroll-position hint (shown only when the column overflows — no noise
-// on short columns). The hint tells the user where the visible window sits in
-// the full list (TEST-014 position indicator).
+// renderChangelogColumn renders the collapsed changelog (FR-6): plain
+// `✓ slug … MM-DD` rows (no card boxes), windowed like the work columns (unit
+// row heights — see cardHeights), overflow shown as `↓ N more · enter to browse`.
+func (m Model) renderChangelogColumn(i, colWidth int) string {
+	col := m.cols[i]
+	if len(col) == 0 {
+		parts := []string{m.columnHeader(i, ""), "", dimStyle.Render("(none)")}
+		return lipgloss.NewStyle().Width(colWidth).Render(strings.Join(parts, "\n"))
+	}
+	rowW := colWidth - 2
+	if rowW < 12 {
+		rowW = 12
+	}
+	heights := m.cardHeights(i, rowW) // 1 per row for the changelog (cardHeights special-cases it)
+
+	start, end := 0, len(col)
+	if m.height > 0 {
+		avail := m.colAvail()
+		if avail < 1 {
+			avail = 1
+		}
+		start = clamp(m.colOffset[i], 0, len(col)-1)
+		end = fitEnd(heights, start, avail)
+	}
+
+	hint := ""
+	if start > 0 || end < len(col) {
+		hint = fmt.Sprintf("%d–%d", start+1, end)
+	}
+	parts := []string{m.columnHeader(i, hint), ""}
+	if start > 0 {
+		parts = append(parts, faintStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
+	}
+	for _, f := range col[start:end] {
+		parts = append(parts, changelogRow(f, rowW))
+	}
+	if below := len(col) - end; below > 0 {
+		parts = append(parts, faintStyle.Render(fmt.Sprintf("  ↓ %d more · enter to browse", below)))
+	}
+	return lipgloss.NewStyle().Width(colWidth).Render(strings.Join(parts, "\n"))
+}
+
+// changelogRow is one collapsed changelog entry (FR-6): `✓ slug` (secondary,
+// truncated) left, `MM-DD` (faint) right — no box.
+func changelogRow(f *contract.Feature, width int) string {
+	date := shortDate(f.Completed)
+	if date == "" {
+		date = shortDate(f.Created)
+	}
+	dateW := len([]rune(date))
+	slugMax := width - dateW - 3 // "✓ " + at least a one-cell gap
+	if slugMax < 4 {
+		slugMax = 4
+	}
+	left := "✓ " + truncate(f.Slug, slugMax)
+	gap := width - lipgloss.Width(left) - dateW
+	if gap < 1 {
+		gap = 1
+	}
+	return secondaryStyle.Render(left) + strings.Repeat(" ", gap) + faintStyle.Render(date)
+}
+
+// shortDate reduces a YYYY-MM-DD date to MM-DD (the changelog's compact form);
+// anything else passes through unchanged.
+func shortDate(s string) string {
+	if len(s) >= 10 && s[4] == '-' && s[7] == '-' {
+		return s[5:10]
+	}
+	return s
+}
+
+// columnHeader renders a column's title + count (FR-2: an accent, underlined
+// title + a trailing dim count — no `(N)` parentheses), a ▸ focus marker, and an
+// optional scroll-position hint (only when the column overflows — no noise on
+// short columns). The changelog count reads `N shipped` (FR-6).
 func (m Model) columnHeader(i int, hint string) string {
 	st := columnStyles[i]
 	n := len(m.cols[i])
-	var head string
-	if i == m.colIdx {
-		head = st.header.Render("▸ "+columnTitles[i]) + st.header.Render(fmt.Sprintf(" (%d)", n))
-	} else {
-		head = "  " + st.header.Render(fmt.Sprintf("%s (%d)", columnTitles[i], n))
+	countTxt := fmt.Sprintf("%d", n)
+	if isChangelogCol(i) {
+		countTxt = fmt.Sprintf("%d shipped", n)
 	}
+	marker := "  "
+	if i == m.colIdx {
+		marker = "▸ "
+	}
+	head := marker + st.header.Underline(true).Render(columnTitles[i]) + dimStyle.Render(" "+countTxt)
 	if hint != "" {
 		head += dimStyle.Render(" · " + hint)
 	}
@@ -172,17 +287,16 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	selected := f.Class == contract.ClassReadyToShip && m.selected[f.Slug]
 	hasSession := hasLiveSession(f.Slug, m.sessions)
 
-	slug := truncate(f.Slug, width)
 	title := f.Title
 	if title == "" {
 		title = f.Slug
 	}
-	b := badge(f, m.sessions)
 
+	// Three rows: name (+ mark, + live ● dot) · one-line desc · status pill + phase dots.
 	var head, titleLine, badgeLine string
 	if focused {
 		// Plain inner text — the frame carries one foreground + background so the
-		// highlight fills cleanly (no per-segment background holes).
+		// highlight fills cleanly (no per-segment holes, incl. the pill's tint).
 		mark := ""
 		if selected {
 			mark = "✓ "
@@ -191,11 +305,11 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 		dot := ""
 		if hasSession {
-			dot = "  ● session"
+			dot = " ●"
 		}
-		head = mark + truncate(slug, width-len([]rune(mark))-len([]rune(dot))) + dot
+		head = mark + truncate(f.Slug, width-len([]rune(mark))-len([]rune(dot))) + dot
 		titleLine = truncate(title, width)
-		badgeLine = truncate(cardBadgeText(f, b), width)
+		badgeLine = truncate(pillLabel(f), width-8) + "  " + phaseDotsPlain()
 	} else {
 		mark := ""
 		if selected {
@@ -205,46 +319,154 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 		dot := ""
 		if hasSession {
-			dot = "  " + sessionStyle.Render("● session")
+			dot = " " + sessionStyle.Render("●")
 		}
-		head = mark + slugStyle.Render(truncate(slug, width-4)) + dot
+		head = mark + slugStyle.Render(truncate(f.Slug, width-4)) + dot
 		titleLine = dimStyle.Render(truncate(title, width))
-		bs := badgeStyleFor(f, columnStyles[colIdx].badge)
-		badgeLine = bs.Render(truncate(cardBadgeText(f, b), width))
+		badgeLine = pillStyleFor(f).Render(pillLabel(f)) + "  " + phaseDots(f)
 	}
 
 	body := strings.Join([]string{head, titleLine, badgeLine}, "\n")
+
+	style := columnStyles[colIdx].card
 	switch {
 	case focused:
-		return columnStyles[colIdx].cardFocused.Width(width).Render(body)
+		style = columnStyles[colIdx].cardFocused
 	case selected:
-		return columnStyles[colIdx].cardSelected.Width(width).Render(body)
-	default:
-		return columnStyles[colIdx].card.Width(width).Render(body)
+		style = columnStyles[colIdx].cardSelected
 	}
+	// FR-5 left accent stripe: recolor the heavy-┃ gate border, independent of
+	// focus (a focused gate card keeps both the focus accent and the stripe).
+	if col, ok := stripeAccent(f); ok {
+		style = style.Border(gateBorder).BorderLeftForeground(col)
+	}
+	return style.Width(width).Render(body)
 }
 
-// cardBadgeText prepends the waiting cue to a card's badge when it is
-// WaitingForInput() — the leading ⏸ marks a card that blocks on the user, shown
-// on both focused and unfocused cards so the signal never depends on focus (FR-B2).
-func cardBadgeText(f *contract.Feature, b string) string {
-	if f.WaitingForInput() {
-		return waitingMarker + " " + b
+// renderNeedsYouStrip renders the FR-8 needs-you inbox above the board: a
+// red-bordered box `⏸ NEEDS YOU (N)` with one 3-line group per WaitingForInput()
+// gate — a gate-type pill, the one-line "what's blocked", and a `[n] read … ·
+// answer` affordance beside the FR-9 segmented bar. Gates ALSO stay in their
+// columns (D3 — the strip is a shortcut, not a move). On a short terminal it
+// degrades to a single summary line so the board never overflows (D3).
+func (m Model) renderNeedsYouStrip() string {
+	gs := m.gates()
+	if len(gs) == 0 {
+		return ""
 	}
-	return b
+	if m.stripDegraded() {
+		return waitStyle.Render(fmt.Sprintf("%s NEEDS YOU (%d)", waitingMarker, len(gs))) +
+			dimStyle.Render(fmt.Sprintf(" — press 1–%d to answer · ? for keys", numberedGates(len(gs))))
+	}
+	innerW := m.boardBodyWidth() - 4 // the red box's border (2) + padding (2)
+	if innerW < 24 {
+		innerW = 24
+	}
+	rows := []string{waitStyle.Render(fmt.Sprintf("%s NEEDS YOU (%d)", waitingMarker, len(gs)))}
+	for i, g := range gs {
+		typePill := g.kindStyle.Render(g.kind)
+		name := slugStyle.Render(truncate(g.feature.Slug, innerW-lipgloss.Width(typePill)-2))
+		rows = append(rows, typePill+"  "+name)
+		rows = append(rows, secondaryStyle.Render(truncate(g.blocked, innerW)))
+		// Number-key affordance only for gates 1..9 (gateNumberKey parses one digit);
+		// a 10th+ gate is still reachable in its column, just without a key (REV-003).
+		read := g.read
+		if i < 9 {
+			read = fmt.Sprintf("[%d] %s", i+1, g.read)
+		}
+		aff := dimStyle.Render(read + " · " + g.answer)
+		rows = append(rows, aff+"   "+phaseBar(g.feature))
+		if i < len(gs)-1 {
+			rows = append(rows, faintStyle.Render(strings.Repeat("─", innerW)))
+		}
+	}
+	return stripBoxStyle.Width(innerW).Render(strings.Join(rows, "\n"))
 }
 
-// badgeStyleFor picks a waiting card's accent: uat purple for the UAT gate, the
-// wait red for a decision gate AND the plan-acceptance gate (which carried no
-// accent before — FR-B2); a flowing card keeps its column accent (base).
-func badgeStyleFor(f *contract.Feature, base lipgloss.Style) lipgloss.Style {
-	switch {
-	case f.AwaitingUAT():
-		return uatStyle
-	case f.WaitingForInput():
-		return waitStyle
+// numberedGates caps a gate count at the 9 that the single-digit number keys can
+// reach (REV-003), for the degraded strip's "press 1–N" summary.
+func numberedGates(n int) int {
+	if n > 9 {
+		return 9
 	}
-	return base
+	return n
+}
+
+// stripDegraded reports whether the terminal is too short to fit the full
+// needs-you box AND a usable board — in which case the strip collapses to a
+// single summary line (D3). It reads m.height directly (never colAvail, which
+// subtracts the strip), so there is no cycle.
+func (m Model) stripDegraded() bool {
+	if m.height <= 0 {
+		return false
+	}
+	full := 3 + 4*len(m.gates()) // box chrome + title + ~4 rows per gate
+	const minBoard = 8           // header + status + footer + column head + ≥1 card row
+	return m.height < full+minBoard
+}
+
+// stripHeight is the rendered height of the needs-you strip plus one blank
+// separator line (0 when there are no gates) — the vertical budget the columns
+// yield to it in colAvail so the strip + board both fit (D3).
+func (m Model) stripHeight() int {
+	s := m.renderNeedsYouStrip()
+	if s == "" {
+		return 0
+	}
+	return lipgloss.Height(s) + 1
+}
+
+// contextualFooter is the FR-7 footer: the focused card's applicable action
+// key-chips (a live card leading with a green ●) + a right-aligned `[?] all
+// keys`. `?` (FR-10) swaps it for the full pre-redesign key list.
+func (m Model) contextualFooter() string {
+	if m.showAllKeys {
+		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · 1–N answer gate · / filter · ? keys · q quit"
+		return helpStyle.Render(full)
+	}
+	right := keyChipStyle.Render("[?] all keys")
+	f := m.focusedCard()
+	if f == nil {
+		return placeApart(dimStyle.Render("no card focused"), right, m.boardBodyWidth())
+	}
+	lead := slugStyle.Render(f.Slug)
+	if hasLiveSession(f.Slug, m.sessions) {
+		lead = sessionStyle.Render("● ") + lead
+	}
+	left := lead + "  " + strings.Join(m.footerChips(f), " ")
+	return placeApart(left, right, m.boardBodyWidth())
+}
+
+// footerChips are the action key-chips applicable to the focused card — the
+// column's legal move first (accept / go / ship), then the always-available
+// drill/view/web and, for a live card, peek/attach.
+func (m Model) footerChips(f *contract.Feature) []string {
+	chip := keyChipStyle.Render
+	var c []string
+	switch f.Class {
+	case contract.ClassUnfinished:
+		if f.Status == "awaiting-plan-acceptance" {
+			c = append(c, chip("[m] accept"))
+		} else {
+			c = append(c, chip("[m] go"))
+		}
+	case contract.ClassInProgress:
+		c = append(c, chip("[m] go"))
+	case contract.ClassReadyToShip:
+		c = append(c, chip("[d] ship"))
+	}
+	c = append(c, chip("[enter] drill"), chip("[v] view"))
+	if hasLiveSession(f.Slug, m.sessions) {
+		c = append(c, chip("[l] peek"), chip("[a] attach"))
+	}
+	c = append(c, chip("[w] web"))
+	return c
+}
+
+// boardBodyWidth is the total rendered width of the 4 columns + their 3 one-cell
+// separators — the width the header / footer / needs-you strip lay out across.
+func (m Model) boardBodyWidth() int {
+	return 4*m.boardColWidth() + 3
 }
 
 func (m Model) sessionsLine() string {

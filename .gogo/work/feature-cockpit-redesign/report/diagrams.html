@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo report diagrams — cockpit-redesign</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo report diagrams — <code>cockpit-redesign</code> (as-built)</h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>As-built — redesigned board render flow (1b + 1c)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  repo[("contract.Repo\n(Features, Status, Phase, Iterations, sessions)")]
+  progress["model.go: phaseProgress(f) → [5]phaseState\n(done / current / pending) — ONE shared vector (D2)"]
+  pill["model.go: pillLabel(f) / pillStyleFor(f)\n(badge() stays canonical)"]
+  gates["model.go: gates() → []gate\n(WaitingForInput cards, board order)"]
+  stripefn["model.go: stripeAccent(f)\n(red plan/decision · purple uat)"]
+
+  view["view.go: viewBoard()"]
+  header["FR-1 header: 'gogo cockpit  N features'\n+ right: ⏸ K need you (red pill, K>0) · ● S session"]
+  strip["FR-8 renderNeedsYouStrip: '⏸ NEEDS YOU (N)'\ngate pill + blocked line + [n] read · answer + FR-9 bar\nD3: degrades to a 1-line summary when short"]
+  cols["renderColumn(i) ×4"]
+  colhead["FR-2 columnHeader: underlined title + dim count (no (N))"]
+  chlog["FR-6 renderChangelogColumn: '✓ slug … MM-DD'\n(no boxes) + '↓ N more · enter to browse'"]
+  footer["FR-7 contextualFooter: focused card key-chips\n+ [?] all keys  (? toggles the full key list)"]
+
+  card["renderCard() — 3-row richer card"]
+  cname["row1: name (bright) + bare ● live-session dot"]
+  cdesc["row2: one-line desc (dim)"]
+  crow3["row3: FR-3 status pill (tinted chip) + FR-4 dots ①②③④⑤"]
+  cstripe["FR-5 heavy ┃ left stripe (gateBorder), focus-independent"]
+
+  keys["update.go: 1..9 jumpToGate → focus + quickView\n(read plan/report) · ? toggle full help (FR-10)"]
+
+  repo --> progress
+  repo --> pill
+  repo --> gates
+  repo --> view
+  view --> header
+  view --> strip
+  view --> cols
+  view --> footer
+  cols -->|work cols| card
+  cols -->|changelog| chlog
+  card --> cname
+  card --> cdesc
+  card --> crow3
+  card --> cstripe
+  progress --> crow3
+  progress --> strip
+  pill --> crow3
+  stripefn --> cstripe
+  gates --> strip
+  gates --> header
+  gates --> keys
+  </pre></div>
+
+  <h2>As-built — FR-10 number-key gate answering (new interaction)</h2>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor U as User
+  participant B as update.go updateBoard
+  participant G as model.go gates()
+  participant Q as drill.go quickView
+  participant VP as viewer
+
+  Note over U,VP: FR-10 — answer a needs-you gate by its number key
+  U->>B: press "1".."9"
+  B->>B: gateNumberKey(key) → n
+  B->>G: gates() (WaitingForInput cards, board order)
+  G-->>B: []gate
+  alt n within range
+    B->>B: jumpToGate(n): focus gate.col/row + reflowColumns
+    B->>Q: quickView(gate.feature)
+    Q->>VP: open plan.md (plan gate) / report.md (uat gate)
+    VP-->>U: read-only view; esc returns to board, gate card focused
+    Note over U,B: then the board move key acts — [m] accept / [d] ship / [m] resume
+  else n out of range
+    B-->>U: status "no gate n — K need you (1..K)"
+  end
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

@@ -21,8 +21,10 @@ func TestWaitingCardCue(t *testing.T) {
 	if !strings.Contains(out, waitingMarker) {
 		t.Errorf("awaiting-plan-acceptance card missing the waiting cue %q:\n%s", waitingMarker, out)
 	}
-	if !strings.Contains(out, "awaiting-plan-acceptance") {
-		t.Errorf("awaiting-plan-acceptance card missing its badge text:\n%s", out)
+	// FR-3 folds ⏸ into the status pill, whose answer-first label reads
+	// "accept plan" (badge() stays canonical — see TestBadgeAwaitingPlanAcceptance).
+	if !strings.Contains(out, "accept plan") {
+		t.Errorf("awaiting-plan-acceptance card missing its pill text:\n%s", out)
 	}
 	// The cue does not depend on focus.
 	if focused := m.renderCard(0, apa, true, 40); !strings.Contains(focused, waitingMarker) {
@@ -43,7 +45,7 @@ func TestBadgeAwaitingPlanAcceptance(t *testing.T) {
 		Slug: "p", Phase: "plan", Status: "awaiting-plan-acceptance",
 		Iterations: "plan=1 · implement=0 · review=0 · test=0",
 	}
-	if got := badge(f, nil); got != "awaiting-plan-acceptance" {
+	if got := badge(f); got != "awaiting-plan-acceptance" {
 		t.Errorf("badge = %q, want awaiting-plan-acceptance (not the plan round)", got)
 	}
 }

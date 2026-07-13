@@ -38,16 +38,25 @@ func (m Model) cardWidth() int {
 
 // colAvail is the vertical budget (terminal rows) a single column has for its
 // cards + overflow indicators: the whole height minus the board chrome (header,
-// status, help = 3 rows) and the column's own head + blank line (2 rows).
+// status, footer = 3 rows), the column's own head + blank line (2 rows), and the
+// needs-you strip's height (1c) so the strip + board both fit rather than
+// overflow (D3). A degraded strip contributes only its one summary line.
 func (m Model) colAvail() int {
-	return m.height - 5
+	return m.height - 5 - m.stripHeight()
 }
 
 // cardHeights measures each card's rendered height. Heights are measured (not
-// assumed fixed) so a card that is a line taller still windows correctly.
+// assumed fixed) so a card that is a line taller still windows correctly. The
+// collapsed changelog (FR-6) is a plain list, so its rows are one line each.
 func (m Model) cardHeights(i, cardW int) []int {
 	col := m.cols[i]
 	hs := make([]int, len(col))
+	if isChangelogCol(i) {
+		for j := range hs {
+			hs[j] = 1
+		}
+		return hs
+	}
 	for j, f := range col {
 		focused := i == m.colIdx && j == m.cardIdx[i]
 		hs[j] = lipgloss.Height(m.renderCard(i, f, focused, cardW))

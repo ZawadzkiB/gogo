@@ -47,7 +47,14 @@ func TestBoardColumnsPopulated(t *testing.T) {
 func TestBoardViewRenders(t *testing.T) {
 	m := newModel(t)
 	out := m.View()
-	for _, want := range []string{"plan (3)", "in progress (1)", "ready (2)", "changelog (3)", "cockpit"} {
+	// FR-2 restyles the column header (underlined title + trailing dim count, no
+	// (N) parens); FR-6 makes the changelog count read "N shipped". FR-4/FR-8 add
+	// the phase dots + the needs-you strip — pinned here so the redesign stays
+	// visibly present (a token diff would fail this, not a palette port).
+	for _, want := range []string{
+		"cockpit", "plan 3", "in progress 1", "ready 2", "changelog 3 shipped",
+		"①②③④⑤", "⏸ NEEDS YOU (1)",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("board view missing %q", want)
 		}
@@ -313,8 +320,9 @@ func TestQuickViewDefaultsPerColumn(t *testing.T) {
 	}
 }
 
-// TEST-006: a card whose gogo-* tmux session is alive shows a green ● session
-// marker, and the board status line surfaces the attach hint for it.
+// TEST-006 (redesigned FR-1/FR-3): a card whose gogo-* tmux session is alive
+// shows a bare green ● dot beside its name, the header attention summary counts
+// it as "● S session", and the board status line surfaces the attach hint.
 func TestSessionIndicatorOnCard(t *testing.T) {
 	m := newModel(t)
 	m.colIdx = 1
@@ -324,17 +332,23 @@ func TestSessionIndicatorOnCard(t *testing.T) {
 	}
 	m.sessions = []string{"gogo-go-" + f.Slug}
 	out := m.View()
-	if !strings.Contains(out, "● session") {
-		t.Errorf("board did not show the ● session marker for the live card:\n%s", out)
+	// FR-1: the header attention summary counts the live session.
+	if !strings.Contains(out, "● 1 session") {
+		t.Errorf("header attention summary missing the ● session count:\n%s", out)
+	}
+	// The card carries a bare live ● dot next to its name (the "● session" text
+	// moved to the header — FR-3).
+	if !strings.Contains(out, f.Slug+" ●") {
+		t.Errorf("card missing the bare live ● dot:\n%s", out)
 	}
 	if !strings.Contains(out, "attach") {
 		t.Errorf("board status line did not surface the attach hint")
 	}
 
-	// No session → no dot.
+	// No live session → no ● anywhere (card dot, header count, footer lead).
 	m.sessions = nil
-	if strings.Contains(m.View(), "● session") {
-		t.Errorf("● session shown with no live session")
+	if strings.Contains(m.View(), "●") {
+		t.Errorf("● shown with no live session:\n%s", m.View())
 	}
 }
 
@@ -361,19 +375,21 @@ func TestRenderTimeline(t *testing.T) {
 
 func TestBadge(t *testing.T) {
 	f := &contract.Feature{Slug: "x", Status: "waiting-for-user"}
-	if got := badge(f, nil); got != "waiting-for-user" {
+	if got := badge(f); got != "waiting-for-user" {
 		t.Errorf("waiting badge = %q", got)
 	}
+	// A live session is NOT a status: the badge stays the card's true phase
+	// (running-vs-status decoupling — liveness rides the separate ● dot).
 	f2 := &contract.Feature{Slug: "runme", Phase: "implement"}
-	if got := badge(f2, []string{"gogo-go-runme"}); got != "running" {
-		t.Errorf("running badge = %q", got)
+	if got := badge(f2); got != "implement" {
+		t.Errorf("badge = %q, want implement (session is a separate signal)", got)
 	}
 	f3 := &contract.Feature{Slug: "y", LatestEvent: &contract.Event{Phase: "review", Round: 2, HasRound: true}}
-	if got := badge(f3, nil); got != "review r2" {
+	if got := badge(f3); got != "review r2" {
 		t.Errorf("event badge = %q", got)
 	}
 	f4 := &contract.Feature{Slug: "z", Phase: "plan", Status: "plan-accepted"}
-	if got := badge(f4, nil); got != "plan-accepted" {
+	if got := badge(f4); got != "plan-accepted" {
 		t.Errorf("state badge = %q", got)
 	}
 
@@ -389,10 +405,10 @@ func TestBadge(t *testing.T) {
 			Phase: "implement", Round: 3, HasRound: true,
 		},
 	}
-	if got := badge(f5, nil); got != "review r2" {
+	if got := badge(f5); got != "review r2" {
 		t.Errorf("stale-event badge = %q, want review r2 (state.md wins)", got)
 	}
-	if got := badge(f5, nil); strings.Contains(got, "implement") {
+	if got := badge(f5); strings.Contains(got, "implement") {
 		t.Errorf("badge must not show the stale implement phase: %q", got)
 	}
 
@@ -402,7 +418,7 @@ func TestBadge(t *testing.T) {
 		Slug: "agree", Phase: "review", Status: "reviewing",
 		LatestEvent: &contract.Event{Phase: "review", Round: 2, HasRound: true},
 	}
-	if got := badge(f6, nil); got != "review r2" {
+	if got := badge(f6); got != "review r2" {
 		t.Errorf("agreeing-event badge = %q, want review r2", got)
 	}
 
@@ -412,7 +428,7 @@ func TestBadge(t *testing.T) {
 		Slug: "kn", Phase: "knowledge", Status: "reporting",
 		LatestEvent: &contract.Event{Phase: "report", Round: 1, HasRound: true},
 	}
-	if got := badge(f7, nil); got != "knowledge r1" {
+	if got := badge(f7); got != "knowledge r1" {
 		t.Errorf("knowledge/report badge = %q, want knowledge r1", got)
 	}
 }

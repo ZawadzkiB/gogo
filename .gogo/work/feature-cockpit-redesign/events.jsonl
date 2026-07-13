@@ -1,0 +1,16 @@
+{"ts":"2026-07-12T12:26:36Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T13:47:05Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","note":"D1->B one feature (1b+1c) @0.18.0; D2->A both dots+bars; D3->A strip shortcut+degrade","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:01:56Z","event":"phase-started","phase":"implement","status":"implementing","round":1,"note":"in-context ② build 1b+1c cockpit redesign","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:22:29Z","event":"phase-done","phase":"implement","status":"implementing","round":1,"note":"1b+1c built in-context; gofmt/vet/test -race green; version 0.18.0","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:30:00Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"note":"fresh-eyes review of the 1b+1c diff","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:33:00Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"3 findings, 0 blocking (REV-001 minor, REV-002/003 nits); verdict APPROVE","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:34:03Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"note":"REV-001..003 fixed in-context; gates re-run green","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:34:30Z","event":"phase-done","phase":"review","status":"reviewing","round":1,"note":"clean after fixes; advancing to test","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:44:00Z","event":"round-opened","phase":"test","status":"testing","round":1,"note":"live-TUI fidelity check (harness + live tmux drive)","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:52:00Z","event":"issues-found","phase":"test","status":"testing","round":1,"note":"GREEN; 1 nit (TEST-001 comment-only); colors verified vs design tokens","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:53:30Z","event":"fix-round","phase":"implement","status":"implementing","round":3,"note":"TEST-001 stale comment fixed in-context; build clean","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:54:00Z","event":"phase-done","phase":"test","status":"testing","round":1,"note":"all-green: suite + live-TUI fidelity match vs 1b/1c mockup","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:46:42Z","event":"phase-started","phase":"report","status":"testing","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:47:30Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:57:35Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"cockpit-redesign"}
+{"ts":"2026-07-12T14:57:35Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-12-cockpit-redesign/","slug":"cockpit-redesign"}

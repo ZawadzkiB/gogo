@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-redesign",
+  "updated": "2026-07-12",
+  "note": "As-is baseline (before) of the board render path the redesign touches: viewBoard → header 'gogo cockpit — N features' → renderColumn ×4 (columnHeader '▸ plan (3)', renderCard 3 rows: mark+slug+● session / title / badge; changelog uses the SAME renderCard boxes) → boardStatusLine → static help line. Scoped to what the change modifies.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Current board render flow (before): (N)-count headers, plain-text badges, full-card changelog, static help line"
+    }
+  ]
+}

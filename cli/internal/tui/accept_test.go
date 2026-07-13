@@ -35,15 +35,19 @@ func TestAcceptMoveGuard(t *testing.T) {
 }
 
 // TestAcceptSessionAttribution: a live /gogo:accept session is attributed to its
-// card (so `a` attach / `l` peek work), and outranks the resting gate badge —
-// something is actively happening on it (FR-C1).
+// card (so `a` attach / `l` peek work), but liveness is a SEPARATE signal from the
+// status pill — the badge stays the true gate status (awaiting-plan-acceptance),
+// never "running" (FR-C1; running-vs-status decoupling).
 func TestAcceptSessionAttribution(t *testing.T) {
 	sessions := []string{"gogo-accept-plan-pending"}
 	if !hasLiveSession("plan-pending", sessions) {
 		t.Errorf("gogo-accept session not attributed to its slug")
 	}
 	f := &contract.Feature{Slug: "plan-pending", Phase: "plan", Status: "awaiting-plan-acceptance"}
-	if got := badge(f, sessions); got != "running" {
-		t.Errorf("running should outrank the plan-acceptance gate badge, got %q", got)
+	if got := badge(f); got != "awaiting-plan-acceptance" {
+		t.Errorf("badge should be the true gate status, not the session; got %q", got)
+	}
+	if got := pillLabel(f); got != waitingMarker+" accept plan" {
+		t.Errorf("pillLabel = %q, want the accept-plan chip", got)
 	}
 }

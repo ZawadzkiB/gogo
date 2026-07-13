@@ -1,0 +1,18 @@
+{
+  "slug": "cockpit-redesign",
+  "updated": "2026-07-12",
+  "members": ["cockpit-redesign"],
+  "note": "Shipped 2026-07-12: the gogo terminal cockpit (cli/internal/tui/) restyled to the Claude-Design 1b + 1c mockup — header attention summary, status pills, phase dots ①②③④⑤, heavy ┃ gate stripes, collapsed changelog, contextual footer, and a needs-you inbox strip with 1..9 number-key gate answering — over the same contract.Repo (no contract or pipeline-state change). Both the FR-4 dots and the FR-9 segmented bar render one shared phaseProgress(f) [5]phaseState vector. before/cockpit-redesign-flow.mmd is the plan-time as-is baseline for the flow diagram.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "cockpit-redesign-flow.mmd",
+      "title": "cockpit-redesign: As-built board render flow (1b pills/dots/┃-stripe/collapsed-changelog/footer + 1c needs-you strip/bars/number-keys)"
+    },
+    {
+      "kind": "sequence",
+      "file": "cockpit-redesign-sequence.mmd",
+      "title": "cockpit-redesign: FR-10 number-key gate answering: key → gates() → jumpToGate (focus + quickView read plan/report)"
+    }
+  ]
+}

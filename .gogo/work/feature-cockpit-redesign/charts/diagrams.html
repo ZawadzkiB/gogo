@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cockpit-redesign</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cockpit-redesign</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Intended design — redesigned board render flow (1b + 1c)</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  repo[("contract.Repo\n(Features, Status, Phase, Iterations, sessions)")]
+  progress["model.go: phaseProgress(f) → [5]phaseState\n(done / current / pending)"]
+  pill["model.go: pillLabel(f) / pillStyleFor(f)\n(badge() stays canonical)"]
+
+  view["view.go: viewBoard()"]
+  header["FR-1 header: 'gogo cockpit  N features'\n+ right: ⏸ K need you (red pill) · ● S session"]
+  strip["FR-8 renderNeedsYouStrip: '⏸ NEEDS YOU (N)'\ngate-type pill + one-line + [n] answer  (1c)"]
+  cols["renderColumn(i) ×4"]
+  colhead["FR-2 columnHeader: underlined title + dim count (no (N))"]
+
+  card["renderCard() — richer card"]
+  cname["name (bright) + ● live session dot"]
+  cdesc["one-line desc (dim/secondary)"]
+  cpill["FR-3 status pill (tinted chip) via pillLabel"]
+  cdots["FR-4 phase dots ①②③④⑤ (green/amber/grey)"]
+  cbar["FR-9 5-segment bar (same vector)  (1c)"]
+  cstripe["FR-5 left accent stripe (red gate / purple uat)"]
+
+  chlog["FR-6 renderChangelogList: '✓ slug … MM-DD'\n(no boxes) + '↓ N more · enter to browse'"]
+  footer["FR-7 contextual footer: focused card key-chips\n+ [?] all keys"]
+
+  gates["model.go: gates() enumerator (stable order)"]
+  keys["update.go: 1..N answer gate · ? toggle full help (FR-10)"]
+
+  repo --> progress
+  repo --> pill
+  repo --> gates
+  repo --> view
+  view --> header
+  view --> strip
+  view --> cols
+  cols --> colhead
+  cols --> card
+  card --> cname
+  card --> cdesc
+  card --> cpill
+  card --> cdots
+  card --> cbar
+  card --> cstripe
+  cols --> chlog
+  view --> footer
+  progress --> cdots
+  progress --> cbar
+  pill --> cpill
+  gates --> strip
+  gates --> keys
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>
