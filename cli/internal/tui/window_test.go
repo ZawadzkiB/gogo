@@ -113,14 +113,14 @@ func TestEmptyColumnWindow(t *testing.T) {
 // --- model / View integration (TEST-014) ------------------------------------
 
 // smallBoard focuses the PLAN column on a short terminal so its 3 fixture cards
-// (5 rows each) must window. At height 20 the needs-you strip (the fixture's one
-// awaiting-uat gate) takes 7 rows, leaving colAvail 8 → one whole card + a ↓.
+// (5 rows each) must window. With the needs-you strip gone (lean-cards) colAvail is
+// just height-5, so height 13 leaves colAvail 8 → one whole card + a ↓.
 // (The changelog column is now a collapsed one-line list — FR-6 — so it no longer
 // windows as cards; its own overflow is covered by TestChangelogOverflowBrowseHint.)
 func smallBoard(t *testing.T) Model {
 	t.Helper()
 	m := newModel(t)
-	m = send(m, tea.WindowSizeMsg{Width: 200, Height: 20})
+	m = send(m, tea.WindowSizeMsg{Width: 200, Height: 13})
 	if m.colIdx != 0 {
 		t.Fatalf("expected the plan column focused, colIdx=%d", m.colIdx)
 	}
@@ -143,7 +143,7 @@ func TestColumnWindowIndicatorsHiddenWhenFits(t *testing.T) {
 // ↓/↑ "N more" indicators AND a header position hint reflecting the visible range.
 func TestColumnWindowIndicatorsAndHint(t *testing.T) {
 	m := newModel(t)
-	m.height = 20 // colAvail = 8 (after the 7-row needs-you strip) → one 5-row card
+	m.height = 13 // colAvail = 8 (height-5, no strip) → one 5-row card
 	m.colIdx = 0  // the plan column (3 five-row cards)
 
 	m.colOffset[0] = 0
@@ -259,7 +259,7 @@ func TestChangelogCollapsedList(t *testing.T) {
 // shows `↓ N more · enter to browse` (the collapse's own overflow affordance).
 func TestChangelogOverflowBrowseHint(t *testing.T) {
 	m := newModel(t)
-	m.height = 9 // colAvail = 2 (degraded 2-row strip) → only one changelog row fits
+	m.height = 7 // colAvail = 2 (height-5, no strip) → only one changelog row fits
 	m.colIdx = 3
 	out := m.renderColumn(3, m.boardColWidth())
 	if !strings.Contains(out, "↓ 2 more · enter to browse") {

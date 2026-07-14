@@ -9,39 +9,32 @@ import (
 
 // --- cockpit redesign (1b + 1c): the new pure helpers + board elements ---
 
-// TestPhaseProgressVector pins the single shared phase-progress model (D2): every
-// phase before the current is done, the current is current, the rest pending;
-// gate/terminal states map meaningfully.
-func TestPhaseProgressVector(t *testing.T) {
-	d, c, p := phaseDone, phaseCurrent, phasePending
+// TestActiveAgent pins the FR-6 phase→agent map: knowledge/report both mean the
+// report step (reporter); done/unknown yield no label; and a blank phase falls
+// back to the status so a live card whose telemetry lags still names its agent.
+func TestActiveAgent(t *testing.T) {
 	cases := []struct {
-		name string
 		f    *contract.Feature
-		want [5]phaseState
+		want string
 	}{
-		{"review is current", &contract.Feature{Phase: "review", Class: contract.ClassInProgress}, [5]phaseState{d, d, c, p, p}},
-		{"plan gate", &contract.Feature{Phase: "plan", Status: "awaiting-plan-acceptance", Class: contract.ClassUnfinished}, [5]phaseState{c, p, p, p, p}},
-		{"uat gate (report current)", &contract.Feature{Phase: "knowledge", Status: "awaiting-uat", Class: contract.ClassReadyToShip}, [5]phaseState{d, d, d, d, c}},
-		{"shipped is all done", &contract.Feature{Phase: "done", Status: "shipped", Class: contract.ClassShipped}, [5]phaseState{d, d, d, d, d}},
-		{"implementing via status", &contract.Feature{Status: "implementing", Class: contract.ClassInProgress}, [5]phaseState{d, c, p, p, p}},
-		{"unknown → all pending", &contract.Feature{Class: contract.ClassUnfinished}, [5]phaseState{p, p, p, p, p}},
+		{&contract.Feature{Phase: "plan"}, "analyst"},
+		{&contract.Feature{Phase: "implement"}, "developer"},
+		{&contract.Feature{Phase: "review"}, "reviewer"},
+		{&contract.Feature{Phase: "test"}, "tester"},
+		{&contract.Feature{Phase: "knowledge"}, "reporter"},
+		{&contract.Feature{Phase: "report"}, "reporter"},
+		{&contract.Feature{Phase: "done"}, ""},
+		{&contract.Feature{Phase: ""}, ""},
+		{&contract.Feature{Phase: "bogus"}, ""},
+		// Phase absent → derive from status (the telemetry-lag fallback).
+		{&contract.Feature{Phase: "", Status: "implementing"}, "developer"},
+		{&contract.Feature{Phase: "", Status: "reviewing"}, "reviewer"},
+		{&contract.Feature{Phase: "", Status: "testing"}, "tester"},
 	}
 	for _, tc := range cases {
-		if got := phaseProgress(tc.f); got != tc.want {
-			t.Errorf("%s: phaseProgress = %v, want %v", tc.name, got, tc.want)
+		if got := activeAgent(tc.f); got != tc.want {
+			t.Errorf("activeAgent(phase=%q status=%q) = %q, want %q", tc.f.Phase, tc.f.Status, got, tc.want)
 		}
-	}
-}
-
-// TestPhaseDotsAndBarPlainText: the FR-4 dots and FR-9 bar render the SAME vector
-// and stay substring-assertable (no TTY under go test → lipgloss emits plain text).
-func TestPhaseDotsAndBarPlainText(t *testing.T) {
-	f := &contract.Feature{Phase: "review", Class: contract.ClassInProgress}
-	if dots := phaseDots(f); dots != "①②③④⑤" {
-		t.Errorf("phaseDots = %q, want the five glyphs ①②③④⑤", dots)
-	}
-	if bar := phaseBar(f); !strings.Contains(bar, "▓") || !strings.Contains(bar, "░") {
-		t.Errorf("phaseBar should carry filled ▓ (done/current) + faint ░ (pending): %q", bar)
 	}
 }
 
@@ -104,31 +97,6 @@ func TestGateCardStripeGlyph(t *testing.T) {
 	}
 }
 
-// TestGatesEnumeration (FR-8): gates() surfaces the board's WaitingForInput()
-// cards. The fixture's sole gate is the awaiting-uat "ready" feature.
-func TestGatesEnumeration(t *testing.T) {
-	m := newModel(t)
-	gs := m.gates()
-	if len(gs) != 1 {
-		t.Fatalf("gates() = %d, want 1 (the awaiting-uat 'ready' feature)", len(gs))
-	}
-	if gs[0].kind != "uat gate" || gs[0].feature.Slug != "ready" {
-		t.Errorf("gate[0] = {%s, %s}, want {uat gate, ready}", gs[0].kind, gs[0].feature.Slug)
-	}
-}
-
-// TestNeedsYouStripRender (FR-8): the strip surfaces the gate as a titled,
-// answer-first inbox row above the board.
-func TestNeedsYouStripRender(t *testing.T) {
-	m := newModel(t)
-	out := m.View()
-	for _, want := range []string{"⏸ NEEDS YOU (1)", "uat gate", "ready", "[1] read report · [d] ship"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("needs-you strip missing %q:\n%s", want, out)
-		}
-	}
-}
-
 // TestHeaderAttentionSummary (FR-1): the header shows the red need-you pill and,
 // when a session is live, the green session count.
 func TestHeaderAttentionSummary(t *testing.T) {
@@ -171,50 +139,6 @@ func TestAllKeysToggle(t *testing.T) {
 	m = send(m, runes("?"))
 	if strings.Contains(m.View(), "space select") {
 		t.Errorf("a second ? did not hide the full key list")
-	}
-}
-
-// TestNumberKeyReadsGate (FR-10): pressing 1 answers gate 1 — it focuses that
-// gate's card AND opens its primary view ("read report" for the uat gate).
-func TestNumberKeyReadsGate(t *testing.T) {
-	m := newModel(t)
-	m = keyPress(t, m, runes("1"))
-	if f := m.focusedCard(); f == nil || f.Slug != "ready" {
-		t.Fatalf("pressing 1 did not focus gate 1 (ready): %v", f)
-	}
-	if m.mode != modeViewer {
-		t.Fatalf("pressing 1 did not open the gate's primary view (mode=%d)", m.mode)
-	}
-	if !strings.HasSuffix(m.viewerTitle, "report.md") {
-		t.Errorf("gate 1 opened %q, want the report", m.viewerTitle)
-	}
-}
-
-// TestNumberKeyOutOfRange (FR-10): a number with no matching gate is a status
-// hint, not a jump or a crash.
-func TestNumberKeyOutOfRange(t *testing.T) {
-	m := newModel(t)
-	nm, cmd := m.Update(runes("5")) // only 1 gate in the fixture
-	m = nm.(Model)
-	if cmd != nil {
-		t.Errorf("out-of-range gate number returned a command")
-	}
-	if m.mode != modeBoard || !strings.Contains(m.status, "no gate 5") {
-		t.Errorf("out-of-range gate number: mode=%d status=%q", m.mode, m.status)
-	}
-}
-
-// sanity: the digit parser is exact (1..9 only).
-func TestGateNumberKeyParse(t *testing.T) {
-	for _, s := range []string{"1", "9"} {
-		if _, ok := gateNumberKey(s); !ok {
-			t.Errorf("gateNumberKey(%q) should parse", s)
-		}
-	}
-	for _, s := range []string{"0", "a", "12", "", "enter"} {
-		if _, ok := gateNumberKey(s); ok {
-			t.Errorf("gateNumberKey(%q) should NOT parse", s)
-		}
 	}
 }
 
@@ -263,20 +187,29 @@ func TestRunningIsNotAStatus(t *testing.T) {
 	}
 }
 
-// TestUATReplanGate (Issue 1): a mid-UAT re-plan surfaces as a "uat re-plan" gate
-// with re-planning wording, distinct from a generic decision fork.
-func TestUATReplanGate(t *testing.T) {
-	f := &contract.Feature{Slug: "redo", Status: "waiting-for-user", Resume: "plan", OpenDecision: "UAT round 2"}
-	g := gateFor(f)
-	if g.kind != "uat re-plan" {
-		t.Errorf("gate kind = %q, want uat re-plan", g.kind)
+// TestChangelogFocusCursor: the collapsed changelog list carries an in-list focus
+// indicator (▸ cursor + selection bar) on the focused row — but only when the
+// changelog column itself holds board focus, and only on that one row.
+func TestChangelogFocusCursor(t *testing.T) {
+	m := newModel(t)
+	a := &contract.Feature{Slug: "alpha", Class: contract.ClassShipped, Completed: "2026-07-01"}
+	b := &contract.Feature{Slug: "bravo", Class: contract.ClassShipped, Completed: "2026-07-02"}
+	m.cols[3] = []*contract.Feature{a, b}
+
+	m.colIdx = 3
+	m.cardIdx[3] = 1
+	out := m.renderColumn(3, m.boardColWidth())
+	if !strings.Contains(out, "▸ ✓ bravo") {
+		t.Errorf("focused changelog row missing the ▸ cursor:\n%s", out)
 	}
-	if !strings.Contains(g.blocked, "re-planning after UAT round 2") {
-		t.Errorf("gate blocked = %q, want the re-planning blurb", g.blocked)
+	if strings.Contains(out, "▸ ✓ alpha") {
+		t.Errorf("non-focused changelog row wrongly shows the cursor:\n%s", out)
 	}
-	d := gateFor(&contract.Feature{Slug: "fork", Status: "waiting-for-user", Resume: "review", OpenDecision: "D3"})
-	if d.kind != "decision gate" {
-		t.Errorf("generic gate kind = %q, want decision gate", d.kind)
+
+	// Focus a different column → no changelog row shows the cursor.
+	m.colIdx = 0
+	if out := m.renderColumn(3, m.boardColWidth()); strings.Contains(out, "▸ ✓") {
+		t.Errorf("changelog rows show a cursor while another column is focused:\n%s", out)
 	}
 }
 
@@ -293,5 +226,69 @@ func TestUATRound(t *testing.T) {
 		if got := uatRound(&contract.Feature{OpenDecision: c.od}); got != c.want {
 			t.Errorf("uatRound(%q) = %d, want %d", c.od, got, c.want)
 		}
+	}
+}
+
+// --- lean cards: the agent chip + the removed strip / phase dots ---
+
+// TestAgentChipOnlyWhenLive (FR-6, D1): a live in-progress card renders the green
+// `● <agent>` chip; the same card with no live session, and a live *gate* card
+// (WaitingForInput), render NO chip — the chip is a "who's on it now" signal.
+func TestAgentChipOnlyWhenLive(t *testing.T) {
+	m := newModel(t)
+	f := &contract.Feature{
+		Slug: "build", Title: "Building it", Phase: "implement", Status: "implementing",
+		Class: contract.ClassInProgress,
+	}
+
+	// Live session on an in-progress card → the chip names its agent.
+	m.sessions = []string{"gogo-go-build"}
+	if out := m.renderCard(1, f, false, 40); !strings.Contains(out, "● developer") {
+		t.Errorf("live in-progress card missing the ● developer chip:\n%s", out)
+	}
+	// Focused (plain-fill) render still carries the chip.
+	if out := m.renderCard(1, f, true, 40); !strings.Contains(out, "● developer") {
+		t.Errorf("focused live card missing the ● developer chip:\n%s", out)
+	}
+
+	// No live session → no chip.
+	m.sessions = nil
+	if out := m.renderCard(1, f, false, 40); strings.Contains(out, "developer") {
+		t.Errorf("idle card wrongly shows the agent chip:\n%s", out)
+	}
+
+	// A live GATE card (WaitingForInput) shows no chip — nobody is working a card
+	// that is parked on the user.
+	gate := &contract.Feature{Slug: "gate", Title: "G", Phase: "plan", Status: "awaiting-plan-acceptance", Class: contract.ClassUnfinished}
+	m.sessions = []string{"gogo-go-gate"}
+	if out := m.renderCard(0, gate, false, 40); strings.Contains(out, "analyst") {
+		t.Errorf("a live gate card wrongly shows the agent chip:\n%s", out)
+	}
+}
+
+// TestNoPhaseDots: no rendered card carries the removed phase-dot glyphs ①②③④⑤.
+func TestNoPhaseDots(t *testing.T) {
+	m := newModel(t)
+	f := &contract.Feature{Slug: "x", Title: "X", Phase: "review", Status: "reviewing", Class: contract.ClassInProgress}
+	for _, focused := range []bool{false, true} {
+		out := m.renderCard(1, f, focused, 40)
+		for _, dot := range []string{"①", "②", "③", "④", "⑤"} {
+			if strings.Contains(out, dot) {
+				t.Errorf("card (focused=%v) still shows a phase dot %q:\n%s", focused, dot, out)
+			}
+		}
+	}
+}
+
+// TestNoNeedsYouStrip: the board view no longer renders the NEEDS YOU inbox box;
+// the gate count survives only as the header pill (⏸ K need you).
+func TestNoNeedsYouStrip(t *testing.T) {
+	m := newModel(t)
+	out := m.View()
+	if strings.Contains(out, "NEEDS YOU") {
+		t.Errorf("board still renders the needs-you strip:\n%s", out)
+	}
+	if !strings.Contains(out, "⏸ 1 need you") {
+		t.Errorf("header lost the need-you count pill:\n%s", out)
 	}
 }

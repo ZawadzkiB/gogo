@@ -1,0 +1,15 @@
+{"ts":"2026-07-14T09:50:45Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:17:37Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:39:09Z","event":"phase-started","phase":"implement","status":"implementing","note":"implement r1: FR-1 dot, FR-2 attach picker, FR-3 kill picker","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:47:57Z","event":"phase-done","phase":"implement","status":"implementing","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:55:00Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"note":"fresh-eyes review of implement r1 diff (dot + attach/kill pickers)","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:55:30Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"0 blockers, 0 majors, 0 minors, 1 nit (REV-001, agent-fixable) - APPROVE","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:55:45Z","event":"phase-done","phase":"review","status":"reviewing","round":1,"note":"verdict APPROVE - no open blockers/majors; gates green","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:58:35Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"note":"REV-001: add board-origin attach-picker + selection-preservation test (test-only)","slug":"board-session-picker"}
+{"ts":"2026-07-14T21:58:36Z","event":"phase-done","phase":"implement","status":"implementing","slug":"board-session-picker"}
+{"ts":"2026-07-14T23:50:00Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"board-session-picker"}
+{"ts":"2026-07-15T00:05:00Z","event":"phase-done","phase":"test","status":"testing","slug":"board-session-picker"}
+{"ts":"2026-07-14T22:05:19Z","event":"phase-started","phase":"report","status":"testing","slug":"board-session-picker"}
+{"ts":"2026-07-14T22:09:08Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"board-session-picker"}
+{"ts":"2026-07-14T23:06:20Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"board-session-picker"}
+{"ts":"2026-07-14T23:06:20Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-15-board-session-picker/","slug":"board-session-picker"}

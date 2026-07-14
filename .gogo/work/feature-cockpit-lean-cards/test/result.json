@@ -1,0 +1,21 @@
+{
+  "slug": "cockpit-lean-cards",
+  "phase": "test",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-cockpit-lean-cards/plan.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/work/feature-cockpit-lean-cards/review/issues.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-cockpit-lean-cards/test/issues.json",
+    ".gogo/work/feature-cockpit-lean-cards/test-01.md",
+    ".gogo/work/feature-cockpit-lean-cards/events.jsonl"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "gofmt/vet/build/go test -race all green across every cli package; hands-on render harness against the testdata fixture confirmed every plan verification item (no NEEDS YOU strip, header pill wording, gate left-border, no phase dots, live-only agent chip, chip suppressed on gates, number-key help text gone); no issues found."
+}

@@ -1,0 +1,27 @@
+{
+  "phase": "report",
+  "status": "ok",
+  "slug": "cockpit-lean-cards",
+  "inputs": [
+    "plan.md",
+    "state.md",
+    "review/issues.json",
+    "test/issues.json",
+    "charts/manifest.json",
+    "charts/before/manifest.json",
+    "decisions.md"
+  ],
+  "outputs": [
+    "report/report.md",
+    "report/flow.mmd",
+    "report/diagrams.html",
+    "report/manifest.json",
+    "report/before/flow.mmd",
+    "report/before/manifest.json",
+    "report/before/diagrams.html",
+    "report/result.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Clean green run: all phases completed, review APPROVE (0 findings), test GREEN (0 findings). As-built matches the plan exactly (presentation-only lean cockpit cards, 0.20.0). Report bundle written with the after flow + the copied-in before set; project-knowledge.md got a 0.20.0 milestone. state.md set to phase=done, status=awaiting-uat."
+}

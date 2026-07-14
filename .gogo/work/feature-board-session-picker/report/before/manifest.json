@@ -1,0 +1,12 @@
+{
+  "slug": "board-session-picker",
+  "updated": "2026-07-14",
+  "note": "As-is baseline the change touches: attach uses liveSessionFor (first match), K confirms over ALL sessions at once, and the changelog list shows no per-row session cue.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "before/flow.mmd",
+      "title": "Current attach/kill flow + dot-less changelog list (before)"
+    }
+  ]
+}

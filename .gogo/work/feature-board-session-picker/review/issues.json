@@ -1,0 +1,21 @@
+{
+  "slug": "board-session-picker",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-14",
+  "resolved_note": "REV-001 fixed in-context during implement r2 (test-only addition; product code unchanged). Added the board-origin attach-picker subtest (pickerFromDrill=false → cancel restores modeBoard) and the ready-ship selection-preservation assertion to TestDrillAttachPicker. gofmt/go vet/go test -race all green.",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "Attach picker: board-origin (≥2 sessions) branch and the ready-ship selection-preservation assertion are untested",
+      "description": "attachFeature() was reworked to branch 0/1/≥2, and startAttachPicker() records the origin via pickerFromDrill = (m.mode == modeDrill) so a cancel restores the right mode (drill vs board). TestDrillAttachPicker covers only the DRILL origin (pickerFromDrill=true → cancel to modeDrill). The BOARD origin — a focused non-changelog card with ≥2 live sessions where board `a` opens the picker with pickerFromDrill=false and a cancel must return to modeBoard — is a real, reachable branch (an in-flight card can carry gogo-go-<slug> + gogo-plan-<slug>) with no test. Separately, the plan's FR-2 attach test explicitly specified asserting that an attach-picker cancel preserves the user's ready-ship multi-selection (formPreservesSelection now includes pendingAttach, REV-012 parity), but the implemented 'cancel attaches nothing and restores the drill' subtest asserts only mode+status, not that m.selected survives. The product code is correct on both points (verified by reading attachFeature/startAttachPicker/finishAttach/cancelForm); this is purely a test-coverage completeness gap, not a defect.",
+      "proposed_solution": "AGENT-FIXABLE. In card_test.go add: (1) a board-origin attach-picker subtest — focus a non-changelog card (colIdx 0..2) with ≥2 exact-match sessions, press `a` (no drill), assert modeForm + pendingAttach set + pickerFromDrill false, then esc and assert mode returns to modeBoard; (2) extend an attach-cancel subtest to pre-select a ready-to-ship slug (m.selected[...] = true) and assert the selection is still present after the picker esc-cancel, mirroring the existing kill/delete REV-012 selection-preservation checks. No product change.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2
+    }
+  ]
+}

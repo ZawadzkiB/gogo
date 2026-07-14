@@ -1,0 +1,12 @@
+{"ts":"2026-07-13T13:10:00Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-13T23:19:35Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:00:24Z","event":"phase-started","phase":"implement","status":"implementing","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:12:19Z","event":"phase-done","phase":"implement","status":"reviewing","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:17:50Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:18:05Z","event":"phase-done","phase":"review","status":"reviewing","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:20:00Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:23:00Z","event":"phase-done","phase":"test","status":"testing","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:24:16Z","event":"phase-started","phase":"report","status":"testing","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T00:27:51Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T07:37:45Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"cockpit-lean-cards"}
+{"ts":"2026-07-14T07:37:45Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-14-cockpit-lean-cards/","slug":"cockpit-lean-cards"}

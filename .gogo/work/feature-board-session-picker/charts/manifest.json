@@ -1,0 +1,12 @@
+{
+  "slug": "board-session-picker",
+  "updated": "2026-07-14",
+  "note": "As-built (implement r1): the per-session attach/kill pickers + the changelog live-session dot, over the same contract.Repo (presentation/interaction only). Shipped design matches the accepted intended design 1:1 - attachFeature branches 0/1/>=2, killDrill 1 vs >=2, changelogRow gains a hasSession dot; both pickers bind through the heap-stable *formBinding.selected.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Per-session attach/kill pickers + changelog liveness dot (as-built)"
+    }
+  ]
+}

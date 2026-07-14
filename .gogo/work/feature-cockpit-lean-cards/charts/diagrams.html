@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cockpit-lean-cards</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cockpit-lean-cards</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Lean board render flow (after)</h2>
+<div class="diagram"><pre class="mermaid">
+flowchart TD
+  repo[("contract.Repo\n(Features · Status · Phase · sessions)")]
+  view["view.go: viewBoard()"]
+  header["header: 'gogo cockpit  N features'\nright: ⏸ K need you (needsYouCount) · ● S session"]
+  cols["renderColumn(i) x4\n(no needs-you strip above the board)"]
+  card["renderCard() — 3 rows"]
+  r1["row1: mark + slug  (+ ● live dot)"]
+  r2["row2: one-line desc (dim)"]
+  r3["row3: status pill  +  [● agent chip]"]
+
+  pill["pillLabel(f) / pillStyleFor(f)\n(badge() stays canonical)"]
+  agent["activeAgent(f): phase→agent\nplan→analyst · implement→developer\nreview→reviewer · test→tester · knowledge|report→reporter"]
+  chipgate{"hasLiveSession(slug)\n&& !WaitingForInput()?"}
+  chip["● <agent>  (green when unfocused, plain when focused)"]
+  nochip["(status pill alone)"]
+
+  stripe["stripeAccent(f) → heavy ┃ left border\nred = plan/decision gate · purple = uat gate\n= THE 'act now' cue"]
+
+  repo --> view --> header
+  view --> cols --> card
+  card --> r1
+  card --> r2
+  card --> r3
+  r3 --> pill
+  r3 --> chipgate
+  chipgate -->|yes| agent --> chip
+  chipgate -->|no| nochip
+  card --> stripe
+</pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

@@ -38,11 +38,10 @@ func (m Model) cardWidth() int {
 
 // colAvail is the vertical budget (terminal rows) a single column has for its
 // cards + overflow indicators: the whole height minus the board chrome (header,
-// status, footer = 3 rows), the column's own head + blank line (2 rows), and the
-// needs-you strip's height (1c) so the strip + board both fit rather than
-// overflow (D3). A degraded strip contributes only its one summary line.
+// status, footer = 3 rows) and the column's own head + blank line (2 rows). The
+// needs-you strip is gone, so no strip height is subtracted from the budget.
 func (m Model) colAvail() int {
-	return m.height - 5 - m.stripHeight()
+	return m.height - 5
 }
 
 // cardHeights measures each card's rendered height. Heights are measured (not

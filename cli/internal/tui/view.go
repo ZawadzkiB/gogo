@@ -48,12 +48,10 @@ func (m Model) viewBoard() string {
 		status = m.boardStatusLine()
 	}
 
-	// Header · (needs-you strip, 1c) · columns · status · contextual footer.
-	parts := []string{header}
-	if strip := m.renderNeedsYouStrip(); strip != "" {
-		parts = append(parts, strip)
-	}
-	parts = append(parts, body, statusStyle(status), m.contextualFooter())
+	// Header · columns · status · contextual footer. The needs-you strip is gone —
+	// the header count (⏸ K need you) plus each gate card's left-border stripe carry
+	// the "act now" signal now.
+	parts := []string{header, body, statusStyle(status), m.contextualFooter()}
 	return strings.Join(parts, "\n")
 }
 
@@ -74,7 +72,7 @@ func placeApart(left, right string, width int) string {
 // attentionSummary is the FR-1 right-aligned header cue: a red `⏸ K need you`
 // pill (only when K>0), then a green `● S session` count (only when S>0).
 func (m Model) attentionSummary() string {
-	k := len(m.gates())
+	k := m.needsYouCount()
 	s := len(m.sessions)
 	var out string
 	if k > 0 {
@@ -215,12 +213,19 @@ func (m Model) renderChangelogColumn(i, colWidth int) string {
 	if start > 0 || end < len(col) {
 		hint = fmt.Sprintf("%d–%d", start+1, end)
 	}
+	// The focused row (only when the changelog column itself holds board focus) gets
+	// the ▸ cursor + selection bar, so navigating the list has an in-list indicator,
+	// not just the footer text.
+	focusedRow := -1
+	if i == m.colIdx {
+		focusedRow = m.cardIdx[i]
+	}
 	parts := []string{m.columnHeader(i, hint), ""}
 	if start > 0 {
 		parts = append(parts, faintStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
 	}
-	for _, f := range col[start:end] {
-		parts = append(parts, changelogRow(f, rowW))
+	for j := start; j < end; j++ {
+		parts = append(parts, changelogRow(col[j], rowW, j == focusedRow, hasLiveSession(col[j].Slug, m.sessions)))
 	}
 	if below := len(col) - end; below > 0 {
 		parts = append(parts, faintStyle.Render(fmt.Sprintf("  ↓ %d more · enter to browse", below)))
@@ -228,24 +233,47 @@ func (m Model) renderChangelogColumn(i, colWidth int) string {
 	return lipgloss.NewStyle().Width(colWidth).Render(strings.Join(parts, "\n"))
 }
 
-// changelogRow is one collapsed changelog entry (FR-6): `✓ slug` (secondary,
-// truncated) left, `MM-DD` (faint) right — no box.
-func changelogRow(f *contract.Feature, width int) string {
+// changelogRow is one collapsed changelog entry (FR-6): a two-column cursor gutter
+// (`▸ ` when focused, else blank), `✓ slug` (truncated) left, `MM-DD` (faint) right
+// — no box. When the shipped item has a live pipeline session (hasSession, FR-1) a
+// green `●` is prefixed just before the slug (`✓ ● slug`), so the user can spot it
+// and enter→drill→kill. A focused row renders as a full-width selection bar: plain
+// inner text under a single focus fg+bg fill so the bar has no per-segment
+// background holes (the same tactic the focused work card uses — the dot rides the
+// fill there too, so on a focused row it is plain, not green).
+func changelogRow(f *contract.Feature, width int, focused, hasSession bool) string {
 	date := shortDate(f.Completed)
 	if date == "" {
 		date = shortDate(f.Created)
 	}
 	dateW := len([]rune(date))
-	slugMax := width - dateW - 3 // "✓ " + at least a one-cell gap
+	// Reserve the leading "● " (2 cells) when live, so the slug truncation and the
+	// right-aligned date math both account for it and MM-DD stays put.
+	dot := ""
+	if hasSession {
+		dot = "● "
+	}
+	slugMax := width - dateW - 5 - len([]rune(dot)) // "▸ " gutter + "✓ " + [dot] + a one-cell gap
 	if slugMax < 4 {
 		slugMax = 4
 	}
-	left := "✓ " + truncate(f.Slug, slugMax)
-	gap := width - lipgloss.Width(left) - dateW
+	slug := truncate(f.Slug, slugMax)
+	leftPlain := "✓ " + dot + slug                       // plain form for the width/gap math
+	gap := width - 2 - lipgloss.Width(leftPlain) - dateW // -2 for the cursor gutter
 	if gap < 1 {
 		gap = 1
 	}
-	return secondaryStyle.Render(left) + strings.Repeat(" ", gap) + faintStyle.Render(date)
+	if focused {
+		row := "▸ " + leftPlain + strings.Repeat(" ", gap) + date
+		return changelogFocusStyle.Width(width).Render(row)
+	}
+	// Non-focused: the ● gets its own green sessionStyle; ✓/slug stay secondary.
+	styledLeft := secondaryStyle.Render("✓ ")
+	if hasSession {
+		styledLeft += sessionStyle.Render("●") + " "
+	}
+	styledLeft += secondaryStyle.Render(slug)
+	return "  " + styledLeft + strings.Repeat(" ", gap) + faintStyle.Render(date)
 }
 
 // shortDate reduces a YYYY-MM-DD date to MM-DD (the changelog's compact form);
@@ -292,7 +320,15 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		title = f.Slug
 	}
 
-	// Three rows: name (+ mark, + live ● dot) · one-line desc · status pill + phase dots.
+	// The live agent chip (FR-6, D1): a green `● <agent>` shown only when a session
+	// is live on the card AND the card is not itself a user gate. An idle card, or a
+	// gate card, shows the status pill alone.
+	agent := ""
+	if hasSession && !f.WaitingForInput() {
+		agent = activeAgent(f)
+	}
+
+	// Three rows: name (+ mark, + live ● dot) · one-line desc · status pill [+ agent chip].
 	var head, titleLine, badgeLine string
 	if focused {
 		// Plain inner text — the frame carries one foreground + background so the
@@ -309,7 +345,15 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 		head = mark + truncate(f.Slug, width-len([]rune(mark))-len([]rune(dot))) + dot
 		titleLine = truncate(title, width)
-		badgeLine = truncate(pillLabel(f), width-8) + "  " + phaseDotsPlain()
+		// The frame carries one fg+bg fill, so a colored chip would punch a hole —
+		// render it plain and reserve its rune width from the pill's truncation budget
+		// (the pill gets the full width when there is no chip).
+		if agent != "" {
+			chip := "  ● " + agent
+			badgeLine = truncate(pillLabel(f), width-len([]rune(chip))) + chip
+		} else {
+			badgeLine = truncate(pillLabel(f), width)
+		}
 	} else {
 		mark := ""
 		if selected {
@@ -323,7 +367,10 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 		head = mark + slugStyle.Render(truncate(f.Slug, width-4)) + dot
 		titleLine = dimStyle.Render(truncate(title, width))
-		badgeLine = pillStyleFor(f).Render(pillLabel(f)) + "  " + phaseDots(f)
+		badgeLine = pillStyleFor(f).Render(pillLabel(f))
+		if agent != "" {
+			badgeLine += "  " + sessionStyle.Render("● "+agent)
+		}
 	}
 
 	body := strings.Join([]string{head, titleLine, badgeLine}, "\n")
@@ -343,85 +390,12 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	return style.Width(width).Render(body)
 }
 
-// renderNeedsYouStrip renders the FR-8 needs-you inbox above the board: a
-// red-bordered box `⏸ NEEDS YOU (N)` with one 3-line group per WaitingForInput()
-// gate — a gate-type pill, the one-line "what's blocked", and a `[n] read … ·
-// answer` affordance beside the FR-9 segmented bar. Gates ALSO stay in their
-// columns (D3 — the strip is a shortcut, not a move). On a short terminal it
-// degrades to a single summary line so the board never overflows (D3).
-func (m Model) renderNeedsYouStrip() string {
-	gs := m.gates()
-	if len(gs) == 0 {
-		return ""
-	}
-	if m.stripDegraded() {
-		return waitStyle.Render(fmt.Sprintf("%s NEEDS YOU (%d)", waitingMarker, len(gs))) +
-			dimStyle.Render(fmt.Sprintf(" — press 1–%d to answer · ? for keys", numberedGates(len(gs))))
-	}
-	innerW := m.boardBodyWidth() - 4 // the red box's border (2) + padding (2)
-	if innerW < 24 {
-		innerW = 24
-	}
-	rows := []string{waitStyle.Render(fmt.Sprintf("%s NEEDS YOU (%d)", waitingMarker, len(gs)))}
-	for i, g := range gs {
-		typePill := g.kindStyle.Render(g.kind)
-		name := slugStyle.Render(truncate(g.feature.Slug, innerW-lipgloss.Width(typePill)-2))
-		rows = append(rows, typePill+"  "+name)
-		rows = append(rows, secondaryStyle.Render(truncate(g.blocked, innerW)))
-		// Number-key affordance only for gates 1..9 (gateNumberKey parses one digit);
-		// a 10th+ gate is still reachable in its column, just without a key (REV-003).
-		read := g.read
-		if i < 9 {
-			read = fmt.Sprintf("[%d] %s", i+1, g.read)
-		}
-		aff := dimStyle.Render(read + " · " + g.answer)
-		rows = append(rows, aff+"   "+phaseBar(g.feature))
-		if i < len(gs)-1 {
-			rows = append(rows, faintStyle.Render(strings.Repeat("─", innerW)))
-		}
-	}
-	return stripBoxStyle.Width(innerW).Render(strings.Join(rows, "\n"))
-}
-
-// numberedGates caps a gate count at the 9 that the single-digit number keys can
-// reach (REV-003), for the degraded strip's "press 1–N" summary.
-func numberedGates(n int) int {
-	if n > 9 {
-		return 9
-	}
-	return n
-}
-
-// stripDegraded reports whether the terminal is too short to fit the full
-// needs-you box AND a usable board — in which case the strip collapses to a
-// single summary line (D3). It reads m.height directly (never colAvail, which
-// subtracts the strip), so there is no cycle.
-func (m Model) stripDegraded() bool {
-	if m.height <= 0 {
-		return false
-	}
-	full := 3 + 4*len(m.gates()) // box chrome + title + ~4 rows per gate
-	const minBoard = 8           // header + status + footer + column head + ≥1 card row
-	return m.height < full+minBoard
-}
-
-// stripHeight is the rendered height of the needs-you strip plus one blank
-// separator line (0 when there are no gates) — the vertical budget the columns
-// yield to it in colAvail so the strip + board both fit (D3).
-func (m Model) stripHeight() int {
-	s := m.renderNeedsYouStrip()
-	if s == "" {
-		return 0
-	}
-	return lipgloss.Height(s) + 1
-}
-
 // contextualFooter is the FR-7 footer: the focused card's applicable action
 // key-chips (a live card leading with a green ●) + a right-aligned `[?] all
 // keys`. `?` (FR-10) swaps it for the full pre-redesign key list.
 func (m Model) contextualFooter() string {
 	if m.showAllKeys {
-		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · 1–N answer gate · / filter · ? keys · q quit"
+		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · / filter · ? keys · q quit"
 		return helpStyle.Render(full)
 	}
 	right := keyChipStyle.Render("[?] all keys")

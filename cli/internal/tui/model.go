@@ -37,9 +37,22 @@ const (
 // on every Update) would leave the form writing to an orphaned copy, so a
 // confirmed launch would read a stale false and silently cancel. TEST-001.
 type formBinding struct {
-	release string
-	confirm bool
+	release  string
+	confirm  bool
+	selected string // the attach/kill picker's chosen value (session name or a sentinel)
 }
+
+// Picker sentinels — the non-empty values the attach/kill huh.NewSelect writes to
+// binding.selected for its non-session options. Plain ASCII, and deliberately NOT
+// valid tmux session names (a leading space never occurs in gogo-<action>-<slug>),
+// so they can never collide with a real session choice. An empty binding.selected
+// means "no picker ran" — the single-session Confirm path — so these must stay
+// non-empty (a distinct-from-"" discriminator, no extra field needed).
+const (
+	killAll      = " kill-all"      // kill every pendingKill session
+	killCancel   = " kill-cancel"   // cancel the kill picker
+	attachCancel = " attach-cancel" // cancel the attach picker
+)
 
 // columnOrder / columnTitles fix the 4-column layout left→right.
 var (
@@ -92,12 +105,14 @@ type Model struct {
 	dark          bool              // terminal background, detected ONCE before the program starts
 
 	// form
-	form          *huh.Form
-	pending       launch.Intent
-	pendingShip   bool
-	pendingDelete *contract.Feature // FR6: the card a confirmed `x` moves to trash
-	pendingKill   []string          // FR-B3: the drill card's live session(s) a confirmed `K` kills
-	binding       *formBinding      // heap-stable targets for the live huh fields
+	form            *huh.Form
+	pending         launch.Intent
+	pendingShip     bool
+	pendingDelete   *contract.Feature // FR6: the card a confirmed `x` moves to trash
+	pendingKill     []string          // FR-B3: the drill card's live session(s) a confirmed `K` kills
+	pendingAttach   []string          // the attach picker's candidate sessions (≥2 live) — FR-2
+	pickerFromDrill bool              // the attach picker was opened from the drill (cancel restores modeDrill vs modeBoard)
+	binding         *formBinding      // heap-stable targets for the live huh fields
 
 	// peek (FR7): a read-only session-log viewer reusing the async viewer.
 	peeking     bool   // the open viewer is a session-log peek (r re-captures)
@@ -309,141 +324,48 @@ func phaseRound(phase string, round int, hasRound bool) string {
 	return phase
 }
 
-// --- redesign: phase progress, status pills, gate enumeration (cockpit-redesign) ---
+// --- redesign: status pills + the live agent chip (cockpit-lean-cards) ---
 //
-// One shared model, several thin renderers. phaseProgress(f) is the single source
-// of truth (D2); the FR-4 dots and the FR-9 segmented bar both render it. badge()
-// stays the canonical status producer; pillLabel/pillStyleFor transform it into
-// the FR-3 chip. gates() enumerates the FR-8 needs-you inbox. All pure, all
-// substring-assertable (no TTY under `go test` → lipgloss emits plain text).
+// badge() stays the canonical status producer; pillLabel/pillStyleFor transform
+// it into the FR-3 status chip. activeAgent names the live session's agent for the
+// FR-6 chip. All pure, all substring-assertable (no TTY under `go test` → lipgloss
+// emits plain text).
 
-// phaseState is one slot of the 5-phase progress vector.
-type phaseState int
-
-const (
-	phasePending phaseState = iota // not started (zero value)
-	phaseCurrent                   // the feature's current phase
-	phaseDone                      // completed
-)
-
-// phaseGlyphs are the FR-4 dots — one circled digit per pipeline phase
-// (plan/implement/review/test/report). An intentional non-ASCII exception
-// (coding-rules "Style").
-var phaseGlyphs = [5]string{"①", "②", "③", "④", "⑤"}
-
-// phaseIndex maps a state.md phase name to its slot in the 5-phase vector, or -1
-// when unknown. "done" (the terminal label) returns 5 → every slot done. events'
-// "report" and state.md's "knowledge" are the same fifth phase.
-func phaseIndex(phase string) int {
-	switch phase {
+// activeAgent maps a card's current pipeline phase to the short, lowercase agent
+// label the FR-6 live chip shows. state.md's fifth phase is "knowledge" while
+// events.jsonl labels it "report" (contract.EventsPhase) — both are the report
+// step, so both map to "reporter" (a display label; there is no gogo-reporter
+// agent). When f.Phase is empty (a live card whose telemetry momentarily lags) it
+// falls back to the status so the chip still names its agent. done/unknown → ""
+// (no chip).
+func activeAgent(f *contract.Feature) string {
+	switch f.Phase {
 	case "plan":
-		return 0
+		return "analyst"
 	case "implement":
-		return 1
+		return "developer"
 	case "review":
-		return 2
+		return "reviewer"
 	case "test":
-		return 3
+		return "tester"
 	case "knowledge", "report":
-		return 4
+		return "reporter"
 	case "done":
-		return 5
+		return ""
 	}
-	return -1
-}
-
-// phaseIndexFromStatus derives the current phase slot from state.md's status when
-// the phase line is absent (older/raw features), so the dots still light up.
-func phaseIndexFromStatus(status string) int {
-	switch status {
-	case "awaiting-plan-acceptance", "plan-accepted":
-		return 0
+	switch f.Status {
 	case "implementing":
-		return 1
+		return "developer"
 	case "reviewing":
-		return 2
+		return "reviewer"
 	case "testing":
-		return 3
-	case "awaiting-uat":
-		return 4
+		return "tester"
 	}
-	return -1
+	return ""
 }
-
-// phaseProgress is the single source of truth for a card's phase display (D2):
-// every phase before the current is done, the current is current, the rest
-// pending; a shipped feature is all-done; an unknown phase is all-pending (a
-// safe, meaningful default — never a panic).
-func phaseProgress(f *contract.Feature) [5]phaseState {
-	var out [5]phaseState // zero value == phasePending
-	if f.Class == contract.ClassShipped {
-		for i := range out {
-			out[i] = phaseDone
-		}
-		return out
-	}
-	idx := phaseIndex(f.Phase)
-	if idx < 0 {
-		idx = phaseIndexFromStatus(f.Status)
-	}
-	if idx < 0 {
-		return out // unknown → all pending
-	}
-	if idx >= len(out) { // terminal "done" phase
-		for i := range out {
-			out[i] = phaseDone
-		}
-		return out
-	}
-	for i := 0; i < idx; i++ {
-		out[i] = phaseDone
-	}
-	out[idx] = phaseCurrent
-	return out
-}
-
-// phaseStyleFor maps a phase slot to its glyph/segment style.
-func phaseStyleFor(s phaseState) lipgloss.Style {
-	switch s {
-	case phaseDone:
-		return phaseDoneStyle
-	case phaseCurrent:
-		return phaseCurrentStyle
-	default:
-		return phasePendingStyle
-	}
-}
-
-// phaseDots renders the FR-4 per-card element: five colored glyphs `①②③④⑤`.
-func phaseDots(f *contract.Feature) string {
-	var b strings.Builder
-	for i, s := range phaseProgress(f) {
-		b.WriteString(phaseStyleFor(s).Render(phaseGlyphs[i]))
-	}
-	return b.String()
-}
-
-// phaseDotsPlain is the uncolored dot run for a FOCUSED card, whose frame carries
-// a single fg+bg fill (per-glyph colors would punch background holes).
-func phaseDotsPlain() string { return strings.Join(phaseGlyphs[:], "") }
 
 // isChangelogCol reports whether board column i is the collapsed changelog list.
 func isChangelogCol(i int) bool { return columnOrder[i] == contract.ColChangelog }
-
-// phaseBar renders the FR-9 flavor: a 5-segment progress bar over the SAME
-// phaseProgress vector (D2). Filled `▓` for done/current (green/amber), faint
-// `░` for pending — both substring-assertable.
-func phaseBar(f *contract.Feature) string {
-	parts := make([]string, 0, 5)
-	for _, s := range phaseProgress(f) {
-		glyph := "▓▓▓"
-		if s == phasePending {
-			glyph = "░░░"
-		}
-		parts = append(parts, phaseStyleFor(s).Render(glyph))
-	}
-	return strings.Join(parts, " ")
-}
 
 // pillLabel is the FR-3 chip text: badge() stays the canonical status producer
 // (its tests + the drill/status line depend on it); this transform maps the gate
@@ -541,59 +463,19 @@ func stripeAccent(f *contract.Feature) (lipgloss.TerminalColor, bool) {
 	return nil, false
 }
 
-// gate is one needs-you inbox row (FR-8): a card parked at a user gate, its gate
-// type + tinted pill, the one-line "what's blocked", the read-key label, the
-// answer key, and where the card sits so a number key can jump focus to it.
-type gate struct {
-	feature   *contract.Feature
-	kind      string         // "plan gate" | "uat gate" | "decision gate"
-	kindStyle lipgloss.Style // the gate-type pill style
-	blocked   string         // one-line what-s-blocked
-	read      string         // the [N] read-key label, e.g. "read plan"
-	answer    string         // the answer key, e.g. "[m] accept"
-	col, row  int            // board coordinates (column, card index) for the jump
-}
-
-// gates enumerates the board's WaitingForInput() cards as inbox rows in board
-// order (plan → in progress → ready → changelog, newest-first within each — the
-// same order the columns render), so the number keys 1..N are stable.
-func (m Model) gates() []gate {
-	var out []gate
+// needsYouCount counts the cards parked at a user gate across all four columns —
+// the header's "⏸ K need you" data source (the last non-test caller of the removed
+// gate enumerator). The left-border stripe (stripeAccent) is now the per-card cue.
+func (m Model) needsYouCount() int {
+	n := 0
 	for i := 0; i < 4; i++ {
-		for j, f := range m.cols[i] {
-			if !f.WaitingForInput() {
-				continue
+		for _, f := range m.cols[i] {
+			if f.WaitingForInput() {
+				n++
 			}
-			g := gateFor(f)
-			g.col, g.row = i, j
-			out = append(out, g)
 		}
 	}
-	return out
-}
-
-// gateFor classifies one gate card into its inbox row (kind, pill, blurb, keys).
-func gateFor(f *contract.Feature) gate {
-	switch {
-	case f.AwaitingUAT():
-		return gate{feature: f, kind: "uat gate", kindStyle: pillPurple,
-			blocked: "report done, awaiting your verification", read: "read report", answer: "[d] ship"}
-	case f.Status == "awaiting-plan-acceptance":
-		return gate{feature: f, kind: "plan gate", kindStyle: pillRed,
-			blocked: "plan ready for your acceptance", read: "read plan", answer: "[m] accept"}
-	case isUATReplan(f):
-		// A mid-UAT re-plan: the analyst is revising the plan (or it is parked for
-		// re-acceptance) — not a stuck decision fork. Say so, and route the read to
-		// the plan being revised.
-		return gate{feature: f, kind: "uat re-plan", kindStyle: pillRed,
-			blocked: fmt.Sprintf("re-planning after UAT round %d — revising the plan", uatRound(f)),
-			read:    "read plan", answer: "[m] resume"}
-	default: // waiting-for-user — a parked decision fork
-		// `m` is the board's go/resume key (move.go: in-progress → go/resume); `g`
-		// has no board handler, so advertise the real key here (REV-001).
-		return gate{feature: f, kind: "decision gate", kindStyle: pillRed,
-			blocked: "parked on a decision — resume with your answer", read: "read state", answer: "[m] resume"}
-	}
+	return n
 }
 
 func hasLiveSession(slug string, sessions []string) bool {

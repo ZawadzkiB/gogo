@@ -1,0 +1,36 @@
+flowchart TD
+  subgraph attach["attach — board a / drill a"]
+    A0["board a: attachFocused()\ndrill a: updateDrill 'a'"] --> A1["attachFeature(f)"]
+    A1 --> A2{"liveSessionsFor(f.Slug)\ncount?"}
+    A2 -->|0| A3["status: no running session"]
+    A2 -->|1| A4["attachSession(s)\ntea.ExecProcess (direct)"]
+    A2 -->|">= 2"| A5["startAttachPicker(f, sessions)\nhuh.NewSelect: one per session + Cancel"]
+    A5 --> A6["updateForm -> StateCompleted\npendingAttach != nil -> finishAttach()"]
+    A6 -->|Cancel / esc| A7["cancelForm -> origin mode"]
+    A6 -->|a session| A4
+  end
+
+  subgraph kill["kill — drill K"]
+    K0["drill K: killDrill()"] --> K1{"liveSessionsFor(f.Slug)\ncount?"}
+    K1 -->|0| K2["status: no live session to kill"]
+    K1 -->|1| K3["startKillForm (huh.Confirm)\nKill / Cancel — unchanged"]
+    K1 -->|">= 2"| K4["startKillPicker(f, sessions)\nhuh.NewSelect: one per session + 'all N' + Cancel"]
+    K3 --> K5["finishKill()"]
+    K4 --> K5
+    K5 -->|Cancel| K6["status: cancelled -> drill"]
+    K5 -->|one session| K7["killer(s) x1"]
+    K5 -->|all N| K8["killer(s) for each pendingKill"]
+    K7 --> K9["loadDrillCard(drill) refresh"]
+    K8 --> K9
+  end
+
+  subgraph changelog["changelog liveness dot — FR-1"]
+    C0["renderChangelogColumn(i)"] --> C1["per row: hasLiveSession(slug, sessions)"]
+    C1 --> C2["changelogRow(f, width, focused, hasSession)"]
+    C2 -->|hasSession| C3["prefix green '●' -> enter drills -> K kills"]
+    C2 -->|idle| C4["plain '✓ slug … MM-DD'"]
+  end
+
+  A4 -.->|binds via| B["binding.selected (heap-stable *formBinding)"]
+  A5 -.-> B
+  K4 -.-> B

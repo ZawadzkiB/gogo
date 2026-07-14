@@ -1,0 +1,28 @@
+flowchart TD
+  repo[("contract.Repo\n(Features · Status · Phase · sessions)")]
+  view["view.go: viewBoard()"]
+  header["header: 'gogo cockpit  N features'\nright: ⏸ K need you (needsYouCount) · ● S session"]
+  cols["renderColumn(i) x4\n(no needs-you strip above the board)"]
+  card["renderCard() — 3 rows"]
+  r1["row1: mark + slug  (+ ● live dot)"]
+  r2["row2: one-line desc (dim)"]
+  r3["row3: status pill  +  [● agent chip]"]
+
+  pill["pillLabel(f) / pillStyleFor(f)\n(badge() stays canonical)"]
+  agent["activeAgent(f): phase→agent\nplan→analyst · implement→developer\nreview→reviewer · test→tester · knowledge|report→reporter"]
+  chipgate{"hasLiveSession(slug)\n&& !WaitingForInput()?"}
+  chip["● <agent>  (green when unfocused, plain when focused)"]
+  nochip["(status pill alone)"]
+
+  stripe["stripeAccent(f) → heavy ┃ left border\nred = plan/decision gate · purple = uat gate\n= THE 'act now' cue"]
+
+  repo --> view --> header
+  view --> cols --> card
+  card --> r1
+  card --> r2
+  card --> r3
+  r3 --> pill
+  r3 --> chipgate
+  chipgate -->|yes| agent --> chip
+  chipgate -->|no| nochip
+  card --> stripe

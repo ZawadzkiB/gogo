@@ -1,0 +1,21 @@
+{
+  "slug": "board-session-picker",
+  "phase": "implement",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-board-session-picker/plan.md",
+    ".gogo/knowledge/coding-rules.md"
+  ],
+  "outputs": [
+    "cli/internal/tui/model.go",
+    "cli/internal/tui/update.go",
+    "cli/internal/tui/view.go",
+    "cli/main.go",
+    "cli/internal/tui/card_test.go",
+    ".gogo/work/feature-board-session-picker/charts/manifest.json"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "FR-1 changelog live-session dot, FR-2 attach picker (0/1/>=2), FR-3 kill picker (one/all N/Cancel) - presentation/interaction-only over the same contract.Repo; version 0.20.0; gofmt/go vet/go test -race all green."
+}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — board-session-picker</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>board-session-picker</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Intended design — per-session attach/kill pickers + changelog liveness dot</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  subgraph attach["attach — board a / drill a"]
+    A0["board a: attachFocused()\ndrill a: updateDrill 'a'"] --> A1["attachFeature(f)"]
+    A1 --> A2{"liveSessionsFor(f.Slug)\ncount?"}
+    A2 -->|0| A3["status: no running session"]
+    A2 -->|1| A4["attachSession(s)\ntea.ExecProcess (direct)"]
+    A2 -->|">= 2"| A5["startAttachPicker(f, sessions)\nhuh.NewSelect: one per session + Cancel"]
+    A5 --> A6["updateForm -> StateCompleted\npendingAttach != nil -> finishAttach()"]
+    A6 -->|Cancel / esc| A7["cancelForm -> origin mode"]
+    A6 -->|a session| A4
+  end
+
+  subgraph kill["kill — drill K"]
+    K0["drill K: killDrill()"] --> K1{"liveSessionsFor(f.Slug)\ncount?"}
+    K1 -->|0| K2["status: no live session to kill"]
+    K1 -->|1| K3["startKillForm (huh.Confirm)\nKill / Cancel — unchanged"]
+    K1 -->|">= 2"| K4["startKillPicker(f, sessions)\nhuh.NewSelect: one per session + 'all N' + Cancel"]
+    K3 --> K5["finishKill()"]
+    K4 --> K5
+    K5 -->|Cancel| K6["status: cancelled -> drill"]
+    K5 -->|one session| K7["killer(s) x1"]
+    K5 -->|all N| K8["killer(s) for each pendingKill"]
+    K7 --> K9["loadDrillCard(drill) refresh"]
+    K8 --> K9
+  end
+
+  subgraph changelog["changelog liveness dot — FR-1"]
+    C0["renderChangelogColumn(i)"] --> C1["per row: hasLiveSession(slug, sessions)"]
+    C1 --> C2["changelogRow(f, width, focused, hasSession)"]
+    C2 -->|hasSession| C3["prefix green '●' -> enter drills -> K kills"]
+    C2 -->|idle| C4["plain '✓ slug … MM-DD'"]
+  end
+
+  A4 -.->|binds via| B["binding.selected (heap-stable *formBinding)"]
+  A5 -.-> B
+  K4 -.-> B
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

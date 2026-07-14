@@ -1,0 +1,12 @@
+{
+  "slug": "board-session-picker",
+  "updated": "2026-07-15",
+  "note": "As-built (0.20.0): the per-session attach/kill pickers + the changelog live-session dot, over the same contract.Repo (presentation/interaction only). A single flow diagram carries the signal - the change is control-flow branching (attach 0/1/>=2, kill 1 vs >=2, completion routing through binding.selected) plus the changelog dot; no new types or cross-module runtime interaction, so class/sequence would be trivial and are skipped.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Per-session attach/kill pickers + changelog liveness dot (as-built)"
+    }
+  ]
+}

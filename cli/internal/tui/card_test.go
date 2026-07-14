@@ -250,6 +250,210 @@ func TestDrillKillWiring(t *testing.T) {
 	})
 }
 
+// TestChangelogLiveSessionDot (FR-1): a collapsed changelog row whose shipped item
+// has a live pipeline session shows a green ● just before its slug; an idle row does
+// not — and the collapsed `✓ slug` list shape is preserved for both.
+func TestChangelogLiveSessionDot(t *testing.T) {
+	m := newModel(t)
+	a := &contract.Feature{Slug: "alpha", Class: contract.ClassShipped, Completed: "2026-07-01"}
+	b := &contract.Feature{Slug: "bravo", Class: contract.ClassShipped, Completed: "2026-07-02"}
+	m.cols[3] = []*contract.Feature{a, b}
+	m.colIdx = 0 // focus another column so neither row is the focus bar
+	// A live gogo-done session for alpha only (exact-match convention — TEST-005).
+	m.sessions = []string{"gogo-done-alpha"}
+
+	out := m.renderColumn(3, m.boardColWidth())
+	if !strings.Contains(out, "● alpha") {
+		t.Errorf("live changelog row missing the ● dot before its slug:\n%s", out)
+	}
+	if strings.Contains(out, "● bravo") {
+		t.Errorf("idle changelog row wrongly shows a live ● dot:\n%s", out)
+	}
+	// Collapsed list shape preserved: the live row keeps ✓ before the dot, the idle
+	// row keeps the plain ✓ slug form.
+	if !strings.Contains(out, "✓ ● alpha") {
+		t.Errorf("live row lost the collapsed ✓ shape:\n%s", out)
+	}
+	if !strings.Contains(out, "✓ bravo") {
+		t.Errorf("idle row lost the collapsed ✓ slug shape:\n%s", out)
+	}
+}
+
+// TestDrillAttachPicker (FR-2): `a` over a card with ≥2 live sessions opens a picker
+// (modeForm, pendingAttach set) listing every exact-match session; selecting one
+// attaches exactly it (m.status names the chosen session); Cancel/esc attaches
+// nothing and restores the drill. Exactly one session keeps the direct-attach UX
+// (TestDrillAttachWiring) — untouched.
+func TestDrillAttachPicker(t *testing.T) {
+	drillMulti := func(t *testing.T) Model {
+		t.Helper()
+		m := newModel(t)
+		m.colIdx = 1
+		m.hasTmux = true
+		m.registry = fakeReg(nil)
+		// Two exact-match sessions PLUS a substring sibling that must NOT be offered.
+		m.sessions = []string{"gogo-go-inprogress", "gogo-plan-inprogress", "gogo-go-inprogressX"}
+		return send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	}
+
+	t.Run("opens a picker listing each session, excludes the sibling", func(t *testing.T) {
+		m := drillMulti(t)
+		nm, cmd := m.Update(runes("a"))
+		m = nm.(Model)
+		if m.mode != modeForm || m.pendingAttach == nil {
+			t.Fatalf("a over ≥2 sessions did not open the picker (mode=%d pending=%v)", m.mode, m.pendingAttach)
+		}
+		if cmd == nil {
+			t.Errorf("picker open returned no init command")
+		}
+		out := m.View()
+		for _, want := range []string{"Attach which session", "gogo-go-inprogress", "gogo-plan-inprogress", "Cancel"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("attach picker missing %q:\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "gogo-go-inprogressX") {
+			t.Errorf("attach picker offered the substring sibling:\n%s", out)
+		}
+	})
+
+	t.Run("selecting a session attaches exactly it", func(t *testing.T) {
+		m := drillMulti(t)
+		nm, _ := m.Update(runes("a"))
+		m = keyPress(t, nm.(Model), runes("j"))            // move to the 2nd option
+		m = keyPress(t, m, tea.KeyMsg{Type: tea.KeyEnter}) // select + submit
+		if !strings.Contains(m.status, "attaching gogo-plan-inprogress") {
+			t.Errorf("status = %q, want it to name the chosen (2nd) session", m.status)
+		}
+		if m.pendingAttach != nil {
+			t.Errorf("pendingAttach not cleared after a completed pick: %v", m.pendingAttach)
+		}
+	})
+
+	t.Run("cancel attaches nothing and restores the drill", func(t *testing.T) {
+		m := drillMulti(t)
+		nm, _ := m.Update(runes("a"))
+		m = keyPress(t, nm.(Model), tea.KeyMsg{Type: tea.KeyEsc})
+		if m.mode != modeDrill {
+			t.Errorf("esc-cancel of the attach picker left mode=%d, want the drill", m.mode)
+		}
+		if strings.Contains(m.status, "attaching") {
+			t.Errorf("esc-cancel still attached: %q", m.status)
+		}
+	})
+
+	// The BOARD-origin picker (pickerFromDrill=false) is a distinct reachable branch:
+	// cancel must restore modeBoard AND preserve the ready-ship multi-selection (the
+	// attach-cancel is unrelated to the selection — formPreservesSelection now covers
+	// pendingAttach, mirroring the kill/delete rule, REV-012).
+	t.Run("board-origin cancel restores the board and keeps the ready-ship selection", func(t *testing.T) {
+		m := newModel(t)
+		m.colIdx = 2 // ready column, focus "ready"
+		m.cardIdx[2] = 0
+		m.hasTmux = true
+		m.registry = fakeReg(nil)
+		m.sessions = []string{"gogo-go-ready", "gogo-plan-ready"} // ≥2 exact matches for "ready"
+		m.selected["ready"] = true
+		m.selected["legacy-ready"] = true
+
+		nm, _ := m.Update(runes("a")) // board a → attach picker (≥2)
+		m = nm.(Model)
+		if m.mode != modeForm || m.pendingAttach == nil || m.pickerFromDrill {
+			t.Fatalf("board a did not open a board-origin attach picker (mode=%d pending=%v fromDrill=%v)", m.mode, m.pendingAttach, m.pickerFromDrill)
+		}
+		m = keyPress(t, m, tea.KeyMsg{Type: tea.KeyEsc})
+		if m.mode != modeBoard {
+			t.Errorf("board-origin cancel left mode=%d, want the board", m.mode)
+		}
+		if strings.Contains(m.status, "attaching") {
+			t.Errorf("board-origin cancel still attached: %q", m.status)
+		}
+		if len(m.selectedSlugs()) != 2 {
+			t.Errorf("attach-cancel wiped the ready-ship selection: %v", m.selectedSlugs())
+		}
+	})
+}
+
+// TestDrillKillPicker (FR-3): `K` over ≥2 live sessions opens a picker listing each
+// session + an "all N" option + Cancel. Selecting one session kills exactly it (once,
+// the exact name); "all N" kills each session once; Cancel kills nothing. The single
+// session case keeps the confirm UX (TestDrillKillWiring) — untouched.
+func TestDrillKillPicker(t *testing.T) {
+	drillMulti := func(t *testing.T, k *recordingKiller) Model {
+		t.Helper()
+		m := newModel(t)
+		m.colIdx = 1
+		m.hasTmux = true
+		m.registry = fakeReg(nil)
+		m.killer = k.kill
+		// Two exact-match sessions PLUS a substring sibling that must never be a target.
+		m.sessions = []string{"gogo-go-inprogress", "gogo-plan-inprogress", "gogo-go-inprogressX"}
+		return send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	}
+
+	t.Run("picker lists each session + all + Cancel, excludes the sibling", func(t *testing.T) {
+		k := &recordingKiller{}
+		m := drillMulti(t, k)
+		nm, _ := m.Update(runes("K"))
+		m = nm.(Model)
+		if m.mode != modeForm || m.pendingKill == nil {
+			t.Fatalf("K over ≥2 sessions did not open the picker (mode=%d pending=%v)", m.mode, m.pendingKill)
+		}
+		out := m.View()
+		for _, want := range []string{"Kill which session", "gogo-go-inprogress", "gogo-plan-inprogress", "all 2 sessions", "Cancel"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("kill picker missing %q:\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "gogo-go-inprogressX") {
+			t.Errorf("kill picker offered the substring sibling:\n%s", out)
+		}
+	})
+
+	// Options order (liveSessionsFor iterates m.sessions): [0]=gogo-go-inprogress,
+	// [1]=gogo-plan-inprogress, [2]=all 2 sessions, [3]=Cancel.
+	t.Run("selecting one session kills exactly it once", func(t *testing.T) {
+		k := &recordingKiller{}
+		m := drillMulti(t, k)
+		nm, _ := m.Update(runes("K"))
+		m = keyPress(t, nm.(Model), tea.KeyMsg{Type: tea.KeyEnter}) // 1st option → select+submit
+		if len(k.calls) != 1 || k.calls[0] != "gogo-go-inprogress" {
+			t.Fatalf("killer calls = %v, want exactly [gogo-go-inprogress]", k.calls)
+		}
+		if m.mode != modeDrill {
+			t.Errorf("after kill, mode=%d, want the drill", m.mode)
+		}
+	})
+
+	t.Run("all N kills each session once", func(t *testing.T) {
+		k := &recordingKiller{}
+		m := drillMulti(t, k)
+		nm, _ := m.Update(runes("K"))
+		m = keyPress(t, nm.(Model), runes("j")) // → 2nd session
+		m = keyPress(t, m, runes("j"))          // → all 2 sessions
+		m = keyPress(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+		if len(k.calls) != 2 {
+			t.Fatalf("all-kill calls = %v, want both sessions killed once each", k.calls)
+		}
+	})
+
+	t.Run("Cancel kills nothing and stays on the drill", func(t *testing.T) {
+		k := &recordingKiller{}
+		m := drillMulti(t, k)
+		nm, _ := m.Update(runes("K"))
+		m = keyPress(t, nm.(Model), runes("j")) // → 2nd session
+		m = keyPress(t, m, runes("j"))          // → all
+		m = keyPress(t, m, runes("j"))          // → Cancel
+		m = keyPress(t, m, tea.KeyMsg{Type: tea.KeyEnter})
+		if len(k.calls) != 0 {
+			t.Fatalf("Cancel still killed: %v", k.calls)
+		}
+		if m.mode != modeDrill {
+			t.Errorf("Cancel left mode=%d, want the drill", m.mode)
+		}
+	})
+}
+
 // TestDrillDegradesNoSessions (FR-B5 no-LLM/degradation): a feature with no
 // registry and no live sessions still renders a clean panel ("no tracked
 // sessions"), and K/a with nothing live are safe no-ops with a hint.

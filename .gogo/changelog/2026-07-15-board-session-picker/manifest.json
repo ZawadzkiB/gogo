@@ -1,0 +1,13 @@
+{
+  "slug": "board-session-picker",
+  "updated": "2026-07-15",
+  "members": ["board-session-picker"],
+  "note": "Shipped 0.20.0: per-session attach/kill pickers + the changelog live-session dot, presentation/interaction-only in cli/internal/tui/ over the same contract.Repo. A single flow diagram carries the signal - control-flow branching (attach 0/1/>=2, kill 1 vs >=2, completion routing through binding.selected) plus the changelog dot; a before/ set enables compare mode.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "board-session-picker-flow.mmd",
+      "title": "board-session-picker: Per-session attach/kill pickers + changelog liveness dot (as-built)"
+    }
+  ]
+}

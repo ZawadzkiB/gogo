@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-lean-cards",
+  "updated": "2026-07-13",
+  "note": "As-is baseline (before) of the board render path this change touches: viewBoard → renderNeedsYouStrip ('⏸ NEEDS YOU (N)' box, fed by gates()/gateFor + phaseBar + the 1..9 number keys) → renderColumn x4 → renderCard row3 = status pill + phase dots ①②③④⑤ (phaseProgress vector). colAvail() subtracts stripHeight(). Scoped to exactly what the change removes/reworks.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Current board render flow (before): needs-you strip + number-key answering + per-card phase dots; colAvail subtracts stripHeight"
+    }
+  ]
+}

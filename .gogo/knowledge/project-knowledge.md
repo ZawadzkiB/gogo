@@ -265,6 +265,40 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   re-plan (`waiting-for-user` carrying a `UAT round N` open-decision) reads **`⏸ re-planning ·
   UAT N`** (a `uat re-plan` gate), distinct from a generic decision fork. No contract/classifier
   change (docs/cli-contract.md §"Changed in 0.19.0"); version **0.19.0**.
+- **Lean cockpit cards (0.20.0):** presentation-only follow-up that makes the `gogo` TUI board
+  (`cli/internal/tui/`) leaner and more legible — each card says plainly WHAT state it is in and
+  WHO is on it, with the left border as the sole "act now" cue. **Drops** the 0.18.0 `⏸ NEEDS YOU
+  (N)` inbox strip (and its whole support cast: `renderNeedsYouStrip`/`stripDegraded`/
+  `numberedGates`/`stripHeight`, `gates()`/`gateFor`, `stripBoxStyle`/`stripBg`/`waitStyle`), the
+  per-card `①②③④⑤` **phase dots** (the `phaseProgress [5]phaseState` vector + `phaseDots`/
+  `phaseBar` + `phaseIndex*`/`phaseStyleFor`/`phaseGlyphs`/phase styles), and the **`1..9`
+  gate number-key** answering (`jumpToGate`/`gateNumberKey`). **Adds** a green `● <agent>` chip on
+  a card's status row — shown **only** when a live session is on it AND it is not a user gate
+  (`hasLiveSession && !WaitingForInput`) — via `activeAgent(f)` (phase→agent: plan→analyst ·
+  implement→developer · review→reviewer · test→tester · knowledge|report→reporter; `reporter`
+  is a display label, no agent file). The header `⏸ K need you` count moves from `len(gates())`
+  to a new `needsYouCount()`; the heavy `┃` left border (`stripeAccent`) is unchanged and becomes
+  THE gate cue; `colAvail()` = `height - 5` (no strip height). Still presentation-only over the
+  **same `contract.Repo`** (no contract/classifier/skill/state change); version **0.20.0**.
+- **Per-session attach/kill pickers + changelog live-session dot (0.20.0):** presentation/
+  interaction-only follow-up (`cli/internal/tui/`) making lingering pipeline sessions **visible
+  and individually actionable**. **FR-1:** collapsed changelog rows show a green `●` before the
+  slug when the shipped item has a live session — `changelogRow` gains a `hasSession bool`,
+  `renderChangelogColumn` passes `hasLiveSession(slug, m.sessions)`. **FR-2:** `attachFeature`
+  (shared by board `a` + drill `a`) branches on the live-session count — `0` hint, `1`
+  `attachSession(s)` direct (unchanged UX, sets an `"attaching <session>"` status observable),
+  `≥2` `startAttachPicker` → a `huh.NewSelect[string]` (one per session + Cancel). **FR-3:** drill
+  `K` branches `1` (the existing `huh.NewConfirm`, unchanged — D2) vs `≥2` `startKillPicker` →
+  Select of one per session + `"all N sessions"` + Cancel; `finishKill` resolves targets from
+  `binding.selected` (`""`=Confirm-path all-or-none · `killAll` · `killCancel` · else the one
+  exact session). Both pickers bind through the heap-stable `*formBinding.selected` (TEST-001) and
+  route through `updateForm` (new `pendingAttach → finishAttach` branch; `formPreservesSelection` +
+  `cancelForm` cover the picker origin mode + selection preservation). Attribution stays EXACT via
+  `launch.SessionMatchesSlug` (TEST-005 — never substring). Picker sentinels
+  (`killAll`/`killCancel`/`attachCancel`) are non-empty leading-space consts that can never equal
+  a real `gogo-*` session, so `selected == ""` is an unambiguous Confirm-path discriminator. Pure,
+  substring-assertable (no TTY); same `contract.Repo`, no state mutation (killing tmux is not a
+  state write); version **0.20.0**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

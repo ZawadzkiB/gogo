@@ -1,0 +1,13 @@
+{
+  "slug": "cockpit-lean-cards",
+  "updated": "2026-07-14",
+  "members": ["cockpit-lean-cards"],
+  "note": "Shipped 2026-07-14 (CLI 0.19.0 -> 0.20.0): the gogo terminal cockpit (cli/internal/tui/) made leaner - the 0.18.0 needs-you strip, per-card phase dots (12345), and the 1..9 gate number-key are all removed; the status pill stays and a live-only green agent chip (activeAgent(f) phase->agent, shown only when hasLiveSession && !WaitingForInput()) is added to card row 3; the heavy | left border (stripeAccent) becomes the sole act-now cue; needsYouCount() replaces len(gates()) for the header count; colAvail() = height-5. Presentation-only over the SAME contract.Repo (no contract/classifier/pipeline-state change). before/cockpit-lean-cards-flow.mmd is the plan-time as-is (0.18.0) baseline for the flow diagram, for before/after compare.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "cockpit-lean-cards-flow.mmd",
+      "title": "cockpit-lean-cards: Lean board render flow (as-built) - no strip, no phase dots; row3 = status pill + live-only agent chip; left border = the act-now cue"
+    }
+  ]
+}

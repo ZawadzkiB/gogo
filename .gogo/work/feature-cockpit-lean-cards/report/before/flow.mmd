@@ -1,0 +1,34 @@
+flowchart TD
+  repo[("contract.Repo\n(Features · Status · Phase · sessions)")]
+  view["view.go: viewBoard()"]
+  header["header: 'gogo cockpit  N features'\nright: ⏸ K need you (len gates()) · ● S session"]
+  strip["renderNeedsYouStrip(): '⏸ NEEDS YOU (N)' box\ngate-type pill + one-line blocked + [n] answer + phaseBar\n(stripDegraded / numberedGates / stripHeight)"]
+  cols["renderColumn(i) x4"]
+  card["renderCard() — 3 rows"]
+  r1["row1: mark + slug  (+ ● live dot)"]
+  r2["row2: one-line desc (dim)"]
+  r3["row3: status pill  +  phase dots ①②③④⑤"]
+
+  pill["pillLabel(f) / pillStyleFor(f)  (badge canonical)"]
+  dots["phaseDots(f) / phaseDotsPlain()\n← phaseProgress(f) [5]phaseState\n(phaseIndex / phaseIndexFromStatus / phaseStyleFor / phaseGlyphs)"]
+  stripe["stripeAccent(f) → heavy ┃ left border (gate cue)"]
+
+  gates["model.go: gates() / gateFor() enumerator\n(feeds strip + header count)"]
+  keys["update.go: 1..9 answer gate\n(jumpToGate / gateNumberKey) + ? full help"]
+  colavail["window.go: colAvail() = height - 5 - stripHeight()"]
+
+  repo --> gates
+  repo --> view
+  view --> header
+  view --> strip
+  view --> cols --> card
+  card --> r1
+  card --> r2
+  card --> r3
+  r3 --> pill
+  r3 --> dots
+  card --> stripe
+  gates --> strip
+  gates --> header
+  keys --> strip
+  strip --> colavail

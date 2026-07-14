@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-lean-cards",
+  "updated": "2026-07-13",
+  "note": "Intended design (plan ①): the LEAN board render flow. The needs-you strip and the per-card phase dots are gone; the card's third row is 'status pill + conditional agent chip'. New pure helpers: activeAgent(f) (phase→agent, chip only when hasLiveSession && !WaitingForInput) and needsYouCount() (header count, replaces gates()). The heavy ┃ left border (stripeAccent) is now the sole act-now cue. Presentation-only over the SAME contract.Repo. As-is baseline: charts/before/flow.mmd.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Lean board render flow (after): no strip, no phase dots; row3 = status pill + live-only agent chip; left border = the gate cue"
+    }
+  ]
+}

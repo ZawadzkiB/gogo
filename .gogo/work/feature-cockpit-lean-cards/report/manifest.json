@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-lean-cards",
+  "updated": "2026-07-14",
+  "note": "As-built (after): the LEAN cockpit board render flow, shipped exactly as the plan's intended design. viewBoard() renders no needs-you strip; renderCard()'s row 3 is 'status pill + conditional agent chip' (no phase dots); activeAgent(f) maps phase->agent and the chip shows only when hasLiveSession && !WaitingForInput(); needsYouCount() feeds the header count (replaced gates()); the heavy | left border (stripeAccent) is the sole act-now cue; colAvail() = height-5. Presentation-only over the SAME contract.Repo. The plan-time as-is baseline is copied into report/before/.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Lean board render flow (as-built): no strip, no phase dots; row3 = status pill + live-only agent chip; left border = the gate cue"
+    }
+  ]
+}

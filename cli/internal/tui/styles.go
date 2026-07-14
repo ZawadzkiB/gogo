@@ -33,7 +33,6 @@ var (
 	// are the few genuinely-new ones the mockup's new elements need.
 	secondaryText = lipgloss.AdaptiveColor{Light: "#3a4048", Dark: "#b7bdc9"} // light body on changelog/footer
 	faintText     = lipgloss.AdaptiveColor{Light: "#9aa0aa", Dark: "#5f6572"} // changelog dates
-	pendingDot    = lipgloss.AdaptiveColor{Light: "#c9cdd6", Dark: "#4a5060"} // pending phase glyph/segment
 
 	// Faint tinted chip backgrounds for the status pills — colored text on a faint
 	// accent wash (the mockup's rounded chips). No TTY under `go test` → lipgloss
@@ -44,15 +43,8 @@ var (
 	dimTint    = lipgloss.AdaptiveColor{Light: "#eceef2", Dark: "#1b1f27"}
 )
 
-// Phase-progress colors (shared by the FR-4 dots and the FR-9 segmented bars —
-// one vector, two renderers): done = ready green, current = in-progress amber,
-// pending = the faint grey token.
 var (
-	phaseDoneStyle    = lipgloss.NewStyle().Foreground(columnAccent[2])
-	phaseCurrentStyle = lipgloss.NewStyle().Bold(true).Foreground(columnAccent[1])
-	phasePendingStyle = lipgloss.NewStyle().Foreground(pendingDot)
-
-	// Status-pill chips (FR-3) + gate-type pills (FR-8): colored label on a faint
+	// Status-pill chips (FR-3): a colored label on a faint
 	// tinted wash. Padding(0,1) gives the rounded-chip breathing room.
 	pillRed    = lipgloss.NewStyle().Bold(true).Foreground(waitAccent).Background(redTint).Padding(0, 1)
 	pillAmber  = lipgloss.NewStyle().Bold(true).Foreground(columnAccent[1]).Background(amberTint).Padding(0, 1)
@@ -61,15 +53,13 @@ var (
 
 	secondaryStyle = lipgloss.NewStyle().Foreground(secondaryText)
 	faintStyle     = lipgloss.NewStyle().Foreground(faintText)
-	keyChipStyle   = lipgloss.NewStyle().Foreground(secondaryText).Background(focusBg).Padding(0, 1) // footer key-chips
 
-	// stripBoxStyle is the FR-8 needs-you inbox frame: a red-bordered box with a
-	// faint red wash — the answer-first attention surface above the board.
-	stripBoxStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(waitAccent).Background(stripBg).Padding(0, 1)
+	// changelogFocusStyle is the selection bar for the focused collapsed-changelog
+	// row: one focus fg+bg fill across the row (accent bg + bright fg), the analog
+	// of the focused work card's highlight for a borderless list row.
+	changelogFocusStyle = lipgloss.NewStyle().Foreground(focusFg).Background(focusBg).Bold(true)
+	keyChipStyle        = lipgloss.NewStyle().Foreground(secondaryText).Background(focusBg).Padding(0, 1) // footer key-chips
 )
-
-// stripBg is the faint wash behind the needs-you strip (mockup rgba(255,107,107,.05)).
-var stripBg = lipgloss.AdaptiveColor{Light: "#fdf3f2", Dark: "#171b24"}
 
 // gateBorder is the card border for a card that needs the user: a heavy `┃` left
 // edge (the mockup's left-accent stripe) recolored red (plan/decision) or purple
@@ -100,7 +90,6 @@ var (
 	dimStyle     = lipgloss.NewStyle().Foreground(dimText)
 	sessionStyle = lipgloss.NewStyle().Bold(true).Foreground(sessionDot)
 	selMarkStyle = lipgloss.NewStyle().Bold(true).Foreground(selectAccent)
-	waitStyle    = lipgloss.NewStyle().Bold(true).Foreground(waitAccent)
 	helpStyle    = lipgloss.NewStyle().Foreground(dimText)
 	sepStyle     = lipgloss.NewStyle().Foreground(subtleBorder) // vertical column separators (FR-B4)
 )

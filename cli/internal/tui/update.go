@@ -148,10 +148,6 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.filtering {
 		return m.updateFilter(msg)
 	}
-	// FR-10: 1..N jump to / read gate N from the needs-you strip.
-	if n, ok := gateNumberKey(msg.String()); ok {
-		return m.jumpToGate(n)
-	}
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, m.quit()
@@ -198,35 +194,6 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// fully visible (scroll-into-view), and refresh each column's offset (TEST-014).
 	m.reflowColumns()
 	return m, nil
-}
-
-// gateNumberKey parses a single digit 1..9 into its gate index, or ok=false.
-func gateNumberKey(s string) (int, bool) {
-	if len(s) == 1 && s[0] >= '1' && s[0] <= '9' {
-		return int(s[0] - '0'), true
-	}
-	return 0, false
-}
-
-// jumpToGate (FR-10) answers strip gate N: it focuses that gate's card (so the
-// board move keys — [m] accept / [d] ship / [m] resume — act on it) and opens
-// its primary view via quickView ("read plan" for a plan gate, "read report" for
-// a uat gate). An out-of-range N is a status hint, no move.
-func (m Model) jumpToGate(n int) (tea.Model, tea.Cmd) {
-	gs := m.gates()
-	if n < 1 || n > len(gs) {
-		if len(gs) == 0 {
-			m.status = "no gates need you"
-		} else {
-			m.status = fmt.Sprintf("no gate %d — %d need you (1–%d)", n, len(gs), len(gs))
-		}
-		return m, nil
-	}
-	g := gs[n-1]
-	m.colIdx = g.col
-	m.cardIdx[g.col] = g.row
-	m.reflowColumns()
-	return m, m.quickView(g.feature)
 }
 
 // toggleSelect flips selection — ONLY for ready-to-ship cards (space guard).
@@ -380,9 +347,14 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingDelete != nil {
 			return m.finishDelete()
 		}
-		// A drill-in kill confirm (FR-B3) is its own completion path too.
+		// A drill-in kill confirm/picker (FR-B3/FR-3) is its own completion path too.
 		if m.pendingKill != nil {
 			return m.finishKill()
+		}
+		// The attach picker (FR-2) completes to finishAttach — mutually exclusive
+		// with the delete/kill paths above and the ship path below.
+		if m.pendingAttach != nil {
+			return m.finishAttach()
 		}
 		if m.binding == nil || !m.binding.confirm {
 			// Completed on "Cancel" — same as an abort. Only a SHIP form reaches
@@ -407,11 +379,11 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// formPreservesSelection reports whether the active form is a delete or kill
-// confirm — both unrelated to the ready-ship selection, so cancelling them must
+// formPreservesSelection reports whether the active form is a delete, kill, or
+// attach form — all unrelated to the ready-ship selection, so cancelling them must
 // NOT wipe the user's multi-selection (only a SHIP form's cancel does). REV-012.
 func (m Model) formPreservesSelection() bool {
-	return m.pendingDelete != nil || m.pendingKill != nil
+	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil
 }
 
 // cancelForm returns to the board and clears the in-flight form state. For a SHIP
@@ -422,11 +394,18 @@ func (m Model) formPreservesSelection() bool {
 // delete, so it survives — an Esc-abort of a delete now matches the Cancel-button
 // (finishDelete) path instead of wiping the user's multi-selection (REV-012).
 func (m Model) cancelForm(preserveSelection bool) Model {
-	// A kill confirm was launched FROM the drill card, so cancelling it (Esc /
-	// abort) returns to that card — matching the Cancel-button path (finishKill),
-	// not bouncing the user back to the board (REV-001). Every other form (ship /
-	// delete) cancels to the board as before.
-	wasKill := m.pendingKill != nil && m.drill != nil
+	// A kill confirm/picker was launched FROM the drill card, and an attach picker
+	// from either the board or the drill; cancelling one (Esc / abort) returns to
+	// the picker's ORIGIN mode — matching the Cancel-option paths (finishKill /
+	// finishAttach), not bouncing the user back to the board (REV-001). Every other
+	// form (ship / delete) cancels to the board as before.
+	returnMode := modeBoard
+	switch {
+	case m.pendingKill != nil && m.drill != nil:
+		returnMode = modeDrill
+	case m.pendingAttach != nil && m.pickerFromDrill:
+		returnMode = modeDrill
+	}
 	m.status = "cancelled"
 	if !preserveSelection {
 		m.selected = map[string]bool{}
@@ -435,13 +414,10 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	}
 	m.pendingDelete = nil
 	m.pendingKill = nil
+	m.pendingAttach = nil
 	m.binding = nil
 	m.form = nil
-	if wasKill {
-		m.mode = modeDrill
-	} else {
-		m.mode = modeBoard
-	}
+	m.mode = returnMode
 	return m
 }
 
@@ -459,8 +435,11 @@ func (m Model) attachFocused() (tea.Model, tea.Cmd) {
 }
 
 // attachFeature suspends the TUI and attaches to f's live tmux session
-// (tea.ExecProcess), when one exists. Shared by the board `a` (focused card) and
-// the drill-in `a` (the drilled card, FR-B3) — one attach path, no duplication.
+// (tea.ExecProcess). Shared by the board `a` (focused card) and the drill-in `a`
+// (the drilled card, FR-B3) — one attach path, no duplication. It branches on the
+// live-session count (FR-2): 0 → a hint, 1 → attach directly (current UX), ≥2 →
+// an attach picker so the user chooses WHICH session (today's code grabbed the
+// first exact match blindly).
 func (m Model) attachFeature(f *contract.Feature) (tea.Model, tea.Cmd) {
 	if f == nil {
 		return m, nil
@@ -469,15 +448,77 @@ func (m Model) attachFeature(f *contract.Feature) (tea.Model, tea.Cmd) {
 		m.status = "tmux not installed — nothing to attach"
 		return m, nil
 	}
-	session := liveSessionFor(f.Slug, m.sessions)
-	if session == "" {
+	sessions := liveSessionsFor(f.Slug, m.sessions)
+	switch len(sessions) {
+	case 0:
 		m.status = "no running session for " + f.Slug
 		return m, nil
+	case 1:
+		return m.attachSession(sessions[0])
+	default:
+		m.startAttachPicker(f, sessions)
+		return m, m.form.Init()
 	}
+}
+
+// attachSession suspends the TUI and attaches to exactly the named tmux session
+// (tea.ExecProcess). It sets a synchronous "attaching <session>" status so the
+// CHOSEN session is substring-assertable in tests — attach has no killer-style
+// seam, so the status line is the observable (the same "status line is the
+// observable" pattern viewDrill already relies on).
+func (m Model) attachSession(session string) (tea.Model, tea.Cmd) {
+	m.status = "attaching " + session
 	c := exec.Command("tmux", launch.AttachArgs(session)...)
 	return m, tea.ExecProcess(c, func(err error) tea.Msg {
 		return launchDoneMsg{status: "detached from " + session}
 	})
+}
+
+// startAttachPicker opens the FR-2 attach picker (≥2 live sessions): one option
+// per session (value = session name) plus a Cancel option (attachCancel sentinel).
+// It records whether the picker was opened from the drill so a cancel restores the
+// right mode, and binds the choice through the heap-stable *formBinding.selected
+// (TEST-001), exactly like the ship/kill forms.
+func (m *Model) startAttachPicker(f *contract.Feature, sessions []string) {
+	m.pendingAttach = sessions
+	m.pickerFromDrill = m.mode == modeDrill
+	m.binding = &formBinding{}
+	opts := make([]huh.Option[string], 0, len(sessions)+1)
+	for _, s := range sessions {
+		opts = append(opts, huh.NewOption(s, s))
+	}
+	opts = append(opts, huh.NewOption("Cancel", attachCancel))
+	m.form = huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Attach which session for " + f.Slug + "?").
+			Description("choose a live session to attach (tmux) — pipeline state is untouched").
+			Options(opts...).
+			Value(&m.binding.selected),
+	))
+	m.mode = modeForm
+}
+
+// finishAttach runs after the attach picker completes. A session name → attach it
+// via attachSession; the Cancel sentinel (or an empty selection) → cancel back to
+// the picker's origin mode (drill vs board).
+func (m Model) finishAttach() (tea.Model, tea.Cmd) {
+	sel := ""
+	if m.binding != nil {
+		sel = m.binding.selected
+	}
+	originMode := modeBoard
+	if m.pickerFromDrill {
+		originMode = modeDrill
+	}
+	m.pendingAttach = nil
+	m.binding = nil
+	m.form = nil
+	m.mode = originMode
+	if sel == "" || sel == attachCancel {
+		m.status = "cancelled"
+		return m, nil
+	}
+	return m.attachSession(sel)
 }
 
 // killDrill (K in the drill — FR-B3) kills the drilled card's LIVE tmux
@@ -494,11 +535,17 @@ func (m Model) killDrill() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	sessions := liveSessionsFor(f.Slug, m.sessions)
-	if len(sessions) == 0 {
+	switch len(sessions) {
+	case 0:
 		m.status = "no live session to kill for " + f.Slug
 		return m, nil
+	case 1:
+		// Exactly one session → keep the existing single-confirm UX (D2).
+		m.startKillForm(f, sessions)
+	default:
+		// ≥2 sessions → a picker: one, or "all N", or Cancel (FR-3).
+		m.startKillPicker(f, sessions)
 	}
-	m.startKillForm(f, sessions)
 	return m, m.form.Init()
 }
 
@@ -524,22 +571,75 @@ func (m *Model) startKillForm(f *contract.Feature, sessions []string) {
 	m.mode = modeForm
 }
 
-// finishKill runs after a completed kill form. A confirmed form kills each live
-// session via the killer seam (the EXACT name — never a substring sibling) and
-// refreshes the drill panel in place; a cancelled one just returns to the drill.
+// startKillPicker opens the FR-3 kill picker (≥2 live sessions): one option per
+// session (value = its exact name), an "all N sessions" option (killAll sentinel),
+// and a Cancel option (killCancel sentinel). It reuses m.pendingKill — so
+// updateForm's StateCompleted already routes completion to finishKill — and binds
+// the choice through the heap-stable *formBinding.selected (TEST-001). The single
+// session a picker selects is still killed by its EXACT name (never a substring
+// sibling — TEST-005), because the option value IS that exact session string.
+func (m *Model) startKillPicker(f *contract.Feature, sessions []string) {
+	m.pendingKill = sessions
+	m.binding = &formBinding{}
+	opts := make([]huh.Option[string], 0, len(sessions)+2)
+	for _, s := range sessions {
+		opts = append(opts, huh.NewOption(s, s))
+	}
+	opts = append(opts,
+		huh.NewOption(fmt.Sprintf("all %d sessions", len(sessions)), killAll),
+		huh.NewOption("Cancel", killCancel),
+	)
+	m.form = huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Kill which session for " + f.Slug + "?").
+			Description(fmt.Sprintf("kill one stray session, or all %d (tmux) — the pipeline state is untouched", len(sessions))).
+			Options(opts...).
+			Value(&m.binding.selected),
+	))
+	m.mode = modeForm
+}
+
+// finishKill runs after a completed kill form OR kill picker. It resolves the kill
+// target(s) from binding.selected and kills each via the killer seam (the EXACT
+// name — never a substring sibling, TEST-005), then refreshes the drill panel in
+// place; a cancelled one just returns to the drill:
+//   - selected == ""        → the single-session Confirm path (no picker ran): kill
+//     every pendingKill iff binding.confirm, else none.
+//   - selected == killAll   → kill every pendingKill session.
+//   - selected == killCancel → cancel (no kill).
+//   - otherwise             → selected is one exact session name; kill only it.
+//
+// The picker's Cancel/all use distinct NON-EMPTY sentinels, so the Confirm path
+// (selected == "") is never ambiguous — no extra discriminator field needed.
 func (m Model) finishKill() (tea.Model, tea.Cmd) {
 	sessions := m.pendingKill
-	confirmed := m.binding != nil && m.binding.confirm
+	sel := ""
+	if m.binding != nil {
+		sel = m.binding.selected
+	}
+	var targets []string
+	switch sel {
+	case "":
+		if m.binding != nil && m.binding.confirm {
+			targets = sessions
+		}
+	case killAll:
+		targets = sessions
+	case killCancel:
+		// cancel — no targets
+	default:
+		targets = []string{sel} // the one exact session the user picked
+	}
 	m.pendingKill = nil
 	m.binding = nil
 	m.form = nil
 	m.mode = modeDrill
-	if !confirmed || len(sessions) == 0 {
+	if len(targets) == 0 {
 		m.status = "cancelled"
 		return m, nil
 	}
 	killed, failed := 0, 0
-	for _, s := range sessions {
+	for _, s := range targets {
 		if err := m.killer(s); err != nil {
 			failed++
 		} else {

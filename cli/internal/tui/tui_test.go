@@ -48,15 +48,21 @@ func TestBoardViewRenders(t *testing.T) {
 	m := newModel(t)
 	out := m.View()
 	// FR-2 restyles the column header (underlined title + trailing dim count, no
-	// (N) parens); FR-6 makes the changelog count read "N shipped". FR-4/FR-8 add
-	// the phase dots + the needs-you strip — pinned here so the redesign stays
-	// visibly present (a token diff would fail this, not a palette port).
+	// (N) parens); FR-6 makes the changelog count read "N shipped". The lean-cards
+	// redesign drops the phase dots ①②③④⑤ and the ⏸ NEEDS YOU strip — the gate count
+	// now lives only in the header pill (⏸ K need you).
 	for _, want := range []string{
 		"cockpit", "plan 3", "in progress 1", "ready 2", "changelog 3 shipped",
-		"①②③④⑤", "⏸ NEEDS YOU (1)",
+		"⏸ 1 need you",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("board view missing %q", want)
+		}
+	}
+	// The removed elements must be gone: no phase dots, no NEEDS YOU box.
+	for _, gone := range []string{"①", "②③④⑤", "NEEDS YOU"} {
+		if strings.Contains(out, gone) {
+			t.Errorf("board view still shows removed element %q", gone)
 		}
 	}
 }

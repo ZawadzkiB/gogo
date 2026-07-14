@@ -1,0 +1,21 @@
+flowchart TD
+  subgraph attach["attach — board a / drill a (as-is)"]
+    A0["board a: attachFocused()\ndrill a: updateDrill 'a'"] --> A1["attachFeature(f)"]
+    A1 --> A2["liveSessionFor(f.Slug)\nFIRST match only"]
+    A2 -->|""| A3["status: no running session"]
+    A2 -->|first session| A4["tea.ExecProcess attach\n(no choice when >= 2 exist)"]
+  end
+
+  subgraph kill["kill — drill K (as-is)"]
+    K0["drill K: killDrill()"] --> K1["liveSessionsFor(f.Slug)\nALL sessions"]
+    K1 -->|none| K2["status: no live session"]
+    K1 -->|1..N| K3["startKillForm (huh.Confirm)\none confirm over ALL"]
+    K3 --> K4["finishKill()"]
+    K4 -->|Kill| K5["killer(s) for EVERY session\n(no per-session choice)"]
+    K4 -->|Cancel| K6["status: cancelled -> drill"]
+  end
+
+  subgraph changelog["changelog list (as-is)"]
+    C0["renderChangelogColumn(i)"] --> C1["changelogRow(f, width, focused)"]
+    C1 --> C2["'✓ slug … MM-DD' — NO session cue\n(cannot see which shipped item has sessions)"]
+  end

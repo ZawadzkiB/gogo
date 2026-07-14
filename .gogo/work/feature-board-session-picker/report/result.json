@@ -1,0 +1,27 @@
+{
+  "slug": "board-session-picker",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-board-session-picker/plan.md",
+    ".gogo/work/feature-board-session-picker/state.md",
+    ".gogo/work/feature-board-session-picker/decisions.md",
+    ".gogo/work/feature-board-session-picker/review/issues.json",
+    ".gogo/work/feature-board-session-picker/test/issues.json",
+    ".gogo/work/feature-board-session-picker/charts/manifest.json",
+    ".gogo/work/feature-board-session-picker/charts/before/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-board-session-picker/report/report.md",
+    ".gogo/work/feature-board-session-picker/report/flow.mmd",
+    ".gogo/work/feature-board-session-picker/report/manifest.json",
+    ".gogo/work/feature-board-session-picker/report/diagrams.html",
+    ".gogo/work/feature-board-session-picker/report/before/flow.mmd",
+    ".gogo/work/feature-board-session-picker/report/before/manifest.json",
+    ".gogo/work/feature-board-session-picker/plan.md",
+    ".gogo/knowledge/project-knowledge.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "As-built report for the per-session attach/kill pickers + changelog live-session dot (0.20.0). Shipped exactly as planned; review APPROVE (1 nit fixed in-context, test-only); test green (unit -race + live tmux drive). One as-built flow diagram + before/after compare; project-knowledge.md 0.20.0 note extended."
+}
