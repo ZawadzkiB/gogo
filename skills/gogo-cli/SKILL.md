@@ -62,6 +62,16 @@ the spawned session's permission mode.
 `a` attach session · `l` peek log · `x` delete→trash · `/` filter · `G` glow ·
 `q` quit. A `⏸` marks a card waiting on you (plan-acceptance / decision / UAT).
 
+**Card vocabulary:** a card shows a **status pill** (the card's true `state.md`
+state — **`running` is never a status**; a live session is the separate green `●`
+next to the name plus the header's `● N session` count) and, only while a session
+is actively working it, a green **`● <agent>` chip** (analyst / developer /
+reviewer / tester / reporter, from the phase). The heavy **left-border stripe**
+(red gate / purple UAT) is the per-card "act now" cue. The collapsed **changelog**
+carries a `●` on any shipped item still holding a session. In the drill, `a` (and
+`K`) open a **picker** to choose *which* session when the card has several — `K`
+also offers "all N".
+
 ## The persistent-session model (what `gogo go`/`gogo plan` actually do)
 
 `gogo go` and `gogo plan` are **session-lifecycle managers over the one skill** —

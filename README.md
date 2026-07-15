@@ -321,7 +321,7 @@ the `uname` bits pick the right asset — darwin/linux × arm64/amd64):
 
 ```bash
 # into ~/bin (no sudo)
-mkdir -p ~/bin && \
+mkdir -p ~/bin && rm -f ~/bin/gogo && \
 curl -fsSL "https://github.com/ZawadzkiB/gogo/releases/latest/download/gogo-$(uname -s | tr 'A-Z' 'a-z')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" -o ~/bin/gogo && \
 chmod +x ~/bin/gogo
 ```
@@ -332,8 +332,15 @@ chmod +x ~/bin/gogo
 ```bash
 # or system-wide (sudo)
 curl -fsSL "https://github.com/ZawadzkiB/gogo/releases/latest/download/gogo-$(uname -s | tr 'A-Z' 'a-z')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" -o /tmp/gogo && \
-sudo mv /tmp/gogo /usr/local/bin/gogo && sudo chmod +x /usr/local/bin/gogo
+sudo install -m 755 /tmp/gogo /usr/local/bin/gogo
 ```
+
+> **Upgrading?** Replace the binary with a **fresh file**, never overwrite it in
+> place. On Apple Silicon, `curl -o`/`mv` **on top of** a binary macOS has already
+> run trips the kernel's code-signing cache and the new one is `killed: 9` at
+> launch. The `rm -f` (user install) and `install` (system install) above create a
+> fresh inode, sidestepping it; if you still hit it, `rm -f` the old binary and
+> reinstall.
 
 Pin a version by replacing `latest/download` with `download/vX.Y.Z`. Assets:
 `gogo-darwin-arm64` · `gogo-darwin-amd64` · `gogo-linux-amd64` ·
@@ -351,19 +358,29 @@ cd cli && go build -o gogo .
 **What it does:**
 
 - **Board** (`gogo`) — four columns **plan · in progress · ready · changelog**
-  (with vertical separators between them) from the ported work-index classifier;
-  cards are your feature folders with a live sub-phase badge (`review r2`,
-  `waiting-for-user`, `awaiting-uat`, `awaiting-plan-acceptance`, `running`) and a
-  distinct **⏸ "waiting for input"** cue on any card blocked on you (the three user
-  gates). `gogo status` carries the same signal in a dedicated **WAIT** column. `/`
-  filters live; **fsnotify** refreshes the board while the pipeline runs.
+  (with vertical separators between them) from the ported work-index classifier.
+  Each card is a feature folder: its name (+ a green `●` when it holds a live
+  session) · a one-line description · a **status pill** showing the card's true
+  `state.md` state (`review r2` · `awaiting-uat` · `awaiting-plan-acceptance` ·
+  `⏸ re-planning · UAT N` · …) plus, **only while a session is actively working
+  it**, a green **`● <agent>` chip** (analyst · developer · reviewer · tester ·
+  reporter, from the current phase). Liveness is a signal **separate** from status
+  — **`running` is never a status**; a card blocked on you is flagged by a heavy
+  **left-border stripe** (red gate / purple UAT) and tallied in the header's
+  **`⏸ K need you`** pill, while live sessions are tallied in **`● N session`**.
+  The **changelog** is a collapsed `✓ slug … MM-DD` list carrying a `●` on any
+  shipped item that still holds a session (drill in to kill it). `gogo status`
+  carries the ⏸ signal in a dedicated **WAIT** column. `/` filters live;
+  **fsnotify** refreshes the board while the pipeline runs.
 - **Drill-in** (`enter`) — a **rich card**: a detail panel (short description,
   work-folder name, status) over the feature's **session(s)** (registry ⨯
   live-tmux, each flagged live/stale, plus any untracked-live racer), a
   **recent-events tail**, then the browsable files — markdown via **glamour**,
   `issues.json` as a table, `events.jsonl` as a full timeline, `.mmd` diagrams as
-  ASCII (flowchart-family) or source. `a` **attaches** the card's live session,
-  `K` **kills** it (behind a confirm — pipeline state untouched); `w` builds the
+  ASCII (flowchart-family) or source. `a` **attaches** the card's live session —
+  a **picker** to choose which one when the card has several; `K` **kills** a
+  session behind a confirm — a **picker** offering one / all N / cancel when there
+  are several (pipeline state untouched); `w` builds the
   interactive HTML page natively (goldmark, before/after compare) and opens the
   browser; `G` opens the file in `glow` when installed.
 - **Moves launch Claude** — `m` on an `awaiting-plan-acceptance` card runs

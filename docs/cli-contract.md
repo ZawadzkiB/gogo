@@ -229,6 +229,19 @@ only truthful live-session state sooner.
   is revising the plan rather than looking like a stuck decision. Derived from the already-read
   `status` + `open-decision`; no new state.
 
+### Changed in 0.20.0 (all additive — presentation/interaction only; no key removed or renamed)
+
+- **Lean board.** The board drops the needs-you strip and the per-card phase dots; each card is
+  `name (+ ● live dot) · description · status pill [+ ● <agent> chip]`, where the green
+  `● <agent>` chip (analyst/developer/reviewer/tester/reporter, from the current phase) shows
+  **only** while a live session is actively working the card (not a user gate). The heavy `┃`
+  left-border stripe (red gate / purple UAT) is the sole per-card "act now" cue; the header keeps
+  the `⏸ K need you` · `● N session` counts.
+- **Per-session attach/kill + changelog dot.** The drill's attach (`a`) and kill (`K`) choose a
+  SINGLE session via a picker when a card has ≥2 live sessions (`K` also offers "all N"); the
+  collapsed changelog shows a `●` on rows whose shipped item still holds a live session. All of
+  this reads the SAME file surface + `ListSessions()` — no state-enum, class, or read-path change.
+
 ## 1. The `.gogo/` layout a consumer reads
 
 Two roots matter: **work** (one folder per feature, the live pipeline state +

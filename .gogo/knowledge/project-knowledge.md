@@ -299,6 +299,15 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   a real `gogo-*` session, so `selected == ""` is an unambiguous Confirm-path discriminator. Pure,
   substring-assertable (no TTY); same `contract.Repo`, no state mutation (killing tmux is not a
   state write); version **0.20.0**.
+- **Docs sync + install hardening (0.20.1):** docs-only patch bringing the user-facing docs to the
+  0.20.0 board — `README.md` drops `running` from the status-badge list (it is not a status — the
+  0.19.0 decoupling) and refreshes the board/drill prose (status pill · `● <agent>` chip · `●`
+  session dot + `● N session` · left-border gate stripe · attach/kill **pickers**); `cli/main.go`
+  `printHelp` + `skills/gogo-cli` note the ≥2-session pickers; `docs/cli-contract.md` gains a
+  "Changed in 0.20.0" presentation-only note. The **install one-liner is hardened** to replace the
+  binary with a fresh inode (`rm -f` / `install`) — an in-place `curl -o`/`mv` over an
+  already-run binary trips macOS's code-signing cache on Apple Silicon (`killed: 9`). No code-path
+  change beyond the help text; version **0.20.1**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

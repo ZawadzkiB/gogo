@@ -16,7 +16,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.20.0"
+const Version = "0.20.1"
 
 func main() {
 	args := os.Args[1:]
@@ -107,7 +107,7 @@ board keys:
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
 
 drill-in keys (enter on a card — shows description / folder / status / sessions / events):
-  ↑↓/jk files · enter open file · a attach session · K kill session (confirm)
+  ↑↓/jk files · enter open file · a attach session (picker if ≥2) · K kill session (confirm; one/all picker if ≥2)
   G glow · w web page · esc/q back
 
 launch permission mode (FR8): board-launched claude sessions run in auto
