@@ -43,24 +43,52 @@ list in sync with `cli/main.go`, `README.md` `## The gogo CLI`, and
 |---|---|
 | `gogo` | open the interactive **board** — kanban of `plan · in progress · ready · changelog`, live-refreshed while the pipeline runs; `enter` drills into a card, action keys launch Claude. |
 | `gogo go [<slug>]` | **launch-or-`--resume` ONE persistent `/gogo:go` session** for the feature (implement warm in-context + review/test as nested `Task` subagents + report). Enforces the same acceptance gate `/gogo:go` does; on the session's exit surfaces the outcome (`awaiting-uat` → run `/gogo:done`; a decision gate → the parked question; an error → halt). |
-| `gogo plan <slug>` | the same persistent-session machinery for a `/gogo:plan` leg. |
+| `gogo plan …` | **two surfaces off one verb.** `gogo plan <slug>` (a bare feature SLUG) is the same persistent-session machinery for a `/gogo:plan` leg. `gogo plan <verb>` (a reserved store verb: `new "<title>"` · `list` · `show <id>` · `add <id> <source>[:<slug>]` · `rm <id> <source>[:<slug>]` · `ready <id>` · `promote <id> <source>` · `delete <id>`) manages the **project-scoped plan store** at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` — a plan targets the project's sources, and `promote` **launches** `/gogo:plan <body> --correlation plan-<hash>` in a source (the skill writes `.gogo/work/` + stamps the correlation; the CLI never writes a source's `.gogo/`). A slug that IS a reserved verb resolves to the store (launch such a feature via `gogo go` / the board). `gogo plan -h` shows both surfaces. |
 | `gogo status` | print the work-index classifier table (every feature's phase / status / iterations / resume hint). |
 | `gogo view <target>` | view a plan/report — glamour in the terminal, or `--web [--open]` builds the self-contained interactive HTML page. Targets: `<slug>` · `<slug>:plan` · `<slug>:report` · `<date>-<name>` changelog entry. |
 | `gogo events <slug>` | print a feature's `events.jsonl` timeline (the same renderer the board's drill-in tail reuses). |
 | `gogo sweep [--dry-run] [<slug>...]` | reap orphaned / shipped persistent sessions (the kill-at-ship backstop); with slug(s), targeted to just those cards (what `/gogo:done` runs at ship); `--dry-run` lists without killing. |
 | `gogo trash [restore <entry>]` | list `.gogo/trash/` entries (deleted work, recoverable), or `restore <entry>` moves one back to `.gogo/work/`. |
+| `gogo project [add <repo> [--name <name>] \| list \| rm <name>]` | manage home-folder projects (`~/.gogo/projects/<name>/config.json`) — a project links many sources (repos with their own `.gogo/`). `add` creates a project (name = repo basename or `--name`) with `<repo>` as source #1 (verifies it contains `.gogo/`, defaults the source's `concurrentWorkItems` cap to 1, detects its `mainBranch`); `rm` deletes only the project's home folder, never a source's `.gogo/`. `add` also auto-initializes the global cockpit home (the `~/.gogo/config.json` marker — FR22). Writes only `~/.gogo/` (CLI-owned data, never `.gogo/` pipeline state). |
+| `gogo global [init \| board]` | the **two modes**: repo-local vs global. `gogo` INSIDE a repo (a dir with `.gogo/`) always shows THAT repo's own single board — even when the repo is a registered project's source. `gogo global` opens the cross-project **cockpit** (board · plans · config) from anywhere; `gogo` OUTSIDE any repo does the same. `gogo global init` sets up the global cockpit home `~/.gogo/` — creates `~/.gogo/projects/` and the `~/.gogo/config.json` marker (its existence = "initialized"); idempotent (re-run → "already initialized"). Bare `gogo global` (or `gogo global board`) opens the cockpit; an uninitialized home hints `gogo global init`, an empty one hints `gogo project add`. Setup: `gogo global init` → `gogo project add <repo>`. Writes ONLY `~/.gogo/`. |
+| `gogo source [add <repo> [--project <name>] \| rm <repo\|name> [--project <name>]]` | add / remove a source to a project. `add` links a repo (or a monorepo service dir, each with its own `.gogo/`) as a source; `--project` defaults to the sole project and is required when several exist. Writes only the project entity under `~/.gogo/`, never a source's `.gogo/`. |
+| `gogo draft [new "<title>" \| list \| show <id> \| ready <id> \| rm <id>]` | a thin alias into `gogo plan` (D9) — a draft is a plan in the `draft` status. Every subcommand forwards to the plan store; `draft list` narrows to `status: draft`, `draft new` seeds a `draft` plan, `draft ready` advances it, `draft rm` deletes. `--project` defaults to the sole project (required when several exist). There is no `edit` and no `promote --to`; use `gogo plan promote <id> <source>` to spawn. |
+| `gogo epic [new "<title>" \| list \| show <id> \| add <id> <source>:<slug> \| rm <id> <source>:<slug> \| delete <id>]` | a thin alias into `gogo plan` (D9) — an epic is a plan that owns members. Every subcommand forwards to the plan store; `epic list` narrows to plans with ≥1 member (or ≥1 target), regardless of status (so a just-linked epic still shows). `add` / `rm` link/unlink an existing work item (`<source>` is one of the project's sources) — the many-to-many correlation. Correlation itself lives in each work item's `state.md` as a `correlation:` list (read straight by the board), NOT a CLI store. |
 | `gogo run [<slug>]` | **DEPRECATED** alias for `gogo go` (prints a notice and forwards; will be removed). |
 | `gogo --version` | print the version (mirrors the plugin's `.claude-plugin/plugin.json`). |
 
 **`gogo go` / `gogo plan` flags:** `--attach` (launch an attachable interactive
 tmux session so you can answer gates live) · `--takeover` (seize the owner lock
-from a live session, reaping the prior). Env `GOGO_CLAUDE_PERMISSION_MODE` sets
-the spawned session's permission mode.
+from a live session, reaping the prior) · `--force` (`gogo go` only — override the
+per-project concurrency cap). Env `GOGO_CLAUDE_PERMISSION_MODE` sets the spawned
+session's permission mode.
 
 **Board keys:** `←→`/`h` columns · `↑↓`/`jk` cards · `space` select (ready) ·
 `enter` drill-in · `v` quick-view · `w` web page · `m` move/launch · `d` ship ·
-`a` attach session · `l` peek log · `x` delete→trash · `/` filter · `G` glow ·
-`q` quit. A `⏸` marks a card waiting on you (plan-acceptance / decision / UAT).
+`a` attach session · `l` peek log · `x` delete→trash · `tab`/`shift+tab` cycle the
+**board · plans · config** tabs · `p` cycles the board's **source chips** (`all` +
+one per source) / the config-tab **project switcher** · `/` filter (a `#plan-<id>`
+token narrows to that plan's members across sources) · `G` glow · `q` quit. A `⏸`
+marks a card waiting on you (plan-acceptance / decision / UAT). On a **lone repo**
+with no home project there are no tabs / chips — just the single-repo board
+(byte-for-byte).
+
+**Plans tab keys:** `↑↓` plans · `enter` open the detail · `n` new plan · `A`
+**plan-with-claude** (mints a draft, then opens a plain `claude` session anchored at
+a source to author the plan file in place — not a `/gogo:plan` scaffold) · `r` mark
+ready · `x` delete. In a plan's detail: `↑↓` target sources · `c` **create work
+item** (launches `/gogo:plan <body> --correlation plan-<hash>` in that source) · `+`
+add a target source · `e` edit the plan file · `esc` back.
+
+**Config tab + per-source concurrency cap (since 0.21.0):** the config tab manages
+the focused project's **sources** (`a` add · `x` remove · `e` edit a source's
+`concurrentWorkItems` cap / `mainBranch` / color / permission mode), offers a
+**project switcher** (`p`), and a **knowledge explorer** over the sources'
+`.gogo/knowledge/` + the project's `.knowledge/`. All writes land under `~/.gogo/`
+only — never a source's `.gogo/`. A capped source refuses a `gogo go` (or board
+`m`→go) that would start an `(N+1)`th live in-progress feature in it (so two build
+sessions can't clobber one working tree); `--force` overrides. `0` = unlimited; an
+uncapped source behaves as before.
 
 **Card vocabulary:** a card shows a **status pill** (the card's true `state.md`
 state — **`running` is never a status**; a live session is the separate green `●`

@@ -30,7 +30,7 @@ func (m Model) peekFocused() (tea.Model, tea.Cmd) {
 	if session := liveSessionFor(f.Slug, m.sessions); session != "" {
 		return m.startPeek(f.Slug, session, "", "peek — "+session)
 	}
-	if logPath := launch.BackgroundLogFor(m.root, f.Slug); logPath != "" {
+	if logPath := launch.BackgroundLogFor(m.rootFor(f), f.Slug); logPath != "" {
 		return m.startPeek(f.Slug, "", logPath, "peek — "+filepath.Base(logPath))
 	}
 	m.status = "no running session or log for " + f.Slug + " — launch it (m / d) first"

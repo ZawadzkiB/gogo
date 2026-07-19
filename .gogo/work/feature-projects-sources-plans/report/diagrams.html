@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo as-built diagrams — projects-sources-plans</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo as-built diagrams — <code>projects-sources-plans</code> (0.21.0)</h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill. Before/after baseline lives in <code>before/</code>.</p>
+  </header>
+
+  <h2>Data model — Project · Sources · project-scoped Plans · WorkItems (correlation[] in state.md)</h2>
+<div class="diagram"><pre class="mermaid">
+classDiagram
+  direction TB
+  note "AS-BUILT 0.21.0 — corrected model: home-folder Project links many Sources, owns project-scoped Plans; correlation[] LIST lives in each work item's state.md (L1)."
+
+  class Project {
+    +string name
+    +string description
+    ~/.gogo/projects/&lt;name&gt;/config.json
+    .knowledge/ (project knowledge)
+    .gogo/plans/ (project-scoped plans)
+    cli/internal/projects
+  }
+  class Source {
+    +string path  (a repo/service with .gogo/)
+    +string name
+    +string mainBranch
+    +int concurrentWorkItems  "0 = unlimited (was per-project MaxConcurrent)"
+    +string color
+  }
+  class Plan {
+    +string id  "plan-&lt;hash&gt; = the correlation id"
+    +string title
+    +string description
+    +string status  "draft | ready | active | done (D8)"
+    +Member[] members  "{source, slug}"
+    ~/.gogo/projects/&lt;name&gt;/.gogo/plans/&lt;id&gt;.md
+    cli/internal/plans
+  }
+  class Target {
+    +string source  "which source this plan targets"
+    +string slugHint
+  }
+  class WorkItem {
+    +string slug
+    &lt;source&gt;/.gogo/work/feature-&lt;slug&gt;/
+    CLI-READ-ONLY (skills write it)
+  }
+  class StateMd {
+    +string phase
+    +string status
+    +correlation[] plan-XXXX  "ADDITIVE optional LIST (L1)"
+  }
+  class LegacyConfig {
+    ~/.config/gogo/ (projects.json · drafts/ · epics.json)
+    cli/internal/config  "kept read-only; folded by MigrateLegacy"
+  }
+
+  Project "1" *-- "many" Source : links (config.json)
+  Project "1" *-- "many" Plan : owns (.gogo/plans/)
+  Plan "1" o-- "1..*" Target : targets sources
+  Target ..> Source : resolves to
+  Plan "1" ..> "0..*" WorkItem : spawns via claude -p (gogo:plan)
+  WorkItem "1" *-- "1" StateMd : carries
+  StateMd "correlation[]" ..> "many" Plan : belongs to (many-to-many)
+  LegacyConfig ..> Project : projects.MigrateLegacy (one-shot, non-destructive)
+  LegacyConfig ..> Plan : plans.MigrateLegacy (drafts+epics → plans)
+
+  note for StateMd "Board reads correlation[] directly from state.md via contract.LoadProject\n(no CLI store overlay) -> ⛓ plan-XXXX chips + #plan-XXXX filter"
+  note for WorkItem "Spawn = launch claude -p; the SKILL writes .gogo/work/\nand stamps correlation. The CLI NEVER writes a source's .gogo/work/."
+  note for LegacyConfig "config package survives as the migration source + read-only legacy\n(minimal green path — not deleted). Migration split into two packages\nto avoid a projects<->plans import cycle."
+</pre></div>
+
+  <h2>Runtime — n/A authoring → c create work item → spawn (claude -p gogo:plan --correlation) → stamp state.md → read back</h2>
+<div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor User
+  participant TUI as gogo TUI (plans tab / detail)
+  participant Plans as plans store (~/.gogo/projects/&lt;n&gt;/.gogo/plans/)
+  participant Launch as launch.PlanIntent / AuthorPlanIntent
+  participant Claude as claude -p (gogo:plan SKILL) / plain claude
+  participant Work as source .gogo/work/feature-&lt;slug&gt;/
+  participant Board as board reader (contract.LoadProject)
+
+  Note over User,TUI: TWO authoring entry points
+
+  User->>TUI: n — quick inline draft
+  TUI->>Plans: Create Plan{id: plan-XXXX, status:draft}
+  Note over Plans: plan-XXXX = the correlation id, minted at creation
+
+  User->>TUI: A — author with claude (REV-002 fix)
+  TUI->>Plans: mint fresh draft up front
+  TUI->>Launch: AuthorPlanIntent(root=first SOURCE, planPath, correlation, sources)
+  Launch-->>Claude: PLAIN claude session (ActionAuthor — no /gogo:plan, no --correlation flag)
+  Note over Claude: edits ~/.gogo plan file in place; creates NO .gogo/work/ scaffold
+
+  User->>TUI: open plan detail, press c "create work item" on source S
+  TUI->>Launch: PlanIntent(root=S, body, correlation="plan-XXXX")
+  Launch-->>Claude: claude -p "/gogo:plan &lt;body&gt; --correlation plan-XXXX"  (anchored at S, single trailing argv element)
+  Note over TUI,Claude: CLI writes NOTHING under S/.gogo/work/ (hard invariant)
+
+  Claude->>Work: write feature-&lt;slug&gt;/ (derives the final slug)
+  Claude->>Work: stamp state.md → - **correlation:** [plan-XXXX]
+  Claude-->>TUI: launch returns err==nil
+  TUI->>Plans: ONLY NOW record member {S, slug} + status→active (REV-005: post-success)
+
+  Board->>Work: read state.md (LLM-free, ms-fast)
+  Work-->>Board: Feature.Correlations = [plan-XXXX]
+  Board-->>User: card shows ⛓ plan-XXXX · #plan-XXXX filters members across sources
+
+  User->>TUI: add an EXISTING work item to plan-YYYY (retroactive, FR16)
+  TUI-->>Claude: re-stamp → state.md correlation list gains plan-YYYY (many-to-many)
+</pre></div>
+
+  <h2>Plan status lifecycle (D8) — draft → ready → active → done</h2>
+<div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --> draft : plan new / A author / n quick draft
+
+  draft : draft
+  draft : being authored; not yet spawnable
+  ready : ready
+  ready : targets chosen; spawnable
+  active : active
+  active : ≥1 work item spawned (the old "epic")
+  done : done
+  done : all members shipped (derived/terminal, optional v1)
+
+  draft --> ready : r mark ready / first target added
+  ready --> active : first spawn (c create work item / plan promote) succeeds
+  active --> active : add another target/member (retroactive, FR16)
+  active --> done : all members shipped
+  done --> [*]
+
+  note right of draft
+    gogo draft ≈ plans filtered to status:draft (D9 alias)
+  end note
+  note right of active
+    gogo epic ≈ member/target-bearing plans, any status (REV-003)
+  end note
+</pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

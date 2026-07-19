@@ -11,7 +11,9 @@ import (
 
 const boardWidth = 268
 
-// View renders the current mode.
+// View renders the current mode. On a project board (tabbed) the top-level render
+// dispatches by the active tab; a lone repo has no tabs and renders today's single-
+// repo board byte-for-byte (FR7).
 func (m Model) View() string {
 	switch m.mode {
 	case modeDrill:
@@ -24,13 +26,64 @@ func (m Model) View() string {
 		}
 		return ""
 	default:
+		if m.global() {
+			switch m.tab {
+			case tabPlans:
+				return m.viewTabBar() + "\n\n" + m.viewPlans()
+			case tabConfig:
+				return m.viewTabBar() + "\n\n" + m.viewConfig()
+			}
+		}
 		return m.viewBoard()
 	}
+}
+
+// viewTabBar renders the FR8 tab bar `board · plans · config` with the active tab
+// highlighted. Project board only (the caller renders it just for m.global()).
+func (m Model) viewTabBar() string {
+	parts := make([]string, len(tabTitles))
+	for i, t := range tabTitles {
+		if tabID(i) == m.tab {
+			parts[i] = tabActiveStyle.Render(t)
+		} else {
+			parts[i] = tabStyle.Render(t)
+		}
+	}
+	return strings.Join(parts, dimStyle.Render("  ·  "))
+}
+
+// viewSourceChips renders the FR7 board source filter chips: `all` + one per source
+// of the focused project, the active chip highlighted. "" (no chips) for a lone repo
+// or a single-source project — so the single-repo board stays byte-for-byte.
+func (m Model) viewSourceChips() string {
+	chips := m.sourceChips()
+	if len(chips) <= 1 {
+		return ""
+	}
+	parts := make([]string, 0, len(chips))
+	for _, c := range chips {
+		label := c
+		if c == "" {
+			label = "all"
+		}
+		if c == m.sourceChip {
+			parts = append(parts, chipActiveStyle.Render(label))
+		} else {
+			parts = append(parts, chipStyle.Render(label))
+		}
+	}
+	return dimStyle.Render("sources ") + strings.Join(parts, " ")
 }
 
 func (m Model) viewBoard() string {
 	total := len(m.repo.Features)
 	left := colTitleStyle.Render("gogo cockpit") + "  " + dimStyle.Render(fmt.Sprintf("%d features", total))
+	// Project board only: a `M projects` note beside the feature count (FR7). Invisible
+	// in single-repo mode, so that header is byte-for-byte unchanged.
+	if m.global() {
+		n := len(m.allProjects)
+		left += dimStyle.Render(fmt.Sprintf("  ·  %d %s", n, plural(n, "project")))
+	}
 	if m.filter != "" {
 		left += dimStyle.Render("  /" + m.filter)
 	}
@@ -50,8 +103,19 @@ func (m Model) viewBoard() string {
 
 	// Header · columns · status · contextual footer. The needs-you strip is gone —
 	// the header count (⏸ K need you) plus each gate card's left-border stripe carry
-	// the "act now" signal now.
-	parts := []string{header, body, statusStyle(status), m.contextualFooter()}
+	// the "act now" signal now. A project board prepends the tab bar + the source
+	// chips (both invisible on a lone repo → single-repo parity).
+	var parts []string
+	if m.global() {
+		parts = append(parts, m.viewTabBar())
+		parts = append(parts, header)
+		if chips := m.viewSourceChips(); chips != "" {
+			parts = append(parts, chips)
+		}
+	} else {
+		parts = append(parts, header)
+	}
+	parts = append(parts, body, statusStyle(status), m.contextualFooter())
 	return strings.Join(parts, "\n")
 }
 
@@ -307,6 +371,102 @@ func (m Model) columnHeader(i int, hint string) string {
 	return head
 }
 
+// sourceTag renders the compact per-card SOURCE tag shown ONLY on the project board
+// (FR7): a colored dot + the source label, tinted with the source's configured color
+// when one is set, else dim. It returns ("","") whenever f.Source == "" — i.e. always
+// in single-repo mode — so the single-repo card is byte-for-byte unchanged. `plain`
+// is the untinted form (used by the focused card, whose single fg/bg fill would punch
+// a hole through a colored chip) and carries the rune width for the title truncation
+// math.
+func (m Model) sourceTag(f *contract.Feature) (styled, plain string) {
+	if f.Source == "" {
+		return "", ""
+	}
+	plain = "● " + f.Source
+	if c := m.sourceColors[f.Source]; c != "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render(plain), plain
+	}
+	return dimStyle.Render(plain), plain
+}
+
+// fitSourceTag truncates a card's right-aligned source tag (styled+plain) so the
+// composed NAME row — `mark + slug + dot`, a forced 1-col gap, then the tag — can never
+// exceed the card text width and wrap (REV-006). It only kicks in when the slug budget
+// would be floored (slugBudget < minSlug, i.e. the tag is so wide the slug can't get its
+// minimum); otherwise the tag is returned untouched. A budget too small for even a
+// 3-rune tag drops it entirely (the slug takes the whole row). A lone-repo card (empty
+// tag) is a no-op — byte-for-byte unchanged. markW/dotW are the display widths of the
+// (styled or plain) mark/dot prefixes already computed by the caller.
+func (m Model) fitSourceTag(f *contract.Feature, styled, plain string, textW, markW, dotW int) (fStyled, fPlain string) {
+	if plain == "" {
+		return "", ""
+	}
+	const minSlug = 4 // matches truncate()'s floor — the widest a floored slug can be
+	slugBudget := textW - markW - dotW - lipgloss.Width(plain) - 1
+	if slugBudget >= minSlug {
+		return styled, plain // the slug floor won't kick in → no wrap possible
+	}
+	// The slug is floored to minSlug, so the name row is wider than the reserved budget
+	// assumed. Shrink the tag so markW + minSlug + dotW + 1(gap) + tag <= textW.
+	maxTag := textW - markW - minSlug - dotW - 1
+	if maxTag < 3 {
+		return "", "" // no room for a meaningful tag → drop it
+	}
+	tp := truncateRunes(plain, maxTag)
+	return m.styleSourceTag(f, tp), tp
+}
+
+// styleSourceTag re-applies a source's tag tint to an (already truncated) plain tag —
+// the same coloring sourceTag uses — so a shrunk tag keeps its source color.
+func (m Model) styleSourceTag(f *contract.Feature, plain string) string {
+	if plain == "" {
+		return ""
+	}
+	if c := m.sourceColors[f.Source]; c != "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render(plain)
+	}
+	return dimStyle.Render(plain)
+}
+
+// truncateRunes truncates s to max runes with a trailing ellipsis (no minimum floor,
+// unlike truncate) — used to shrink a source tag to an exact narrow budget.
+func truncateRunes(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	if max == 1 {
+		return "…"
+	}
+	return string(r[:max-1]) + "…"
+}
+
+// correlationChipsPlain is the plain (untinted) `⛓ plan-… ⛓ plan-…` chip string for
+// a card's correlation membership (FR14) read straight from state.md, or "" when the
+// ticket carries no correlation. Plural: one `⛓ plan-<id>` per membership,
+// space-joined (a ticket in two plans shows two chips). The rune width feeds the
+// card's fit math.
+func correlationChipsPlain(f *contract.Feature) string {
+	if len(f.Correlations) == 0 {
+		return ""
+	}
+	parts := make([]string, len(f.Correlations))
+	for i, id := range f.Correlations {
+		parts[i] = "⛓ " + id
+	}
+	return strings.Join(parts, " ")
+}
+
+// correlationCountFallback is the compact chip a card shows when it is too narrow to
+// render its full ⛓ plan-<id> chip(s) (TEST-002): `⛓ ×N` preserves the "belongs to N
+// plans" signal instead of collapsing to a content-free `⛓ plan-…` ellipsis.
+func correlationCountFallback(n int) string {
+	return fmt.Sprintf("⛓ ×%d", n)
+}
+
 // renderCard draws one feature as a bordered card. The focused card gets a
 // full-card highlight (accent border + subtle background, TEST-007); a
 // selected-for-ship card gets the select accent border + a ✓; a card with a
@@ -328,7 +488,9 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		agent = activeAgent(f)
 	}
 
-	// Three rows: name (+ mark, + live ● dot) · one-line desc · status pill [+ agent chip].
+	// Three rows: name (+ mark, + live ● dot, + right-aligned SOURCE tag) · one-line
+	// desc · status pill [+ agent chip]. Per the design (TURN-3a) the source tag rides
+	// the NAME row, right-aligned — the description gets its own row below.
 	var head, titleLine, badgeLine string
 	if focused {
 		// Plain inner text — the frame carries one foreground + background so the
@@ -343,7 +505,26 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		if hasSession {
 			dot = " ●"
 		}
-		head = mark + truncate(f.Slug, width-len([]rune(mark))-len([]rune(dot))) + dot
+		// The tag rides the name row right-aligned; it is plain here (the focus fill
+		// carries one fg/bg), and its width is reserved from the slug's budget. Right-
+		// alignment pads to the card's TEXT area (width minus the style's Padding(0,1)),
+		// so the padded line never overruns the frame and wraps.
+		_, tag := m.sourceTag(f)
+		textW := width - 2
+		mw, dw := lipgloss.Width(mark), lipgloss.Width(dot)
+		// Truncate the tag if a long source name at a narrow width would wrap the row
+		// (REV-006). The focused card renders the tag plain (the focus fill owns fg/bg).
+		_, tag = m.fitSourceTag(f, tag, tag, textW, mw, dw)
+		slugBudget := textW - mw - dw
+		if tag != "" {
+			slugBudget -= lipgloss.Width(tag) + 1
+		}
+		nameLeft := mark + truncate(f.Slug, slugBudget) + dot
+		if tag != "" {
+			head = placeApart(nameLeft, tag, textW)
+		} else {
+			head = nameLeft
+		}
 		titleLine = truncate(title, width)
 		// The frame carries one fg+bg fill, so a colored chip would punch a hole —
 		// render it plain and reserve its rune width from the pill's truncation budget
@@ -365,11 +546,55 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		if hasSession {
 			dot = " " + sessionStyle.Render("●")
 		}
-		head = mark + slugStyle.Render(truncate(f.Slug, width-4)) + dot
+		// Name row: mark + slug + live ● dot, with the (styled) SOURCE tag right-
+		// aligned; its width is reserved from the slug's budget so nothing overruns.
+		// Right-alignment pads to the card TEXT area (width minus the Padding(0,1)) so
+		// the padded line stays inside the frame (no wrap).
+		styled, plain := m.sourceTag(f)
+		textW := width - 2
+		mw, dw := lipgloss.Width(mark), lipgloss.Width(dot)
+		// Truncate the tag if a long source name at a narrow width would wrap the row
+		// (REV-006) — the composed name row must never exceed textW (the window height
+		// math depends on it). Lone-repo (empty tag) is a no-op.
+		styled, plain = m.fitSourceTag(f, styled, plain, textW, mw, dw)
+		slugBudget := textW - mw - dw
+		if plain != "" {
+			slugBudget -= lipgloss.Width(plain) + 1
+		}
+		nameLeft := mark + slugStyle.Render(truncate(f.Slug, slugBudget)) + dot
+		if plain != "" {
+			head = placeApart(nameLeft, styled, textW)
+		} else {
+			head = nameLeft
+		}
 		titleLine = dimStyle.Render(truncate(title, width))
 		badgeLine = pillStyleFor(f).Render(pillLabel(f))
 		if agent != "" {
 			badgeLine += "  " + sessionStyle.Render("● "+agent)
+		}
+	}
+
+	// Correlation chip(s) (FR14): a member ticket paints its ⛓ plan-… chip(s) after
+	// the status pill (plural — a ticket in two plans shows two chips), read straight
+	// from state.md. Appended only when it FITS the card width, so it never wraps the
+	// line (which would desync the window height math); a correlation-less card carries
+	// nothing (byte-for-byte parity).
+	if plain := correlationChipsPlain(f); plain != "" {
+		if room := width - lipgloss.Width(badgeLine) - 1; room >= 8 {
+			shown := plain
+			// When the full ⛓ plan-<id> chip(s) don't fit, fall back to a compact
+			// count (⛓ ×N) rather than an indistinguishable truncated `⛓ plan-…`
+			// (TEST-002) — the card still says "belongs to N plans" at a narrow
+			// width; full ids render at comfortable widths.
+			if lipgloss.Width(plain) > room {
+				shown = correlationCountFallback(len(f.Correlations))
+			}
+			shown = truncate(shown, room)
+			if focused {
+				badgeLine += " " + shown // plain — the focus fill carries one fg/bg
+			} else {
+				badgeLine += " " + correlationChipStyle.Render(shown)
+			}
 		}
 	}
 
@@ -395,7 +620,7 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 // keys`. `?` (FR-10) swaps it for the full pre-redesign key list.
 func (m Model) contextualFooter() string {
 	if m.showAllKeys {
-		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · / filter · ? keys · q quit"
+		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · p source · tab plans/config · / filter · ? keys · q quit"
 		return helpStyle.Render(full)
 	}
 	right := keyChipStyle.Render("[?] all keys")

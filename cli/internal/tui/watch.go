@@ -58,6 +58,28 @@ func watchPaths(root string, repo *contract.Repo) []string {
 	return paths
 }
 
+// watchDirs is the full directory set this board watches: the single root's tree
+// in single-repo mode, or the UNION across every SOURCE root of the focused project
+// (each source's per-root path set from watchPaths, deduped). fsnotify is
+// non-recursive, so watchPaths enumerates the subdirs per root and this only unions
+// them — the project board keeps every source live.
+func (m Model) watchDirs() []string {
+	if !m.global() {
+		return watchPaths(m.root, m.repo)
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range m.sources() {
+		for _, path := range watchPaths(s.Path, m.repo) {
+			if !seen[path] {
+				seen[path] = true
+				out = append(out, path)
+			}
+		}
+	}
+	return out
+}
+
 // watchSet is a long-lived fsnotify watcher plus the set of directories it is
 // currently armed on. It is created once (startWatchCmd), re-armed on every
 // reload (reconcile), and torn down on quit (close). All watched-set mutation
@@ -166,8 +188,7 @@ func (ws *watchSet) close() error {
 // starts the debounced loop, handing the set back via watcherReadyMsg.
 // Best-effort: any error just disables live refresh (manual reload still works).
 func (m Model) startWatchCmd() tea.Cmd {
-	root := m.root
-	repo := m.repo
+	dirs := m.watchDirs() // single root, or the union across all project roots
 	ch := m.reloadCh
 	return func() tea.Msg {
 		w, err := fsnotify.NewWatcher()
@@ -180,7 +201,7 @@ func (m Model) startWatchCmd() tea.Cmd {
 			done:    make(chan struct{}),
 			watched: map[string]bool{},
 		}
-		ws.reconcile(watchPaths(root, repo))
+		ws.reconcile(dirs)
 		ws.start()
 		return watcherReadyMsg{ws: ws}
 	}

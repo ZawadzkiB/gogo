@@ -114,6 +114,66 @@ func TestTmuxNewSessionArgs(t *testing.T) {
 	}
 }
 
+// TestPlanIntent pins the spawn seam (D3): the plan body is seeded whole as the
+// /gogo:plan goal (a single argv element via TmuxNewSessionArgs — injection-safe,
+// even with spaces/newlines), and the tmux session name is derived from the label
+// (the plan title), sanitized to [a-z0-9-]. An empty correlation degrades to a
+// plain body-seeded plan launch (no --correlation param).
+func TestPlanIntent(t *testing.T) {
+	t.Setenv(PermissionModeEnv, "auto")
+	body := "Swap the linear scan for a prefix trie; keep lookups O(k) & safe"
+	in := PlanIntent("My Plan Title", body, "")
+	if in.Action != ActionPlan {
+		t.Errorf("action = %v, want ActionPlan", in.Action)
+	}
+	if in.Command != "/gogo:plan "+body {
+		t.Errorf("command = %q, want the body seeded whole (no --correlation)", in.Command)
+	}
+	if in.Session != "gogo-plan-my-plan-title" {
+		t.Errorf("session = %q, want gogo-plan-my-plan-title", in.Session)
+	}
+	// The body stays ONE trailing argv element (no shell splitting) — injection-safe.
+	got := TmuxNewSessionArgs("/repo/root", in)
+	if last := got[len(got)-1]; last != "/gogo:plan "+body {
+		t.Errorf("body was split across argv: last element = %q", last)
+	}
+}
+
+// TestPlanIntentEmptyBodySeedsTitle (REV-002): a title-only plan (empty/blank body)
+// spawns with its TITLE as the goal, never an empty `/gogo:plan `.
+func TestPlanIntentEmptyBodySeedsTitle(t *testing.T) {
+	for _, body := range []string{"", "   \n\t "} {
+		in := PlanIntent("Add a retry budget", body, "")
+		if in.Command != "/gogo:plan Add a retry budget" {
+			t.Errorf("empty body: command = %q, want the title seeded as goal", in.Command)
+		}
+	}
+}
+
+// TestPlanIntentCorrelation pins FR15/D3=A: a non-empty correlation folds
+// `--correlation plan-XXXX` onto the goal, staying a SINGLE trailing argv element
+// (injection-safe) even when the body carries spaces AND newlines; an empty/blank
+// correlation degrades to a plain body-seeded PlanIntent (no dangling flag).
+func TestPlanIntentCorrelation(t *testing.T) {
+	t.Setenv(PermissionModeEnv, "auto")
+	body := "migrate the shared token store\nkeep the two apps in lock-step & safe"
+	in := PlanIntent("Token migration", body, "plan-7f3a1b2c")
+	if in.Command != "/gogo:plan "+body+" --correlation plan-7f3a1b2c" {
+		t.Errorf("command = %q, want the --correlation param appended to the goal", in.Command)
+	}
+	// The whole command (body + newlines + --correlation) stays ONE trailing argv
+	// element — injection-safe (no shell splitting on the spaces/newlines).
+	got := TmuxNewSessionArgs("/repo/root", in)
+	if last := got[len(got)-1]; last != in.Command {
+		t.Errorf("command was split across argv: last element = %q", last)
+	}
+	// A blank correlation is exactly a plain PlanIntent (no dangling --correlation).
+	plain := PlanIntent("Token migration", body, "  ")
+	if plain.Command != PlanIntent("Token migration", body, "").Command {
+		t.Errorf("blank correlation: command = %q, want a plain PlanIntent", plain.Command)
+	}
+}
+
 // setEnv sets or unsets an env var for a test and restores it after. t.Setenv
 // cannot represent "unset", which the default-mode case needs.
 func setEnv(t *testing.T, key string, val *string) {

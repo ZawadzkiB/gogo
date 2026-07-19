@@ -54,6 +54,11 @@ four**; the `cli` test `TestCLICommandEnumerationInSync` greps them against
 | `gogo view <target>` | reads a plan/report bundle → terminal or `--web` HTML (pure read). |
 | `gogo events <slug>` | reads `events.jsonl` → timeline (pure read). |
 | `gogo trash [restore <entry>]` | lists / restores `.gogo/trash/` entries (file moves, recoverable). |
+| `gogo project [add <repo> [--name <name>] \| list \| rm <name>]` | manages home-folder **projects** at `~/.gogo/projects/<name>/config.json` (CLI-owned data, NOT pipeline state) — a project links many **sources**; `add` creates one with `<repo>` as source #1 (requires `<repo>/.gogo/`), `rm` deletes only the project's home folder (never a source's `.gogo/`). `add` also auto-initializes the global cockpit home (writes the `~/.gogo/config.json` marker — FR22). |
+| `gogo global [init \| board]` | the **two-mode model** (UAT round 1): `gogo` INSIDE a repo shows THAT repo's own board (always); `gogo global` opens the cross-project **cockpit** (board · plans · config) from anywhere, and `gogo` OUTSIDE any repo does the same. `init` sets up the global cockpit home `~/.gogo/` (creates `~/.gogo/projects/` + the `~/.gogo/config.json` marker whose existence = "initialized"); idempotent. Bare `global` / `global board` open the cockpit (an uninitialized home hints `gogo global init`). Writes ONLY `~/.gogo/`. |
+| `gogo source [add <repo> [--project <name>] \| rm <repo\|name> [--project <name>]]` | adds / removes a **source** (a repo with its own `.gogo/`, or a monorepo service dir) to a project (`--project` defaults to the sole project, required when several exist). Writes only the project entity under `~/.gogo/` — never a source's `.gogo/`. |
+| `gogo draft [new "<title>" \| list \| show <id> \| ready <id> \| rm <id>]` | a thin **alias into `gogo plan`** (D9): a draft is a plan in the `draft` status. Forwards to the project-scoped plan store under `~/.gogo/projects/<name>/.gogo/plans/`; `draft list` narrows to `status: draft`. (Superseded the 0.23.0 global-drafts store — see the SUPERSEDED note below.) |
+| `gogo epic [new "<title>" \| list \| show <id> \| add <id> <source>:<slug> \| rm <id> <source>:<slug> \| delete <id>]` | a thin **alias into `gogo plan`** (D9): an epic is a plan that owns members. Forwards to the project-scoped plan store; `epic list` narrows to plans with ≥1 member (or target), any status. Correlation lives in each work item's `state.md` as a `correlation:` list (§2), not a CLI store. (Superseded the 0.24.0 global-epics store — see the SUPERSEDED note below.) |
 | `gogo run [<slug>]` | DEPRECATED alias for `gogo go`. |
 | `gogo --version` | prints the version (mirrors this contract's plugin version). |
 
@@ -242,6 +247,56 @@ only truthful live-session state sooner.
   collapsed changelog shows a `●` on rows whose shipped item still holds a live session. All of
   this reads the SAME file surface + `ListSessions()` — no state-enum, class, or read-path change.
 
+### Changed in 0.24.0 (all additive — new CLI-owned config surface; no `.gogo/` change)
+
+> **SUPERSEDED by the projects·sources·plans rework (0.21.0).** The epics/drafts stores below
+> collapsed into ONE project-scoped **plans** store (`~/.gogo/projects/<name>/.gogo/plans/`), and
+> correlation MOVED into each work item's `state.md` as an additive optional `correlation:` **list**
+> (§2) — reversing the D1=B CLI-store overlay. `gogo epic`/`gogo draft` survive as thin aliases into
+> `gogo plan`. The historical narrative below is kept for provenance; §2 + the plans store are the
+> live contract.
+
+- **Global epics (`gogo epic`, board key `E`; add-to-epic `e`; filter `#epic-<hash>`).** A new
+  CLI-owned store at `~/.config/gogo/epics.json` holds first-class **epic** objects — each a stable
+  `epic-<hash>` correlation id, a title/description, a created stamp, and a **many-to-many** member
+  set (`{repo, slugHint}`; a ticket may belong to several epics, and epics may share tickets).
+  `gogo epic new/list/show/add/rm/delete` and the board `E` epics screen manage them; `e` on a card
+  adds it to an epic. Like `projects.json`/`drafts/` this is **CLI-owned config, NOT pipeline
+  state** — the hard "CLI reads, skills write" invariant is about `.gogo/`, never `~/.config/gogo/`
+  — and every read degrades to empty on a missing / malformed file.
+- **The board OVERLAYS each member ticket's epic id(s) at load (D1=B).** The correlation lives ONLY
+  in the CLI store; a new transient `Feature.Epics []string` is stamped from the store at board load
+  (`contract.StampEpics`, resolving each `{repo, slugHint}` to an on-disk feature — exact match),
+  painted as `#epic-…` card tag(s) and filterable with a `#<id>` token (ANDed with `@project`/text).
+  **(Reversed in 0.21.0:** correlation now lives in each work item's `state.md` as the additive
+  optional `correlation:` list of §2 — read straight by the parser onto `Feature.Correlations`, no
+  CLI-store overlay — painted as `⛓ plan-…` chip(s) and filterable with a `#plan-…` token. An absent
+  `correlation:` line is byte-for-byte the pre-correlation board.**)
+- **Multi-target promote LAUNCHES + links.** `gogo draft promote <slug> --to a --to b …` (and the
+  board multi-select) is **repeatable**: a SINGLE target is exactly the 0.23.0 promote (no epic); TWO
+  OR MORE create ONE epic seeded from the draft, launch `/gogo:plan <body>` in EACH target (with an
+  advisory suggested-slug line so a promote-time member links exact-when-honored), and record each as
+  an epic member. The CLI still never writes any target's `.gogo/work/`.
+
+### Changed in 0.23.0 (all additive — new CLI-owned config surface; no key removed or renamed)
+
+- **Global plan-drafts (`gogo draft`, board key `D`).** A new CLI-owned store at
+  `~/.config/gogo/drafts/<slug>.md` holds lightweight, repo-agnostic briefs — each a fenced
+  `--- … ---` front-matter (`title`, `created`, optional `target`, and `promoted-to`/`promoted-at`
+  once promoted) + a free-text body. `gogo draft new/list/edit/rm/promote` and the board `D`
+  drafts screen manage them. Like `projects.json` this is **CLI-owned config, NOT pipeline
+  state** — the hard "CLI reads, skills write" invariant is about `.gogo/`, never
+  `~/.config/gogo/` — and every read degrades to empty on a missing dir / malformed file.
+- **Promote LAUNCHES, never writes.** `gogo draft promote <slug> --to <project>` (and the board
+  screen's `enter`/`p`) resolves the target from the project registry and **launches**
+  `/gogo:plan <body>` in that repo (the body seeded whole as the goal, a single argv element —
+  injection-safe); the **analyst derives the final feature slug** and writes the target's
+  `.gogo/work/feature-<slug>/`. The CLI never writes the target's **`.gogo/work/` pipeline
+  state**; it only stamps the draft `promoted-to`/`promoted-at` in its own store (mark-promoted,
+  kept — never auto-removed). (The tmux path writes nothing in the target; the no-tmux fallback
+  backgrounds `claude -p` and writes a launch log under the target's CLI-owned
+  `.gogo/resources/cli/logs/`, the same sanctioned resources root the board's `Launch` uses.)
+
 ## 1. The `.gogo/` layout a consumer reads
 
 Two roots matter: **work** (one folder per feature, the live pipeline state +
@@ -319,9 +374,12 @@ ignore anything else and tolerate extra bolded lines a future version adds.
 | `resume` | `<phase> — <next action>` \| `none` | the human resume hint; free text after the phase token |
 | `open-decision` | `<decisions.md anchor>` \| `none` | a trailing parenthetical (`none (D1=A …)`) may summarize resolved forks |
 | `stage` | free text (e.g. `A of B`) | optional; multi-stage features only |
+| `correlation` | `[plan-XXXX, …]` | **additive, optional** (0.21.0): the cross-source PLAN id(s) this work item belongs to — a LIST (many-to-many; a ticket may be in several plans). Stamped by `/gogo:plan --correlation plan-XXXX` when a plan spawns/links the item; **absent = today's behaviour, byte-for-byte** (no chip, no `#plan-…` filter). Ids are `plan-<hex8>` ([a-z0-9-]); the reader parses the bracketed list defensively (bare id, empty `[]` → none) |
 
 Parse defensively: a value may carry a trailing `<!-- … -->` or a `(…)` note;
-strip those. `phase`/`status` are the two enums a reader can rely on.
+strip those. `phase`/`status` are the two enums a reader can rely on. Every other
+key (incl. the additive `correlation` list) is optional — an absent line is the
+byte-for-byte default, never an error.
 
 ## 3. The work-index classifier → the four board columns
 

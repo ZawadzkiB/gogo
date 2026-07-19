@@ -105,13 +105,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Re-arm the watch so features/entries born mid-session keep the board
 		// live (REV-010); reconcile also drops any that vanished.
 		if m.watch != nil {
-			m.watch.reconcile(watchPaths(m.root, m.repo))
+			m.watch.reconcile(m.watchDirs())
 		}
 		return m, waitForReload(m.reloadCh)
 
 	case launchDoneMsg:
 		m.status = msg.status
 		m.sessions = launch.ListSessions()
+		// A plan spawn records its member + active flip only on a SUCCESSFUL launch
+		// (REV-005), inside the fired cmd — so re-read the project's plans here to catch
+		// the Model up to that store write. A no-op on a single-repo board (no plans).
+		m.loadPlans()
 		return m, nil
 
 	case tea.KeyMsg:
@@ -123,7 +127,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case modeDrill:
 			return m.updateDrill(msg)
 		default:
-			return m.updateBoard(msg)
+			return m.updateActive(msg)
 		}
 	}
 
@@ -144,13 +148,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// updateActive is the tabbed dispatch (FR8/D6): it owns the keys that persist
+// across every tab (q quit · ? help · tab/shift+tab cycle · / filter) and then
+// routes the remaining keys to the active tab's handler. On a lone repo (no tabs)
+// the tab keys are inert and it always lands on the board — byte-for-byte fallback.
+func (m Model) updateActive(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.filtering {
 		return m.updateFilter(msg)
 	}
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, m.quit()
+	case "?":
+		// FR-10: toggle the full key list (the pre-redesign long help line).
+		m.showAllKeys = !m.showAllKeys
+		return m, nil
+	case "tab":
+		if m.global() {
+			m.cycleTab(1)
+		}
+		return m, nil
+	case "shift+tab":
+		if m.global() {
+			m.cycleTab(-1)
+		}
+		return m, nil
+	}
+	switch m.tab {
+	case tabPlans:
+		return m.updatePlans(msg)
+	case tabConfig:
+		return m.updateConfig(msg)
+	default:
+		return m.updateBoard(msg)
+	}
+}
+
+func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
 	case "left", "h":
 		m.colIdx = clamp(m.colIdx-1, 0, 3)
 	case "right":
@@ -166,9 +201,10 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.filtering = true
 		m.status = "filter: type to narrow · enter keeps · esc clears"
-	case "?":
-		// FR-10: toggle the full key list (the pre-redesign long help line).
-		m.showAllKeys = !m.showAllKeys
+	case "p":
+		// FR7: cycle the board's source filter chip (all → source-1 → … → all). A
+		// no-op on a lone repo / a project with a single source.
+		m.cycleChip(1)
 	case "enter":
 		if f := m.focusedCard(); f != nil {
 			m.openDrill(f)
@@ -356,6 +392,17 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingAttach != nil {
 			return m.finishAttach()
 		}
+		// A config-tab per-source add/edit/remove form (FR9) completes to
+		// finishSourceForm — its own path (stays on the config tab), mutually
+		// exclusive with every launch/kill/attach path above and the ship path below.
+		if m.pendingSource != nil {
+			return m.finishSourceForm()
+		}
+		// A plans-tab new-plan form (FR10 `n`) completes to finishPlanForm — its own
+		// path (stays on the plans tab), mutually exclusive with every path above.
+		if m.pendingPlan {
+			return m.finishPlanForm()
+		}
 		if m.binding == nil || !m.binding.confirm {
 			// Completed on "Cancel" — same as an abort. Only a SHIP form reaches
 			// here (delete/kill forms are handled above), so the pending targets are
@@ -379,11 +426,12 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// formPreservesSelection reports whether the active form is a delete, kill, or
-// attach form — all unrelated to the ready-ship selection, so cancelling them must
-// NOT wipe the user's multi-selection (only a SHIP form's cancel does). REV-012.
+// formPreservesSelection reports whether the active form is a delete, kill, attach,
+// or config-tab source form — all unrelated to the ready-ship selection, so
+// cancelling them must NOT wipe the user's multi-selection (only a SHIP form's
+// cancel does). REV-012.
 func (m Model) formPreservesSelection() bool {
-	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil
+	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingPlan
 }
 
 // cancelForm returns to the board and clears the in-flight form state. For a SHIP
@@ -406,6 +454,9 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	case m.pendingAttach != nil && m.pickerFromDrill:
 		returnMode = modeDrill
 	}
+	// A config-tab per-source form was opened while the config TAB was active;
+	// cancelling it returns to the tab's normal state (modeBoard renders the active
+	// tab — m.tab stays tabConfig), never a modal screen (those are gone).
 	m.status = "cancelled"
 	if !preserveSelection {
 		m.selected = map[string]bool{}
@@ -415,6 +466,8 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	m.pendingDelete = nil
 	m.pendingKill = nil
 	m.pendingAttach = nil
+	m.pendingSource = nil
+	m.pendingPlan = false
 	m.binding = nil
 	m.form = nil
 	m.mode = returnMode

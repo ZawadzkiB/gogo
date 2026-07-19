@@ -55,7 +55,7 @@ func (m Model) finishDelete() (tea.Model, tea.Cmd) {
 		m.status = "cancelled"
 		return m, nil
 	}
-	entry, err := trash.MoveToTrash(m.root, f.Dir)
+	entry, err := trash.MoveToTrash(m.rootFor(f), f.Dir)
 	if err != nil {
 		m.status = "delete failed: " + err.Error()
 		return m, nil

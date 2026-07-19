@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 )
 
 // Work-index classes (docs/cli-contract.md §3, verbatim rule order).
@@ -49,8 +51,26 @@ func Column(class string) string {
 // Feature is one .gogo/work/feature-<slug>/ folder, parsed + classified. This
 // mirrors the work-index record shape documented in skills/gogo-status.
 type Feature struct {
-	Slug          string
-	Dir           string // absolute path to the feature folder
+	Slug string
+	Dir  string // absolute path to the feature folder
+	// Root is the repo root (the dir containing .gogo/) this feature was loaded
+	// from — stamped by LoadRepo on every feature. In the aggregate project board
+	// (LoadProject) it is what makes a per-feature action target the RIGHT source
+	// (rootFor); in single-repo mode it simply equals the board's one root.
+	Root string
+	// Source is the label the board tags this feature's card with — the SOURCE it
+	// was loaded from (LoadProject stamps it per source). Empty in single-repo mode —
+	// so the card tag is invisible there (byte-for-byte fallback parity). Renamed from
+	// Project as part of the corrected project→sources model (a card is tagged by its
+	// source, not a flat repo-project).
+	Source string
+	// Correlations are the plan ids (plan-<hash>) this work item belongs to — read
+	// DIRECTLY from state.md's additive optional `correlation:` list by the parser
+	// (FR13/L1), NOT a CLI-side overlay. Many-to-many: a ticket in two plans carries
+	// both ids. nil when the state.md carries no correlation line (the byte-for-byte
+	// pre-correlation fallback — no `⛓` chip, no `#plan-…` filter effect). This
+	// supersedes the removed epics-store overlay: correlation now lives in state.md.
+	Correlations  []string
 	Title         string
 	Phase         string
 	Status        string
@@ -186,11 +206,41 @@ func LoadRepo(root string) (*Repo, error) {
 		}
 		slug := strings.TrimPrefix(e.Name(), "feature-")
 		f := loadFeature(filepath.Join(workDir, e.Name()), slug)
+		f.Root = root // every feature carries its own root (single-repo == global here)
 		classify(f, r.Changelog)
 		r.Features = append(r.Features, f)
 	}
 	sortFeaturesNewestFirst(r.Features)
 	return r, nil
+}
+
+// LoadProject builds a PROJECT board view (the corrected multi-source model): it
+// calls the per-repo LoadRepo ONCE per source (no fork of the reader), stamps each
+// Feature with its source label (Root is already set by LoadRepo == the source
+// path), and merges every source's features + changelog into ONE newest-first
+// *Repo with an empty Root (each Feature carries its own). A source path with no
+// readable .gogo/work yields an empty LoadRepo and contributes nothing (skipped
+// gracefully, never a crash) — the defensive reader style. This is the sole
+// aggregate board reader, keyed on a home project's sources.
+func LoadProject(p projects.Project) *Repo {
+	agg := &Repo{}
+	for _, s := range p.Sources {
+		repo, err := LoadRepo(s.Path)
+		if err != nil || repo == nil {
+			continue
+		}
+		label := s.Name
+		if label == "" {
+			label = filepath.Base(s.Path)
+		}
+		for _, f := range repo.Features {
+			f.Source = label // Root already stamped by LoadRepo (== s.Path)
+			agg.Features = append(agg.Features, f)
+		}
+		agg.Changelog = append(agg.Changelog, repo.Changelog...)
+	}
+	sortFeaturesNewestFirst(agg.Features)
+	return agg
 }
 
 // Feature returns the loaded feature for a slug, or nil.

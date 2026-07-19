@@ -1,0 +1,38 @@
+sequenceDiagram
+  autonumber
+  actor User
+  participant TUI as gogo TUI (plans tab / detail)
+  participant Plans as plans store (~/.gogo/projects/&lt;n&gt;/.gogo/plans/)
+  participant Launch as launch.PlanIntent / AuthorPlanIntent
+  participant Claude as claude -p (gogo:plan SKILL) / plain claude
+  participant Work as source .gogo/work/feature-&lt;slug&gt;/
+  participant Board as board reader (contract.LoadProject)
+
+  Note over User,TUI: TWO authoring entry points
+
+  User->>TUI: n — quick inline draft
+  TUI->>Plans: Create Plan{id: plan-XXXX, status:draft}
+  Note over Plans: plan-XXXX = the correlation id, minted at creation
+
+  User->>TUI: A — author with claude (REV-002 fix)
+  TUI->>Plans: mint fresh draft up front
+  TUI->>Launch: AuthorPlanIntent(root=first SOURCE, planPath, correlation, sources)
+  Launch-->>Claude: PLAIN claude session (ActionAuthor — no /gogo:plan, no --correlation flag)
+  Note over Claude: edits ~/.gogo plan file in place; creates NO .gogo/work/ scaffold
+
+  User->>TUI: open plan detail, press c "create work item" on source S
+  TUI->>Launch: PlanIntent(root=S, body, correlation="plan-XXXX")
+  Launch-->>Claude: claude -p "/gogo:plan &lt;body&gt; --correlation plan-XXXX"  (anchored at S, single trailing argv element)
+  Note over TUI,Claude: CLI writes NOTHING under S/.gogo/work/ (hard invariant)
+
+  Claude->>Work: write feature-&lt;slug&gt;/ (derives the final slug)
+  Claude->>Work: stamp state.md → - **correlation:** [plan-XXXX]
+  Claude-->>TUI: launch returns err==nil
+  TUI->>Plans: ONLY NOW record member {S, slug} + status→active (REV-005: post-success)
+
+  Board->>Work: read state.md (LLM-free, ms-fast)
+  Work-->>Board: Feature.Correlations = [plan-XXXX]
+  Board-->>User: card shows ⛓ plan-XXXX · #plan-XXXX filters members across sources
+
+  User->>TUI: add an EXISTING work item to plan-YYYY (retroactive, FR16)
+  TUI-->>Claude: re-stamp → state.md correlation list gains plan-YYYY (many-to-many)

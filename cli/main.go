@@ -10,15 +10,25 @@ import (
 	"os"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
+	"github.com/ZawadzkiB/gogo/cli/internal/plans"
+	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	"github.com/ZawadzkiB/gogo/cli/internal/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.20.1"
+const Version = "0.21.0"
 
 func main() {
+	// One-shot, best-effort, non-destructive migration of the legacy flat registry
+	// into home-folder projects (FR6, D4). Guarded to run at most once and never
+	// blocks startup — a no-op on every machine that already uses ~/.gogo/projects/.
+	projects.Migrate()
+	// Phase-C extension of the migration (FR6): fold the legacy global drafts + epics
+	// stores into project plans (runs after projects exist; guarded + non-destructive).
+	plans.MigrateLegacy()
+
 	args := os.Args[1:]
 	if len(args) == 0 {
 		os.Exit(runBoard())
@@ -42,6 +52,16 @@ func main() {
 		os.Exit(cmdEvents(args[1:]))
 	case "trash":
 		os.Exit(cmdTrash(args[1:]))
+	case "project":
+		os.Exit(cmdProject(args[1:]))
+	case "global":
+		os.Exit(cmdGlobal(args[1:]))
+	case "source":
+		os.Exit(cmdSource(args[1:]))
+	case "draft":
+		os.Exit(cmdDraft(args[1:]))
+	case "epic":
+		os.Exit(cmdEpic(args[1:]))
 	case "-h", "--help", "help":
 		printHelp()
 	default:
@@ -51,14 +71,62 @@ func main() {
 	}
 }
 
-// runBoard opens the interactive TUI. Returns a process exit code.
+// runBoard opens the interactive TUI. Returns a process exit code. It resolves
+// which board to open through the two-mode chooseBoard (UAT round 1): inside a repo
+// → THAT repo's single board (always); outside any repo → the global cockpit when
+// the home is initialized (else a hint to `gogo global init`). `gogo global` forces
+// the cockpit regardless of cwd.
 func runBoard() int {
 	root, err := contract.FindRoot(".")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "gogo: no .gogo/ found from here up — run inside a gogo project (or use /gogo:build)")
+	choice := chooseBoard(root, err == nil, projects.List, projects.Initialized)
+	if choice.model == nil {
+		fmt.Fprintln(os.Stderr, choice.err)
 		return 1
 	}
-	p := tea.NewProgram(tui.New(root), tea.WithAltScreen())
+	return runProgram(choice.model)
+}
+
+// boardChoice is the resolved runBoard decision (REV-003): the board Model to run,
+// or — when model is nil — the stderr line to print before exiting 1. Extracting
+// it makes the branch unit-testable without opening a TTY.
+type boardChoice struct {
+	model tea.Model
+	kind  string // "project" | "single" | "none" — the branch taken (test seam)
+	err   string // stderr line, set only when model == nil
+}
+
+// chooseBoard decides which board a bare `gogo` opens — the two-mode model (UAT
+// round 1). Pure/no-TTY testable: the project store is injected via listProjects and
+// the global-home "initialized" check via initialized, so every branch is driven
+// with fakes in tests.
+//
+//  1. Inside a repo (rootFound) → THAT repo's single board, ALWAYS — even when the
+//     repo is a registered project's source. Per-repo stays simple (no auto-route to
+//     the project cockpit); the graceful single-repo board is byte-for-byte unchanged.
+//  2. Outside any repo + the global cockpit initialized + ≥1 project → the global
+//     cockpit (the first project's board, `p`-switchable across the rest).
+//  3. Outside + initialized + 0 projects → a "add a project" hint (no crash).
+//  4. Outside + NOT initialized → a "run gogo global init" hint (no crash).
+//
+// `gogo global` (cmdGlobal) forces the cockpit regardless of cwd; this function is
+// only the bare-`gogo` resolver.
+func chooseBoard(root string, rootFound bool, listProjects func() ([]projects.Project, error), initialized func() bool) boardChoice {
+	if rootFound {
+		return boardChoice{model: tui.New(root), kind: "single"}
+	}
+	if !initialized() {
+		return boardChoice{kind: "none", err: "gogo: no repo here and no global cockpit yet — run `gogo global init`, or cd into a gogo repo"}
+	}
+	projs, _ := listProjects() // missing / malformed store → empty, never a crash
+	if len(projs) == 0 {
+		return boardChoice{kind: "none", err: "gogo: global cockpit is empty — add a project with `gogo project add <repo>`"}
+	}
+	return boardChoice{model: tui.NewProjectBoard(projs[0]), kind: "project"}
+}
+
+// runProgram runs a built board Model to completion in the alt screen.
+func runProgram(m tea.Model) int {
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "gogo:", err)
 		return 1
@@ -70,21 +138,28 @@ func printHelp() {
 	fmt.Print(`gogo — the deterministic cockpit for your gogo pipeline
 
 usage:
-  gogo                 open the kanban board (plan | in progress | ready | changelog)
+  gogo                 open the kanban board (plan | in progress | ready | changelog) — in a repo → THAT repo; outside a repo → the global cockpit
   gogo go [<slug>]     launch-or-resume the feature's persistent /gogo:go session (implement + review/test + report)
-  gogo plan <slug>     launch-or-resume the feature's persistent /gogo:plan session
+  gogo plan <cmd>      manage project plans (new | list | show | add | rm | ready | promote | delete) — a plan targets sources & spawns work items
+  gogo plan <slug>     (bare slug) launch-or-resume the feature's persistent /gogo:plan session
   gogo sweep           reap orphaned / shipped persistent sessions (kill-at-ship backstop)
   gogo status          print the work-index classifier table
   gogo view <target>   view a plan/report — glamour in the terminal, or --web for the browser
   gogo events <slug>   print a feature's events.jsonl timeline
   gogo trash           list .gogo/trash/ entries (deleted work, recoverable)
   gogo trash restore <entry>   move a trashed entry back to .gogo/work/
+  gogo project <cmd>   manage home-folder projects (add <repo> [--name <n>] | list | rm <name>) — a project links many sources
+  gogo global <cmd>    the global cockpit across projects (init | board) — gogo global opens it from anywhere; gogo in a repo shows THAT repo
+  gogo source <cmd>    manage a project's sources — repos with .gogo/ (add <repo> [--project <name>] | rm <repo|name> [--project <name>])
+  gogo draft <cmd>     alias into ` + "`gogo plan`" + ` — a draft is a plan in status draft (new | list | show | ready | rm)
+  gogo epic <cmd>      alias into ` + "`gogo plan`" + ` — an epic is a plan with members (new | list | show | add <id> <source>:<slug> | rm | delete)
   gogo run [<slug>]    DEPRECATED alias for "gogo go" (forwards; will be removed)
   gogo --version       print the version (mirrors the plugin)
 
 gogo go / gogo plan flags:
   --attach             launch an attachable tmux session (interactive claude) to answer gates live
   --takeover           seize the owner lock from a live session (the prior is reaped)
+  --force              (gogo go) override the project's concurrency cap (maxConcurrent)
   (env: GOGO_CLAUDE_PERMISSION_MODE — permission mode for the spawned session; see "gogo go --help")
 
 gogo sweep flags:
@@ -103,8 +178,12 @@ view flags:
 board keys:
   ←→/h columns · ↑↓/jk cards · space select (ready) · enter drill-in · v quick-view
   w web page · m move/launch (accepts a plan-pending card) · d ship · a attach session
-  l peek log · x delete→trash · / filter · G glow · q quit
+  l peek log · x delete→trash · p source chip · tab board/plans/config · #plan-<id> filter to a plan · / filter · G glow · q quit
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
+
+plans tab keys:
+  ↑↓ plans · enter open · n new · A plan-with-claude · r mark ready · x delete
+  in a plan: ↑↓ target sources · c create work item (spawn /gogo:plan --correlation) · + add source · e edit · esc back
 
 drill-in keys (enter on a card — shows description / folder / status / sessions / events):
   ↑↓/jk files · enter open file · a attach session (picker if ≥2) · K kill session (confirm; one/all picker if ≥2)

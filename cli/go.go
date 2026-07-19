@@ -9,7 +9,14 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/launch"
 	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
+	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 )
+
+// sessionLister lists live gogo-* tmux sessions for the concurrency-cap guard. A
+// package seam (defaults to launch.ListSessions) so the over-cap refusal can be
+// driven with a fake session set in tests — no real tmux (FR8). Only the go-cap
+// guard reads it; every other launch path is unchanged.
+var sessionLister = launch.ListSessions
 
 // slugPattern is the canonical kebab-case feature slug (same shape the typed
 // contracts use). It is the write-scope guard: an unvalidated slug flows into
@@ -24,7 +31,7 @@ func validSlug(slug string) bool { return slugPattern.MatchString(slug) }
 const goHelp = `gogo go — launch or resume a feature's persistent pipeline session
 
 usage:
-  gogo go [<slug>] [--attach] [--takeover]
+  gogo go [<slug>] [--attach] [--takeover] [--force]
 
 Launches (or --resumes) ONE persistent ` + "`claude -p`" + ` session running the existing
 /gogo:go skill for the whole feature — implement warm in-context + review/test as
@@ -38,6 +45,8 @@ needs tmux.
   --attach     launch an attachable tmux session (interactive claude) so you can
                answer decision/UAT gates live in the warm session (reaped at close)
   --takeover   seize the owner lock from a live session (the prior is reaped)
+  --force      override the project's concurrency cap (start work even when the
+               repo is already at its maxConcurrent live in-progress features)
 
 env:
   GOGO_CLAUDE_PERMISSION_MODE   permission mode for the spawned session (default: auto)
@@ -75,32 +84,37 @@ concurrent ship. The session hosting this sweep is always spared (no self-kill).
 lockfiles (scoped to the named slugs in targeted mode).
 `
 
-// parseSessionFlags pulls the shared flags (--attach / --takeover / slug) out of an
-// argv for gogo go / gogo plan, printing help + signalling exit on -h.
-func parseSessionFlags(cmd, help string, args []string) (slug string, attach, takeover, helped bool, code int) {
+// parseSessionFlags pulls the shared flags (--attach / --takeover / --force / slug)
+// out of an argv for gogo go / gogo plan, printing help + signalling exit on -h.
+// --force is the concurrency-cap escape hatch (D3): honored by `gogo go` (it
+// overrides the cap), parsed-but-ignored by `gogo plan` (planning is uncapped).
+// It is DISTINCT from --takeover (which seizes the per-feature owner lock).
+func parseSessionFlags(cmd, help string, args []string) (slug string, attach, takeover, force, helped bool, code int) {
 	for _, a := range args {
 		switch {
 		case a == "--attach":
 			attach = true
 		case a == "--takeover":
 			takeover = true
+		case a == "--force":
+			force = true
 		case a == "-h" || a == "--help":
 			fmt.Print(help)
-			return "", false, false, true, 0
+			return "", false, false, false, true, 0
 		case strings.HasPrefix(a, "-"):
 			fmt.Fprintf(os.Stderr, "%s: unknown flag %q\n", cmd, a)
-			return "", false, false, true, 1
+			return "", false, false, false, true, 1
 		case slug == "":
 			slug = a
 		}
 	}
-	return slug, attach, takeover, false, 0
+	return slug, attach, takeover, force, false, 0
 }
 
 // cmdGo is the `gogo go` entry (FR1/FR3): enforce the SAME acceptance gate /gogo:go
 // uses, then launch-or-resume the one persistent session via the lifecycle manager.
 func cmdGo(args []string) int {
-	slug, attach, takeover, helped, code := parseSessionFlags("gogo go", goHelp, args)
+	slug, attach, takeover, force, helped, code := parseSessionFlags("gogo go", goHelp, args)
 	if helped {
 		return code
 	}
@@ -146,6 +160,16 @@ func cmdGo(args []string) int {
 		return 1
 	}
 
+	// Concurrency-cap guard (FR4/FR5, D3): refuse a go that would start work on an
+	// (N+1)th live in-progress feature in this repo — two live build sessions
+	// clobber the shared working tree. A resume of THIS feature is never blocked
+	// (slug excluded from its own count); cap 0 = unlimited (fallback); --force
+	// overrides. Read-side only — it composes with the one-owner lock.
+	if msg := capBlock(root, repo, slug, force); msg != "" {
+		fmt.Fprintln(os.Stderr, msg)
+		return 1
+	}
+
 	sess := &orchestrator.Session{
 		Root: root, Slug: slug, Kind: "go",
 		Out: os.Stdout, Attach: attach, Takeover: takeover,
@@ -154,10 +178,55 @@ func cmdGo(args []string) int {
 	return runSession(sess, "gogo go")
 }
 
-// cmdPlan is the `gogo plan` entry (FR2): launch-or-resume a persistent /gogo:plan
-// session for a feature (new or in-planning) through the same lifecycle machinery.
+// capBlock returns a refusal message when a go-launch for slug in root would
+// exceed the SOURCE's concurrency cap (and --force was not given), else "". Pure
+// over its inputs (the projects store + the live session set are read through
+// seams: projects.List and sessionLister) so the over-cap decision is
+// unit-testable. It names the cap and the live feature(s) already building, plus
+// the --force hint. The cap is now per-source (corrected model): root is a source
+// repo, so its ConcurrentWorkItems is resolved from the flattened source set.
+func capBlock(root string, repo *contract.Repo, slug string, force bool) string {
+	if force {
+		return ""
+	}
+	projs, _ := projects.List()
+	cap := orchestrator.CapForSource(projects.AllSources(projs), root)
+	if cap <= 0 {
+		return "" // unlimited / unregistered → never blocks (byte-for-byte fallback)
+	}
+	active := orchestrator.ActiveWorkSlugs(repo, root, sessionLister(), slug)
+	if !orchestrator.CapExceeded(cap, len(active)) {
+		return ""
+	}
+	return fmt.Sprintf("gogo go: %s is capped at %d concurrent feature(s) — already building: %s.\n"+
+		"  ship/finish one first, or re-run `gogo go %s --force` to override.",
+		root, cap, strings.Join(active, ", "), slug)
+}
+
+// cmdPlan is the `gogo plan` entry. It serves TWO surfaces off the same verb (the
+// corrected project→plans model layered over the persistent-session lifecycle):
+//   - `gogo plan <store-verb> …` (new/list/show/add/rm/ready/promote/delete) →
+//     the PROJECT-scoped plan store (cmdPlanStore, FR17);
+//   - `gogo plan <slug>` (a bare feature slug) → launch-or-resume the feature's
+//     persistent /gogo:plan session (the lifecycle command, unchanged).
+//
+// The store verbs are a small RESERVED set that SHADOW a bare slug (REV-004): a
+// single-token slug that IS a store verb (e.g. a feature literally named `ready`,
+// `promote`, or `show`) resolves to the store, NOT a session — such a feature must be
+// launched another way (`gogo go`, or the board). Multi-word slugs never collide.
 func cmdPlan(args []string) int {
-	slug, attach, takeover, helped, code := parseSessionFlags("gogo plan", planHelp, args)
+	// `gogo plan -h`/`--help`/`help` shows BOTH surfaces (store verbs + the bare-slug
+	// session launch, REV-007). Intercept it here before the store-verb dispatch, which
+	// would otherwise print the store help alone.
+	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help" || args[0] == "help") {
+		printPlanHelp()
+		return 0
+	}
+	if len(args) > 0 && isPlanStoreVerb(args[0]) {
+		return cmdPlanStore(args)
+	}
+	// --force is parsed for flag-shape parity but ignored here (planning is uncapped, D6).
+	slug, attach, takeover, _, helped, code := parseSessionFlags("gogo plan", planHelp, args)
 	if helped {
 		return code
 	}
@@ -195,6 +264,23 @@ func cmdPlan(args []string) int {
 	}
 	fmt.Printf("gogo plan %s — launch-or-resume the persistent /gogo:plan session\n", slug)
 	return runSession(sess, "gogo plan")
+}
+
+// printPlanHelp prints the COMBINED `gogo plan -h` help (REV-007): the project-scoped
+// store verbs AND the bare-slug persistent-session launch usage, so neither surface is
+// hidden behind the other. It also states the reserved-word caveat (REV-004).
+func printPlanHelp() {
+	fmt.Print(planStoreHelp)
+	fmt.Print(`
+gogo plan <slug> — (a bare feature SLUG, not a store subcommand) launch-or-resume the
+feature's persistent /gogo:plan session:
+
+  gogo plan <slug> [--attach] [--takeover]
+
+Reserved words: the store verbs (new, list, show, add, rm, ready, promote, delete)
+shadow a bare slug, so a feature literally named e.g. ` + "`ready`" + ` or ` + "`promote`" + ` resolves to
+the store subcommand — launch such a feature another way (` + "`gogo go`" + `, or the board).
+`)
 }
 
 // runSession drives a lifecycle leg and maps its Outcome to a process exit code

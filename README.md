@@ -417,15 +417,65 @@ cd cli && go build -o gogo .
   attachable interactive session (answer gates live, reaped at close). Bookkeeping lives under
   `.gogo/resources/cli/` (CLI-owned; never pipeline state). `gogo run` is a deprecated alias for
   `gogo go`. Needs `claude` on PATH; `--attach` needs `tmux`.
+- **Projects · sources cockpit — the two-mode model (since 0.21.0)** — a **project** is a home-folder
+  entity (`~/.gogo/projects/<name>/`) that links many **sources** (repos with their own `.gogo/`).
+  There are **two modes**: (1) **repo-local** — running `gogo` INSIDE a repo (a dir with `.gogo/`)
+  always shows THAT repo's own single board, even when the repo is a registered project's source
+  (per-repo stays simple, byte-for-byte); (2) **global cockpit** — `gogo global` opens the
+  cross-project tabbed cockpit (board · plans · config) from anywhere, and `gogo` OUTSIDE any repo
+  does the same. Set it up once with **`gogo global init`** (creates `~/.gogo/` — the home where your
+  projects live) then **`gogo project add <repo>`**; `gogo project list` / `gogo project rm <name>`
+  manage projects, and `gogo source add <repo> [--project <name>]` / `gogo source rm <repo|name>` add
+  and remove sources (`gogo project add` also auto-initializes the cockpit home, so registering a
+  project is enough). The CLI writes ONLY `~/.gogo/` (its own data) — never a source's `.gogo/`
+  pipeline state.
+- **Tabbed cockpit — board · plans · config (since 0.21.0)** — on a project board, `tab` /
+  `shift+tab` cycle three tabs: **board** (the kanban of the project's sources), **plans** (the
+  project's plan store), and **config** (per-source settings + a knowledge explorer). `p` cycles the
+  board's **source chips** (`all` + one per source) and, on the config tab, the **project switcher**.
+  A lone repo with no home project shows just the single-repo board (no tabs, no chips) — byte-for-byte.
+- **Plans tab + spawn (since 0.21.0)** — a **plan** is a project-scoped, hand-editable markdown file
+  at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
+  active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
+  The plans tab lists them grouped by status; keys: `n` new plan · `A` **plan-with-claude** (mints a
+  draft, then opens a plain `claude` session anchored at a source to author the plan file in place —
+  never a `/gogo:plan` scaffold) · `r` mark ready · `x` delete · `enter` open the detail. In a plan's
+  **detail** you target the project's sources and press `c` **create work item** on a source row — the
+  CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the analyst derives
+  the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+` adds a target,
+  `e` edits the plan file. `gogo plan new/list/show/add/rm/ready/promote/delete` is the scriptable
+  surface for the same store.
+- **Correlation in `state.md` (since 0.21.0)** — when a plan spawns/links a work item, the
+  `/gogo:plan --correlation` skill stamps `- **correlation:** [plan-<hash>, …]` — an additive,
+  optional **list** — into that work item's `state.md` (many-to-many: a ticket can belong to several
+  plans). The board reads it straight from `state.md` (no CLI store), paints a `⛓ plan-<hash>` chip per
+  id, and filters to a plan's members across sources with a `#plan-<hash>` token. An absent
+  `correlation:` line is byte-for-byte the pre-correlation board.
+- **Config tab (since 0.21.0)** — per-source settings (add `a` · remove `x` · edit `e` a source's
+  `concurrentWorkItems` cap / `mainBranch` / color / permission mode) plus a project switcher and a
+  **knowledge explorer** over the sources' `.gogo/knowledge/` and the project's `.knowledge/`. The
+  per-source **concurrency cap** refuses a `gogo go` (or board `m`→go) that would start work on an
+  **(N+1)th** live in-progress feature in that source (so two build sessions can't clobber one shared
+  working tree); `--force` overrides. Default cap `1`; `0` = unlimited; an uncapped source is inert.
+  All config writes land under `~/.gogo/` only — never a source's `.gogo/`.
 - **Scriptable** — `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
-  `gogo events <slug>`, `gogo go [<slug>] [--attach] [--takeover]`, `gogo plan <slug>`,
-  `gogo sweep [--dry-run] [<slug>...]`, `gogo trash [restore <entry>]`, `gogo --version` (mirrors the plugin).
+  `gogo events <slug>`, `gogo go [<slug>] [--attach] [--takeover]`,
+  `gogo sweep [--dry-run] [<slug>...]`, `gogo trash [restore <entry>]`,
+  `gogo project [add <repo> [--name <name>] | list | rm <name>]`,
+  `gogo global [init | board]` (set up / open the cross-project cockpit — `gogo` in a repo shows THAT repo),
+  `gogo source [add <repo> [--project <name>] | rm <repo|name> [--project <name>]]`,
+  `gogo plan [new "<title>" | list | show <id> | add <id> <source>[:<slug>] | rm <id> <source>[:<slug>] | ready <id> | promote <id> <source> | delete <id>]`
+  (or `gogo plan <slug>` — a bare feature slug — to launch the feature's persistent `/gogo:plan` session),
+  `gogo draft [new "<title>" | list | show <id> | ready <id> | rm <id>]` (a thin alias into `gogo plan`, narrowed to `status: draft`),
+  `gogo epic [new "<title>" | list | show <id> | add <id> <source>:<slug> | rm <id> <source>:<slug> | delete <id>]` (a thin alias into `gogo plan`, `list` = member-bearing plans),
+  `gogo --version` (mirrors the plugin).
 
 **Soft deps** (detected at use, graceful fallback): `tmux` (else backgrounded
 `claude -p` + log), `claude` (needed only to launch), `glow` (the built-in
 glamour view is the fallback). Keymap: `←→`/`h` columns · `↑↓`/`jk` cards ·
 `space` select · `enter` drill-in · `v` view · `w` web · `m` move · `d` ship ·
-`a` attach · `l` peek · `x` delete→trash · `/` filter · `G` glow · `q` quit.
+`a` attach · `l` peek · `x` delete→trash · `tab`/`shift+tab` board·plans·config ·
+`p` source chip / project switcher · `/` filter (incl. `#plan-<id>`) · `G` glow · `q` quit.
 
 **CLI companion reference** — an installed Claude also carries an on-demand
 `gogo-cli` skill (`skills/gogo-cli/SKILL.md`) documenting the full command

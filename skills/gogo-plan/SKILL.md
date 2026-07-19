@@ -33,6 +33,16 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
   `/gogo:build`) before relying on it.
 
 ## Steps
+0. **Parse the invocation.** The goal is the free text after `/gogo:plan`. If it
+   carries an explicit **`--correlation plan-XXXX`** param (a cross-source plan the
+   gogo cockpit spawned this work item from — `plan-<hex8>`, `[a-z0-9-]`), CAPTURE
+   that id and STRIP the `--correlation plan-XXXX` token from the goal text before
+   deriving the slug/plan (the rest of the goal is the real brief). No `--correlation`
+   → today's behaviour, byte-for-byte. Never treat any other text as a flag.
+   The AUTHORITATIVE id is the LAST (trailing) `--correlation plan-XXXX` token: the
+   cockpit CLI always appends it as the FINAL token of the invocation. If the goal
+   BODY itself contains an earlier `--correlation plan-YYYY` lookalike substring, that
+   one is ordinary prose (never a flag) - honor only the trailing token.
 1. **Slug + folder.** Derive a kebab-case slug from the goal. Create
    `.gogo/work/feature-<slug>/`. If it already exists, you are **revising** — read the
    existing `plan.md`/`adjustments.md`/`state.md`; don't overwrite blindly.
@@ -110,6 +120,16 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
    `state.md` and `decisions.template.md` → `decisions.md`; create
    `adjustments.md` (header only). Set `state.md`: phase=plan,
    status=awaiting-plan-acceptance, created=<today>, iterations all 0.
+
+   **Stamp the correlation (only when Step 0 captured a `--correlation plan-XXXX`).**
+   Add an additive bolded line to `state.md` (see `templates/state.template.md` + the
+   contract `docs/cli-contract.md §2`):
+   `- **correlation:** [plan-XXXX]`. It is a **LIST** — if a `correlation:` line
+   already exists (this work item is being linked to ANOTHER plan too), APPEND the id
+   to the existing bracketed list (dedup; a ticket may belong to several plans),
+   never replace it. No captured id → write NO `correlation:` line (byte-for-byte the
+   pre-correlation `state.md`). The gogo cockpit reads this line back onto
+   `Feature.Correlations` to paint the `⛓ plan-XXXX` chip + the `#plan-XXXX` filter.
 
    **Append the transition event (telemetry).** Beside this `state.md` write,
    append one compact JSON line to `.gogo/work/feature-<slug>/events.jsonl` per

@@ -35,7 +35,7 @@ func (m *Model) openDrill(f *contract.Feature) {
 // launch, no registry write), so opening — or refreshing — a drill never mutates
 // state (FR-B5). Also called after a kill to refresh the panel in place.
 func (m *Model) loadDrillCard(f *contract.Feature) {
-	reg := m.registry(m.root, f.Slug)
+	reg := m.registry(m.rootFor(f), f.Slug)
 	m.drillSessions = sessionRows(reg, m.sessions, f.Slug)
 	m.drillEventsTail = eventsTail(contract.ReadEvents(filepath.Join(f.Dir, "events.jsonl")), 5)
 }
@@ -317,7 +317,7 @@ func (m Model) buildPageCmd() tea.Cmd {
 	if f == nil {
 		return func() tea.Msg { return launchDoneMsg{status: "no feature to view"} }
 	}
-	root := m.root
+	root := m.rootFor(f)
 	feat := f
 	return func() tea.Msg {
 		bundle, err := bundleFor(root, feat)

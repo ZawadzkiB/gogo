@@ -1,0 +1,49 @@
+classDiagram
+  direction TB
+
+  class Project {
+    +string name
+    +string description
+    ~/.gogo/projects/&lt;name&gt;/config.json
+    .knowledge/ (project knowledge)
+    .gogo/plans/ (project-scoped plans)
+  }
+  class Source {
+    +string path  (a repo/service with .gogo/)
+    +string name
+    +string mainBranch
+    +int concurrentWorkItems
+    +string color
+  }
+  class Plan {
+    +string id  "plan-&lt;hash&gt; = the correlation id"
+    +string title
+    +string description
+    +string status  "draft | active"
+    ~/.gogo/projects/&lt;name&gt;/.gogo/plans/&lt;id&gt;.md
+  }
+  class Target {
+    +string source  "which source this plan targets"
+    +string slugHint
+  }
+  class WorkItem {
+    +string slug
+    &lt;source&gt;/.gogo/work/feature-&lt;slug&gt;/
+    CLI-READ-ONLY (skills write it)
+  }
+  class StateMd {
+    +string phase
+    +string status
+    +correlation[] plan-XXXX  "ADDITIVE optional LIST (L1)"
+  }
+
+  Project "1" *-- "many" Source : links (config.json)
+  Project "1" *-- "many" Plan : owns (.gogo/plans/)
+  Plan "1" o-- "1..*" Target : targets sources
+  Target ..> Source : resolves to
+  Plan "1" ..> "0..*" WorkItem : spawns via claude -p (gogo:plan)
+  WorkItem "1" *-- "1" StateMd : carries
+  StateMd "correlation[]" ..> "many" Plan : belongs to (many-to-many)
+
+  note for StateMd "Board reads correlation[] directly from state.md\n(no CLI store overlay) -> ⛓ plan-XXXX chips + #plan-XXXX filter"
+  note for WorkItem "Spawn = launch claude -p; the SKILL writes .gogo/work/\nand stamps correlation. The CLI NEVER writes a source's .gogo/work/."

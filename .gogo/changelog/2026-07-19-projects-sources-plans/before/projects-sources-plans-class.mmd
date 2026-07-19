@@ -1,0 +1,39 @@
+classDiagram
+  direction TB
+  note for RegistryFile "TODAY (uncommitted P1-P4): FLAT model — project == one registered repo"
+
+  class RegistryFile {
+    ~/.config/gogo/projects.json
+    +int schema
+  }
+  class Project {
+    +string name
+    +string path  "== a single repo root with .gogo/"
+    +string color
+    +int maxConcurrent  "per-PROJECT cap (P2)"
+  }
+  class DraftsStore {
+    ~/.config/gogo/drafts/&lt;slug&gt;.md  (P3)
+    global, repo-agnostic briefs
+  }
+  class EpicsStore {
+    ~/.config/gogo/epics.json  (P4)
+    +Epic[] epics
+  }
+  class Epic {
+    +string id  "epic-&lt;hash&gt; (correlation)"
+    +Member[] members  "{repo, slugHint}"
+  }
+  class Feature {
+    +string Project  "CLI overlay"
+    +string Root
+    +string[] Epics  "overlay from EpicsStore (NOT state.md)"
+  }
+
+  RegistryFile "1" *-- "many" Project : registry
+  EpicsStore "1" *-- "many" Epic : store
+  Epic "1" o-- "many" Feature : members (StampEpics overlay)
+  Project ..> Feature : LoadProjects (one LoadRepo per repo)
+
+  note for Epic "P4 D1=B: correlation kept in the CLI store, OUT of .gogo/state.md\n(this rework REVERSES it → correlation[] in state.md)"
+  note for DraftsStore "drafts + epics are TWO separate global stores\n(this rework COLLAPSES them into project-scoped plans)"

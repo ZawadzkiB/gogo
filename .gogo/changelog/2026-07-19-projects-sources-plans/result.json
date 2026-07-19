@@ -1,0 +1,36 @@
+{
+  "slug": "projects-sources-plans",
+  "phase": "report",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-projects-sources-plans/plan.md",
+    ".gogo/work/feature-projects-sources-plans/state.md",
+    ".gogo/work/feature-projects-sources-plans/decisions.md",
+    ".gogo/work/feature-projects-sources-plans/adjustments.md",
+    ".gogo/work/feature-projects-sources-plans/review/issues.json",
+    ".gogo/work/feature-projects-sources-plans/review/review-01.md",
+    ".gogo/work/feature-projects-sources-plans/test/issues.json",
+    ".gogo/work/feature-projects-sources-plans/test/test-01.md",
+    ".gogo/work/feature-projects-sources-plans/charts/manifest.json",
+    ".gogo/work/feature-projects-sources-plans/charts/before/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-projects-sources-plans/report/report.md",
+    ".gogo/work/feature-projects-sources-plans/report/class.mmd",
+    ".gogo/work/feature-projects-sources-plans/report/sequence.mmd",
+    ".gogo/work/feature-projects-sources-plans/report/activity.mmd",
+    ".gogo/work/feature-projects-sources-plans/report/diagrams.html",
+    ".gogo/work/feature-projects-sources-plans/report/manifest.json",
+    ".gogo/work/feature-projects-sources-plans/report/before/class.mmd",
+    ".gogo/work/feature-projects-sources-plans/report/before/manifest.json",
+    ".gogo/work/feature-projects-sources-plans/plan.md",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/work/feature-projects-sources-plans/state.md",
+    ".gogo/work/feature-projects-sources-plans/uat.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "As-built report for the 0.21.0 projects-sources-plans cockpit re-architecture: all 18 FRs shipped, 7 review + 3 test findings all fixed, gates green; 3 as-built UML diagrams (class/sequence/activity) + before/after class comparison; plan.md finalized to as-built; project-knowledge.md gogo-overrides region corrected (P1-P4 0.21-0.24 narration replaced by the shipped 0.21.0 rework, released line 0.20.1); state.md -> awaiting-uat."
+}

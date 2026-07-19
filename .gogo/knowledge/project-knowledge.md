@@ -308,6 +308,28 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   binary with a fresh inode (`rm -f` / `install`) — an in-place `curl -o`/`mv` over an
   already-run binary trips macOS's code-signing cache on Apple Silicon (`killed: 9`). No code-path
   change beyond the help text; version **0.20.1**.
+- **Cockpit re-architecture: projects · sources · plans (0.21.0):** the **shipped** `0.21.0`.
+  The last **released** line was **0.20.1**; the working-tree P1-P4 epic once narrated here as
+  0.21.0-0.24.0 was **never committed** and is **superseded**, so this single entry replaces those
+  four. It **reworks** that flat `project == one repo` epic (not a restart, locked **L2**) into the
+  **corrected model**. A **project** is a home-folder entity `~/.gogo/projects/<name>/` (`config.json`
+  + `.knowledge/` + `.gogo/plans/`; package `cli/internal/projects`, `$GOGO_DATA_HOME` seam) that
+  **links many SOURCES** (repos or monorepo services with their own `.gogo/`; per-source
+  `{path,name,mainBranch,concurrentWorkItems,color}`, so the P2 per-project cap is now per-source),
+  **owns project-scoped PLANS** (`cli/internal/plans`, collapsing the old separate drafts and epics
+  stores into one; `plan-<hash>` id, status lifecycle **draft → ready → active → done**, D8), and
+  **spawns WORK ITEMS** into sources by launching `claude -p` `gogo:plan --correlation plan-XXXX`.
+  The SKILL (never the CLI) writes the source's `.gogo/work/` and stamps an **additive, optional
+  `correlation:` LIST** into `state.md` (locked **L1**, reversing P4's out-of-`.gogo` CLI-store
+  choice); the board reads that list directly (no store overlay) for `⛓ plan-XXXX` chips and
+  `#plan-XXXX` filtering. The modal `C`/`D`/`E` screens become a **tabbed TUI** (**board · plans ·
+  config**); `gogo project`/`source`/`plan` are the canonical verbs, with `gogo draft`/`gogo epic`
+  kept as thin aliases (D9). Legacy `~/.config/gogo/` (projects.json + drafts + epics) is folded in
+  **non-destructively** by `projects.MigrateLegacy` + `plans.MigrateLegacy` (the old
+  `cli/internal/config` survives read-only as the migration source). Invariants held: the CLI
+  **never writes a source's `.gogo/work/`** (only skills do), single-repo fallback byte-for-byte,
+  LLM-free millisecond read path, enum-sync + no-unsafe-rm guards green. Slash command set unchanged;
+  version **0.21.0**. Roadmap remaining: **P5** opt-in worktrees.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

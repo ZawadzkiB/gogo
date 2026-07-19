@@ -1,0 +1,22 @@
+{
+  "slug": "projects-sources-plans",
+  "updated": "2026-07-18",
+  "note": "As-built 0.21.0 (projects · sources · plans, the corrected cockpit model). class.mmd = the shipped data model (home-folder Project → many Sources → project-scoped Plans with a draft→ready→active→done lifecycle → WorkItems carrying an additive correlation[] LIST in state.md; legacy ~/.config/gogo folded by MigrateLegacy). sequence.mmd = the two authoring entry points (n quick draft · A plain-claude AuthorPlanIntent) + the c-create plan→spawn(claude -p gogo:plan --correlation)→stamp→read-back flow, with the REV-005 post-success member/active flip. activity.mmd = the D8 plan status lifecycle state machine. before/ carries the plan-time as-is baseline (flat project=repo + separate drafts/epics stores).",
+  "diagrams": [
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "As-built data model: Project → Sources + project-scoped Plans → WorkItems, correlation[] list in state.md (many-to-many); legacy config folded by MigrateLegacy"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "As-built runtime: n/A authoring → c create work item → launch claude -p gogo:plan --correlation → skill writes work item + stamps state.md → board reads correlation[] back (member/active flip post-success)"
+    },
+    {
+      "kind": "activity",
+      "file": "activity.mmd",
+      "title": "Plan status lifecycle (D8): draft → ready → active → done; draft/epic are CLI aliases (D9)"
+    }
+  ]
+}

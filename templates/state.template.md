@@ -11,6 +11,7 @@
   - test/issues.json   — living, typed test findings (same contract)
   - test-NN.md     — each test round's rendered snapshot
   - events.jsonl   — append-only progress telemetry (one schema'd JSON line per phase transition; read by the gogo CLI; a missing file is never an error)
+  - (optional) the `correlation:` line below — the plan id(s) this work item belongs to (a LIST; stamped when spawned via `/gogo:plan --correlation plan-XXXX`; absent = the item belongs to no cross-source plan)
   - report/        — the as-built bundle (written at phase ⑤): report.md + the UML set (.mmd) + report/before/ (the plan-time "before" set, copied in for before/after compare) + diagrams.html + result.json
   - charts/        — mermaid diagrams (.mmd) + charts/before/ (the plan-time as-is baseline) + manifest.json + an offline diagrams.html viewer
   (and at the .gogo/ level: .gogo/changelog/<YYYY-MM-DD>-<slug>/ — the shipped report bundle archived by /gogo:done)
@@ -31,3 +32,6 @@
 - **iterations:** plan=0 · implement=0 · review=0 · test=0   <!-- add · uat=N once a UAT round loops back to planning -->
 - **resume:** none           <!-- <phase to re-enter> — <next action> | none -->
 - **open-decision:** none    <!-- <decisions.md anchor> | none -->
+<!-- optional, additive — include ONLY when this work item belongs to one or more cross-source plans (a LIST; stamped by /gogo:plan --correlation). Absent = today's behaviour, byte-for-byte.
+- **correlation:** [plan-XXXX]   plan id(s) this item belongs to, e.g. [plan-7f3a, plan-9c2e]
+-->

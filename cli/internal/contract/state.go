@@ -55,11 +55,36 @@ func parseStateFile(path string) *Feature {
 			f.OpenDecision = val
 		case "stage":
 			f.Stage = val
+		case "correlation":
+			// The additive, optional correlation LIST (FR13/L1): plan ids a work item
+			// belongs to, e.g. `- **correlation:** [plan-7f3a, plan-9c2e]`. Absent →
+			// Correlations stays nil (byte-for-byte parity with a pre-correlation
+			// state.md). Many-to-many: a ticket in several plans carries several ids.
+			if ids := parseCorrelationList(val); len(ids) > 0 {
+				f.Correlations = ids
+			}
 		default:
 			f.Extra[key] = val
 		}
 	}
 	return f
+}
+
+// parseCorrelationList parses the correlation value into plan ids, tolerating the
+// bracketed list form (`[plan-a, plan-b]`), a bare single id (`plan-a`), extra
+// whitespace, and an empty list (`[]` → nil). It never errors — a malformed value
+// degrades to whatever tokens it can recover (the reader's defensive style).
+func parseCorrelationList(v string) []string {
+	v = strings.TrimSpace(v)
+	v = strings.TrimPrefix(v, "[")
+	v = strings.TrimSuffix(v, "]")
+	var out []string
+	for _, tok := range strings.Split(v, ",") {
+		if tok = strings.TrimSpace(tok); tok != "" {
+			out = append(out, tok)
+		}
+	}
+	return out
 }
 
 // stripComment removes a trailing "<!-- ... -->" HTML comment and trims.

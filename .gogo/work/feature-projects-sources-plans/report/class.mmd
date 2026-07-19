@@ -1,0 +1,60 @@
+classDiagram
+  direction TB
+  note "AS-BUILT 0.21.0 — corrected model: home-folder Project links many Sources, owns project-scoped Plans; correlation[] LIST lives in each work item's state.md (L1)."
+
+  class Project {
+    +string name
+    +string description
+    ~/.gogo/projects/&lt;name&gt;/config.json
+    .knowledge/ (project knowledge)
+    .gogo/plans/ (project-scoped plans)
+    cli/internal/projects
+  }
+  class Source {
+    +string path  (a repo/service with .gogo/)
+    +string name
+    +string mainBranch
+    +int concurrentWorkItems  "0 = unlimited (was per-project MaxConcurrent)"
+    +string color
+  }
+  class Plan {
+    +string id  "plan-&lt;hash&gt; = the correlation id"
+    +string title
+    +string description
+    +string status  "draft | ready | active | done (D8)"
+    +Member[] members  "{source, slug}"
+    ~/.gogo/projects/&lt;name&gt;/.gogo/plans/&lt;id&gt;.md
+    cli/internal/plans
+  }
+  class Target {
+    +string source  "which source this plan targets"
+    +string slugHint
+  }
+  class WorkItem {
+    +string slug
+    &lt;source&gt;/.gogo/work/feature-&lt;slug&gt;/
+    CLI-READ-ONLY (skills write it)
+  }
+  class StateMd {
+    +string phase
+    +string status
+    +correlation[] plan-XXXX  "ADDITIVE optional LIST (L1)"
+  }
+  class LegacyConfig {
+    ~/.config/gogo/ (projects.json · drafts/ · epics.json)
+    cli/internal/config  "kept read-only; folded by MigrateLegacy"
+  }
+
+  Project "1" *-- "many" Source : links (config.json)
+  Project "1" *-- "many" Plan : owns (.gogo/plans/)
+  Plan "1" o-- "1..*" Target : targets sources
+  Target ..> Source : resolves to
+  Plan "1" ..> "0..*" WorkItem : spawns via claude -p (gogo:plan)
+  WorkItem "1" *-- "1" StateMd : carries
+  StateMd "correlation[]" ..> "many" Plan : belongs to (many-to-many)
+  LegacyConfig ..> Project : projects.MigrateLegacy (one-shot, non-destructive)
+  LegacyConfig ..> Plan : plans.MigrateLegacy (drafts+epics → plans)
+
+  note for StateMd "Board reads correlation[] directly from state.md via contract.LoadProject\n(no CLI store overlay) -> ⛓ plan-XXXX chips + #plan-XXXX filter"
+  note for WorkItem "Spawn = launch claude -p; the SKILL writes .gogo/work/\nand stamps correlation. The CLI NEVER writes a source's .gogo/work/."
+  note for LegacyConfig "config package survives as the migration source + read-only legacy\n(minimal green path — not deleted). Migration split into two packages\nto avoid a projects<->plans import cycle."

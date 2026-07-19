@@ -1,0 +1,29 @@
+stateDiagram-v2
+  direction LR
+  [*] --> draft : plan new / A author / n quick draft
+
+  draft : draft
+  draft : being authored; not yet spawnable
+  ready : ready
+  ready : targets chosen; spawnable
+  active : active
+  active : ≥1 work item spawned (the old "epic")
+  done : done
+  done : all members shipped (derived/terminal, optional v1)
+
+  draft --> ready : r mark ready / first target added
+  ready --> active : first spawn (c create work item / plan promote) succeeds
+  active --> active : add another target/member (retroactive, FR16)
+  active --> done : all members shipped
+  done --> [*]
+
+  note right of draft
+    gogo draft ≈ plans filtered to status:draft (D9 alias)
+  end note
+  note right of active
+    gogo epic ≈ member/target-bearing plans, any status (REV-003)
+  end note
+  note right of active
+    REV-005: status flips to active ONLY after the launch
+    succeeds — a failed spawn leaves the plan untouched
+  end note

@@ -1,0 +1,17 @@
+{
+  "slug": "projects-sources-plans",
+  "updated": "2026-07-18",
+  "note": "Intended design (corrected model): a home-folder PROJECT (~/.gogo/projects/<name>/, config.json + .knowledge/ + .gogo/plans/) links many SOURCES (repos/services with .gogo/) and owns project-scoped PLANS. A plan (id plan-<hash> = the correlation id) targets sources and is spawned into each by launching claude -p (gogo:plan --correlation plan-XXXX) — the SKILL writes the source's .gogo/work/feature-<slug>/ and stamps an additive optional correlation[] LIST in state.md (locked L1, reversing P4's CLI-store D1=B). The board reads correlation[] directly from state.md (no store overlay) for ⛓ plan-XXXX chips + a #plan-XXXX filter. Tabbed TUI board/plans/config. class.mmd = the project->sources->plans->work-items data model; sequence.mmd = the plan->spawn->correlation-in-state.md runtime path.",
+  "diagrams": [
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "Data model: Project -> Sources + project-scoped Plans -> WorkItems, correlation[] list in state.md (many-to-many)"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "Runtime: create plan (mint plan-XXXX) -> c create work item -> launch claude -p gogo:plan --correlation -> skill writes work item + stamps state.md -> board reads correlation[] back"
+    }
+  ]
+}

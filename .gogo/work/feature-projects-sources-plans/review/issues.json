@@ -1,0 +1,99 @@
+{
+  "slug": "projects-sources-plans",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-18",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "README.md + gogo-cli SKILL.md still document the superseded P1–P4 UX (dead board keys C/D/E/e, ~/.config/gogo stores, failing draft/epic subcommands)",
+      "description": "FR17 requires the command surface be enum-synced across cli/main.go printHelp, README.md, docs/cli-contract.md and skills/gogo-cli/SKILL.md, and code-review-standards §1 requires 'no place still describes the old behaviour.' printHelp + docs/cli-contract.md were reworked to the tabbed ~/.gogo model, but README.md (## The gogo CLI + keymap) and skills/gogo-cli/SKILL.md were only ADDED the old P1–P4 narrative as if current. They describe behaviour that does not exist / actively fails in the shipped tree: board keys `C config · D drafts · E epics · e add-to-epic` and `#epic-<id>` (no such handlers remain — verified: updateBoard has no C/D/E/e case; the board uses tabs + `p` + `#plan-<id>`), a `C` config SCREEN (now the config TAB), `~/.config/gogo/` stores (now ~/.gogo/projects/<name>/), and `gogo draft [edit <slug> | promote <slug> --to <project>]` / `gogo epic add <id> <repo>:<slug>` — the aliases (cli/draft.go, cli/epic.go) forward to cmdPlanStore, which has no `edit` and no `--to` flag, so `gogo draft edit foo` and `gogo draft promote foo --to bar` exit 2. The enum-sync TEST passes because it only greps verb presence, not narrative accuracy. An agent reading gogo-cli SKILL.md will hand users instructions that silently no-op or error. docs/cli-contract.md's draft/epic command-table rows are also stale but are mitigated by their 'SUPERSEDED by 0.21.0' pointer; README + SKILL carry no such note. (Note: .gogo/knowledge/project-knowledge.md is likewise stale but is explicitly deferred to report ⑤ per plan.md Context — out of scope here.)",
+      "proposed_solution": "AGENT-FIXABLE. Rewrite the README ## The gogo CLI narrative + keymap and skills/gogo-cli/SKILL.md to the shipped 0.21.0 model: tabs (`tab`/`shift+tab` board·plans·config), `p` source chips, `#plan-<id>` filter, ~/.gogo/projects/<name>/ project entities + sources, and the real `gogo plan`/`draft`/`epic` alias subcommands (new/list/show/add/rm/ready/promote/delete; draft list=status:draft; epic list=member-bearing). Delete the C/D/E/e board-key, `C` config-screen, `~/.config/gogo` and `draft ... --to` / `epic add <repo>:<slug>` text. Optionally re-title the stale cli-contract draft/epic rows to the alias surface.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Rewrote README.md ## The gogo CLI: replaced the three superseded bullets (0.22 config-screen/0.23 drafts/0.24 epics on ~/.config/gogo with C/D/E/e keys, draft edit/promote --to, epic add <repo>:<slug>) with the shipped model — tabbed board·plans·config, `p` source chips/project switcher, plans tab (n/A/r/x/enter; detail c/+/e), correlation: list in state.md with ⛓ plan-<id> chips + #plan-<id> filter, config tab per-source cap/knowledge explorer, all under ~/.gogo/. Fixed the Scriptable line (real gogo plan store verbs + draft/epic as thin aliases) and the keymap footer (tab/shift+tab, p, #plan-<id> — dropped C/D/E/e/#epic-<id>). Rewrote skills/gogo-cli/SKILL.md rows for `gogo plan …` (both store + bare-slug surfaces), `gogo draft`/`gogo epic` (alias surface, no edit/--to/<repo>:<slug>), plus the board-keys/plans-tab/config-tab sections. Also re-titled docs/cli-contract.md rows 59–60 to the alias surface. Enum-sync + no-unsafe-rm guards stay green."
+    },
+    {
+      "id": "REV-002",
+      "title": "`A` plan-with-claude authoring relies on advisory prose to stop gogo-plan scaffolding a work item — the exact anti-pattern D3 rejected",
+      "description": "planWithClaude (cli/internal/tui/plans_tab.go:356) mints an 'Untitled plan' draft, then launches `/gogo:plan <prose> --correlation plan-XXXX` anchored at ~/.gogo/projects/<name>/, where <prose> = 'Author the project plan brief in place at <plans>/<id>.md … do not scaffold a source work item.' But gogo-plan SKILL.md Step 1 (verified, unchanged) UNCONDITIONALLY does 'Derive a kebab-case slug from the goal. Create .gogo/work/feature-<slug>/'. So the launched analyst is told by the skill's own numbered step to scaffold a work item, and told by the seeded prose NOT to — a contradiction. The likely outcome: a stray work-item scaffold at ~/.gogo/projects/<name>/.gogo/work/feature-author-the-project-plan-…/ (correlation orphaned there — that path is not a registered source, so the board never reads it), and the plan file <id>.md left as the empty 'Untitled plan'. This is precisely the failure mode D3 used to REJECT advisory prose in favour of an explicit param ('prose is ignorable'), yet FR-D's headline `A` flow depends entirely on prose to redirect the skill away from its scaffolding contract. No write-scope breach (all writes stay under ~/.gogo/), and the seam-fires-once test (TestPlanWithClaudeMintsAndFires) cannot catch it because it asserts only the intent, not the skill's end behaviour.",
+      "proposed_solution": "NEEDS-USER-DECISION. gogo-plan is not built to author a project-level plan file — decide the intended `A` mechanism: (a) add an explicit param/branch to gogo-plan (e.g. `--project-plan <path>`) that authors the plan file and SKIPS the .gogo/work scaffold; (b) point `A` at a dedicated authoring skill/command; or (c) accept that `A` opens a normal /gogo:plan session in the project home and drop the 'author in place' framing. Whichever is chosen, align the seeded body, the SKILL steps, and an e2e/dogfood assertion.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "DECISION (orchestrator): `A` authors the PROJECT PLAN, so it must NOT launch /gogo:plan (Step 1 scaffolds a source work item). Added launch.AuthorPlanIntent(label, planPath, correlation, sources) (cli/internal/launch/launch.go) — a new ActionAuthor whose Command is a PLAIN authoring prompt (single injection-safe argv element, no slash command, no --correlation flag): read+edit the project-plan markdown at planPath, choose among the listed sources, keep the front-matter correlation id, and create NO .gogo/work/ scaffolding. Reworked planWithClaude (cli/internal/tui/plans_tab.go): still mints a fresh draft up front, then fires the launcher seam EXACTLY ONCE with AuthorPlanIntent anchored at the project's FIRST SOURCE root (a trusted repo — not the untrusted ~/.gogo home, which would park on a first-run trust prompt, TEST-013); the plan file is edited by its absolute ~/.gogo path so the source's .gogo/work/ is never touched. Falls back to the project home (with a note) only when the project has no sources. Added helpers sourceNames()/firstSourcePath(). Updated the test to assert the plain authoring intent (references plan path + correlation, no /gogo:plan slash launch, no --correlation flag, anchored at /repos/web) fired once, plus a new no-sources fallback test; the no-claude-inert test still holds."
+    },
+    {
+      "id": "REV-003",
+      "title": "`gogo epic list` filters status==active, but `gogo epic add` never flips status — a just-added-to epic won't appear",
+      "description": "cli/epic.go:37 makes `gogo epic list` == `plan list --status active`, and epicHelp calls an epic 'a plan with members'. But `gogo epic add <id> <src>:<slug>` → planAdd → plans.AddMember (cli/internal/plans/plans.go:390) adds a member WITHOUT setting status active (only promote / plan-detail create-work-item flip to active). So a draft/ready plan you link a member to via `gogo epic add` has members yet stays out of `gogo epic list`, contradicting the alias's own definition. Same mismatch surfaces for a plan that has members but was never promoted.",
+      "proposed_solution": "AGENT-FIXABLE. Make `gogo epic list` narrow by membership, not status — e.g. filter on plans.Plan.HasMembers() (already exists) instead of `--status active`; add a plans.List predicate/flag for member-bearing plans, or have AddMember advance a draft/ready plan to active for consistency (pick one and keep FormatPlans honest).",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Replaced `gogo epic list`'s status==active filter with a dedicated epicList() (cli/epic.go) that lists plans with p.HasMembers() || len(p.Targets) > 0 — REGARDLESS of status — so a just-linked draft/ready epic still appears in its own list. Updated epicHelp to describe the member/target filter. Added TestCmdEpicListShowsMemberBearingRegardlessOfStatus (cli/epic_test.go): a draft linked via `epic add` (which stays draft) appears; a memberless/targetless draft is excluded (captured via a new captureStdout helper)."
+    },
+    {
+      "id": "REV-004",
+      "title": "`gogo plan <slug>` shadows the reserved store verbs — the 'never ambiguous' comment overstates",
+      "description": "cmdPlan (cli/go.go:214) routes args[0] to the store when isPlanStoreVerb(args[0]) is true, else treats it as a feature slug for the persistent /gogo:plan session; its comment claims 'a bare slug is never ambiguous.' But validSlug accepts any kebab word, and the reserved verbs (new/list/show/add/rm/remove/delete/del/ready/promote) are themselves valid kebab slugs, so a feature literally named e.g. `ready`, `promote` or `show` can never be launched via `gogo plan <slug>` — it dispatches to the store instead. Low real-world likelihood (slugs are usually multi-word) but the comment/help ('The store verbs are a small reserved set, so a bare slug is never ambiguous') is inaccurate.",
+      "proposed_solution": "AGENT-FIXABLE. Soften the comment/help to state the reserved-word limitation (single-token slugs colliding with a store verb resolve to the store), and/or document that such a feature must be launched some other way (e.g. `gogo go`/board). No behavioural change required.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Softened the cmdPlan comment (cli/go.go) to the truth: the store verbs are a RESERVED set that SHADOW a bare slug — a single-token slug that IS a store verb (e.g. a feature named `ready`/`promote`/`show`) resolves to the store, not a session, and must be launched via `gogo go`/the board; multi-word slugs never collide. The new combined `gogo plan -h` help (printPlanHelp) documents the reserved words explicitly."
+    },
+    {
+      "id": "REV-005",
+      "title": "Spawn records member + flips plan to active BEFORE the launch fires — a failed spawn leaves a phantom active member",
+      "description": "planCreateWorkItem (cli/internal/tui/plans_tab.go:247-254) and planPromote (cli/plan.go:394-395) call plans.AddMember + plans.SetStatus(active) and reload the detail SYNCHRONOUSLY, then return the fire-once launch as a deferred cmd. If the deferred launch fails (launcher returns an error → launchDoneMsg 'spawn failed'), the plan is already persisted as active with a member whose work item was never created. The board's per-source dot self-corrects (spawnedFeature reads real state.md correlations), but `gogo plan show` / the plans store now over-report a member/active status that does not exist. Comments acknowledge 'best-effort', but the store desyncs from reality on the exact path a user needs feedback on.",
+      "proposed_solution": "AGENT-FIXABLE. Record the member + status transition only on a successful launch (move the AddMember/SetStatus into the launcher-success branch of the returned cmd via a follow-up msg, or gate them on res/err), so a failed spawn leaves the plan untouched. Mirror the same for the CLI planPromote path.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Reordered planCreateWorkItem (cli/internal/tui/plans_tab.go): the AddMember + SetStatus(active) now run INSIDE the deferred launch cmd, only AFTER launcher() returns err==nil — a failed spawn leaves the plan untouched (no phantom active member). Added m.loadPlans() to the launchDoneMsg handler (cli/internal/tui/update.go) so the Model catches up to that post-success store write. The CLI planPromote path (cli/plan.go) was already correct — it records the member + flips active only after `res, err := planLauncher(...)` returns success (the `if err != nil { return 1 }` guard precedes it) — verified, no change needed. TestPlanDetailCreateWorkItemFiresLauncherOnce still asserts active + 1 member after a successful cmd()."
+    },
+    {
+      "id": "REV-006",
+      "title": "Project-board card source tag is right-aligned un-truncated — can wrap the name row at narrow column widths",
+      "description": "renderCard (cli/internal/tui/view.go:450-497) reserves the source tag's width from the slug budget, but truncate() floors any budget below 4 to 4 and the tag itself is never truncated. On a project board with a long source name at a narrow column (e.g. an 80-col terminal → colWidth ~20 → textW ~14, tag '● backend-service' ~18), slugBudget goes negative, the slug is floored to 4, and placeApart's forced gap=1 pushes the composed name row past textW → the line wraps, desyncing the per-card height math the windowing relies on. Cosmetic, project-board only (single-repo has no tag → byte-for-byte safe), and harmless at the design's wide (268) width — but the brief flagged 'no wrap at narrow widths.'",
+      "proposed_solution": "AGENT-FIXABLE. Truncate the source tag to a small budget (or drop it) when slugBudget falls below a floor, so the composed name row can never exceed textW; add a narrow-width render test asserting single-line output with a long source name.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Added fitSourceTag (cli/internal/tui/view.go): when the slug budget would be floored (tag so wide the slug can't get its 4-rune minimum), it truncates the source tag (via truncateRunes + a re-style styleSourceTag that keeps the source color) so mark+minSlug+dot+1(gap)+tag never exceeds textW — or drops the tag when there's no room for even a 3-rune one. Applied in both renderCard branches (focused plain + non-focused styled) before the slug-budget math; the lone-repo (empty-tag) path is a no-op, byte-for-byte. Added TestRenderCardNarrowLongSourceTagNoWrap asserting a long-source card renders at the same height (no wrap) as a short-source one at a narrow (20-col) width, for both focus states, with lone-repo parity."
+    },
+    {
+      "id": "REV-007",
+      "title": "Minor lifecycle side-effects: MigrateLegacy touches ~/.gogo on a no-op run; `gogo plan -h` shows store help only",
+      "description": "Two low-impact observations. (1) plans.MigrateLegacy (cli/internal/plans/migrate.go:50-51) writes ~/.gogo/ + a .legacy-plans-migrated marker on the FIRST `gogo` invocation even on a machine with zero projects and zero legacy stores (nothing to migrate) — a surprising data-home creation for a user who never used gogo projects (benign, non-destructive, guarded). (2) `gogo plan -h`/`--help` is caught by isPlanStoreVerb → prints planStoreHelp, so the persistent-session planHelp text (cli/go.go:57) is effectively unreachable via the common `gogo plan --help` (only reachable as e.g. `gogo plan <slug> --help`). Neither breaks anything; both are papercuts.",
+      "proposed_solution": "AGENT-FIXABLE (optional). (1) Skip writing the marker/creating ~/.gogo when there is nothing to migrate AND no data home exists yet, or defer the marker until a real project exists. (2) Have planStoreHelp cross-reference the bare-slug session leg (it already does at the bottom) — acceptable as-is, or route -h to a combined help.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "(1) Guarded MigrateLegacy (cli/internal/plans/migrate.go): it now only creates the data home + latch when dirExists(dataHome) OR hasLegacyStores() (a legacy ~/.config/gogo drafts dir or epics.json) — so a machine that never used gogo is left untouched (no surprise ~/.gogo on first run); the cheap re-scan repeats until real content appears. Added TestMigrateLegacyNoOpLeavesDataHomeUncreated (a non-existent data home + empty config home leaves ~/.gogo uncreated). (2) `gogo plan -h`/`--help`/`help` is now intercepted in cmdPlan (cli/go.go) before the store dispatch and routed to a new printPlanHelp() that prints BOTH the store verbs AND the bare-slug session-launch usage (+ the reserved-word caveat from REV-004)."
+    }
+  ]
+}

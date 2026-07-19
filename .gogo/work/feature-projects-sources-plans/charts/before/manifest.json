@@ -1,0 +1,12 @@
+{
+  "slug": "projects-sources-plans",
+  "updated": "2026-07-18",
+  "note": "As-is baseline (the uncommitted P1-P4 FLAT model this rework replaces): project == one registered repo in ~/.config/gogo/projects.json (Project{name,path,color,maxConcurrent} — per-PROJECT cap); TWO separate global stores — drafts/ (P3) and epics.json (P4); correlation kept in the epics STORE as an overlay (Feature.Epics via StampEpics), explicitly OUT of state.md (P4 D1=B). This rework lifts project one level (project links many sources), collapses drafts+epics into project-scoped plans, and moves correlation into each work item's state.md as a list.",
+  "diagrams": [
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "Before: flat project=repo registry (projects.json) + separate drafts + epics stores; correlation in the epics store overlay, not state.md"
+    }
+  ]
+}

@@ -54,11 +54,27 @@ var (
 	secondaryStyle = lipgloss.NewStyle().Foreground(secondaryText)
 	faintStyle     = lipgloss.NewStyle().Foreground(faintText)
 
+	// correlationChipStyle tints a card's ⛓ plan-… correlation chip(s) (FR14) — a muted
+	// purple, distinct from the source tag's registry color, echoing the uat/gate
+	// purple family without implying a gate. Plain text under `go test` (no TTY), so the
+	// chip stays substring-assertable.
+	correlationChipStyle = lipgloss.NewStyle().Foreground(uatAccent)
+
 	// changelogFocusStyle is the selection bar for the focused collapsed-changelog
 	// row: one focus fg+bg fill across the row (accent bg + bright fg), the analog
 	// of the focused work card's highlight for a borderless list row.
 	changelogFocusStyle = lipgloss.NewStyle().Foreground(focusFg).Background(focusBg).Bold(true)
 	keyChipStyle        = lipgloss.NewStyle().Foreground(secondaryText).Background(focusBg).Padding(0, 1) // footer key-chips
+
+	// Tab bar (FR8): the active tab is a bold accent chip, the others dim. Plain
+	// text under `go test` (no TTY), so the tab LABELS stay substring-assertable.
+	tabActiveStyle = lipgloss.NewStyle().Bold(true).Foreground(focusFg).Background(focusBg).Padding(0, 1)
+	tabStyle       = lipgloss.NewStyle().Foreground(dimText).Padding(0, 1)
+
+	// Source filter chips (FR7): the active chip is a tinted accent wash, the others
+	// dim. Substring-assertable like the tab bar.
+	chipActiveStyle = lipgloss.NewStyle().Bold(true).Foreground(focusFg).Background(focusBg).Padding(0, 1)
+	chipStyle       = lipgloss.NewStyle().Foreground(dimText).Padding(0, 1)
 )
 
 // gateBorder is the card border for a card that needs the user: a heavy `┃` left

@@ -1,0 +1,17 @@
+{
+  "schema": 2,
+  "name": "projects-sources-plans",
+  "release": "0.21.0",
+  "date": "2026-07-19",
+  "members": [
+    { "slug": "projects-sources-plans", "title": "projects · sources · plans (cockpit re-architecture)", "version": "0.21.0" }
+  ],
+  "diagrams": [
+    { "kind": "class", "file": "projects-sources-plans-class.mmd" },
+    { "kind": "sequence", "file": "projects-sources-plans-sequence.mmd" },
+    { "kind": "activity", "file": "projects-sources-plans-activity.mmd" }
+  ],
+  "before": [
+    { "kind": "class", "file": "before/projects-sources-plans-class.mmd" }
+  ]
+}

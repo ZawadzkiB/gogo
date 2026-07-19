@@ -29,6 +29,7 @@ const (
 	ActionDone   Action = "done"   // ready→changelog (single or merged) → /gogo:done
 	ActionResume Action = "resume" // answer a paused decision gate → /gogo:resume (orchestrator --attach)
 	ActionAccept Action = "accept" // clear the plan-acceptance gate → /gogo:accept (board `m` on a plan-pending card)
+	ActionAuthor Action = "author" // author a PROJECT plan brief in place → a plain `claude` session (plans-tab `A`)
 )
 
 // Intent is a fully-resolved, quoted plan for a launch — built purely from a
@@ -307,6 +308,82 @@ func ResumeIntent(slug string) Intent {
 		Slugs:   []string{slug},
 		Command: "/gogo:resume " + slug,
 		Session: sessionName("resume", slug),
+	}
+}
+
+// PlanIntent builds the Intent for a fire-once, body-seeded `/gogo:plan <body>`
+// launch — the plan-detail SPAWN path (FR11/FR15/D3). Unlike BuildIntent(ActionPlan,
+// …), which passes a kebab SLUG as the goal (the persistent `gogo plan` leg), this
+// seeds the plan's full free-text BODY as the goal so the analyst plans from the
+// real idea and DERIVES the final feature slug itself (the CLI cannot pin it). When
+// correlation is non-empty it is folded onto the command as a trailing
+// `--correlation plan-XXXX` param the `gogo:plan` skill parses + stamps into the new
+// work item's state.md (FR15) — the deterministic, injection-safe alternative to an
+// advisory prose hint. The whole command reaches claude as ONE trailing argv element
+// (no shell — injection-safe, exactly like TmuxNewSessionArgs, even with
+// newlines/spaces), and the tmux session name is derived from label, sanitized to
+// tmux-safe [a-z0-9-]. Spawn is fire-once, so this is the non-persistent
+// Launch(targetRoot, intent) path — no lock/registry, no resume key. An empty
+// correlation degrades to a plain body-seeded plan launch (byte-for-byte).
+func PlanIntent(label, body, correlation string) Intent {
+	// A title-only plan (empty body) seeds its LABEL as the goal, so a spawn never
+	// launches an empty `/gogo:plan ` — the title is the one thing such a plan carries.
+	goal := body
+	if strings.TrimSpace(goal) == "" {
+		goal = label
+	}
+	cmd := "/gogo:plan " + goal
+	if c := strings.TrimSpace(correlation); c != "" {
+		// The correlation id is [a-z0-9-] (plan-<hex8>), appended AFTER the goal as
+		// the explicit `--correlation` param. It stays inside the single trailing argv
+		// element (never a shell string), so a body with spaces/newlines is safe.
+		cmd += " --correlation " + c
+	}
+	return Intent{
+		Action:  ActionPlan,
+		Command: cmd,
+		Session: sessionName("plan", label),
+	}
+}
+
+// AuthorPlanIntent builds the Intent for the plans-tab `A` "plan-with-claude"
+// authoring trigger (FR-D — the user's "start a claude session and prepare a plan"
+// ask). Unlike PlanIntent (a /gogo:plan SPAWN that has the skill scaffold a SOURCE
+// work item), this AUTHORS a PROJECT-LEVEL plan brief, so it launches a PLAIN
+// interactive `claude` session — NOT a slash command. /gogo:plan Step 1 would
+// unconditionally scaffold a source `.gogo/work/feature-<slug>/` (the wrong thing for
+// a project-plan file, and the advisory-prose-ignored failure D3 rejected), so the
+// authoring session is a plain prompt seeded to READ + EDIT the CLI-owned project-plan
+// markdown at planPath (fill in the goal / which of the listed sources to target / the
+// work items to spawn), keeping its front-matter correlation id, and to create NO
+// `.gogo/work/` scaffolding. The whole prompt reaches claude as ONE trailing argv
+// element (no shell — injection-safe, exactly like PlanIntent, even with spaces/
+// newlines in planPath or a source name). correlation rides in the PROSE only (the plan
+// file already carries it in front-matter); there is NO `--correlation` flag — that
+// param is a /gogo:plan spawn contract, meaningless to a plain session. Session name is
+// derived from label (sessionName("author", label)); like PlanIntent this is the
+// fire-once, non-persistent Launch path (no lock/registry, no resume key).
+func AuthorPlanIntent(label, planPath, correlation string, sources []string) Intent {
+	var b strings.Builder
+	b.WriteString("Author a gogo PROJECT PLAN in place. Read and edit the plan markdown file at ")
+	b.WriteString(planPath)
+	b.WriteString(" directly: set its front-matter title, then write the goal, BDD scenarios, and the target sources into that same file.")
+	if len(sources) > 0 {
+		b.WriteString(" The project's sources you may target are: ")
+		b.WriteString(strings.Join(sources, ", "))
+		b.WriteString(".")
+	}
+	if c := strings.TrimSpace(correlation); c != "" {
+		b.WriteString(" The plan's correlation id is ")
+		b.WriteString(c)
+		b.WriteString(" — it is already in the file's front-matter; keep it.")
+	}
+	b.WriteString(" This is a PROJECT-LEVEL plan under the gogo data home: edit ONLY that one markdown file.")
+	b.WriteString(" Do NOT create any .gogo/work/ scaffolding and do NOT run the gogo-plan skill here — a work item is spawned separately, later, per target source.")
+	return Intent{
+		Action:  ActionAuthor,
+		Command: b.String(),
+		Session: sessionName("author", label),
 	}
 }
 
