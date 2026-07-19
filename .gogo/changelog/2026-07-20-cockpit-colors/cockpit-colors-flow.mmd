@@ -1,0 +1,26 @@
+flowchart TD
+  subgraph store["~/.gogo/projects/&lt;name&gt;/config.json  (CLI-owned data)"]
+    PC["Project.color  (NEW, hex, omitempty)"]
+    SC["Source.color  (existing, hex)"]
+  end
+  subgraph palette["cli/internal/projects/palette.go  (pure strings, 1 source of truth)"]
+    SW["Swatches[] {Name,Light,Dark}"]
+    AS["AssignColor(taken) → Dark hex"]
+    CF["ColorForIndex(i) → never-blank fallback"]
+    LU["LookupSwatch(hex) → swatch"]
+  end
+  ADD["gogo project add · gogo source add · config-tab form"] -->|assign + persist| PC
+  ADD -->|assign + persist| SC
+  AS --- ADD
+  PC --> HELP
+  SC --> HELP
+  CF --> HELP
+  LU --> HELP
+  HELP["tui.colorFor(hex, idx) → AdaptiveColor | Color (never blank)"]
+  HELP --> BOARD["board card: source dot"]
+  HELP --> CHIP["filter chips: dot per source"]
+  HELP --> CHG["changelog row: source dot (NEW)"]
+  HELP --> PLAN["plans card + detail: source dots"]
+  HELP --> CFGS["config: source dots + label-color"]
+  HELP --> COMBO["originDots(●project ●source) — multi-project switcher / future unified board"]
+  HELP --> CFGP["config: project switcher dots"]

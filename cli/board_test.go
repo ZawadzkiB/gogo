@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
@@ -18,6 +19,9 @@ import (
 //  4. outside + NOT initialized → a "gogo global init" hint (none)
 func TestChooseBoardTwoMode(t *testing.T) {
 	const root = "/repos/gogo"
+	// The data home the FR1 guard compares against — deliberately NOT root/.gogo, so an
+	// ordinary repo stays a single board.
+	const dataHome = "/home/u/.gogo"
 	// A store where `root` IS a registered project's source — mode 1 must STILL
 	// resolve to the single repo board (the dropped case-1 auto-route).
 	owning := func() ([]projects.Project, error) {
@@ -38,21 +42,21 @@ func TestChooseBoardTwoMode(t *testing.T) {
 
 	// 1. Inside a repo → the single-repo board, EVEN when the repo is a registered
 	//    source of a project (the two-mode drop of the old case-1 project auto-route).
-	if got := chooseBoard(root, true, owning, yes); got.kind != "single" || got.model == nil {
+	if got := chooseBoard(root, true, dataHome, owning, yes); got.kind != "single" || got.model == nil {
 		t.Errorf("in-repo (is a project source): kind=%q model=%v, want single/non-nil", got.kind, got.model)
 	}
 	// The single board also holds with an empty / uninitialized store — a repo is a repo.
-	if got := chooseBoard(root, true, noProjects, no); got.kind != "single" || got.model == nil {
+	if got := chooseBoard(root, true, dataHome, noProjects, no); got.kind != "single" || got.model == nil {
 		t.Errorf("in-repo (empty store): kind=%q model=%v, want single/non-nil", got.kind, got.model)
 	}
 
 	// 2. Outside any repo + initialized + ≥1 project → the global cockpit.
-	if got := chooseBoard("", false, someProjects, yes); got.kind != "project" || got.model == nil {
+	if got := chooseBoard("", false, dataHome, someProjects, yes); got.kind != "project" || got.model == nil {
 		t.Errorf("outside/initialized/≥1: kind=%q model=%v, want project/non-nil", got.kind, got.model)
 	}
 
 	// 3. Outside + initialized + 0 projects → none (add-a-project hint, no model).
-	got := chooseBoard("", false, noProjects, yes)
+	got := chooseBoard("", false, dataHome, noProjects, yes)
 	if got.kind != "none" || got.model != nil {
 		t.Errorf("outside/initialized/0: kind=%q model=%v, want none/nil", got.kind, got.model)
 	}
@@ -61,11 +65,41 @@ func TestChooseBoardTwoMode(t *testing.T) {
 	}
 
 	// 4. Outside + NOT initialized → none (a `gogo global init` hint, no model).
-	got = chooseBoard("", false, someProjects, no)
+	got = chooseBoard("", false, dataHome, someProjects, no)
 	if got.kind != "none" || got.model != nil {
 		t.Errorf("outside/uninitialized: kind=%q model=%v, want none/nil", got.kind, got.model)
 	}
 	if got.err == "" {
 		t.Error("outside/uninitialized must carry a stderr hint")
+	}
+}
+
+// TestChooseBoardHomeDirFallsThrough pins the FR1 bug fix (cockpit-colors): running
+// `gogo` from ~ resolves the DATA home via FindRoot (rootFound=true, root=~), but its
+// .gogo IS the data home, so it must NOT open an empty single-repo board — it falls
+// through to the global cockpit path (project when initialized+≥1, else the friendly
+// hint), exactly like `gogo` outside any repo.
+func TestChooseBoardHomeDirFallsThrough(t *testing.T) {
+	const home = "/home/u"                   // the "root" FindRoot returns from ~
+	dataHome := filepath.Join(home, ".gogo") // == filepath.Join(home, ".gogo")
+	someProjects := func() ([]projects.Project, error) {
+		return []projects.Project{{Name: "other", Sources: []projects.Source{{Path: "/repos/other", Name: "other"}}}}, nil
+	}
+	noProjects := func() ([]projects.Project, error) { return nil, nil }
+	yes := func() bool { return true }
+	no := func() bool { return false }
+
+	// root whose .gogo == data-home + initialized + ≥1 project → the global cockpit,
+	// NOT a single (empty) board.
+	if got := chooseBoard(home, true, dataHome, someProjects, yes); got.kind != "project" || got.model == nil {
+		t.Errorf("home-dir + initialized/≥1: kind=%q model=%v, want project (global cockpit), never single", got.kind, got.model)
+	}
+	// root == data-home + initialized + 0 projects → the add-a-project hint (none), not single.
+	if got := chooseBoard(home, true, dataHome, noProjects, yes); got.kind != "none" || got.model != nil {
+		t.Errorf("home-dir + 0 projects: kind=%q model=%v, want none (hint), never single", got.kind, got.model)
+	}
+	// root == data-home + NOT initialized → the `gogo global init` hint (none), not single.
+	if got := chooseBoard(home, true, dataHome, someProjects, no); got.kind != "none" {
+		t.Errorf("home-dir + uninitialized: kind=%q, want none (init hint), never single", got.kind)
 	}
 }

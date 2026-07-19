@@ -1,0 +1,16 @@
+flowchart TD
+  subgraph store["~/.gogo/projects/&lt;name&gt;/config.json  (TODAY)"]
+    SC["Source.color  (hex, OFTEN BLANK — no auto-assign)"]
+    NOPC["Project — NO color field"]
+  end
+  SC --> MAP["model.sourceColorMap: maps a source ONLY when s.Color != ''"]
+  MAP -->|has color| DOT["source dot in the source's hex"]
+  MAP -->|no color| GREY["dimStyle grey dot (or omitted)"]
+  DOT --> BOARD["board card source tag"]
+  DOT --> PLAN["plans card + detail dots"]
+  GREY --> BOARD
+  GREY --> PLAN
+  CHIPS["filter chips — labels, NO dots"]
+  CHG["changelog row — leading ● = live SESSION only; NO source dot"]
+  CFG["config: source rows start with an uncolored ●; project rows have NO dot; right pane shows 'color &lt;hex&gt;'"]
+  BUG["runBoard → FindRoot('.') finds ~/.gogo (the DATA home) → chooseBoard: rootFound → tui.New(~) → EMPTY board (no data-home guard)"]

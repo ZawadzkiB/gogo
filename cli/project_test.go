@@ -174,6 +174,63 @@ func TestCmdProjectAddAutoInitializesHome(t *testing.T) {
 	}
 }
 
+// TestCmdProjectAddAssignsColors (cockpit-colors FR2): `gogo project add` writes a
+// non-blank palette color for the PROJECT and its source #1, both real palette swatches,
+// persisted to config.json.
+func TestCmdProjectAddAssignsColors(t *testing.T) {
+	seedDataHome(t)
+	root := gogoRepo(t)
+	if code := cmdProject([]string{"add", root}); code != 0 {
+		t.Fatalf("project add: exit %d", code)
+	}
+	p, _ := projects.Load(filepath.Base(root))
+	if p.Color == "" {
+		t.Error("project add left the project color blank (FR2)")
+	}
+	if _, ok := projects.LookupSwatch(p.Color); !ok {
+		t.Errorf("project color %q is not a palette swatch", p.Color)
+	}
+	if len(p.Sources) != 1 || p.Sources[0].Color == "" {
+		t.Fatalf("project add left source #1 colorless: %+v", p.Sources)
+	}
+	if _, ok := projects.LookupSwatch(p.Sources[0].Color); !ok {
+		t.Errorf("source color %q is not a palette swatch", p.Sources[0].Color)
+	}
+}
+
+// TestCmdSourceAddAssignsNextFreeColor (cockpit-colors FR2): a second source added to a
+// project gets a DIFFERENT (next-free) palette color, and a re-add preserves it.
+func TestCmdSourceAddAssignsNextFreeColor(t *testing.T) {
+	seedDataHome(t)
+	repo1 := gogoRepo(t)
+	repo2 := gogoRepo(t)
+	if code := cmdProject([]string{"add", repo1, "--name", "gogo"}); code != 0 {
+		t.Fatalf("project add: exit %d", code)
+	}
+	if code := cmdSource([]string{"add", repo2}); code != 0 {
+		t.Fatalf("source add: exit %d", code)
+	}
+	p, _ := projects.Load("gogo")
+	if len(p.Sources) != 2 {
+		t.Fatalf("sources = %d, want 2", len(p.Sources))
+	}
+	c1, c2 := p.Sources[0].Color, p.Sources[1].Color
+	if c1 == "" || c2 == "" {
+		t.Fatalf("a source has no color: %+v", p.Sources)
+	}
+	if c1 == c2 {
+		t.Errorf("both sources share color %q — AssignColor should skip taken", c1)
+	}
+	// Re-add repo2 → its color is preserved (never churned).
+	if code := cmdSource([]string{"add", repo2}); code != 0 {
+		t.Fatalf("source re-add: exit %d", code)
+	}
+	p, _ = projects.Load("gogo")
+	if got := p.Sources[1].Color; got != c2 {
+		t.Errorf("re-add churned the source color: %q, want preserved %q", got, c2)
+	}
+}
+
 func TestCapLabel(t *testing.T) {
 	if capLabel(0) != "∞" || capLabel(3) != "3" {
 		t.Errorf("capLabel(0)=%q capLabel(3)=%q, want ∞ / 3", capLabel(0), capLabel(3))

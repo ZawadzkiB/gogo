@@ -78,11 +78,16 @@ func projectAdd(args []string) int {
 	if name == "" {
 		name = filepath.Base(abs)
 	}
+	// Auto-assign a default origin color for the project AND its first source
+	// (cockpit-colors FR2): a deterministic round-robin over the palette that skips
+	// colors already used by existing projects/sources, persisted into config.json.
+	takenProj, takenSrc := takenColors()
 	src := projects.Source{
 		Path:                abs,
 		Name:                filepath.Base(abs),
 		MainBranch:          detectMainBranch(abs),
 		ConcurrentWorkItems: projects.DefaultConcurrentWorkItems,
+		Color:               projects.AssignColor(takenSrc),
 	}
 
 	existing, _ := projects.Load(name)
@@ -96,7 +101,7 @@ func projectAdd(args []string) int {
 		return 1
 	}
 
-	p := projects.Project{Name: name, Sources: []projects.Source{src}}
+	p := projects.Project{Name: name, Color: projects.AssignColor(takenProj), Sources: []projects.Source{src}}
 	if _, err := projects.Add(p); err != nil {
 		fmt.Fprintf(os.Stderr, "gogo project add: %v\n", err)
 		return 1
@@ -144,6 +149,26 @@ func capLabel(n int) string {
 		return "∞"
 	}
 	return strconv.Itoa(n)
+}
+
+// takenColors gathers the non-blank project + source origin colors already in use
+// across the whole store — the `taken` sets projects.AssignColor round-robins around so
+// a freshly-added project/source fans out to the next free palette swatch
+// (cockpit-colors FR2). A missing/empty store yields empty slices (AssignColor then
+// picks the first swatch).
+func takenColors() (projColors, srcColors []string) {
+	all, _ := projects.List()
+	for _, p := range all {
+		if p.Color != "" {
+			projColors = append(projColors, p.Color)
+		}
+		for _, s := range p.Sources {
+			if s.Color != "" {
+				srcColors = append(srcColors, s.Color)
+			}
+		}
+	}
+	return projColors, srcColors
 }
 
 // hasSourcePath reports whether sources already carries a source at path.

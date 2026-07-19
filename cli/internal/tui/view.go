@@ -63,13 +63,18 @@ func (m Model) viewSourceChips() string {
 	parts := make([]string, 0, len(chips))
 	for _, c := range chips {
 		label := c
+		prefix := ""
 		if c == "" {
 			label = "all"
+		} else {
+			// Each source chip carries its colored origin dot (design 3a). The chip style's
+			// Padding(0,1) supplies the space between the dot and the label.
+			prefix = m.sourceDot(c)
 		}
 		if c == m.sourceChip {
-			parts = append(parts, chipActiveStyle.Render(label))
+			parts = append(parts, prefix+chipActiveStyle.Render(label))
 		} else {
-			parts = append(parts, chipStyle.Render(label))
+			parts = append(parts, prefix+chipStyle.Render(label))
 		}
 	}
 	return dimStyle.Render("sources ") + strings.Join(parts, " ")
@@ -289,7 +294,7 @@ func (m Model) renderChangelogColumn(i, colWidth int) string {
 		parts = append(parts, faintStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
 	}
 	for j := start; j < end; j++ {
-		parts = append(parts, changelogRow(col[j], rowW, j == focusedRow, hasLiveSession(col[j].Slug, m.sessions)))
+		parts = append(parts, m.changelogRow(col[j], rowW, j == focusedRow, hasLiveSession(col[j].Slug, m.sessions)))
 	}
 	if below := len(col) - end; below > 0 {
 		parts = append(parts, faintStyle.Render(fmt.Sprintf("  ↓ %d more · enter to browse", below)))
@@ -299,20 +304,60 @@ func (m Model) renderChangelogColumn(i, colWidth int) string {
 
 // changelogRow is one collapsed changelog entry (FR-6): a two-column cursor gutter
 // (`▸ ` when focused, else blank), `✓ slug` (truncated) left, `MM-DD` (faint) right
-// — no box. When the shipped item has a live pipeline session (hasSession, FR-1) a
-// green `●` is prefixed just before the slug (`✓ ● slug`), so the user can spot it
-// and enter→drill→kill. A focused row renders as a full-width selection bar: plain
-// inner text under a single focus fg+bg fill so the bar has no per-segment
-// background holes (the same tactic the focused work card uses — the dot rides the
-// fill there too, so on a focused row it is plain, not green).
-func changelogRow(f *contract.Feature, width int, focused, hasSession bool) string {
+// — no box.
+//
+// D3=A (cockpit-colors): on a PROJECT board (the row has a Source) the row LEADS with a
+// SOURCE-colored origin dot (`● ✓ slug`), the design's fast origin cue, and the
+// live-session cue moves to a TRAILING green `●` just before the date (`… ● MM-DD`), so
+// origin reads left and liveness right. A SINGLE-REPO row (no source) keeps today's
+// leading session dot — byte-for-byte unchanged (changelogRowSingle).
+//
+// A focused row renders as a full-width selection bar: plain inner text under a single
+// focus fg+bg fill so the bar has no per-segment background holes.
+func (m Model) changelogRow(f *contract.Feature, width int, focused, hasSession bool) string {
 	date := shortDate(f.Completed)
 	if date == "" {
 		date = shortDate(f.Created)
 	}
 	dateW := len([]rune(date))
-	// Reserve the leading "● " (2 cells) when live, so the slug truncation and the
-	// right-aligned date math both account for it and MM-DD stays put.
+	if f.Source == "" {
+		return changelogRowSingle(f, width, focused, hasSession, date, dateW)
+	}
+
+	// Project board: leading source dot + ✓ + slug, trailing green session dot + date.
+	trailing := ""
+	if hasSession {
+		trailing = "● " // relocated live-session cue (D3=A)
+	}
+	// Reserve: cursor(2) + source-dot "● "(2) + "✓ "(2) + trailing + a 1-cell gap + date.
+	slugMax := width - 2 - 2 - 2 - len([]rune(trailing)) - 1 - dateW
+	if slugMax < 4 {
+		slugMax = 4
+	}
+	slug := truncate(f.Slug, slugMax)
+	leftPlain := "● " + "✓ " + slug
+	rightPlain := trailing + date
+	gap := width - 2 - lipgloss.Width(leftPlain) - lipgloss.Width(rightPlain) // -2 for the cursor gutter
+	if gap < 1 {
+		gap = 1
+	}
+	if focused {
+		row := "▸ " + leftPlain + strings.Repeat(" ", gap) + rightPlain
+		return changelogFocusStyle.Width(width).Render(row)
+	}
+	styledLeft := m.sourceDot(f.Source) + " " + secondaryStyle.Render("✓ ") + secondaryStyle.Render(slug)
+	styledRight := ""
+	if hasSession {
+		styledRight = sessionStyle.Render("●") + " "
+	}
+	styledRight += faintStyle.Render(date)
+	return "  " + styledLeft + strings.Repeat(" ", gap) + styledRight
+}
+
+// changelogRowSingle is the SINGLE-REPO changelog row (no source label) — byte-for-byte
+// today's behaviour: `✓ slug` with the live-session green `●` prefixed just before the
+// slug (`✓ ● slug`). Kept identical so a lone repo's board never gains a source dot.
+func changelogRowSingle(f *contract.Feature, width int, focused, hasSession bool, date string, dateW int) string {
 	dot := ""
 	if hasSession {
 		dot = "● "
@@ -331,7 +376,6 @@ func changelogRow(f *contract.Feature, width int, focused, hasSession bool) stri
 		row := "▸ " + leftPlain + strings.Repeat(" ", gap) + date
 		return changelogFocusStyle.Width(width).Render(row)
 	}
-	// Non-focused: the ● gets its own green sessionStyle; ✓/slug stay secondary.
 	styledLeft := secondaryStyle.Render("✓ ")
 	if hasSession {
 		styledLeft += sessionStyle.Render("●") + " "
@@ -383,10 +427,9 @@ func (m Model) sourceTag(f *contract.Feature) (styled, plain string) {
 		return "", ""
 	}
 	plain = "● " + f.Source
-	if c := m.sourceColors[f.Source]; c != "" {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render(plain), plain
-	}
-	return dimStyle.Render(plain), plain
+	// The source palette is never-blank (cockpit-colors FR2), so the tag always
+	// carries its source's color — never the old grey "no color" fallback.
+	return lipgloss.NewStyle().Foreground(m.sourceColor(f.Source)).Render(plain), plain
 }
 
 // fitSourceTag truncates a card's right-aligned source tag (styled+plain) so the
@@ -422,10 +465,7 @@ func (m Model) styleSourceTag(f *contract.Feature, plain string) string {
 	if plain == "" {
 		return ""
 	}
-	if c := m.sourceColors[f.Source]; c != "" {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render(plain)
-	}
-	return dimStyle.Render(plain)
+	return lipgloss.NewStyle().Foreground(m.sourceColor(f.Source)).Render(plain)
 }
 
 // truncateRunes truncates s to max runes with a trailing ellipsis (no minimum floor,

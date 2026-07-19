@@ -253,6 +253,102 @@ func TestConfigTabProjectSwitcher(t *testing.T) {
 	}
 }
 
+// TestConfigProjectColorEdit (cockpit-colors FR4): `c` opens the project label-color
+// form (pendingProject set); a completed edit accepting a swatch NAME persists the
+// resolved hex to Project.Color and re-tints the board (refreshProject).
+func TestConfigProjectColorEdit(t *testing.T) {
+	seedDataHome(t)
+	p := projects.Project{Name: "app", Sources: []projects.Source{{Name: "svc", Path: "/r/svc"}}}
+	if err := projects.Save(&p); err != nil {
+		t.Fatal(err)
+	}
+
+	m := configTab(sizedWorkspace(t, &contract.Repo{}, p))
+	m = send(m, runes("c"))
+	if m.mode != modeForm || m.pendingProject == nil || m.pendingProject.name != "app" {
+		t.Fatalf("c did not open the project-color form (mode=%d pending=%v)", m.mode, m.pendingProject)
+	}
+	// Accept a swatch NAME through the heap-stable binding (TEST-001).
+	m.binding.projColor = "teal"
+	nm, _ := m.finishProjectColorForm()
+	m = nm.(Model)
+
+	if m.tab != tabConfig || m.mode != modeBoard {
+		t.Errorf("project-color edit did not return to the config tab (tab=%d mode=%d)", m.tab, m.mode)
+	}
+	got, _ := projects.Load("app")
+	if got.Color != "#35c9b5" {
+		t.Errorf("project color = %q, want the teal swatch hex #35c9b5", got.Color)
+	}
+	// The live board re-tinted (refreshProject rebuilt projectColors from the store).
+	if m.projectColors["app"] != "#35c9b5" {
+		t.Errorf("board projectColors not re-tinted live: %q", m.projectColors["app"])
+	}
+}
+
+// TestConfigSourceColorSwatchNameOrHex (cockpit-colors FR4): the source `e` form's Label
+// color field accepts a swatch NAME (resolved to its hex) or a raw hex, persisted to
+// Source.Color.
+func TestConfigSourceColorSwatchNameOrHex(t *testing.T) {
+	seedDataHome(t)
+	repo := gogoRepoDir(t)
+	p := projects.Project{Name: "app", Sources: []projects.Source{{Name: "svc", Path: repo, ConcurrentWorkItems: 1}}}
+	projects.Save(&p)
+
+	m := configTab(sizedWorkspace(t, &contract.Repo{}, p))
+	m = send(m, runes("e"))
+	if m.pendingSource == nil || m.pendingSource.op != "edit" {
+		t.Fatalf("e did not open an edit form (pending=%v)", m.pendingSource)
+	}
+	m.binding.srcColor = "pink" // a swatch name
+	nm, _ := m.finishSourceForm()
+	m = nm.(Model)
+	if got, _ := projects.Load("app"); got.Sources[0].Color != "#eb7bb5" {
+		t.Errorf("source color = %q, want the pink swatch hex #eb7bb5", got.Sources[0].Color)
+	}
+}
+
+// TestConfigAddAssignsBlankColor (cockpit-colors FR4): a blank Label color on ADD gets an
+// auto-assigned palette swatch (a new source is never colorless).
+func TestConfigAddAssignsBlankColor(t *testing.T) {
+	seedDataHome(t)
+	repo := gogoRepoDir(t)
+	p := projects.Project{Name: "app"}
+	projects.Save(&p)
+
+	m := configTab(sizedWorkspace(t, &contract.Repo{}, p))
+	m = send(m, runes("a"))
+	m.binding.srcPath = repo
+	m.binding.srcName = "svc"
+	// srcColor left blank → auto-assign on finish.
+	nm, _ := m.finishSourceForm()
+	m = nm.(Model)
+	got, _ := projects.Load("app")
+	if len(got.Sources) != 1 || got.Sources[0].Color == "" {
+		t.Fatalf("blank color on add was not auto-assigned: %+v", got.Sources)
+	}
+	if _, ok := projects.LookupSwatch(got.Sources[0].Color); !ok {
+		t.Errorf("auto-assigned color %q is not a palette swatch", got.Sources[0].Color)
+	}
+}
+
+// TestConfigTabRendersColorDots (cockpit-colors FR4): the config left column shows a dot
+// per project and per source, and the right pane shows the "label color · <name>" field
+// naming the swatch.
+func TestConfigTabRendersColorDots(t *testing.T) {
+	seedDataHome(t)
+	p := projects.Project{Name: "app", Color: "#58a6ff", Sources: []projects.Source{
+		{Name: "svc", Path: "/r/svc", Color: "#35c9b5"},
+	}}
+	m := configTab(sizedWorkspace(t, &contract.Repo{}, p))
+	out := m.View()
+	for _, want := range []string{"● svc", "label color", "teal"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("config tab missing %q:\n%s", want, out)
+		}
+	}
+}
+
 // TestViewConfigTab: the config tab renders the sources with their caps (`cap N` /
 // `cap ∞`) and the knowledge explorer lists the focused source's .gogo/knowledge/
 // files + sizes.

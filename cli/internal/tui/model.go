@@ -76,6 +76,9 @@ type formBinding struct {
 	// Plans-tab new-plan form field (FR10 `n`): the plan title as a STRING the huh
 	// input binds heap-stably (TEST-001).
 	planTitle string
+	// Config-tab project label-color form field (cockpit-colors FR4): the project's
+	// origin color (hex or a swatch name) as a STRING bound heap-stably (TEST-001).
+	projColor string
 }
 
 // sourceEdit marks an in-flight config-tab per-source form (the analog of
@@ -87,6 +90,13 @@ type sourceEdit struct {
 	op       string
 	project  string
 	origPath string
+}
+
+// projectEdit marks an in-flight config-tab project label-color form (cockpit-colors
+// FR4): name is the project the color write targets. Analogous to sourceEdit but for the
+// project-level Color field.
+type projectEdit struct {
+	name string
 }
 
 // Picker sentinels — the non-empty values the attach/kill huh.NewSelect writes to
@@ -120,17 +130,19 @@ type Model struct {
 	// merged repo's features each carry their own Source/Root, so the board tags cards
 	// by Feature.Source and the live re-aggregate (reload → LoadProject) stays source-
 	// native — no config.Project bridge.
-	tab          tabID
-	project      *projects.Project
-	allProjects  []projects.Project
-	sourceColors map[string]string
+	tab           tabID
+	project       *projects.Project
+	allProjects   []projects.Project
+	sourceColors  map[string]string // source label → resolved never-blank color hex
+	projectColors map[string]string // project name → resolved never-blank color hex (D5 combo)
 
 	// Config tab (FR9): the project-switcher cursor + the per-source cursor + the
 	// in-flight per-source edit marker. Reads/writes ONLY ~/.gogo/… via the projects
 	// store (never a source's .gogo/).
-	projIdx       int
-	sourceIdx     int
-	pendingSource *sourceEdit
+	projIdx        int
+	sourceIdx      int
+	pendingSource  *sourceEdit
+	pendingProject *projectEdit // in-flight project label-color form (cockpit-colors FR4)
 
 	// Plans tab (FR10/FR11): the focused project's plans (grouped ACTIVE·READY·DRAFTS),
 	// the list cursor (planIdx, over the grouped order), the open plan detail (nil =
@@ -290,6 +302,7 @@ func newFromRepo(repo *contract.Repo, root string, project *projects.Project, al
 	}
 	if project != nil {
 		m.sourceColors = sourceColorMap(project.Sources)
+		m.projectColors = projectColorMap(all)
 		for i := range all {
 			if all[i].Name == project.Name {
 				m.projIdx = i // start the config-tab switcher on the focused project
@@ -310,23 +323,6 @@ func (m *Model) sources() []projects.Source {
 		return nil
 	}
 	return m.project.Sources
-}
-
-// sourceColorMap builds the source-label → tag-color (hex) lookup the project board
-// tints cards with, defaulting an unnamed source to its folder base. Shared by the
-// constructor and the config-tab refresh so the two never drift.
-func sourceColorMap(sources []projects.Source) map[string]string {
-	colors := make(map[string]string, len(sources))
-	for _, s := range sources {
-		name := s.Name
-		if name == "" {
-			name = filepath.Base(s.Path)
-		}
-		if s.Color != "" {
-			colors[name] = s.Color
-		}
-	}
-	return colors
 }
 
 // sourceChips is the ordered set of source-filter chip labels (FR7): "all" first,
@@ -395,6 +391,7 @@ func (m *Model) focusedSource() *projects.Source {
 func (m *Model) refreshProject() {
 	all, _ := projects.List()
 	m.allProjects = all
+	m.projectColors = projectColorMap(all)
 	m.projIdx = clamp(m.projIdx, 0, len(all)-1)
 	if p := m.focusedProject(); p != nil {
 		m.project = p
@@ -416,6 +413,7 @@ func (m *Model) switchProject(idx int) {
 	m.projIdx = ((idx % len(m.allProjects)) + len(m.allProjects)) % len(m.allProjects)
 	m.project = &m.allProjects[m.projIdx]
 	m.sourceColors = sourceColorMap(m.project.Sources)
+	m.projectColors = projectColorMap(m.allProjects)
 	m.sourceIdx = clamp(m.sourceIdx, 0, len(m.project.Sources)-1)
 	m.sourceChip = ""
 	// A project switch invalidates the plans-tab cursor/detail (a different plan set).

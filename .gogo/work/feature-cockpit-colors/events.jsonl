@@ -1,0 +1,12 @@
+{"ts":"2026-07-19T22:55:00Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"cockpit-colors","note":"follow-up to 0.21.0 cockpit: FR1 home-dir empty-board bug (data-home vs FindRoot) + per-project/per-source default colors (palette, assign, persist, fallback) + combined origin dots + changelog source dot; target 0.22.0; 5 decisions at the gate"}
+{"ts":"2026-07-19T12:00:00Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"cockpit-colors","note":"D1-D5 = A (design-faithful palette, two-dot ●project ●source combo, changelog source dot + relocated session dot, home-dir bug fix); ship 0.22.0"}
+{"ts":"2026-07-19T13:00:00Z","event":"phase-started","phase":"review","status":"reviewing","slug":"cockpit-colors","note":"implement green + rendered + 0.22.0 preview installed; fresh-eyes review of color render + bug fix + back-compat"}
+{"ts":"2026-07-19T13:30:00Z","event":"review-done","phase":"review","status":"reviewing","slug":"cockpit-colors","note":"APPROVE 0/0/0/3-nits; advancing to test"}
+{"ts":"2026-07-19T13:31:00Z","event":"phase-started","phase":"test","status":"testing","slug":"cockpit-colors","note":"e2e: render/design-fidelity + FR1 home-dir bug e2e + color edge cases + A-persistence"}
+{"ts":"2026-07-19T22:05:57Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"cockpit-colors"}
+{"ts":"2026-07-19T22:06:03Z","event":"phase-done","phase":"test","status":"testing","slug":"cockpit-colors"}
+{"ts":"2026-07-20T09:00:00Z","event":"test-done","phase":"test","status":"testing","slug":"cockpit-colors","note":"PASS, no new issues; FR1 e2e-confirmed; 3 review nits contained"}
+{"ts":"2026-07-20T09:01:00Z","event":"report-done","phase":"report","status":"reporting","slug":"cockpit-colors","note":"report written; as-built diagram copied"}
+{"ts":"2026-07-20T09:02:00Z","event":"awaiting-uat","phase":"report","status":"awaiting-uat","slug":"cockpit-colors","note":"visual UAT: run gogo global + config; accept via /gogo:done to ship 0.22.0"}
+{"ts":"2026-07-20T09:30:00Z","event":"uat-passed","phase":"done","status":"shipped","slug":"cockpit-colors","note":"user accepted via /gogo:done"}
+{"ts":"2026-07-20T09:31:00Z","event":"shipped","phase":"done","status":"shipped","slug":"cockpit-colors","note":"0.22.0 changelog entry written (.gogo/changelog/2026-07-20-cockpit-colors/)"}

@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-colors",
+  "updated": "2026-07-19",
+  "note": "As-is baseline (0.21.0) — the color flow the change touches. Source.Color exists but is OFTEN BLANK (no auto-assignment); model.sourceColorMap maps a source ONLY when s.Color != '' so a colorless source renders a dimStyle grey dot (or is omitted). There is NO project-level color. Filter chips carry no dot; the changelog row's leading ● means a live SESSION, not a source; config source rows start with an uncolored ● and project rows have no dot. Separately, runBoard/chooseBoard has NO data-home guard, so `gogo` in ~ (where FindRoot walks up to ~/.gogo, the data home) opens an EMPTY single-repo board. flow.mmd = this baseline.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Before: Source.Color often blank -> grey dot; no Project color; no chip/changelog source dots; no data-home guard (gogo in ~ = empty board)"
+    }
+  ]
+}

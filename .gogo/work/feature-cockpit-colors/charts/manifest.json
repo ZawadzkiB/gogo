@@ -1,0 +1,12 @@
+{
+  "slug": "cockpit-colors",
+  "updated": "2026-07-19",
+  "note": "Intended design (0.22.0 cockpit colors): a curated palette of named AdaptiveColor swatches lives once in cli/internal/projects/palette.go (pure strings). project add / source add / the config form call AssignColor(taken) (deterministic round-robin, skip collisions) and persist a Dark hex into Project.color (NEW) / Source.color (existing) in ~/.gogo/projects/<name>/config.json. tui.colorFor(hex, idx) resolves any stored hex to an AdaptiveColor (swatch match) or a direct Color (arbitrary hex), falling back to ColorForIndex when blank — never grey/blank. That one helper feeds every render site: board card source dot, filter chips, the NEW changelog source dot, plans-tab card + detail dots, and the config tab (project + source dots + editable label-color). originDots(project,source) renders a two-dot combo for multi-project surfaces (the config switcher now; a future unified board later). Separately, the FR1 fix makes chooseBoard data-home-aware so `gogo` in ~ opens the global cockpit, not an empty board. flow.mmd = the color model + where each color renders.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Color model: config.json (Project.color + Source.color) -> palette (Assign/Fallback/Lookup) -> tui.colorFor -> every render site (board / chips / changelog / plans / config / combo)"
+    }
+  ]
+}

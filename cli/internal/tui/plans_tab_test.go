@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -214,6 +215,51 @@ func TestPlanWithClaudeMintsAndFires(t *testing.T) {
 	}
 	if gotRoot == projects.Dir("app") {
 		t.Errorf("anchored at the untrusted project home %q — must anchor at a source root", gotRoot)
+	}
+}
+
+// TestPlanWithClaudePersistsDraftBeforeLaunch (cockpit-colors extra check): the `A`
+// trigger must persist the draft plan to disk (plans.New writes
+// ~/.gogo/projects/<name>/.gogo/plans/<id>.md) SYNCHRONOUSLY — before, and independent
+// of, the launcher cmd ever running. This pins the "author sessions launched but the
+// plans dir was empty" report: the draft is on disk the instant `A` returns, whether or
+// not the launch cmd is later executed.
+func TestPlanWithClaudePersistsDraftBeforeLaunch(t *testing.T) {
+	seedDataHome(t)
+	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/repos/web")))
+	m.hasClaude = true
+	m.tab = tabPlans
+
+	launched := 0
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		launched++
+		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
+	}
+
+	nm, cmd := m.Update(runes("A"))
+	m = nm.(Model)
+
+	// The draft is minted + persisted before the launcher cmd runs.
+	list, _ := plans.List("app")
+	if len(list) != 1 {
+		t.Fatalf("A did not persist a draft before launch: %d plans on disk", len(list))
+	}
+	id := list[0].ID
+	if _, err := os.Stat(plans.Path("app", id)); err != nil {
+		t.Errorf("plan file %s not on disk before launch: %v", plans.Path("app", id), err)
+	}
+	if launched != 0 {
+		t.Errorf("launcher already ran (%d) — the draft must persist independent of the launch", launched)
+	}
+	// The launch is still scheduled (fire-once) when its cmd is executed.
+	if cmd == nil {
+		t.Fatal("A returned no launch cmd")
+	}
+	if _, ok := cmd().(launchDoneMsg); !ok {
+		t.Fatal("A cmd did not resolve to a launchDoneMsg")
+	}
+	if launched != 1 {
+		t.Errorf("launcher fired %d times, want exactly 1", launched)
 	}
 }
 

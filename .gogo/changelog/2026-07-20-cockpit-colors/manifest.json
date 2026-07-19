@@ -1,0 +1,11 @@
+{
+  "schema": 2,
+  "name": "cockpit-colors",
+  "release": "0.22.0",
+  "date": "2026-07-20",
+  "members": [
+    { "slug": "cockpit-colors", "title": "cockpit colors + home-dir board fix", "version": "0.22.0" }
+  ],
+  "diagrams": [ { "kind": "flow", "file": "cockpit-colors-flow.mmd" } ],
+  "before": [ { "kind": "flow", "file": "before/cockpit-colors-flow.mmd" } ]
+}

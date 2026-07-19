@@ -8,6 +8,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/plans"
@@ -18,7 +19,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.21.0"
+const Version = "0.22.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -78,7 +79,7 @@ func main() {
 // the cockpit regardless of cwd.
 func runBoard() int {
 	root, err := contract.FindRoot(".")
-	choice := chooseBoard(root, err == nil, projects.List, projects.Initialized)
+	choice := chooseBoard(root, err == nil, projects.Home(), projects.List, projects.Initialized)
 	if choice.model == nil {
 		fmt.Fprintln(os.Stderr, choice.err)
 		return 1
@@ -110,8 +111,15 @@ type boardChoice struct {
 //
 // `gogo global` (cmdGlobal) forces the cockpit regardless of cwd; this function is
 // only the bare-`gogo` resolver.
-func chooseBoard(root string, rootFound bool, listProjects func() ([]projects.Project, error), initialized func() bool) boardChoice {
-	if rootFound {
+//
+// FR1 (cockpit-colors): dataHome is the global data home (projects.Home() == ~/.gogo).
+// contract.FindRoot walks UP looking for any .gogo/, so from ~ (or any child of ~
+// without its own .gogo/) it resolves the DATA home itself and would open an empty
+// single-repo board. A root whose .gogo IS the data home is therefore NOT a repo — we
+// fall through to the global-cockpit path. (A real gogo repo living AT the data home is
+// pathological: the data home wins → global cockpit; don't register $HOME as a source.)
+func chooseBoard(root string, rootFound bool, dataHome string, listProjects func() ([]projects.Project, error), initialized func() bool) boardChoice {
+	if rootFound && !sameDir(filepath.Join(root, ".gogo"), dataHome) {
 		return boardChoice{model: tui.New(root), kind: "single"}
 	}
 	if !initialized() {
@@ -123,6 +131,10 @@ func chooseBoard(root string, rootFound bool, listProjects func() ([]projects.Pr
 	}
 	return boardChoice{model: tui.NewProjectBoard(projs[0]), kind: "project"}
 }
+
+// sameDir reports whether two paths point at the same directory (cleaned compare) —
+// the FR1 data-home guard.
+func sameDir(a, b string) bool { return filepath.Clean(a) == filepath.Clean(b) }
 
 // runProgram runs a built board Model to completion in the alt screen.
 func runProgram(m tea.Model) int {

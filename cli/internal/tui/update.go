@@ -398,6 +398,12 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingSource != nil {
 			return m.finishSourceForm()
 		}
+		// A config-tab project label-color form (cockpit-colors FR4) completes to
+		// finishProjectColorForm — its own path (stays on the config tab), mutually
+		// exclusive with the source form and every launch/kill/attach path.
+		if m.pendingProject != nil {
+			return m.finishProjectColorForm()
+		}
 		// A plans-tab new-plan form (FR10 `n`) completes to finishPlanForm — its own
 		// path (stays on the plans tab), mutually exclusive with every path above.
 		if m.pendingPlan {
@@ -431,7 +437,7 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 // cancelling them must NOT wipe the user's multi-selection (only a SHIP form's
 // cancel does). REV-012.
 func (m Model) formPreservesSelection() bool {
-	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingPlan
+	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingProject != nil || m.pendingPlan
 }
 
 // cancelForm returns to the board and clears the in-flight form state. For a SHIP
@@ -467,6 +473,7 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	m.pendingKill = nil
 	m.pendingAttach = nil
 	m.pendingSource = nil
+	m.pendingProject = nil
 	m.pendingPlan = false
 	m.binding = nil
 	m.form = nil

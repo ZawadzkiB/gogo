@@ -28,6 +28,13 @@ func (m Model) updateConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// board tab reflects the switch too.
 		m.switchProject(m.projIdx + 1)
 		return m, nil
+	case "c":
+		// Edit the focused PROJECT's label color (cockpit-colors FR4). Source colors are
+		// edited via the per-source e form's Color field.
+		if m.project != nil {
+			m.startProjectColorForm()
+			return m, m.form.Init()
+		}
 	case "up", "k":
 		m.sourceIdx = clamp(m.sourceIdx-1, 0, len(m.sources())-1)
 	case "down", "j":
@@ -101,10 +108,61 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		huh.NewInput().Title("Path").Description("the repo/service root that contains .gogo/").Value(&b.srcPath),
 		huh.NewInput().Title("Name").Description("display name (defaults to the folder name)").Value(&b.srcName),
 		huh.NewInput().Title("Main branch").Description("the source's default branch").Value(&b.srcBranch),
-		huh.NewInput().Title("Color").Description("optional card-tag hex, e.g. #7aa8ff").Value(&b.srcColor),
+		huh.NewInput().Title("Label color").Description("origin-dot hex or a swatch name (e.g. teal, #58a6ff) — blank auto-assigns").Value(&b.srcColor),
 		huh.NewInput().Title("Concurrent work items").Description("0 = unlimited; N caps live in-progress features").Value(&b.srcCap),
 	))
 	m.mode = modeForm
+}
+
+// startProjectColorForm opens the huh project label-color form under modeForm
+// (cockpit-colors FR4, `c`): a single input seeded from the focused project's Color,
+// bound through the heap-stable *formBinding.projColor (TEST-001). Completion routes to
+// finishProjectColorForm; a cancel returns to the config tab.
+func (m *Model) startProjectColorForm() {
+	p := m.project
+	m.pendingProject = &projectEdit{name: p.Name}
+	b := &formBinding{projColor: p.Color}
+	m.binding = b
+	m.form = huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Project label color — " + p.Name).
+			Description("origin-dot hex or a swatch name (e.g. teal, #58a6ff) — the project's color in the switcher").
+			Value(&b.projColor),
+	))
+	m.mode = modeForm
+}
+
+// finishProjectColorForm applies a completed project label-color form: it resolves a
+// swatch NAME to its hex (or keeps a raw hex), persists Project.Color to config.json (a
+// ~/.gogo/ write only), and re-tints the board live via refreshProject. Lands back on
+// the config tab.
+func (m Model) finishProjectColorForm() (tea.Model, tea.Cmd) {
+	edit := m.pendingProject
+	b := m.binding
+	m.pendingProject = nil
+	m.binding = nil
+	m.form = nil
+	m.mode = modeBoard // renders the active tab (tabConfig)
+	if edit == nil || b == nil {
+		return m, nil
+	}
+	color := strings.TrimSpace(b.projColor)
+	if hex, ok := projects.SwatchByName(color); ok {
+		color = hex
+	}
+	p, _ := projects.Load(edit.name)
+	if p.Name == "" {
+		m.status = "no such project " + edit.name
+		return m, nil
+	}
+	p.Color = color
+	if err := projects.Save(p); err != nil {
+		m.status = "recolor failed: " + err.Error()
+		return m, nil
+	}
+	m.refreshProject()
+	m.status = "recolored project " + edit.name
+	return m, nil
 }
 
 // finishSourceForm applies a completed add/edit/remove per-source form (updateForm
@@ -159,6 +217,15 @@ func (m Model) finishSourceForm() (tea.Model, tea.Cmd) {
 	if name == "" {
 		name = filepath.Base(abs)
 	}
+	// Label color (cockpit-colors FR4): accept a hex OR a swatch name; a blank color on
+	// ADD auto-assigns the next free palette swatch, so a new source is never colorless.
+	color := strings.TrimSpace(b.srcColor)
+	if hex, ok := projects.SwatchByName(color); ok {
+		color = hex
+	}
+	if color == "" && edit.op == "add" {
+		color = projects.AssignColor(m.takenSourceColors())
+	}
 	// An edit that moves the path removes the old entry so it is not orphaned
 	// (AddSource dedupes by path, so a same-path edit updates in place).
 	if edit.op == "edit" && edit.origPath != "" && edit.origPath != abs {
@@ -168,7 +235,7 @@ func (m Model) finishSourceForm() (tea.Model, tea.Cmd) {
 		Name:                name,
 		Path:                abs,
 		MainBranch:          strings.TrimSpace(b.srcBranch),
-		Color:               strings.TrimSpace(b.srcColor),
+		Color:               color,
 		ConcurrentWorkItems: cap,
 	}
 	if _, err := projects.AddSource(edit.project, src); err != nil {
@@ -178,6 +245,21 @@ func (m Model) finishSourceForm() (tea.Model, tea.Cmd) {
 	m.refreshProject()
 	m.status = "saved " + name
 	return m, nil
+}
+
+// takenSourceColors gathers the non-blank source colors already used across every home
+// project — the `taken` set AssignColor skips when auto-assigning a config-tab add's
+// blank color (so it fans out to the next free swatch, cockpit-colors FR2).
+func (m Model) takenSourceColors() []string {
+	var out []string
+	for _, p := range m.allProjects {
+		for _, s := range p.Sources {
+			if s.Color != "" {
+				out = append(out, s.Color)
+			}
+		}
+	}
+	return out
 }
 
 // nonEmpty returns s if it is non-blank, else the fallback — a tiny guard so a blank
@@ -209,7 +291,7 @@ func (m Model) viewConfig() string {
 	if m.status != "" {
 		parts = append(parts, "", statusStyle(m.status))
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓/jk source · p switch project · a add · e edit · x remove · tab board/plans · q quit")
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓/jk source · p switch project · c project color · a add · e edit · x remove · tab board/plans · q quit")
 	parts = append(parts, "", help)
 	return strings.Join(parts, "\n")
 }
@@ -224,13 +306,23 @@ func (m Model) viewConfigLeft() string {
 	}
 	for i, p := range m.allProjects {
 		cursor := "  "
-		row := p.Name + dimStyle.Render(fmt.Sprintf("  %d %s", len(p.Sources), plural(len(p.Sources), "source")))
-		if i == m.projIdx {
+		focused := i == m.projIdx
+		// Origin dots (D5): a project dot + its first source's dot (`●P ●S`) — the
+		// multi-project combo that reads "project P, source S" at a glance. A focused row
+		// renders the dots plain (the focus fill owns fg/bg). A live-session ● trails the
+		// focused project's row when it has running sessions (they aggregate to it).
+		dots := m.projectOriginDots(p, focused)
+		meta := dimStyle.Render(fmt.Sprintf("  %d %s", len(p.Sources), plural(len(p.Sources), "source")))
+		live := ""
+		if focused && len(m.sessions) > 0 {
+			live = " " + sessionStyle.Render("●")
+		}
+		if focused {
 			cursor = "▸ "
-			b = append(b, changelogFocusStyle.Render(cursor+p.Name)+dimStyle.Render(fmt.Sprintf("  %d %s", len(p.Sources), plural(len(p.Sources), "source"))))
+			b = append(b, changelogFocusStyle.Render(cursor+dots+" "+p.Name)+meta+live)
 			continue
 		}
-		b = append(b, cursor+row)
+		b = append(b, cursor+dots+" "+p.Name+meta+live)
 	}
 
 	b = append(b, "", colTitleStyle.Render("sources"))
@@ -240,7 +332,8 @@ func (m Model) viewConfigLeft() string {
 	}
 	for i, s := range srcs {
 		cursor := "  "
-		if i == m.sourceIdx {
+		focused := i == m.sourceIdx
+		if focused {
 			cursor = "▸ "
 		}
 		name := s.Name
@@ -251,14 +344,32 @@ func (m Model) viewConfigLeft() string {
 		if branch == "" {
 			branch = "main"
 		}
-		row := fmt.Sprintf("%s● %-16s %-28s %-8s %s", cursor, truncate(name, 16), truncate(s.Path, 28), branch, capText(s.ConcurrentWorkItems))
-		if i == m.sourceIdx {
+		// The source's colored origin dot (cockpit-colors FR4); a focused row renders it
+		// plain so the single focus fg/bg fill has no per-segment hole.
+		dot := "●"
+		if !focused {
+			dot = m.sourceDot(name)
+		}
+		row := fmt.Sprintf("%s%s %-16s %-28s %-8s %s", cursor, dot, truncate(name, 16), truncate(s.Path, 28), branch, capText(s.ConcurrentWorkItems))
+		if focused {
 			b = append(b, changelogFocusStyle.Render(row))
 		} else {
 			b = append(b, row)
 		}
 	}
 	return strings.Join(b, "\n")
+}
+
+// projectOriginDots renders a config-switcher project row's origin dots (D5): a project
+// dot + the project's FIRST source's dot (`●P ●S`), or a lone project dot when the
+// project has no sources yet. `plain` drops the tint for the focused (fill-owned) row.
+func (m Model) projectOriginDots(p projects.Project, plain bool) string {
+	pc := m.projectColor(p.Name)
+	if len(p.Sources) == 0 {
+		return originDots(nil, pc, plain) // a single project dot
+	}
+	sc := colorFor(p.Sources[0].Color, 0)
+	return originDots(pc, sc, plain)
 }
 
 // viewConfigRight is the config tab's right column: the focused source's detail + the
@@ -278,16 +389,19 @@ func (m Model) viewConfigRight() string {
 	if branch == "" {
 		branch = "main"
 	}
-	color := s.Color
-	if color == "" {
-		color = "-"
+	// Label color (design 3b): the resolved never-blank color named by its swatch
+	// (`teal`) or shown as a raw hex; a blank stored color is flagged `(default)` so the
+	// user knows it is the auto fallback, editable via the source `e` form's Label color.
+	colorLabel := swatchName(m.sourceColors[name])
+	if s.Color == "" {
+		colorLabel += " (default)"
 	}
 	b = append(b,
 		colTitleStyle.Render("source — "+name),
-		dimStyle.Render("path    ")+s.Path,
-		dimStyle.Render("branch  ")+branch,
-		dimStyle.Render("color   ")+color,
-		dimStyle.Render("cap     ")+capText(s.ConcurrentWorkItems),
+		dimStyle.Render("path         ")+s.Path,
+		dimStyle.Render("branch       ")+branch,
+		dimStyle.Render("label color  ")+m.sourceDot(name)+" "+colorLabel,
+		dimStyle.Render("cap          ")+capText(s.ConcurrentWorkItems),
 	)
 
 	b = append(b, "", colTitleStyle.Render("knowledge"))

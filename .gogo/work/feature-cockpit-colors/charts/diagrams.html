@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — cockpit-colors</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>cockpit-colors</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Color model — where each color comes from and where it renders</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  subgraph store["~/.gogo/projects/&lt;name&gt;/config.json  (CLI-owned data)"]
+    PC["Project.color  (NEW, hex, omitempty)"]
+    SC["Source.color  (existing, hex)"]
+  end
+  subgraph palette["cli/internal/projects/palette.go  (pure strings, 1 source of truth)"]
+    SW["Swatches[] {Name,Light,Dark}"]
+    AS["AssignColor(taken) → Dark hex"]
+    CF["ColorForIndex(i) → never-blank fallback"]
+    LU["LookupSwatch(hex) → swatch"]
+  end
+  ADD["gogo project add · gogo source add · config-tab form"] -->|assign + persist| PC
+  ADD -->|assign + persist| SC
+  AS --- ADD
+  PC --> HELP
+  SC --> HELP
+  CF --> HELP
+  LU --> HELP
+  HELP["tui.colorFor(hex, idx) → AdaptiveColor | Color (never blank)"]
+  HELP --> BOARD["board card: source dot"]
+  HELP --> CHIP["filter chips: dot per source"]
+  HELP --> CHG["changelog row: source dot (NEW)"]
+  HELP --> PLAN["plans card + detail: source dots"]
+  HELP --> CFGS["config: source dots + label-color"]
+  HELP --> COMBO["originDots(●project ●source) — multi-project switcher / future unified board"]
+  HELP --> CFGP["config: project switcher dots"]
+  </pre></div>
+
+  <script src="../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

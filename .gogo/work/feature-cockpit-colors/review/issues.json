@@ -1,0 +1,41 @@
+{
+  "slug": "cockpit-colors",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-19",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "\"gather taken colors\" logic duplicated across three sites",
+      "description": "The taken-colors set is computed by three separate helpers: takenColors() (cli/project.go:157, proj+src over projects.List()), existingSourceColor() (cli/source.go:132, preserve-on-readd) and Model.takenSourceColors() (cli/internal/tui/config_tab.go:251, src over m.allProjects). They are individually correct and split by context (CLI has no Model; the TUI holds an in-memory allProjects), but the source-color gathering is near-identical in two of them. Mild DRY smell, not a defect.",
+      "proposed_solution": "AGENT-FIXABLE (optional, low value): expose a single projects.TakenColors(projs []projects.Project) (proj, src []string) helper in the projects package and call it from all three sites so the round-robin seed can never drift. Leave as-is if the churn isn't worth it.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "new",
+      "origin": "review",
+      "found_in_round": 1
+    },
+    {
+      "id": "REV-002",
+      "title": "Legacy colorless source's fallback swatch shifts with slice position (cosmetic)",
+      "description": "sourceColorMap (cli/internal/tui/palette.go:92) resolves a blank Source.Color to projects.ColorForIndex(i) where i is the slice POSITION, not a name hash. So a pre-0.22 colorless source's rendered dot color - and the config right-pane 'label color · <name> (default)' text (config_tab.go:395) - can change if a sibling source is added/removed and positions shift. This only affects legacy blank entries (all newly-added sources now persist a real color) and is purely cosmetic; it also matches the plan's stated 'index = the source's position, or a hash of its name' latitude, so it is intended behaviour rather than a bug.",
+      "proposed_solution": "NEEDS-USER-DECISION (accept as-is is fine): if position-stability matters for legacy entries, switch the blank-color fallback in sourceColorMap/projectColorMap to stableIndex(name) (already used by sourceColor for unknown labels) so a colorless entity's fallback hue is stable across reorders. Otherwise wontfix - it is a documented design choice.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "new",
+      "origin": "review",
+      "found_in_round": 1
+    },
+    {
+      "id": "REV-003",
+      "title": "Config project-switcher rows add the two-dot origin cue without width truncation",
+      "description": "viewConfigLeft (cli/internal/tui/config_tab.go:317 via projectOriginDots) now prefixes each project switcher row with `●P ●S ` (~4 extra cells) and appends `meta`/`live`, but the project row is not truncated to the pane width - unlike board source tags which reuse fitSourceTag. FR3 called for the combo to stay 'legible at narrow widths (reuse the existing source-tag truncation)'. Low risk in practice: the config left pane is a wide fixed column and project names were already un-truncated pre-0.22, so the constant-width dots are unlikely to wrap; the constrained surface FR3 mainly targets (the future unified board card) is out of scope here.",
+      "proposed_solution": "AGENT-FIXABLE (optional): if a narrow terminal wraps the switcher row, truncate `p.Name` (or the whole row) to the available config-pane width the way board cards do. Otherwise leave - no wrap observed at normal widths.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "new",
+      "origin": "review",
+      "found_in_round": 1
+    }
+  ]
+}

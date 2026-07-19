@@ -68,10 +68,15 @@ type Source struct {
 // Project is a home-folder entity linking many sources. It is written to
 // ~/.gogo/projects/<Name>/config.json.
 type Project struct {
-	Schema      int      `json:"schema"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Sources     []Source `json:"sources"`
+	Schema      int    `json:"schema"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	// Color is the optional project-level origin color (hex) — the design's
+	// per-project label color, auto-assigned at `gogo project add`, editable in the
+	// config tab. Additive + optional (omitempty, schema stays 1): an absent field
+	// degrades to the deterministic palette fallback (ColorForIndex), never a crash.
+	Color   string   `json:"color,omitempty"`
+	Sources []Source `json:"sources"`
 }
 
 // Home resolves the gogo DATA home directory, honoring (in order):

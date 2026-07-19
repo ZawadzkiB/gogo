@@ -61,11 +61,16 @@ func sourceAdd(args []string) int {
 	if code != 0 {
 		return code
 	}
+	// Auto-assign a default origin color (cockpit-colors FR2) — the next free palette
+	// swatch, skipping colors already taken. A re-add of a source that already carries a
+	// color keeps it (never churns a user's customized color).
+	_, takenSrc := takenColors()
 	src := projects.Source{
 		Path:                abs,
 		Name:                filepath.Base(abs),
 		MainBranch:          detectMainBranch(abs),
 		ConcurrentWorkItems: projects.DefaultConcurrentWorkItems,
+		Color:               existingSourceColor(name, abs, projects.AssignColor(takenSrc)),
 	}
 	added, err := projects.AddSource(name, src)
 	if err != nil {
@@ -119,6 +124,19 @@ func sourceRemove(args []string) int {
 	}
 	fmt.Printf("removed source %s from project %q\n", key, name)
 	return 0
+}
+
+// existingSourceColor returns the color a source at path already carries in the named
+// project (so a re-add preserves a customized color), else the supplied fallback (a
+// freshly-assigned palette swatch). Keeps `gogo source add` idempotent on color.
+func existingSourceColor(project, path, fallback string) string {
+	p, _ := projects.Load(project)
+	for _, s := range p.Sources {
+		if s.Path == path && s.Color != "" {
+			return s.Color
+		}
+	}
+	return fallback
 }
 
 // resolveProjectName resolves the target project for a source op: the given

@@ -641,11 +641,9 @@ func containsString(ss []string, want string) bool {
 	return false
 }
 
-// sourceDot is the small colored dot the plan detail prefixes a target source with,
-// tinted with the source's configured color when set, else dim.
+// sourceDot is the small colored origin dot the plans tab / changelog / filter chips
+// prefix a source with — always the source's never-blank palette color (cockpit-colors
+// FR2), dropping the old grey "no color" fallback.
 func (m Model) sourceDot(sourceName string) string {
-	if c := m.sourceColors[sourceName]; c != "" {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Render("●")
-	}
-	return dimStyle.Render("●")
+	return lipgloss.NewStyle().Foreground(m.sourceColor(sourceName)).Render("●")
 }
