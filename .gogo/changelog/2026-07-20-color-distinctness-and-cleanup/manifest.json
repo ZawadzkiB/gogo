@@ -1,0 +1,2 @@
+{ "schema": 2, "name": "color-distinctness-and-cleanup", "release": "0.22.1", "date": "2026-07-20",
+  "members": [ { "slug": "cockpit-colors-patch", "title": "distinct colors + em-dash sweep + nits", "version": "0.22.1" } ] }

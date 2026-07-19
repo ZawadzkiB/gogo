@@ -10,21 +10,43 @@ import (
 )
 
 // TestColorForNeverBlank (cockpit-colors D2=A): colorFor resolves a swatch hex
-// adaptively, an arbitrary hex directly, and a blank via the never-blank ColorForIndex
-// fallback (also adaptive) — it never returns a nil/zero color.
+// adaptively, an arbitrary hex directly, and a blank via the never-blank name-stable
+// ColorForName fallback (also adaptive) — it never returns a nil/zero color.
 func TestColorForNeverBlank(t *testing.T) {
-	if colorFor("", 0) == nil {
+	if colorFor("", "web") == nil {
 		t.Fatal("colorFor(\"\", …) returned nil — must never be blank")
 	}
-	if _, ok := colorFor("", 3).(lipgloss.AdaptiveColor); !ok {
-		t.Errorf("colorFor(blank) = %T, want an AdaptiveColor (swatch fallback)", colorFor("", 3))
+	if _, ok := colorFor("", "api").(lipgloss.AdaptiveColor); !ok {
+		t.Errorf("colorFor(blank) = %T, want an AdaptiveColor (swatch fallback)", colorFor("", "api"))
 	}
-	if _, ok := colorFor("#58a6ff", 0).(lipgloss.AdaptiveColor); !ok {
-		t.Errorf("colorFor(swatch dark) = %T, want an AdaptiveColor", colorFor("#58a6ff", 0))
+	if _, ok := colorFor("#58a6ff", "web").(lipgloss.AdaptiveColor); !ok {
+		t.Errorf("colorFor(swatch dark) = %T, want an AdaptiveColor", colorFor("#58a6ff", "web"))
 	}
-	got := colorFor("#abcdef", 0)
+	got := colorFor("#abcdef", "web")
 	if c, ok := got.(lipgloss.Color); !ok || string(c) != "#abcdef" {
 		t.Errorf("colorFor(arbitrary hex) = %#v, want a direct lipgloss.Color(#abcdef)", got)
+	}
+}
+
+// TestColorlessFallbackIsNameStable (REV-002): a colorless source/project's fallback color
+// is derived from its NAME (ColorForName), so it stays the SAME when the list REORDERS —
+// unlike the old position-indexed fallback, whose hue shifted with slice position.
+func TestColorlessFallbackIsNameStable(t *testing.T) {
+	fwd := sourceColorMap([]projects.Source{{Name: "web", Path: "/r/web"}, {Name: "api", Path: "/r/api"}})
+	rev := sourceColorMap([]projects.Source{{Name: "api", Path: "/r/api"}, {Name: "web", Path: "/r/web"}})
+	if fwd["web"] != rev["web"] || fwd["api"] != rev["api"] {
+		t.Errorf("colorless source color shifted on reorder: web %q→%q, api %q→%q",
+			fwd["web"], rev["web"], fwd["api"], rev["api"])
+	}
+	if fwd["web"] != projects.ColorForName("web") {
+		t.Errorf("sourceColorMap fallback %q != ColorForName(web) %q — single source of truth drift",
+			fwd["web"], projects.ColorForName("web"))
+	}
+	pFwd := projectColorMap([]projects.Project{{Name: "alpha"}, {Name: "beta"}})
+	pRev := projectColorMap([]projects.Project{{Name: "beta"}, {Name: "alpha"}})
+	if pFwd["alpha"] != pRev["alpha"] || pFwd["beta"] != pRev["beta"] {
+		t.Errorf("colorless project color shifted on reorder: alpha %q→%q, beta %q→%q",
+			pFwd["alpha"], pRev["alpha"], pFwd["beta"], pRev["beta"])
 	}
 }
 

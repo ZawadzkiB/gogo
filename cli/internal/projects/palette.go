@@ -1,6 +1,9 @@
 package projects
 
-import "strings"
+import (
+	"hash/fnv"
+	"strings"
+)
 
 // palette.go is the ONE source of truth for the cockpit's per-project / per-source
 // origin colors (cockpit-colors, D2/D2.1). It lives in the `projects` package — the
@@ -55,6 +58,38 @@ func AssignColor(taken []string) string {
 func ColorForIndex(i int) string {
 	n := len(Swatches)
 	return Swatches[((i%n)+n)%n].Dark
+}
+
+// ColorForName is the NAME-stable never-blank fallback (REV-002): the palette Dark hex at
+// fnv(name) % len(Swatches). Unlike ColorForIndex (keyed on slice POSITION, so a colorless
+// entity's dot shifts hue when the project/source list reorders), it derives the color
+// from the entity's own name, so a colorless project/source keeps the SAME origin color
+// across a reorder. Deterministic and never blank.
+func ColorForName(name string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(name))
+	return ColorForIndex(int(h.Sum32()))
+}
+
+// TakenColors gathers every non-blank origin color in use across projs — each
+// Project.Color and each of its Source.Color — the `taken` set AssignColor round-robins
+// around so a freshly-added project/source fans out to the next free palette swatch
+// (cockpit-colors FR2). ONE shared walk (REV-001) for `gogo project add`, `gogo source
+// add`, and the config tab's blank-on-add auto-assign, so the gather logic lives in a
+// single place. A nil/empty input yields nil.
+func TakenColors(projs []Project) []string {
+	var out []string
+	for _, p := range projs {
+		if p.Color != "" {
+			out = append(out, p.Color)
+		}
+		for _, s := range p.Sources {
+			if s.Color != "" {
+				out = append(out, s.Color)
+			}
+		}
+	}
+	return out
 }
 
 // LookupSwatch resolves a persisted hex back to its Swatch (matching either the Dark or

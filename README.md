@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="gogo — make your flow more agentic" width="360" />
+  <img src="docs/assets/logo.png" alt="gogo - make your flow more agentic" width="360" />
 </p>
 
 <h1 align="center">gogo</h1>
@@ -8,21 +8,21 @@
 
 **A portable, knowledge-grounded development pipeline for Claude Code.**
 
-📖 **Documentation: <https://zawadzkib.github.io/gogo/>** — commands, the flow,
+📖 **Documentation: <https://zawadzkib.github.io/gogo/>** - commands, the flow,
 the per-agent I/O reference, discovery, and the contracts, with rendered diagrams.
 The site is **generated from** this repo's `commands/`, `agents/`, `skills/`, and
 `templates/`; the **code and skills are authoritative** and the site may lag them.
 
 > **The flow is generic and ships with the plugin. The rules are yours.**
-> gogo runs every non-trivial change through five fixed phases — **plan →
-> implement → review → test → report** — but *what* it plans against, *how* it
+> gogo runs every non-trivial change through five fixed phases - **plan →
+> implement → review → test → report** - but *what* it plans against, *how* it
 > writes code, *what* review flags, and *how* it tests are all driven by plain
 > markdown **knowledge files** that gogo wires up from your existing project docs.
 > Same pipeline everywhere; the behaviour is configuration.
 
 ## The flow
 
-![gogo pipeline — goal → plan → implement → review → test → report, with review/test fix-loops back into implement, grounded in your .gogo/knowledge config](assets/flow.png)
+![gogo pipeline - goal → plan → implement → review → test → report, with review/test fix-loops back into implement, grounded in your .gogo/knowledge config](assets/flow.png)
 
 <details>
 <summary>Same flow as an editable Mermaid diagram</summary>
@@ -48,9 +48,9 @@ flowchart LR
 
 *Plan waits for your acceptance before any code is written. Review and test loop
 fixes back into implement, and either can **pause for your decision** at any point
-— you answer and it resumes. On success, Report writes an as-built `report/` bundle
+- you answer and it resumes. On success, Report writes an as-built `report/` bundle
 (`report/report.md` + diagrams) and updates your knowledge docs, then stops at the
-**UAT gate** (`awaiting-uat`) for you to verify the work — running `/gogo:done`
+**UAT gate** (`awaiting-uat`) for you to verify the work - running `/gogo:done`
 **is** the acceptance, or your feedback loops back into planning on the same work
 item (recorded in `uat.md`). **Every phase is grounded in your `.gogo/knowledge/`
 config.***
@@ -58,7 +58,7 @@ config.***
 ## Generic flow, your rules
 
 The five phases never change. What changes per project lives in **`.gogo/knowledge/`**
-— small markdown files, one concern each, that gogo reads at the relevant phase.
+- small markdown files, one concern each, that gogo reads at the relevant phase.
 **These files are the configuration**: they're what make the generic flow behave
 like *your* project.
 
@@ -72,7 +72,7 @@ like *your* project.
 | `code-review-standards.md` | what review checks for: correctness, security, performance, error handling, style | Review |
 | `testing-tools.md` | the test tools and exactly how to run them | Test |
 | `test-strategy.md` | how to test: user journeys, UI / design checks, e2e levels, deploy checks, the done-bar | Test |
-| `index.md` | a purpose-map of the folder + the proxy convention | — |
+| `index.md` | a purpose-map of the folder + the proxy convention | - |
 | `_discovered.md` | what `/gogo:build` found and how each file was wired (regenerated each run) | build |
 
 On success, the **Report** phase writes anything it learned back into these files
@@ -80,22 +80,22 @@ On success, the **Report** phase writes anything it learned back into these file
 
 These files are **proxies**: they link to your project's real docs (an existing
 `CLAUDE.md`, `README`, `CONTRIBUTING`, Copilot / Cursor / Windsurf / Codex configs,
-manifests, test configs) and add a short gogo-specific summary — they don't
+manifests, test configs) and add a short gogo-specific summary - they don't
 duplicate them. Where a project has no doc for a topic, gogo authors that file
 from your codebase. You create them once with `/gogo:build` and refresh anytime;
 re-runs pick up new docs and **preserve your edits**.
 
 **Your own notes survive: `## Custom`.** Any knowledge file can carry a `## Custom`
-section — anything *you* write there is **user-owned and copied 1:1**: `/gogo:build`
+section - anything *you* write there is **user-owned and copied 1:1**: `/gogo:build`
 re-runs and the report phase **never rewrite it** (build reports what it preserved).
-It sits alongside the gogo-authored `## gogo overrides` block — the distinction is
+It sits alongside the gogo-authored `## gogo overrides` block - the distinction is
 simply **overrides = gogo's notes; Custom = yours, untouchable.**
 
-So adopting gogo in a new project is just `/gogo:build` — no flow to rewrite.
+So adopting gogo in a new project is just `/gogo:build` - no flow to rewrite.
 
 ## How it works
 
-Want the full picture — the flow-vs-knowledge split, *why* knowledge is split
+Want the full picture - the flow-vs-knowledge split, *why* knowledge is split
 again into always-read config vs on-demand skills, and exactly what gets stored
 where (plugin side vs your project's `.gogo/`)? See
 [**docs/architecture.md**](docs/architecture.md).
@@ -104,7 +104,7 @@ In short: the **flow ships with the plugin** (`commands/`, `skills/`, `agents/`)
 the **rules live in your project** (`.gogo/knowledge/`), and situational detail
 that would bloat the always-read config is extracted into **on-demand skills**
 (`.gogo/skills/`, or `.claude/skills/` for reusable ones) that load only when a
-task needs them — keeping each phase's context small and the LLM workers
+task needs them - keeping each phase's context small and the LLM workers
 deterministic.
 
 ## Quickstart
@@ -118,7 +118,7 @@ deterministic.
 # review the plan, accept it, then:
 /gogo:go                    # implement → review → test → report, stops at the UAT gate
 # verify the work, then:
-/gogo:done                  # your acceptance — ships it to the changelog (or give feedback to loop back)
+/gogo:done                  # your acceptance - ships it to the changelog (or give feedback to loop back)
 ```
 
 > Hacking on gogo itself? Add your local clone as the marketplace instead of the
@@ -144,7 +144,7 @@ ls ~/.claude/plugins/cache/gogo/gogo/   # newest dir = active version
 ```
 
 > Using a local clone as the marketplace? A plain `git pull` in the clone is
-> enough — no `marketplace update` needed — followed by `/reload-plugins`.
+> enough - no `marketplace update` needed - followed by `/reload-plugins`.
 
 ## Developing gogo locally
 
@@ -167,19 +167,19 @@ Then, after each change:
 
 ## Commands
 
-Each command is an ultra-thin entry point to the orchestrator — no flow logic
+Each command is an ultra-thin entry point to the orchestrator - no flow logic
 lives in the commands themselves.
 
 **`/gogo:build [--force]`**
 
 Set up or refresh the project's knowledge config. Discovers your existing docs
 (`CLAUDE.md`, Copilot / Cursor / Windsurf / Codex configs, README, manifests,
-test/CI configs) **at any depth** — including nested monorepo packages like
-`frontend/.github/` — plus a sweep of all project markdown and a light pass over
+test/CI configs) **at any depth** - including nested monorepo packages like
+`frontend/.github/` - plus a sweep of all project markdown and a light pass over
 in-code doc comments, then wires each knowledge file as a proxy, or synthesizes it
 from the codebase when none exists. It then **verifies the high-signal facts
 against your actual code** (tech stack, build/run/test commands, test framework,
-entry points) — on a conflict **code wins**, so a stale doc can't quietly poison
+entry points) - on a conflict **code wins**, so a stale doc can't quietly poison
 the config (gogo corrects its own summary, never your upstream file). Idempotent:
 re-run anytime to pick up new docs while preserving your edits. `--force` resets to
 fresh scaffolds.
@@ -193,25 +193,25 @@ Keep your knowledge config lean so the pipeline stays deterministic. Audits ever
 and **proposes them, then stops for your per-candidate approval** before writing
 anything. On approval it extracts each into a `SKILL.md` (+ optional `scripts/` /
 `.env.example`) and leaves a `**Load when:**` pointer in the parent. Directed mode
-— `/gogo:skills "extract the deploy runbook"` — pulls out exactly what you name.
+- `/gogo:skills "extract the deploy runbook"` - pulls out exactly what you name.
 Idempotent; re-run anytime. Knowledge-maintenance sibling of `/gogo:build`.
 
 **`/gogo:plan "<goal>"`**
 
 Runs the plan phase only. Writes an accept-pending plan to
 `.gogo/work/feature-<slug>/` (with the feature's functional requirements, a changes
-checklist, and a mermaid chart) and **stops for your acceptance** — no code is
+checklist, and a mermaid chart) and **stops for your acceptance** - no code is
 written until you accept.
 
 **`/gogo:go [feature-slug]`**
 
-Implements the accepted plan through the implement → review → test → report loop —
+Implements the accepted plan through the implement → review → test → report loop -
 the orchestrator **runs ② implement in-context** (warm across the fix loop) and
 **delegates the fresh-eyes phases** (③ review, ④ test) to the specialist agents,
 pausing only at real decisions. Refuses to start until a plan is accepted.
 
 The implement → review → test → report phases are **also runnable on their own**
-— each is a thin, idempotent entry point to its phase skill that **validates its
+- each is a thin, idempotent entry point to its phase skill that **validates its
 inputs** before working and **validates its outputs** before hand-off (the
 contract layer, below). `/gogo:go` chains these same commands.
 
@@ -226,7 +226,7 @@ as-built diagram set. With `--issues <path>` (a `review/issues.json` or
 
 Phase ③ standalone. Fresh-eyes review against your standards; emits the living,
 typed `review/issues.json` (the contract) and renders a `review-NN.md` snapshot.
-Re-run it after fixes — it updates the same list in place (open → fixed/verified,
+Re-run it after fixes - it updates the same list in place (open → fixed/verified,
 adds new).
 
 **`/gogo:test [feature-slug]`**
@@ -239,7 +239,7 @@ Phase ④ standalone. e2e/UI/CLI/API testing per your strategy; emits the living
 Phase ⑤ standalone. For an all-green feature: finalizes the plan to as-built,
 writes the `report/` bundle (`report/report.md` + the as-built UML diagrams), and
 updates your gogo-owned knowledge docs. Run standalone, it **also (re)generates a
-report for a past or broken run** — synthesizing a best-effort `report/report.md`
+report for a past or broken run** - synthesizing a best-effort `report/report.md`
 from whatever artifacts exist (plan, decisions, review/test issues, state, charts)
 and clearly marking which phases ran and what's still open. `plan.md` is the one
 prerequisite. (The in-pipeline ⑤, right after a green test, keeps its strict gate.)
@@ -248,32 +248,32 @@ prerequisite. (The in-pipeline ⑤, right after a green test, keeps its strict g
 
 Ship report-complete features into a high-level changelog. A **slug** ships that one;
 **`slug1+slug2+...`** ships those as ONE merged release entry; **no slug opens the work
-board cockpit** over every `.gogo/work/feature-*` — the shared `/gogo:status` classifier
+board cockpit** over every `.gogo/work/feature-*` - the shared `/gogo:status` classifier
 labels each **shipped · ready-to-ship · in-progress · unfinished** and from the
 four-class table you **view** any card (`v`), **ship** ready cards separately (`s`) or
 **merged** (`m`), **run/resume** the pipeline on an unbuilt card (`g`), and **filter**
-(`/`) — an interactive terminal kanban when `python3` + `tmux` + a tty are present,
+(`/`) - an interactive terminal kanban when `python3` + `tmux` + a tty are present,
 otherwise a status table + multi-select ship fallback (never failing over the board).
 Each key writes a single-shot **intent** the orchestrator runs before **relaunching**
 the board (`go` hands off to the pipeline; `q` cancels). When you ship merged (or pick
 **≥2** in the fallback), one question gates separate (N entries) vs merged (1
-entry). Every entry is a **high-level synthesis, not a copy** of the report bundle —
+entry). Every entry is a **high-level synthesis, not a copy** of the report bundle -
 gogo **writes** a `report.md` summarizing *what was changed/done/implemented* (key
 outcomes, one-line decisions, a review/test verdict, a member table + per-member section
 when merged) with a **link back** to each member's `.gogo/work/` folder for the full
-audit trail — plus the slug-prefixed `.mmd` set, a `manifest.json` carrying a
+audit trail - plus the slug-prefixed `.mmd` set, a `manifest.json` carrying a
 `members[]` array, and the merged `before/` set, into
 `.gogo/changelog/<YYYY-MM-DD>-<name>/` (date = newest member's `completed:`; **no
-`diagrams.html` copy** — the viewer builds from source). It **builds the interactive
+`diagrams.html` copy** - the viewer builds from source). It **builds the interactive
 viewer page for the entry and prints its `file://` link** (best-effort, reusing the
-`/gogo:view` build; falls back to the changelog folder path — never failing over the
+`/gogo:view` build; falls back to the changelog folder path - never failing over the
 link), and sets **each member's** `state.md` to a terminal `shipped` status. The audit
 trail stays in `.gogo/work/`; idempotent. A named slug with no report stops and tells
 you to run `/gogo:report <feature>` first.
 
 **`/gogo:view [changelog-entry | feature-slug[:plan|:report]]`**
 
-Open a gogo **plan or report** as a self-contained, offline **interactive webpage** —
+Open a gogo **plan or report** as a self-contained, offline **interactive webpage** -
 the `plan.md` / `report.md` summary rendered as readable HTML plus its mermaid diagrams
 made **interactive** (vendored runtime, no network, no build). Flowchart-family diagrams
 get an xplan-style rich renderer: custom-styled node cards you **drag** with edges
@@ -281,7 +281,7 @@ that **re-route live**, plus **zoom / fit / minimap** and a **persisted layout**
 other kinds fall back to a pan/zoom/drag canvas. A bundle carrying a `before/` set
 renders **before / after side by side** (compare mode). With no arg it presents a
 grouped **Work** (each feature's plan + report) / **Changelog** (shipped reports)
-picker — plans render in place from `plan.md` + `charts/` — and opens your pick; falls
+picker - plans render in place from `plan.md` + `charts/` - and opens your pick; falls
 back to printing the `file://` path if it can't auto-open.
 
 **`/gogo:status`**
@@ -298,26 +298,26 @@ Resumes a feature that paused for your decision, folding your answer into
 
 **`/gogo:accept <feature-slug>`**
 
-Accepts a plan at the **plan-acceptance gate** from the board — the CLI board
+Accepts a plan at the **plan-acceptance gate** from the board - the CLI board
 launches it when you press `m` on an `awaiting-plan-acceptance` card, so a
 plan-pending card the board now *shows* can also be *cleared* from the board.
 It presents `plan.md` for you to eyeball, then on your confirmation records
 acceptance exactly as planning does (`state.md` → `plan-accepted`, the
 `Status: **accepted**` line, the single-owner `plan-accepted` event). **Accept-only**
-— it does not chain into `/gogo:go` (the board's `m` on the now-accepted card is the
+- it does not chain into `/gogo:go` (the board's `m` on the now-accepted card is the
 natural second step). The CLI never mutates state; only the launched session does.
 
 ## The gogo CLI
 
-An **instant, deterministic cockpit** for your pipeline — a native **`gogo`
+An **instant, deterministic cockpit** for your pipeline - a native **`gogo`
 binary** (Go + Bubble Tea, in `cli/`) that opens a kanban board in milliseconds
 by **parsing the contract files the plugin already writes** ([the CLI
 contract](https://zawadzkib.github.io/gogo/cli-contract.html)) with **no LLM in
-the read path**. It is a companion binary, **not** a 14th slash command — the
+the read path**. It is a companion binary, **not** a 14th slash command - the
 slash commands stay the pipeline engine; the CLI is the read/launch cockpit.
 
-**Install** — grab the prebuilt binary from the GitHub release (no Go needed;
-the `uname` bits pick the right asset — darwin/linux × arm64/amd64):
+**Install** - grab the prebuilt binary from the GitHub release (no Go needed;
+the `uname` bits pick the right asset - darwin/linux × arm64/amd64):
 
 ```bash
 # into ~/bin (no sudo)
@@ -352,12 +352,12 @@ every `v*` tag).
 ```bash
 cd cli && go build -o gogo .
 # `go install ./cli` also works, but names the binary after the module tail
-# (`cli`, not `gogo`) — rename it, or prefer the explicit `-o gogo` build above.
+# (`cli`, not `gogo`) - rename it, or prefer the explicit `-o gogo` build above.
 ```
 
 **What it does:**
 
-- **Board** (`gogo`) — four columns **plan · in progress · ready · changelog**
+- **Board** (`gogo`) - four columns **plan · in progress · ready · changelog**
   (with vertical separators between them) from the ported work-index classifier.
   Each card is a feature folder: its name (+ a green `●` when it holds a live
   session) · a one-line description · a **status pill** showing the card's true
@@ -365,49 +365,49 @@ cd cli && go build -o gogo .
   `⏸ re-planning · UAT N` · …) plus, **only while a session is actively working
   it**, a green **`● <agent>` chip** (analyst · developer · reviewer · tester ·
   reporter, from the current phase). Liveness is a signal **separate** from status
-  — **`running` is never a status**; a card blocked on you is flagged by a heavy
+  - **`running` is never a status**; a card blocked on you is flagged by a heavy
   **left-border stripe** (red gate / purple UAT) and tallied in the header's
   **`⏸ K need you`** pill, while live sessions are tallied in **`● N session`**.
   The **changelog** is a collapsed `✓ slug … MM-DD` list carrying a `●` on any
   shipped item that still holds a session (drill in to kill it). `gogo status`
   carries the ⏸ signal in a dedicated **WAIT** column. `/` filters live;
   **fsnotify** refreshes the board while the pipeline runs.
-- **Drill-in** (`enter`) — a **rich card**: a detail panel (short description,
+- **Drill-in** (`enter`) - a **rich card**: a detail panel (short description,
   work-folder name, status) over the feature's **session(s)** (registry ⨯
   live-tmux, each flagged live/stale, plus any untracked-live racer), a
-  **recent-events tail**, then the browsable files — markdown via **glamour**,
+  **recent-events tail**, then the browsable files - markdown via **glamour**,
   `issues.json` as a table, `events.jsonl` as a full timeline, `.mmd` diagrams as
-  ASCII (flowchart-family) or source. `a` **attaches** the card's live session —
+  ASCII (flowchart-family) or source. `a` **attaches** the card's live session -
   a **picker** to choose which one when the card has several; `K` **kills** a
-  session behind a confirm — a **picker** offering one / all N / cancel when there
+  session behind a confirm - a **picker** offering one / all N / cancel when there
   are several (pipeline state untouched); `w` builds the
   interactive HTML page natively (goldmark, before/after compare) and opens the
   browser; `G` opens the file in `glow` when installed.
-- **Moves launch Claude** — `m` on an `awaiting-plan-acceptance` card runs
-  `claude "/gogo:accept <slug>"` (accept the plan from the board — closing the dead
+- **Moves launch Claude** - `m` on an `awaiting-plan-acceptance` card runs
+  `claude "/gogo:accept <slug>"` (accept the plan from the board - closing the dead
   end where it used to bounce into a `/gogo:go` that refuses); on any other
   plan/in-progress card `m` runs `claude "/gogo:go <slug>"`; selecting ready cards
   (`space`) and pressing `m`/`d` runs `claude "/gogo:done a+b+c"` (multiple = ONE
-  merged entry) — always behind a confirmation, in an attachable **tmux** session
+  merged entry) - always behind a confirmation, in an attachable **tmux** session
   (`a` attaches; gates stay answerable). Launches run in claude's **auto (classifier) permission mode** so
   the skills' safe file steps don't nag inside an unwatched session (NOT a full
   bypass); set `GOGO_CLAUDE_PERMISSION_MODE` to override the value (any
   `claude --permission-mode` value; empty string omits the flag → claude prompts),
   and the confirm states the effective mode. The CLI **never mutates pipeline
-  state** — a card moves columns only when the contract files actually change.
-- **Peek a session (`l`)** — read-only view of a live `gogo-*` session's recent
+  state** - a card moves columns only when the contract files actually change.
+- **Peek a session (`l`)** - read-only view of a live `gogo-*` session's recent
   output (`tmux capture-pane`, `r` re-captures) without attaching; for a
   backgrounded `claude -p` run it tails the log instead. `a` from the peek
   escalates to a full attach.
-- **Delete to trash (`x`)** — moves a card's work folder to `.gogo/trash/` behind
+- **Delete to trash (`x`)** - moves a card's work folder to `.gogo/trash/` behind
   an explicit confirm (recoverable, never `rm`); changelog cards are append-only
   and bounce. `gogo trash` lists deleted work; `gogo trash restore <entry>` puts
   it back.
-- **Persistent-session orchestrator (`gogo go [<slug>]` · `gogo plan <slug>`)** — the CLI as a
+- **Persistent-session orchestrator (`gogo go [<slug>]` · `gogo plan <slug>`)** - the CLI as a
   **session-lifecycle manager over the one skill**: `gogo go` **launches or `--resume`s ONE
   persistent `claude -p` session** running the existing `/gogo:go` skill for the whole feature
   (**implement warm in-context** + **review/test as nested `Task` subagents** + report), and the
-  CLI only manages that session's lifecycle — no phase loop, no routing in Go (the single routing
+  CLI only manages that session's lifecycle - no phase loop, no routing in Go (the single routing
   rule lives in the skill). It enforces the same acceptance gate `/gogo:go` does, and on the
   child's exit surfaces the outcome (`awaiting-uat` → run `/gogo:done`; a decision gate → the
   parked question + resume hint; an error → halt). `gogo plan` is the same machinery for a
@@ -417,55 +417,55 @@ cd cli && go build -o gogo .
   attachable interactive session (answer gates live, reaped at close). Bookkeeping lives under
   `.gogo/resources/cli/` (CLI-owned; never pipeline state). `gogo run` is a deprecated alias for
   `gogo go`. Needs `claude` on PATH; `--attach` needs `tmux`.
-- **Projects · sources cockpit — the two-mode model (since 0.21.0)** — a **project** is a home-folder
+- **Projects · sources cockpit - the two-mode model (since 0.21.0)** - a **project** is a home-folder
   entity (`~/.gogo/projects/<name>/`) that links many **sources** (repos with their own `.gogo/`).
-  There are **two modes**: (1) **repo-local** — running `gogo` INSIDE a repo (a dir with `.gogo/`)
+  There are **two modes**: (1) **repo-local** - running `gogo` INSIDE a repo (a dir with `.gogo/`)
   always shows THAT repo's own single board, even when the repo is a registered project's source
-  (per-repo stays simple, byte-for-byte); (2) **global cockpit** — `gogo global` opens the
+  (per-repo stays simple, byte-for-byte); (2) **global cockpit** - `gogo global` opens the
   cross-project tabbed cockpit (board · plans · config) from anywhere, and `gogo` OUTSIDE any repo
-  does the same. Set it up once with **`gogo global init`** (creates `~/.gogo/` — the home where your
+  does the same. Set it up once with **`gogo global init`** (creates `~/.gogo/` - the home where your
   projects live) then **`gogo project add <repo>`**; `gogo project list` / `gogo project rm <name>`
   manage projects, and `gogo source add <repo> [--project <name>]` / `gogo source rm <repo|name>` add
   and remove sources (`gogo project add` also auto-initializes the cockpit home, so registering a
-  project is enough). The CLI writes ONLY `~/.gogo/` (its own data) — never a source's `.gogo/`
+  project is enough). The CLI writes ONLY `~/.gogo/` (its own data) - never a source's `.gogo/`
   pipeline state.
-- **Tabbed cockpit — board · plans · config (since 0.21.0)** — on a project board, `tab` /
+- **Tabbed cockpit - board · plans · config (since 0.21.0)** - on a project board, `tab` /
   `shift+tab` cycle three tabs: **board** (the kanban of the project's sources), **plans** (the
   project's plan store), and **config** (per-source settings + a knowledge explorer). `p` cycles the
   board's **source chips** (`all` + one per source) and, on the config tab, the **project switcher**.
-  A lone repo with no home project shows just the single-repo board (no tabs, no chips) — byte-for-byte.
-- **Plans tab + spawn (since 0.21.0)** — a **plan** is a project-scoped, hand-editable markdown file
+  A lone repo with no home project shows just the single-repo board (no tabs, no chips) - byte-for-byte.
+- **Plans tab + spawn (since 0.21.0)** - a **plan** is a project-scoped, hand-editable markdown file
   at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
   The plans tab lists them grouped by status; keys: `n` new plan · `A` **plan-with-claude** (mints a
-  draft, then opens a plain `claude` session anchored at a source to author the plan file in place —
+  draft, then opens a plain `claude` session anchored at a source to author the plan file in place -
   never a `/gogo:plan` scaffold) · `r` mark ready · `x` delete · `enter` open the detail. In a plan's
-  **detail** you target the project's sources and press `c` **create work item** on a source row — the
+  **detail** you target the project's sources and press `c` **create work item** on a source row - the
   CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the analyst derives
   the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+` adds a target,
   `e` edits the plan file. `gogo plan new/list/show/add/rm/ready/promote/delete` is the scriptable
   surface for the same store.
-- **Correlation in `state.md` (since 0.21.0)** — when a plan spawns/links a work item, the
-  `/gogo:plan --correlation` skill stamps `- **correlation:** [plan-<hash>, …]` — an additive,
-  optional **list** — into that work item's `state.md` (many-to-many: a ticket can belong to several
+- **Correlation in `state.md` (since 0.21.0)** - when a plan spawns/links a work item, the
+  `/gogo:plan --correlation` skill stamps `- **correlation:** [plan-<hash>, …]` - an additive,
+  optional **list** - into that work item's `state.md` (many-to-many: a ticket can belong to several
   plans). The board reads it straight from `state.md` (no CLI store), paints a `⛓ plan-<hash>` chip per
   id, and filters to a plan's members across sources with a `#plan-<hash>` token. An absent
   `correlation:` line is byte-for-byte the pre-correlation board.
-- **Config tab (since 0.21.0)** — per-source settings (add `a` · remove `x` · edit `e` a source's
+- **Config tab (since 0.21.0)** - per-source settings (add `a` · remove `x` · edit `e` a source's
   `concurrentWorkItems` cap / `mainBranch` / color / permission mode) plus a project switcher and a
   **knowledge explorer** over the sources' `.gogo/knowledge/` and the project's `.knowledge/`. The
   per-source **concurrency cap** refuses a `gogo go` (or board `m`→go) that would start work on an
   **(N+1)th** live in-progress feature in that source (so two build sessions can't clobber one shared
   working tree); `--force` overrides. Default cap `1`; `0` = unlimited; an uncapped source is inert.
-  All config writes land under `~/.gogo/` only — never a source's `.gogo/`.
-- **Scriptable** — `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
+  All config writes land under `~/.gogo/` only - never a source's `.gogo/`.
+- **Scriptable** - `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
   `gogo events <slug>`, `gogo go [<slug>] [--attach] [--takeover]`,
   `gogo sweep [--dry-run] [<slug>...]`, `gogo trash [restore <entry>]`,
   `gogo project [add <repo> [--name <name>] | list | rm <name>]`,
-  `gogo global [init | board]` (set up / open the cross-project cockpit — `gogo` in a repo shows THAT repo),
+  `gogo global [init | board]` (set up / open the cross-project cockpit - `gogo` in a repo shows THAT repo),
   `gogo source [add <repo> [--project <name>] | rm <repo|name> [--project <name>]]`,
   `gogo plan [new "<title>" | list | show <id> | add <id> <source>[:<slug>] | rm <id> <source>[:<slug>] | ready <id> | promote <id> <source> | delete <id>]`
-  (or `gogo plan <slug>` — a bare feature slug — to launch the feature's persistent `/gogo:plan` session),
+  (or `gogo plan <slug>` - a bare feature slug - to launch the feature's persistent `/gogo:plan` session),
   `gogo draft [new "<title>" | list | show <id> | ready <id> | rm <id>]` (a thin alias into `gogo plan`, narrowed to `status: draft`),
   `gogo epic [new "<title>" | list | show <id> | add <id> <source>:<slug> | rm <id> <source>:<slug> | delete <id>]` (a thin alias into `gogo plan`, `list` = member-bearing plans),
   `gogo --version` (mirrors the plugin).
@@ -477,7 +477,7 @@ glamour view is the fallback). Keymap: `←→`/`h` columns · `↑↓`/`jk` car
 `a` attach · `l` peek · `x` delete→trash · `tab`/`shift+tab` board·plans·config ·
 `p` source chip / project switcher · `/` filter (incl. `#plan-<id>`) · `G` glow · `q` quit.
 
-**CLI companion reference** — an installed Claude also carries an on-demand
+**CLI companion reference** - an installed Claude also carries an on-demand
 `gogo-cli` skill (`skills/gogo-cli/SKILL.md`) documenting the full command
 surface, the persistent-session model, and *when* to suggest the CLI vs the
 in-chat `/gogo:*` flow. It is kept in sync with this section, `cli/main.go` help,
@@ -485,66 +485,66 @@ and the CLI contract by the `TestCLICommandEnumerationInSync` test.
 
 ## Agents
 
-- **`gogo`** — the orchestrator: owns the flow/loop, knows what to run when, **runs
+- **`gogo`** - the orchestrator: owns the flow/loop, knows what to run when, **runs
   ② implement in-context** (warm across the fix loop), and delegates the fresh-eyes
   phases (①③④) to the specialists. Also usable hands-off ("build X end-to-end").
-- **`gogo-analyst`** — phase ① specialist: reads `analysis.md` + the named knowledge
+- **`gogo-analyst`** - phase ① specialist: reads `analysis.md` + the named knowledge
   set, analyses the goal against the actual code, and writes the plan (and re-analyses
   UAT feedback into a plan delta on the same work item).
-- **`gogo-developer`** — implements the accepted plan and applies review/test fixes.
+- **`gogo-developer`** - implements the accepted plan and applies review/test fixes.
   Backs standalone `/gogo:implement` + hands-off runs (on `/gogo:go` the orchestrator
   implements in-context instead).
-- **`gogo-reviewer`** — fresh-eyes, adversarial code review.
-- **`gogo-tester`** — e2e/UI testing via the bundled Playwright MCP.
+- **`gogo-reviewer`** - fresh-eyes, adversarial code review.
+- **`gogo-tester`** - e2e/UI testing via the bundled Playwright MCP.
 
 ## What gets created in your project
 
-gogo keeps everything under one **`.gogo/`** folder — plain markdown you can read,
+gogo keeps everything under one **`.gogo/`** folder - plain markdown you can read,
 edit, and commit:
 
-**`.gogo/knowledge/`** — your project's configuration: the ten files described in
+**`.gogo/knowledge/`** - your project's configuration: the ten files described in
 [**Generic flow, your rules**](#generic-flow-your-rules) above. Every file states
 its own purpose in its header, and `index.md` is the folder's purpose-map.
 
-**`.gogo/skills/`** — on-demand skills `/gogo:skills` has extracted from your
+**`.gogo/skills/`** - on-demand skills `/gogo:skills` has extracted from your
 knowledge files: cohesive, situational detail moved out of the always-read config
 into skills that load **only when relevant**, keeping the pipeline lean and
 deterministic. `.gogo/skills/index.md` is the registry. A candidate the command
 classifies as **standalone** (a reusable, self-contained capability) instead lands
-in **`.claude/skills/<slug>/`** so Claude Code auto-discovers it — written only
+in **`.claude/skills/<slug>/`** so Claude Code auto-discovers it - written only
 when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
-**`.gogo/resources/`** — one vendored mermaid runtime per project
+**`.gogo/resources/`** - one vendored mermaid runtime per project
 (`mermaid.min.js`, shared by every feature) plus the interactive viewer module set
 (`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`), and
-`kanban/` (the `/gogo:done` work-board scratch — the vendored `board.py`, the
+`kanban/` (the `/gogo:done` work-board scratch - the vendored `board.py`, the
 work-index, and the board-intent). Offline, no network, no build.
 
-**`.gogo/work/feature-<slug>/`** — one folder per piece of work:
+**`.gogo/work/feature-<slug>/`** - one folder per piece of work:
 
 | File | Purpose |
 |---|---|
 | `plan.md` | The accepted plan (the contract), incl. the feature's functional requirements |
 | `adjustments.md` | Log of changes/clarifications you asked for during planning |
-| `state.md` | Current phase/status/iterations — lets work resume across sessions |
+| `state.md` | Current phase/status/iterations - lets work resume across sessions |
 | `decisions.md` | Forks that needed your call, with gogo's recommendation + your answer |
-| `uat.md` | The **UAT gate** log (appears once report ⑤ reaches `awaiting-uat`) — one round per user check: a `/gogo:done` accept line, or an analyst-authored issues round (verbatim input + analysis + plan delta + verdict) when feedback loops back into planning on the same work item |
-| `review/issues.json` | The living, typed review findings — the **contract** review hands to implement (one list, updated in place across rounds) |
+| `uat.md` | The **UAT gate** log (appears once report ⑤ reaches `awaiting-uat`) - one round per user check: a `/gogo:done` accept line, or an analyst-authored issues round (verbatim input + analysis + plan delta + verdict) when feedback loops back into planning on the same work item |
+| `review/issues.json` | The living, typed review findings - the **contract** review hands to implement (one list, updated in place across rounds) |
 | `review-NN.md` | Each code-review round's rendered snapshot of `issues.json` |
 | `test/issues.json` | The living, typed test findings (same contract) |
 | `test-NN.md` | Each test round's rendered snapshot |
-| `events.jsonl` | Append-only progress telemetry — one JSON line per phase transition (schema'd), read by the `gogo` CLI cockpit; a missing file is never an error |
+| `events.jsonl` | Append-only progress telemetry - one JSON line per phase transition (schema'd), read by the `gogo` CLI cockpit; a missing file is never an error |
 | `report/` | The as-built bundle (written at report phase): `report/report.md` (planned-vs-shipped, implementation, decisions + reasons, review/test outcomes), the UML set (`.mmd` chosen by the diff), `report/before/` (the plan-time "before" set copied in for a self-contained before/after compare), `diagrams.html`, `manifest.json`. This is the full audit trail; `/gogo:done` **synthesizes** a high-level entry from it into `.gogo/changelog/<date>-<name>/` (it does not copy the bundle) |
-| `charts/` | Mermaid diagrams (`.mmd`) + `charts/before/` (the plan-time as-is baseline) + `manifest.json` + an offline `diagrams.html` viewer — the plan's intended design, plus the implement as-built flow / sequence / class / activity set |
+| `charts/` | Mermaid diagrams (`.mmd`) + `charts/before/` (the plan-time as-is baseline) + `manifest.json` + an offline `diagrams.html` viewer - the plan's intended design, plus the implement as-built flow / sequence / class / activity set |
 
-**`.gogo/trash/`** — deleted work, recoverable. Deleting a board card (`x` in the
+**`.gogo/trash/`** - deleted work, recoverable. Deleting a board card (`x` in the
 `gogo` CLI) **moves** its `feature-<slug>/` folder here (`<compact-ts>-<slug>/`,
 never `rm`); `gogo trash` lists it and `gogo trash restore <entry>` puts it back.
 The CLI's one write outside `.gogo/resources/`.
 
-**`.gogo/changelog/`** — the append-only shipped archive, a high-level release
+**`.gogo/changelog/`** - the append-only shipped archive, a high-level release
 history. When you run `/gogo:done`, gogo **synthesizes** an entry into
-`.gogo/changelog/<YYYY-MM-DD>-<name>/` — a written `report.md` (not a copy of the
+`.gogo/changelog/<YYYY-MM-DD>-<name>/` - a written `report.md` (not a copy of the
 report bundle) + the slug-prefixed `.mmd` set + a `manifest.json` with a `members[]`
 array + the `before/` set. One or several related features can ship as a single merged
 release entry; the full detail stays in `.gogo/work/`. `/gogo:view` reads from here too.
@@ -552,7 +552,7 @@ release entry; the full detail stays in `.gogo/work/`. `/gogo:view` reads from h
 The typed artifacts (`*/issues.json`, `charts/manifest.json`, per-run
 `result.json`, the feature `pipeline.json`) follow JSON Schemas shipped in the
 plugin (`templates/contracts/`). Each phase command validates its inputs and
-outputs against them so a bad LLM hand-off is caught, not propagated — the
+outputs against them so a bad LLM hand-off is caught, not propagated - the
 validation is portable (`jq`/schema if present, else the agent checks against the
 schema; no new required dependency).
 
@@ -564,7 +564,7 @@ gogo is built to run anywhere it's installed:
   dependencies**.
 - **Mermaid** diagrams render natively in GitHub / VS Code / JetBrains from
   fenced ` ```mermaid ` blocks; the bundled offline viewer needs only a browser
-  (mermaid is vendored — no network, no CLI).
+  (mermaid is vendored - no network, no CLI).
 - **Browser / UI testing** uses the bundled **Playwright MCP**, which boots via
   `npx` on first use (needs **Node.js**). Without it, the test phase falls back to
   API/CLI tests plus written manual steps.
@@ -575,4 +575,4 @@ get a local desktop notification + a terminal bell.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT - see [LICENSE](./LICENSE).

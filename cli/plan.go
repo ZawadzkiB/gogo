@@ -12,7 +12,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 )
 
-const planStoreHelp = `gogo plan — manage project-scoped plans (~/.gogo/projects/<project>/.gogo/plans/)
+const planStoreHelp = `gogo plan - manage project-scoped plans (~/.gogo/projects/<project>/.gogo/plans/)
 
 usage:
   gogo plan new "<title>" [--project <p>] [--desc <text>]   create a draft plan (prints its plan-<hash> id)
@@ -27,11 +27,11 @@ usage:
 A PLAN is one lifecycle entity (draft → ready → active → done) owned by a home
 project; it targets the project's sources and spawns a work item per source, each
 stamped with the plan's correlation id in its state.md. --project defaults to the
-sole project and is REQUIRED when several exist. This writes ONLY ~/.gogo/ — a spawn
+sole project and is REQUIRED when several exist. This writes ONLY ~/.gogo/ - a spawn
 LAUNCHES /gogo:plan in the source (the skill writes its .gogo/work/), never the CLI.
 
 Note: "gogo plan <slug>" (a bare feature slug, not a subcommand) still launches the
-feature's persistent /gogo:plan session — the lifecycle command, unchanged.
+feature's persistent /gogo:plan session - the lifecycle command, unchanged.
 `
 
 // planLauncher is the injectable spawn seam (mirroring draftLauncher): tests swap it
@@ -52,7 +52,7 @@ func isPlanStoreVerb(v string) bool {
 }
 
 // cmdPlanStore dispatches the project-scoped `gogo plan` subcommands (FR17). It writes
-// ONLY the plans store under ~/.gogo/ — never a source's .gogo/ (a promote LAUNCHES
+// ONLY the plans store under ~/.gogo/ - never a source's .gogo/ (a promote LAUNCHES
 // the skill in the source, which writes the work item + stamps the correlation).
 func cmdPlanStore(args []string) int {
 	if len(args) == 0 {
@@ -165,7 +165,7 @@ func planNew(args []string) int {
 		fmt.Fprintf(os.Stderr, "gogo plan new: %v\n", err)
 		return 1
 	}
-	fmt.Printf("created plan %s (%s) in %q — %s\n", p.ID, p.Status, project, p.Title)
+	fmt.Printf("created plan %s (%s) in %q - %s\n", p.ID, p.Status, project, p.Title)
 	return 0
 }
 
@@ -224,7 +224,7 @@ func planShow(args []string) int {
 		fmt.Printf("  targets: %s\n", strings.Join(p.Targets, ", "))
 	}
 	if len(p.Members) == 0 {
-		fmt.Println("  (no work items — spawn one with `gogo plan promote " + p.ID + " <source>`)")
+		fmt.Println("  (no work items - spawn one with `gogo plan promote " + p.ID + " <source>`)")
 		return 0
 	}
 	fmt.Printf("  %d work item%s:\n", len(p.Members), planPlural(len(p.Members)))
@@ -234,7 +234,7 @@ func planShow(args []string) int {
 	return 0
 }
 
-// planAdd adds a target source (or, with a `:slug`, links an existing work item —
+// planAdd adds a target source (or, with a `:slug`, links an existing work item -
 // the retroactive many-to-many connect, FR16).
 func planAdd(args []string) int {
 	pa, ok, code := parsePlanArgs("gogo plan add", args)
@@ -390,14 +390,14 @@ func planPromote(args []string) int {
 		fmt.Fprintf(os.Stderr, "gogo plan promote: %v\n", err)
 		return 1
 	}
-	// Record the spawn (advisory member + ready→active) — store writes to ~/.gogo/ only.
+	// Record the spawn (advisory member + ready→active) - store writes to ~/.gogo/ only.
 	plans.AddMember(project, id, plans.Member{Source: sname, SlugHint: planKebab(p.Title)})
 	plans.SetStatus(project, id, plans.StatusActive)
 	where := res.Session
 	if where == "" {
 		where = res.LogPath
 	}
-	fmt.Printf("spawned work item for plan %s in %s — launched %s (%s)\n", id, sname, intent.Command, where)
+	fmt.Printf("spawned work item for plan %s in %s - launched %s (%s)\n", id, sname, intent.Command, where)
 	return 0
 }
 
@@ -447,9 +447,9 @@ func planKebab(title string) string {
 // (id · status · items · title). Exposed so a test can pin it.
 func FormatPlans(project string, list []plans.Plan) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "gogo plans — %d in %q  (~/.gogo/projects/%s/.gogo/plans/)\n\n", len(list), project, project)
+	fmt.Fprintf(&b, "gogo plans - %d in %q  (~/.gogo/projects/%s/.gogo/plans/)\n\n", len(list), project, project)
 	if len(list) == 0 {
-		b.WriteString("(none — create one with `gogo plan new \"<title>\"`)\n")
+		b.WriteString("(none - create one with `gogo plan new \"<title>\"`)\n")
 		return b.String()
 	}
 	fmt.Fprintf(&b, "%-18s %-8s %-7s %s\n", "ID", "STATUS", "ITEMS", "TITLE")

@@ -11,7 +11,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 )
 
-const projectHelp = `gogo project — manage home-folder projects (~/.gogo/projects/<name>/)
+const projectHelp = `gogo project - manage home-folder projects (~/.gogo/projects/<name>/)
 
 usage:
   gogo project add <repo> [--name <name>]   create a project (name defaults to the repo basename)
@@ -21,11 +21,11 @@ usage:
 
 A PROJECT is a home-folder entity that links many SOURCES (repos with their own
 .gogo/). Add more sources with ` + "`gogo source add`" + `. This writes ONLY
-~/.gogo/ (the CLI's own data) — never a source's .gogo/ pipeline state.
+~/.gogo/ (the CLI's own data) - never a source's .gogo/ pipeline state.
 `
 
 // cmdProject dispatches the `gogo project` subcommands (FR4). It writes ONLY the
-// gogo DATA home (~/.gogo/projects/<name>/) — never a source's .gogo/ pipeline
+// gogo DATA home (~/.gogo/projects/<name>/) - never a source's .gogo/ pipeline
 // state (the CLI-reads/skills-write invariant is about a source's .gogo/, and a
 // project entity is CLI-owned data, not pipeline state).
 func cmdProject(args []string) int {
@@ -71,7 +71,7 @@ func projectAdd(args []string) int {
 	}
 	// FR22: registering a project also initializes the global cockpit home (writes
 	// the ~/.gogo/config.json marker) so the cockpit becomes available even without
-	// an explicit `gogo global init`. Best-effort — a marker write failure never
+	// an explicit `gogo global init`. Best-effort - a marker write failure never
 	// blocks the add (Save creates the project dir regardless), and it is idempotent
 	// once the home exists.
 	projects.EnsureHome()
@@ -81,27 +81,28 @@ func projectAdd(args []string) int {
 	// Auto-assign a default origin color for the project AND its first source
 	// (cockpit-colors FR2): a deterministic round-robin over the palette that skips
 	// colors already used by existing projects/sources, persisted into config.json.
-	takenProj, takenSrc := takenColors()
+	all, _ := projects.List()
+	taken := projects.TakenColors(all)
 	src := projects.Source{
 		Path:                abs,
 		Name:                filepath.Base(abs),
 		MainBranch:          detectMainBranch(abs),
 		ConcurrentWorkItems: projects.DefaultConcurrentWorkItems,
-		Color:               projects.AssignColor(takenSrc),
+		Color:               projects.AssignColor(taken),
 	}
 
 	existing, _ := projects.Load(name)
 	if len(existing.Sources) > 0 {
 		if hasSourcePath(existing.Sources, abs) {
-			fmt.Printf("already registered %s in project %q — edit sources with `gogo source`\n", abs, name)
+			fmt.Printf("already registered %s in project %q - edit sources with `gogo source`\n", abs, name)
 			return 0
 		}
-		fmt.Fprintf(os.Stderr, "gogo project add: project %q already exists with %d source(s) — add this repo with `gogo source add %s --project %s`\n",
+		fmt.Fprintf(os.Stderr, "gogo project add: project %q already exists with %d source(s) - add this repo with `gogo source add %s --project %s`\n",
 			name, len(existing.Sources), abs, name)
 		return 1
 	}
 
-	p := projects.Project{Name: name, Color: projects.AssignColor(takenProj), Sources: []projects.Source{src}}
+	p := projects.Project{Name: name, Color: projects.AssignColor(taken), Sources: []projects.Source{src}}
 	if _, err := projects.Add(p); err != nil {
 		fmt.Fprintf(os.Stderr, "gogo project add: %v\n", err)
 		return 1
@@ -122,7 +123,7 @@ func projectList() int {
 	return 0
 }
 
-// projectRemove removes a project by NAME (its home folder only — never a
+// projectRemove removes a project by NAME (its home folder only - never a
 // source's .gogo/).
 func projectRemove(args []string) int {
 	if len(args) == 0 {
@@ -149,26 +150,6 @@ func capLabel(n int) string {
 		return "∞"
 	}
 	return strconv.Itoa(n)
-}
-
-// takenColors gathers the non-blank project + source origin colors already in use
-// across the whole store — the `taken` sets projects.AssignColor round-robins around so
-// a freshly-added project/source fans out to the next free palette swatch
-// (cockpit-colors FR2). A missing/empty store yields empty slices (AssignColor then
-// picks the first swatch).
-func takenColors() (projColors, srcColors []string) {
-	all, _ := projects.List()
-	for _, p := range all {
-		if p.Color != "" {
-			projColors = append(projColors, p.Color)
-		}
-		for _, s := range p.Sources {
-			if s.Color != "" {
-				srcColors = append(srcColors, s.Color)
-			}
-		}
-	}
-	return projColors, srcColors
 }
 
 // hasSourcePath reports whether sources already carries a source at path.
@@ -225,14 +206,14 @@ func resolveGogoRepo(cmd, repo string) (string, int) {
 	}
 	abs = filepath.Clean(abs)
 	if info, err := os.Stat(filepath.Join(abs, ".gogo")); err != nil || !info.IsDir() {
-		fmt.Fprintf(os.Stderr, "%s: %s has no .gogo/ — not a gogo source (run /gogo:build there first)\n", cmd, abs)
+		fmt.Fprintf(os.Stderr, "%s: %s has no .gogo/ - not a gogo source (run /gogo:build there first)\n", cmd, abs)
 		return "", 1
 	}
 	return abs, 0
 }
 
 // detectMainBranch best-effort resolves a repo's default branch: the
-// origin/HEAD symbolic ref, else the current branch, else "main". Never fatal —
+// origin/HEAD symbolic ref, else the current branch, else "main". Never fatal -
 // a repo without git (or without a remote) falls straight through to "main".
 func detectMainBranch(repo string) string {
 	for _, args := range [][]string{
@@ -254,9 +235,9 @@ func detectMainBranch(repo string) string {
 // plain-text table. Exposed so a test can pin it.
 func FormatProjects(projs []projects.Project) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "gogo projects — %d project(s)  (~/.gogo/projects/)\n\n", len(projs))
+	fmt.Fprintf(&b, "gogo projects - %d project(s)  (~/.gogo/projects/)\n\n", len(projs))
 	if len(projs) == 0 {
-		b.WriteString("(none — create one with `gogo project add <repo>`)\n")
+		b.WriteString("(none - create one with `gogo project add <repo>`)\n")
 		return b.String()
 	}
 	for _, p := range projs {

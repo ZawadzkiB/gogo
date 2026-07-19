@@ -9,6 +9,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // seedConfigHome points the legacy registry / epics store at a fresh t.TempDir() via
@@ -346,6 +347,35 @@ func TestConfigTabRendersColorDots(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("config tab missing %q:\n%s", want, out)
 		}
+	}
+}
+
+// TestConfigSwitcherRowTruncatedToPane (REV-003): a long project name in the switcher is
+// truncated to the switcher pane width instead of wrapping past it.
+func TestConfigSwitcherRowTruncatedToPane(t *testing.T) {
+	seedDataHome(t)
+	longName := "a-really-really-long-project-name-that-would-wrap"
+	p := projects.Project{Name: longName, Sources: []projects.Source{{Name: "svc", Path: "/r/svc"}}}
+	m := NewWorkspace(&contract.Repo{}, p)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 40}) // half=30 → pane floored to 30
+	m = configTab(nm.(Model))
+
+	pane := m.configPaneWidth()
+	var row string
+	for _, ln := range strings.Split(m.viewConfigLeft(), "\n") {
+		if strings.Contains(ln, "…") && strings.Contains(ln, "a-really") {
+			row = ln
+			break
+		}
+	}
+	if row == "" {
+		t.Fatalf("switcher row not truncated (no ellipsis) for a long name:\n%s", m.viewConfigLeft())
+	}
+	if w := lipgloss.Width(row); w > pane {
+		t.Errorf("switcher row width %d exceeds pane %d (would wrap): %q", w, pane, row)
+	}
+	if strings.Contains(row, longName) {
+		t.Errorf("switcher row still carries the full long name (not truncated): %q", row)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/plans"
 )
 
-const draftHelp = `gogo draft — a thin ALIAS into ` + "`gogo plan`" + ` (a draft is a plan in status draft, D9)
+const draftHelp = `gogo draft - a thin ALIAS into ` + "`gogo plan`" + ` (a draft is a plan in status draft, D9)
 
 usage:
   gogo draft new "<title>" [--project <p>] [--desc <text>]   create a draft plan (== gogo plan new)
@@ -43,8 +43,8 @@ func cmdDraft(args []string) int {
 }
 
 // draftRemove implements `gogo draft rm` (TEST-001). A draft is a MEMBERLESS plan, so
-// the intuitive `gogo draft rm <id>` (a single id, no <source>) DELETES the draft —
-// mapping to the plan-delete path — instead of forwarding to plan-rm-target, which
+// the intuitive `gogo draft rm <id>` (a single id, no <source>) DELETES the draft -
+// mapping to the plan-delete path - instead of forwarding to plan-rm-target, which
 // demands a second <source> arg a draft never has and made the documented command a
 // dead end. `gogo draft rm <id> <source>[:<slug>]` (an explicit target given) still
 // unlinks via the canonical plan store, and `gogo plan rm <id> <source>` is unchanged.

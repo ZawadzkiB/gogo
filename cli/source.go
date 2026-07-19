@@ -8,7 +8,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 )
 
-const sourceHelp = `gogo source — manage a project's sources (repos with their own .gogo/)
+const sourceHelp = `gogo source - manage a project's sources (repos with their own .gogo/)
 
 usage:
   gogo source add <repo> [--project <name>]      link a repo as a source of a project
@@ -17,11 +17,11 @@ usage:
 A SOURCE is a repo (or a monorepo service, pointed at its service dir) that carries
 its own .gogo/. --project selects the target project; it defaults to the sole
 project and is REQUIRED when more than one project exists. This writes ONLY the
-project entity under ~/.gogo/ — never a source's .gogo/ pipeline state.
+project entity under ~/.gogo/ - never a source's .gogo/ pipeline state.
 `
 
 // cmdSource dispatches the `gogo source` subcommands (FR5). Like `gogo project` it
-// writes ONLY the project entity under ~/.gogo/ — never a source's .gogo/.
+// writes ONLY the project entity under ~/.gogo/ - never a source's .gogo/.
 func cmdSource(args []string) int {
 	if len(args) == 0 {
 		fmt.Print(sourceHelp)
@@ -61,16 +61,17 @@ func sourceAdd(args []string) int {
 	if code != 0 {
 		return code
 	}
-	// Auto-assign a default origin color (cockpit-colors FR2) — the next free palette
+	// Auto-assign a default origin color (cockpit-colors FR2) - the next free palette
 	// swatch, skipping colors already taken. A re-add of a source that already carries a
 	// color keeps it (never churns a user's customized color).
-	_, takenSrc := takenColors()
+	all, _ := projects.List()
+	taken := projects.TakenColors(all)
 	src := projects.Source{
 		Path:                abs,
 		Name:                filepath.Base(abs),
 		MainBranch:          detectMainBranch(abs),
 		ConcurrentWorkItems: projects.DefaultConcurrentWorkItems,
-		Color:               existingSourceColor(name, abs, projects.AssignColor(takenSrc)),
+		Color:               existingSourceColor(name, abs, projects.AssignColor(taken)),
 	}
 	added, err := projects.AddSource(name, src)
 	if err != nil {
@@ -150,7 +151,7 @@ func resolveProjectName(cmd, projName string) (string, int) {
 	projs, _ := projects.List()
 	switch len(projs) {
 	case 0:
-		fmt.Fprintf(os.Stderr, "%s: no projects yet — create one with `gogo project add <repo>`\n", cmd)
+		fmt.Fprintf(os.Stderr, "%s: no projects yet - create one with `gogo project add <repo>`\n", cmd)
 		return "", 1
 	case 1:
 		return projs[0].Name, 0
@@ -159,7 +160,7 @@ func resolveProjectName(cmd, projName string) (string, int) {
 		for _, p := range projs {
 			names = append(names, p.Name)
 		}
-		fmt.Fprintf(os.Stderr, "%s: several projects exist (%s) — pass --project <name>\n", cmd, joinNames(names))
+		fmt.Fprintf(os.Stderr, "%s: several projects exist (%s) - pass --project <name>\n", cmd, joinNames(names))
 		return "", 1
 	}
 }

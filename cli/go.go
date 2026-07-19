@@ -14,7 +14,7 @@ import (
 
 // sessionLister lists live gogo-* tmux sessions for the concurrency-cap guard. A
 // package seam (defaults to launch.ListSessions) so the over-cap refusal can be
-// driven with a fake session set in tests — no real tmux (FR8). Only the go-cap
+// driven with a fake session set in tests - no real tmux (FR8). Only the go-cap
 // guard reads it; every other launch path is unchanged.
 var sessionLister = launch.ListSessions
 
@@ -28,16 +28,16 @@ var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 func validSlug(slug string) bool { return slugPattern.MatchString(slug) }
 
-const goHelp = `gogo go — launch or resume a feature's persistent pipeline session
+const goHelp = `gogo go - launch or resume a feature's persistent pipeline session
 
 usage:
   gogo go [<slug>] [--attach] [--takeover] [--force]
 
 Launches (or --resumes) ONE persistent ` + "`claude -p`" + ` session running the existing
-/gogo:go skill for the whole feature — implement warm in-context + review/test as
+/gogo:go skill for the whole feature - implement warm in-context + review/test as
 nested Task subagents + report. The CLI only manages that session's lifecycle: it
 guards a one-owner lock, resolves fresh-vs-resume from the session registry,
-classifies the child's exit, and reaps at ship. No phase loop, no routing in Go —
+classifies the child's exit, and reaps at ship. No phase loop, no routing in Go -
 the ONE routing rule lives in the skill. Needs the claude CLI on PATH; --attach
 needs tmux.
 
@@ -54,29 +54,29 @@ env:
 exit: 0 = green (awaiting-uat) / attached · 2 = parked at a gate · 1 = error / refused
 `
 
-const planHelp = `gogo plan — launch or resume a feature's persistent planning session
+const planHelp = `gogo plan - launch or resume a feature's persistent planning session
 
 usage:
   gogo plan <slug> [--attach] [--takeover]
 
 Launch-or-resumes ONE persistent ` + "`claude -p`" + ` session running /gogo:plan <slug>
-through the same lifecycle machinery as ` + "`gogo go`" + ` (its own tracked session — plan
+through the same lifecycle machinery as ` + "`gogo go`" + ` (its own tracked session - plan
 and go are distinct legs of the same feature's work). Writes an accept-pending plan
 and stops for your acceptance. Needs the claude CLI on PATH; --attach needs tmux.
 `
 
-const sweepHelp = `gogo sweep — reap orphaned / shipped persistent sessions
+const sweepHelp = `gogo sweep - reap orphaned / shipped persistent sessions
 
 usage:
   gogo sweep [--dry-run] [<slug>...]
 
 With no slug (whole-board), kills (1) gogo-* tmux sessions whose owning feature is
-already terminal (shipped/aborted) — the kill-at-ship backstop — and (2) orphans:
+already terminal (shipped/aborted) - the kill-at-ship backstop - and (2) orphans:
 a live gogo-* session with no live, non-terminal owning feature. Attribution is by
 the exact gogo-<action>-<slug> convention (never substring).
 
 With one or more <slug> args (TARGETED), restricts the reap to just those slugs'
-sessions (and their lock/registry cleanup) — this is what /gogo:done runs at ship
+sessions (and their lock/registry cleanup) - this is what /gogo:done runs at ship
 so it reaps only the shipped card's own sessions and never a different feature's
 concurrent ship. The session hosting this sweep is always spared (no self-kill).
 
@@ -119,7 +119,7 @@ func cmdGo(args []string) int {
 		return code
 	}
 	if slug != "" && !validSlug(slug) {
-		fmt.Fprintf(os.Stderr, "gogo go: invalid slug %q — expected kebab-case [a-z0-9-] (no path separators)\n", slug)
+		fmt.Fprintf(os.Stderr, "gogo go: invalid slug %q - expected kebab-case [a-z0-9-] (no path separators)\n", slug)
 		return 1
 	}
 
@@ -128,7 +128,7 @@ func cmdGo(args []string) int {
 		return 1
 	}
 	if !launch.HasClaude() {
-		fmt.Fprintln(os.Stderr, "gogo go: claude CLI not on PATH — the persistent session runs `claude -p`")
+		fmt.Fprintln(os.Stderr, "gogo go: claude CLI not on PATH - the persistent session runs `claude -p`")
 		return 1
 	}
 
@@ -136,7 +136,7 @@ func cmdGo(args []string) int {
 	if slug == "" {
 		f := newestRunnable(repo)
 		if f == nil {
-			fmt.Fprintln(os.Stderr, "gogo go: no runnable feature — need a plan-accepted or mid-pipeline one (run /gogo:plan and accept a plan first)")
+			fmt.Fprintln(os.Stderr, "gogo go: no runnable feature - need a plan-accepted or mid-pipeline one (run /gogo:plan and accept a plan first)")
 			return 1
 		}
 		slug = f.Slug
@@ -152,19 +152,19 @@ func cmdGo(args []string) int {
 	if orchestrator.TerminalStatus(f.Status) {
 		sess := &orchestrator.Session{Root: root, Slug: slug, Kind: "go", Out: os.Stdout}
 		sess.Reap()
-		fmt.Printf("gogo go: %s is %s — nothing to run; reaped any tracked session.\n", slug, f.Status)
+		fmt.Printf("gogo go: %s is %s - nothing to run; reaped any tracked session.\n", slug, f.Status)
 		return 0
 	}
 	if !orchestrator.RunnableStatus(f.Status) {
-		fmt.Fprintf(os.Stderr, "gogo go: feature %q is %q — not runnable here. %s\n", slug, f.Status, runnableHint(f.Status))
+		fmt.Fprintf(os.Stderr, "gogo go: feature %q is %q - not runnable here. %s\n", slug, f.Status, runnableHint(f.Status))
 		return 1
 	}
 
 	// Concurrency-cap guard (FR4/FR5, D3): refuse a go that would start work on an
-	// (N+1)th live in-progress feature in this repo — two live build sessions
+	// (N+1)th live in-progress feature in this repo - two live build sessions
 	// clobber the shared working tree. A resume of THIS feature is never blocked
 	// (slug excluded from its own count); cap 0 = unlimited (fallback); --force
-	// overrides. Read-side only — it composes with the one-owner lock.
+	// overrides. Read-side only - it composes with the one-owner lock.
 	if msg := capBlock(root, repo, slug, force); msg != "" {
 		fmt.Fprintln(os.Stderr, msg)
 		return 1
@@ -174,7 +174,7 @@ func cmdGo(args []string) int {
 		Root: root, Slug: slug, Kind: "go",
 		Out: os.Stdout, Attach: attach, Takeover: takeover,
 	}
-	fmt.Printf("gogo go %s — launch-or-resume the persistent /gogo:go session (implement in-context + Task review/test + report)\n", slug)
+	fmt.Printf("gogo go %s - launch-or-resume the persistent /gogo:go session (implement in-context + Task review/test + report)\n", slug)
 	return runSession(sess, "gogo go")
 }
 
@@ -198,7 +198,7 @@ func capBlock(root string, repo *contract.Repo, slug string, force bool) string 
 	if !orchestrator.CapExceeded(cap, len(active)) {
 		return ""
 	}
-	return fmt.Sprintf("gogo go: %s is capped at %d concurrent feature(s) — already building: %s.\n"+
+	return fmt.Sprintf("gogo go: %s is capped at %d concurrent feature(s) - already building: %s.\n"+
 		"  ship/finish one first, or re-run `gogo go %s --force` to override.",
 		root, cap, strings.Join(active, ", "), slug)
 }
@@ -212,7 +212,7 @@ func capBlock(root string, repo *contract.Repo, slug string, force bool) string 
 //
 // The store verbs are a small RESERVED set that SHADOW a bare slug (REV-004): a
 // single-token slug that IS a store verb (e.g. a feature literally named `ready`,
-// `promote`, or `show`) resolves to the store, NOT a session — such a feature must be
+// `promote`, or `show`) resolves to the store, NOT a session - such a feature must be
 // launched another way (`gogo go`, or the board). Multi-word slugs never collide.
 func cmdPlan(args []string) int {
 	// `gogo plan -h`/`--help`/`help` shows BOTH surfaces (store verbs + the bare-slug
@@ -231,11 +231,11 @@ func cmdPlan(args []string) int {
 		return code
 	}
 	if slug == "" {
-		fmt.Fprintln(os.Stderr, "gogo plan: needs a <slug> — the feature to plan (e.g. `gogo plan my-feature`)")
+		fmt.Fprintln(os.Stderr, "gogo plan: needs a <slug> - the feature to plan (e.g. `gogo plan my-feature`)")
 		return 1
 	}
 	if !validSlug(slug) {
-		fmt.Fprintf(os.Stderr, "gogo plan: invalid slug %q — expected kebab-case [a-z0-9-] (no path separators)\n", slug)
+		fmt.Fprintf(os.Stderr, "gogo plan: invalid slug %q - expected kebab-case [a-z0-9-] (no path separators)\n", slug)
 		return 1
 	}
 
@@ -244,7 +244,7 @@ func cmdPlan(args []string) int {
 		return 1
 	}
 	if !launch.HasClaude() {
-		fmt.Fprintln(os.Stderr, "gogo plan: claude CLI not on PATH — the persistent session runs `claude -p`")
+		fmt.Fprintln(os.Stderr, "gogo plan: claude CLI not on PATH - the persistent session runs `claude -p`")
 		return 1
 	}
 
@@ -254,7 +254,7 @@ func cmdPlan(args []string) int {
 		status = f.Status
 	}
 	if !orchestrator.PlannableStatus(status) {
-		fmt.Fprintf(os.Stderr, "gogo plan: feature %q is %q — already shipped; nothing to plan.\n", slug, status)
+		fmt.Fprintf(os.Stderr, "gogo plan: feature %q is %q - already shipped; nothing to plan.\n", slug, status)
 		return 1
 	}
 
@@ -262,7 +262,7 @@ func cmdPlan(args []string) int {
 		Root: root, Slug: slug, Kind: "plan",
 		Out: os.Stdout, Attach: attach, Takeover: takeover,
 	}
-	fmt.Printf("gogo plan %s — launch-or-resume the persistent /gogo:plan session\n", slug)
+	fmt.Printf("gogo plan %s - launch-or-resume the persistent /gogo:plan session\n", slug)
 	return runSession(sess, "gogo plan")
 }
 
@@ -272,14 +272,14 @@ func cmdPlan(args []string) int {
 func printPlanHelp() {
 	fmt.Print(planStoreHelp)
 	fmt.Print(`
-gogo plan <slug> — (a bare feature SLUG, not a store subcommand) launch-or-resume the
+gogo plan <slug> - (a bare feature SLUG, not a store subcommand) launch-or-resume the
 feature's persistent /gogo:plan session:
 
   gogo plan <slug> [--attach] [--takeover]
 
 Reserved words: the store verbs (new, list, show, add, rm, ready, promote, delete)
 shadow a bare slug, so a feature literally named e.g. ` + "`ready`" + ` or ` + "`promote`" + ` resolves to
-the store subcommand — launch such a feature another way (` + "`gogo go`" + `, or the board).
+the store subcommand - launch such a feature another way (` + "`gogo go`" + `, or the board).
 `)
 }
 
@@ -333,15 +333,15 @@ func cmdSweep(args []string) int {
 	}
 	repo, _ := contract.LoadRepo(root)
 	// Self-guard (FR3): tell the sweeper which session it is itself running in so
-	// it never reaps its own host — makes `gogo sweep` safe to invoke from any
+	// it never reaps its own host - makes `gogo sweep` safe to invoke from any
 	// context, including the /gogo:done ship-reap inside a gogo-done-<slug> session.
 	// Only (D4=B): with slug args, a TARGETED sweep that touches only those slugs'
-	// sessions (the ship-reap) — never another feature's concurrent ship (REV-002);
+	// sessions (the ship-reap) - never another feature's concurrent ship (REV-002);
 	// with no slug, the whole-board manual cleanup.
 	sw := &orchestrator.Sweeper{Root: root, Repo: repo, Out: os.Stdout, DryRun: dryRun, Self: launch.CurrentSession(), Only: only}
 	killed := sw.Sweep()
 	if dryRun && len(killed) > 0 {
-		fmt.Printf("(dry-run) %d session(s) would be reaped — re-run without --dry-run to kill.\n", len(killed))
+		fmt.Printf("(dry-run) %d session(s) would be reaped - re-run without --dry-run to kill.\n", len(killed))
 	}
 	return 0
 }
@@ -349,7 +349,7 @@ func cmdSweep(args []string) int {
 // cmdRun is the deprecated `gogo run` alias (FR11): it forwards to `gogo go` for
 // one version so existing muscle-memory / scripts keep working.
 func cmdRun(args []string) int {
-	fmt.Fprintln(os.Stderr, "gogo run is deprecated — use `gogo go` (this alias forwards for now and will be removed in a future version).")
+	fmt.Fprintln(os.Stderr, "gogo run is deprecated - use `gogo go` (this alias forwards for now and will be removed in a future version).")
 	return cmdGo(args)
 }
 
@@ -370,9 +370,9 @@ func newestRunnable(repo *contract.Repo) *contract.Feature {
 func runnableHint(status string) string {
 	switch status {
 	case "awaiting-uat":
-		return "it's at the UAT gate — run /gogo:done to ship, or give feedback to loop it back."
+		return "it's at the UAT gate - run /gogo:done to ship, or give feedback to loop it back."
 	case "waiting-for-user":
-		return "it's paused on a decision — resolve it and re-accept (→ plan-accepted) first."
+		return "it's paused on a decision - resolve it and re-accept (→ plan-accepted) first."
 	case "awaiting-plan-acceptance":
 		return "accept its plan first (/gogo:accept), then re-run gogo go."
 	case "shipped", "done", "aborted":

@@ -93,6 +93,50 @@ func TestColorForIndexNeverBlankAndWraps(t *testing.T) {
 	}
 }
 
+// TestColorForNameStableAndNeverBlank (REV-002): ColorForName is deterministic, never
+// blank, always resolves to a palette swatch, and depends ONLY on the name (so a colorless
+// entity keeps its hue when the list reorders — unlike the position-keyed ColorForIndex).
+func TestColorForNameStableAndNeverBlank(t *testing.T) {
+	for _, name := range []string{"web", "api", "gogo", "", "a-very-long-source-name"} {
+		got := ColorForName(name)
+		if got == "" {
+			t.Fatalf("ColorForName(%q) is blank", name)
+		}
+		if _, ok := LookupSwatch(got); !ok {
+			t.Errorf("ColorForName(%q) = %q, not a palette swatch", name, got)
+		}
+		if got != ColorForName(name) {
+			t.Errorf("ColorForName(%q) is not deterministic", name)
+		}
+	}
+	// Distinct, differently-hashing names land on different swatches (spot-check).
+	if ColorForName("web") == ColorForName("api") {
+		t.Error("ColorForName(web) == ColorForName(api) — expected distinct swatches")
+	}
+}
+
+// TestTakenColors (REV-001): the one shared walk gathers every non-blank project + source
+// color across the store, skips blanks, and yields nil for an empty input.
+func TestTakenColors(t *testing.T) {
+	if got := TakenColors(nil); got != nil {
+		t.Errorf("TakenColors(nil) = %v, want nil", got)
+	}
+	projs := []Project{
+		{Name: "a", Color: "#111111", Sources: []Source{{Color: "#222222"}, {Color: ""}}},
+		{Name: "b", Color: "", Sources: []Source{{Color: "#333333"}}},
+	}
+	got := TakenColors(projs)
+	want := []string{"#111111", "#222222", "#333333"}
+	if len(got) != len(want) {
+		t.Fatalf("TakenColors = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("TakenColors[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
 // TestLookupSwatchRoundTrip: every swatch's Dark AND Light hex resolve back to it (case-
 // insensitively); a non-palette hex and a blank do not.
 func TestLookupSwatchRoundTrip(t *testing.T) {

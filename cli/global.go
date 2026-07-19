@@ -8,15 +8,15 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/tui"
 )
 
-const globalHelp = `gogo global — the global cockpit (board · plans · config across all your projects)
+const globalHelp = `gogo global - the global cockpit (board · plans · config across all your projects)
 
 usage:
-  gogo global init     initialize the global cockpit home (~/.gogo/) — where your projects live
+  gogo global init     initialize the global cockpit home (~/.gogo/) - where your projects live
   gogo global          open the global tabbed cockpit from anywhere (even inside a repo)
   gogo global board    alias for ` + "`gogo global`" + ` (open the cockpit)
 
 The two modes (UAT round 1):
-  - gogo INSIDE a repo (a dir with .gogo/) → THAT repo's own board — always, even
+  - gogo INSIDE a repo (a dir with .gogo/) → THAT repo's own board - always, even
     when the repo is a registered project's source. Per-repo stays simple.
   - gogo global → the cross-project cockpit, from anywhere.
   - gogo OUTSIDE any repo → the global cockpit.
@@ -26,7 +26,7 @@ Set it up once: ` + "`gogo global init`" + ` then ` + "`gogo project add <repo>`
 
 // cmdGlobal dispatches the `gogo global` verb (FR19/FR20). `init` sets up the global
 // cockpit home (~/.gogo/); a bare `global` (or `global board`) opens the tabbed
-// cockpit from anywhere — the explicit "global mode" that complements the repo-local
+// cockpit from anywhere - the explicit "global mode" that complements the repo-local
 // `gogo` (which always shows the repo's own board).
 func cmdGlobal(args []string) int {
 	if len(args) == 0 {
@@ -48,7 +48,7 @@ func cmdGlobal(args []string) int {
 
 // globalInit initializes the global cockpit home ~/.gogo/ (FR19): it creates the
 // dir + ~/.gogo/projects/ and writes the ~/.gogo/config.json marker via
-// projects.EnsureHome. Idempotent — a re-run reports "already initialized" and still
+// projects.EnsureHome. Idempotent - a re-run reports "already initialized" and still
 // exits 0. Prints the home path + a per-run status + the next step. It writes ONLY
 // under ~/.gogo/.
 func globalInit() int {
@@ -75,12 +75,12 @@ func globalInit() int {
 // `p` switcher spans the rest).
 func globalBoard() int {
 	if !projects.Initialized() {
-		fmt.Fprintln(os.Stderr, "gogo global: no global cockpit yet — run `gogo global init` to set it up")
+		fmt.Fprintln(os.Stderr, "gogo global: no global cockpit yet - run `gogo global init` to set it up")
 		return 1
 	}
 	projs, _ := projects.List()
 	if len(projs) == 0 {
-		fmt.Fprintln(os.Stderr, "gogo global: no projects yet — add one with `gogo project add <repo>`")
+		fmt.Fprintln(os.Stderr, "gogo global: no projects yet - add one with `gogo project add <repo>`")
 		return 1
 	}
 	return runProgram(tui.NewProjectBoard(projs[0]))

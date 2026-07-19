@@ -224,7 +224,7 @@ func (m Model) finishSourceForm() (tea.Model, tea.Cmd) {
 		color = hex
 	}
 	if color == "" && edit.op == "add" {
-		color = projects.AssignColor(m.takenSourceColors())
+		color = projects.AssignColor(projects.TakenColors(m.allProjects))
 	}
 	// An edit that moves the path removes the old entry so it is not orphaned
 	// (AddSource dedupes by path, so a same-path edit updates in place).
@@ -247,21 +247,6 @@ func (m Model) finishSourceForm() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// takenSourceColors gathers the non-blank source colors already used across every home
-// project — the `taken` set AssignColor skips when auto-assigning a config-tab add's
-// blank color (so it fans out to the next free swatch, cockpit-colors FR2).
-func (m Model) takenSourceColors() []string {
-	var out []string
-	for _, p := range m.allProjects {
-		for _, s := range p.Sources {
-			if s.Color != "" {
-				out = append(out, s.Color)
-			}
-		}
-	}
-	return out
-}
-
 // nonEmpty returns s if it is non-blank, else the fallback — a tiny guard so a blank
 // cap input is read as "0" (unlimited) rather than a parse error.
 func nonEmpty(s, fallback string) string {
@@ -280,10 +265,7 @@ func nonEmpty(s, fallback string) string {
 func (m Model) viewConfig() string {
 	left := m.viewConfigLeft()
 	right := m.viewConfigRight()
-	half := m.width / 2
-	if half < 30 {
-		half = 30
-	}
+	half := m.configPaneWidth()
 	leftCol := lipgloss.NewStyle().Width(half).Render(left)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "  ", right)
 
@@ -296,9 +278,21 @@ func (m Model) viewConfig() string {
 	return strings.Join(parts, "\n")
 }
 
+// configPaneWidth is the width of each config-tab column — half the terminal with a
+// 30-col floor. Shared by viewConfig (which sizes the two columns) and viewConfigLeft
+// (which truncates the switcher rows to it, REV-003) so the two never drift.
+func (m Model) configPaneWidth() int {
+	half := m.width / 2
+	if half < 30 {
+		half = 30
+	}
+	return half
+}
+
 // viewConfigLeft is the config tab's left column: the project switcher + the focused
 // project's sources.
 func (m Model) viewConfigLeft() string {
+	pane := m.configPaneWidth()
 	var b []string
 	b = append(b, dimStyle.Render("project  ")+dimStyle.Render("(p to switch)"))
 	if len(m.allProjects) == 0 {
@@ -319,10 +313,17 @@ func (m Model) viewConfigLeft() string {
 		}
 		if focused {
 			cursor = "▸ "
-			b = append(b, changelogFocusStyle.Render(cursor+dots+" "+p.Name)+meta+live)
+		}
+		// Truncate the project NAME so the composed `▸ ●P ●S name  N sources ●` row fits
+		// the switcher pane instead of wrapping for a long name (REV-003). Widths are
+		// measured ANSI-aware so the styled dots/meta/live don't inflate the budget.
+		nameBudget := pane - lipgloss.Width(cursor+dots+" ") - lipgloss.Width(meta) - lipgloss.Width(live)
+		name := truncate(p.Name, nameBudget)
+		if focused {
+			b = append(b, changelogFocusStyle.Render(cursor+dots+" "+name)+meta+live)
 			continue
 		}
-		b = append(b, cursor+dots+" "+p.Name+meta+live)
+		b = append(b, cursor+dots+" "+name+meta+live)
 	}
 
 	b = append(b, "", colTitleStyle.Render("sources"))
@@ -368,7 +369,12 @@ func (m Model) projectOriginDots(p projects.Project, plain bool) string {
 	if len(p.Sources) == 0 {
 		return originDots(nil, pc, plain) // a single project dot
 	}
-	sc := colorFor(p.Sources[0].Color, 0)
+	first := p.Sources[0]
+	label := first.Name
+	if label == "" {
+		label = filepath.Base(first.Path)
+	}
+	sc := colorFor(first.Color, label)
 	return originDots(pc, sc, plain)
 }
 

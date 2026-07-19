@@ -1,6 +1,6 @@
 {
   "name": "gogo",
-  "version": "0.22.0",
+  "version": "0.22.1",
   "description": "Knowledge-grounded dev pipeline for Claude Code: analyst-planned -> implement -> review -> test -> report, gated by plan acceptance and a human UAT step. Typed contracts + live events telemetry, synthesized changelog releases, and the native `gogo` TUI cockpit (board, viewers, Claude-launching moves). Configure per-project with /gogo:build.",
   "author": {
     "name": "Bart\u0142omiej Zawadzki",

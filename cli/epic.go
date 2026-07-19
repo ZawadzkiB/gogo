@@ -7,11 +7,11 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/plans"
 )
 
-const epicHelp = `gogo epic — a thin ALIAS into ` + "`gogo plan`" + ` (an epic is a plan with members, D9)
+const epicHelp = `gogo epic - a thin ALIAS into ` + "`gogo plan`" + ` (an epic is a plan with members, D9)
 
 usage:
   gogo epic new "<title>" [--project <p>] [--desc <text>]   create a plan (== gogo plan new)
-  gogo epic list [--project <p>]                            list the EPICS — plans that own members/targets (any status)
+  gogo epic list [--project <p>]                            list the EPICS - plans that own members/targets (any status)
   gogo epic show <id> [--project <p>]                       show a plan + its work items
   gogo epic add <id> <source>:<slug> [--project <p>]        link an existing work item (many-to-many, FR16)
   gogo epic rm  <id> <source>:<slug> [--project <p>]        unlink a work item
@@ -19,13 +19,13 @@ usage:
 
 An EPIC is just a plan that owns members across sources (D8). Every subcommand
 forwards to ` + "`gogo plan`" + `; ` + "`epic list`" + ` narrows to plans that carry ≥1 member (or
-≥1 target) — REGARDLESS of status, since ` + "`epic add`" + ` links a member without flipping
+≥1 target) - REGARDLESS of status, since ` + "`epic add`" + ` links a member without flipping
 status (so a just-linked epic still appears). See ` + "`gogo plan --help`" + `.
 `
 
 // cmdEpic is the `gogo epic` alias (D9): an epic is a plan with members, so this
 // forwards to the project-scoped plan store, with `epic list` narrowed to the
-// member-bearing (or target-bearing) plans — independent of status (REV-003).
+// member-bearing (or target-bearing) plans - independent of status (REV-003).
 func cmdEpic(args []string) int {
 	if len(args) == 0 {
 		fmt.Print(epicHelp)
@@ -43,7 +43,7 @@ func cmdEpic(args []string) int {
 	}
 }
 
-// epicList prints the project's EPICS — plans that own ≥1 member (or ≥1 target),
+// epicList prints the project's EPICS - plans that own ≥1 member (or ≥1 target),
 // REGARDLESS of lifecycle status (D9: an epic is a plan with members). `epic add` /
 // AddMember links a member without flipping status, so filtering on `status==active`
 // (the old behaviour) hid a just-linked draft/ready epic from its own list (REV-003).
