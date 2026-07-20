@@ -77,6 +77,8 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		b.srcBranch = s.MainBranch
 		b.srcColor = s.Color
 		b.srcCap = strconv.Itoa(s.ConcurrentWorkItems)
+		b.srcPlanSkip = s.PlanAcceptanceSkip
+		b.srcUatSkip = s.UatAcceptanceSkip
 	}
 	m.pendingSource = edit
 	m.binding = b
@@ -110,6 +112,12 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		huh.NewInput().Title("Main branch").Description("the source's default branch").Value(&b.srcBranch),
 		huh.NewInput().Title("Label color").Description("origin-dot hex or a swatch name (e.g. teal, #58a6ff) — blank auto-assigns").Value(&b.srcColor),
 		huh.NewInput().Title("Concurrent work items").Description("0 = unlimited; N caps live in-progress features").Value(&b.srcCap),
+		// Per-source gate-skip flags (FR4): opt this source OUT of the plan-acceptance /
+		// UAT gate. When on, `gogo go` appends --skip-acceptance / --skip-uat to the
+		// launched /gogo:go and the gogo skills auto-advance that gate. Default off →
+		// today's hard gate byte-for-byte.
+		huh.NewConfirm().Title("Skip plan-acceptance gate").Description("auto-accept this source's plans (planAcceptanceSkip)").Affirmative("Yes").Negative("No").Value(&b.srcPlanSkip),
+		huh.NewConfirm().Title("Skip UAT gate").Description("auto-pass this source's per-item UAT (uatAcceptanceSkip)").Affirmative("Yes").Negative("No").Value(&b.srcUatSkip),
 	))
 	m.mode = modeForm
 }
@@ -237,6 +245,8 @@ func (m Model) finishSourceForm() (tea.Model, tea.Cmd) {
 		MainBranch:          strings.TrimSpace(b.srcBranch),
 		Color:               color,
 		ConcurrentWorkItems: cap,
+		PlanAcceptanceSkip:  b.srcPlanSkip,
+		UatAcceptanceSkip:   b.srcUatSkip,
 	}
 	if _, err := projects.AddSource(edit.project, src); err != nil {
 		m.status = "save failed: " + err.Error()
@@ -408,20 +418,44 @@ func (m Model) viewConfigRight() string {
 		dimStyle.Render("branch       ")+branch,
 		dimStyle.Render("label color  ")+m.sourceDot(name)+" "+colorLabel,
 		dimStyle.Render("cap          ")+capText(s.ConcurrentWorkItems),
+		// Per-source gate-skip flags (FR4): a source with both off reads today's detail
+		// byte-for-byte; when on, the gate auto-advances (--skip-acceptance / --skip-uat).
+		dimStyle.Render("plan-accept skip  ")+yesNo(s.PlanAcceptanceSkip),
+		dimStyle.Render("uat skip          ")+yesNo(s.UatAcceptanceSkip),
 	)
 
-	b = append(b, "", colTitleStyle.Render("knowledge"))
-	files := knowledgeFiles(filepath.Join(s.Path, ".gogo", "knowledge"))
+	// Knowledge explorer (FR2): split the PROJECT-level cross-repo knowledge
+	// (~/.gogo/projects/<name>/.knowledge/ — how the sources connect) from this
+	// SOURCE's own per-repo knowledge (<repo>/.gogo/knowledge/), each in its own
+	// labelled group — no longer one flat mixed list.
 	if m.project != nil {
-		files = append(files, knowledgeFiles(filepath.Join(projects.Dir(m.project.Name), ".knowledge"))...)
+		b = append(b, "", colTitleStyle.Render("project knowledge"))
+		b = appendKnowledge(b, knowledgeFiles(filepath.Join(projects.Dir(m.project.Name), ".knowledge")))
 	}
+	b = append(b, "", colTitleStyle.Render("source knowledge"))
+	b = appendKnowledge(b, knowledgeFiles(filepath.Join(s.Path, ".gogo", "knowledge")))
+	return strings.Join(b, "\n")
+}
+
+// appendKnowledge renders a knowledge group's file rows (name + human size), or a
+// dim "(none)" line when the group is empty. Shared by the two config-tab groups.
+func appendKnowledge(b []string, files []knEntry) []string {
 	if len(files) == 0 {
-		b = append(b, dimStyle.Render("  (no knowledge files)"))
+		return append(b, dimStyle.Render("  (none)"))
 	}
 	for _, f := range files {
 		b = append(b, fmt.Sprintf("  %-30s %s", truncate(f.name, 30), dimStyle.Render(humanSize(f.size))))
 	}
-	return strings.Join(b, "\n")
+	return b
+}
+
+// yesNo renders a per-source gate-skip flag (FR4) as a plain `yes`/`no` for the
+// source detail — a source with both false reads today's detail byte-for-byte.
+func yesNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
 }
 
 // capText renders a per-source concurrency cap: `cap ∞` for 0 (unlimited), else

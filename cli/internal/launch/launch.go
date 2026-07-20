@@ -123,6 +123,24 @@ func PermissionSummary() string {
 	return "permission: " + mode + " (via " + PermissionModeEnv + ")"
 }
 
+// SkipParams returns the per-source gate-skip params to append to a `/gogo:go`
+// command for a source that opted out of the plan-acceptance / UAT gate (FR4):
+// ` --skip-acceptance` and/or ` --skip-uat`. Each is a single fixed [a-z-] token
+// appended INSIDE the one trailing argv element (exactly like the --correlation
+// param), so it never reaches a shell — injection-safe. The gogo skills honor the
+// params (auto-record the acceptance / auto-pass UAT); absent flags → "" (today's
+// gated command byte-for-byte).
+func SkipParams(planSkip, uatSkip bool) string {
+	s := ""
+	if planSkip {
+		s += " --skip-acceptance"
+	}
+	if uatSkip {
+		s += " --skip-uat"
+	}
+	return s
+}
+
 // ClaudePrintArgs builds the argv for a backgrounded `claude -p <command>` run
 // (the no-tmux fallback), with the permission flag spliced in as separate argv
 // elements ahead of -p.
@@ -368,11 +386,22 @@ func PlanIntent(label, body, correlation string) Intent {
 // param is a /gogo:plan spawn contract, meaningless to a plain session. Session name is
 // derived from label (sessionName("author", label)); like PlanIntent this is the
 // fire-once, non-persistent Launch path (no lock/registry, no resume key).
-func AuthorPlanIntent(label, planPath, correlation string, sources []string) Intent {
+//
+// FR2 (project-knowledge author-read): when knowledgePath is non-empty the seed prose
+// instructs the session to READ the project's cross-repo .knowledge/ FIRST, so the
+// whole-domain context (how the sources connect, glossary, integration contracts)
+// flows INTO the authored brief (and thus into each spawned work item's goal body).
+// The path is spliced into the same single trailing argv element (injection-safe).
+func AuthorPlanIntent(label, planPath, correlation, knowledgePath string, sources []string) Intent {
 	var b strings.Builder
 	b.WriteString("Author a gogo PROJECT PLAN in place. Read and edit the plan markdown file at ")
 	b.WriteString(planPath)
 	b.WriteString(" directly: set its front-matter title, then write the goal, BDD scenarios, and the target sources into that same file.")
+	if kp := strings.TrimSpace(knowledgePath); kp != "" {
+		b.WriteString(" Before writing, READ the project's cross-repo domain knowledge under ")
+		b.WriteString(kp)
+		b.WriteString(" (e.g. project-knowledge.md) so the brief carries the whole-domain context - how the sources connect, the shared glossary, and the integration contracts.")
+	}
 	if len(sources) > 0 {
 		b.WriteString(" The project's sources you may target are: ")
 		b.WriteString(strings.Join(sources, ", "))

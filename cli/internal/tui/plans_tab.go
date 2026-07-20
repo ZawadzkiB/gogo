@@ -168,6 +168,8 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "A":
 		return m.planWithClaude()
+	case "D":
+		return m.planAcceptUAT(m.focusedPlan())
 	case "r":
 		if p := m.focusedPlan(); p != nil && m.project != nil {
 			if _, err := plans.MarkReady(m.project.Name, p.ID); err != nil {
@@ -208,10 +210,114 @@ func (m Model) updatePlanDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.planCreateWorkItem()
 	case "+":
 		return m.planAddTarget()
+	case "D":
+		return m.planAcceptUAT(p)
 	case "e":
 		m.status = "edit the plan by hand at " + plans.Path(m.project.Name, p.ID) + " (or `gogo plan show " + p.ID + "`)"
 	}
 	return m, nil
+}
+
+// planAcceptUAT is the plans-tab project-UAT accept trigger (FR3, `D`) — the TUI
+// mirror of `gogo plan done`. It applies the SAME guard: it REFUSES (a status message
+// naming any unshipped members, no state change) unless EVERY member work item of the
+// plan is shipped, reading each member's source state.md through the already-loaded
+// board repo (plans.MembersShippedIn — never a source .gogo/ write). Only when all are
+// shipped does it open a huh confirm; the confirm's completion (finishPlanDone) records
+// the accept via plans.MarkDone (appends a `## Project UAT` round + flips the plan to
+// the persisted `done`).
+func (m Model) planAcceptUAT(p *plans.Plan) (tea.Model, tea.Cmd) {
+	if p == nil || m.project == nil {
+		return m, nil
+	}
+	if p.Status == plans.StatusDone {
+		m.status = "plan " + p.ID + " is already done (project-UAT accepted)"
+		return m, nil
+	}
+	allShipped, unshipped := plans.MembersShippedIn(m.project.Name, *p, m.repo)
+	if !allShipped {
+		if len(p.Members) == 0 {
+			m.status = "refusing — plan " + p.ID + " has no work items yet; spawn + ship members first (c)"
+		} else {
+			m.status = fmt.Sprintf("refusing — %d of %d member(s) not shipped: %s",
+				len(unshipped), len(p.Members), strings.Join(unshipped, ", "))
+		}
+		return m, nil
+	}
+	m.startPlanDoneForm(p)
+	return m, m.form.Init()
+}
+
+// startPlanDoneForm opens the huh project-UAT accept confirm under modeForm (FR3, `D`).
+// It marks pendingPlanDone (so updateForm routes completion to finishPlanDone and a
+// cancel returns to the plans tab) and binds the confirm through a heap-stable
+// *formBinding (TEST-001). Reached only after planAcceptUAT's members-shipped guard
+// passed, so accepting flips a genuinely-ready plan.
+func (m *Model) startPlanDoneForm(p *plans.Plan) {
+	m.pendingPlanDone = &planDoneEdit{project: m.project.Name, id: p.ID, title: p.Title}
+	b := &formBinding{}
+	m.binding = b
+	m.form = huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title("Accept project-UAT for " + p.ID + "?").
+			Description("all members shipped — flips this plan to done + records a project-UAT round (~/.gogo/ only)").
+			Affirmative("Accept").
+			Negative("Cancel").
+			Value(&b.confirm),
+	))
+	m.mode = modeForm
+}
+
+// finishPlanDone applies a completed project-UAT accept confirm (FR3). On Accept it
+// re-guards the members-shipped invariant (defensive — the board may have moved since
+// the confirm opened), records the accept via plans.MarkDone (a ~/.gogo/ write only,
+// never a source's .gogo/), reloads the plans list, and lands back on the plans tab.
+// The now-`done` plan drops out of the ACTIVE/READY/DRAFTS sections.
+func (m Model) finishPlanDone() (tea.Model, tea.Cmd) {
+	edit := m.pendingPlanDone
+	b := m.binding
+	m.pendingPlanDone = nil
+	m.binding = nil
+	m.form = nil
+	m.mode = modeBoard // renders the active tab (tabPlans)
+	if edit == nil || b == nil {
+		return m, nil
+	}
+	if !b.confirm {
+		m.status = "cancelled"
+		return m, nil
+	}
+	p, ok := plans.Get(edit.project, edit.id)
+	if !ok {
+		m.status = "no plan " + edit.id + " in " + edit.project
+		return m, nil
+	}
+	if allShipped, unshipped := plans.MembersShippedIn(edit.project, p, m.repo); !allShipped {
+		m.status = fmt.Sprintf("refusing — %d member(s) not shipped: %s", len(unshipped), strings.Join(unshipped, ", "))
+		return m, nil
+	}
+	if _, err := plans.MarkDone(edit.project, edit.id); err != nil {
+		m.status = "accept failed: " + err.Error()
+		return m, nil
+	}
+	m.loadPlans()
+	m.planDetail = nil
+	m.planIdx = clamp(m.planIdx, 0, len(m.groupedPlans())-1)
+	m.status = "accepted project-UAT for " + edit.id + " — plan is now done"
+	return m, nil
+}
+
+// planDerivedStatus computes p's DISPLAY status (FR3, derive-at-read): an `active`
+// plan whose every member work item is shipped reads `awaiting-project-uat`, else the
+// persisted status. The members-shipped decision reads the already-loaded board repo
+// (never a source .gogo/ write).
+func (m Model) planDerivedStatus(p plans.Plan) string {
+	project := ""
+	if m.project != nil {
+		project = m.project.Name
+	}
+	allShipped, _ := plans.MembersShippedIn(project, p, m.repo)
+	return plans.DerivedStatus(p, allShipped)
 }
 
 // planCreateWorkItem SPAWNS a work item for the focused target source (FR11): it
@@ -392,7 +498,9 @@ func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 	// injection-safe); the correlation id rides in the prose (already in front-matter),
 	// NOT as a --correlation flag (that is a /gogo:plan spawn param, not a plain session).
 	planPath := plans.Path(m.project.Name, p.ID)
-	intent := launch.AuthorPlanIntent(p.Title, planPath, p.ID, m.sourceNames())
+	// FR2: seed the author to READ the project's cross-repo .knowledge/ first, so the
+	// whole-domain context flows into the brief (and each spawned work item's goal).
+	intent := launch.AuthorPlanIntent(p.Title, planPath, p.ID, projects.KnowledgeDir(m.project.Name), m.sourceNames())
 
 	// Anchor at a real source root (trusted repo) so the session doesn't park on a
 	// first-run trust prompt for the ~/.gogo/ home. No source yet → fall back to the
@@ -478,7 +586,7 @@ func (m Model) viewPlans() string {
 	if m.status != "" {
 		parts = append(parts, statusStyle(m.status), "")
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · enter open · n new · A plan-with-claude · r ready · x delete · tab board/config · q quit")
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · enter open · n new · A plan-with-claude · r ready · D accept UAT · x delete · tab board/config · q quit")
 	parts = append(parts, help)
 	return strings.Join(parts, "\n")
 }
@@ -525,6 +633,16 @@ func (m Model) planCardMeta(p plans.Plan, plain bool) string {
 			return s
 		}
 		return dimStyle.Render(s)
+	}
+	// A plan whose every member work item is shipped is at the project-UAT gate — flag
+	// it `awaiting-project-uat` on the card (distinct from a still-building `active`),
+	// so the ACTIVE section makes the ready-to-accept plan visible at a glance (FR3).
+	if m.planDerivedStatus(p) == plans.StatusAwaitingProjectUAT {
+		label := plans.StatusAwaitingProjectUAT + " · press D"
+		if plain {
+			return label
+		}
+		return statusStyle(label)
 	}
 	created := 0
 	for _, t := range p.Targets {
@@ -597,12 +715,23 @@ func (m Model) viewPlanDetail() string {
 	if title == "" {
 		title = "(untitled)"
 	}
+	// Derive the DISPLAY status (FR3): an active plan with every member shipped reads
+	// `awaiting-project-uat` (distinct from `active`); a done plan reads `done`.
+	derived := m.planDerivedStatus(*p)
 	var b []string
 	b = append(b,
 		colTitleStyle.Render("plans / "+title)+"   "+correlationChipStyle.Render("⛓ "+p.ID),
-		dimStyle.Render("status  ")+p.Status,
+		dimStyle.Render("status  ")+derived,
 		"",
 	)
+	// Project-UAT affordance: when every member is shipped, the plan is at the
+	// project-UAT gate — spell out the shipped tally + the `D` accept key (FR3).
+	if derived == plans.StatusAwaitingProjectUAT {
+		b = append(b,
+			statusStyle(fmt.Sprintf("all %d work item(s) shipped — press D to accept the project-UAT (→ done)", len(p.Members))),
+			"",
+		)
+	}
 	desc := p.Description
 	if strings.TrimSpace(desc) == "" {
 		desc = dimStyle.Render("(no description — edit the plan file with e)")
@@ -633,7 +762,7 @@ func (m Model) viewPlanDetail() string {
 	if m.status != "" {
 		b = append(b, "", statusStyle(m.status))
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · c create item · + add source · e edit plan · esc back")
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · c create item · + add source · D accept project-UAT · e edit plan · esc back")
 	b = append(b, "", help)
 	return strings.Join(b, "\n")
 }

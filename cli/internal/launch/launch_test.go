@@ -60,6 +60,27 @@ func TestSessionSanitize(t *testing.T) {
 	}
 }
 
+// TestSkipParams pins the FR4 gate-skip param rendering (REV-001): each flag maps to its
+// exact fixed [a-z-] token appended INSIDE the single trailing argv element (exactly like
+// --correlation — injection-safe), both flags render both tokens in order, and neither
+// flag → "" (today's gated command byte-for-byte).
+func TestSkipParams(t *testing.T) {
+	cases := []struct {
+		planSkip, uatSkip bool
+		want              string
+	}{
+		{false, false, ""},
+		{true, false, " --skip-acceptance"},
+		{false, true, " --skip-uat"},
+		{true, true, " --skip-acceptance --skip-uat"},
+	}
+	for _, c := range cases {
+		if got := SkipParams(c.planSkip, c.uatSkip); got != c.want {
+			t.Errorf("SkipParams(plan=%v uat=%v) = %q, want %q", c.planSkip, c.uatSkip, got, c.want)
+		}
+	}
+}
+
 // TestSessionMatchesSlug pins TEST-005: session ↔ slug matching is an exact
 // boundary match on the sanitized-slug component, never a substring search.
 func TestSessionMatchesSlug(t *testing.T) {

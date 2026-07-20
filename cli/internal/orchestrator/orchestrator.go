@@ -87,6 +87,22 @@ type Session struct {
 	Out      io.Writer
 	Attach   bool
 	Takeover bool
+	// SkipAcceptance / SkipUAT append the per-source gate-skip params (FR4) to the
+	// launched /gogo:go command (--skip-acceptance / --skip-uat), which the gogo skills
+	// honor. Set by `gogo go` from the SOURCE's config (projects.SkipForSource); only
+	// the `go` leg carries them. Both false → the command is byte-for-byte today's.
+	SkipAcceptance bool
+	SkipUAT        bool
+}
+
+// goSkipSuffix is the FR4 gate-skip param suffix appended to this session's /gogo:go
+// command (only the `go` leg; the `plan` leg never carries them). "" when neither flag
+// is set — the byte-for-byte fallback.
+func (s *Session) goSkipSuffix() string {
+	if s.Kind == "plan" {
+		return ""
+	}
+	return launch.SkipParams(s.SkipAcceptance, s.SkipUAT)
 }
 
 // RunnableStatus reports whether a feature's state.md status permits `gogo go` —
@@ -135,6 +151,10 @@ func (s *Session) LaunchOrResume() (Outcome, error) {
 	}
 
 	inv := ResolveInvocation(s.Reg, s.Kind, s.Slug)
+	// FR4: append the source's gate-skip params to the launched /gogo:go command
+	// (--skip-acceptance / --skip-uat) — a single injection-safe token suffix the
+	// skills honor. Applies to both the headless -p command and the --attach intent.
+	inv.Command += s.goSkipSuffix()
 	me := Owner{
 		PID:       os.Getpid(),
 		UUID:      invUUID(inv),
@@ -455,7 +475,9 @@ func (s *Session) intent() launch.Intent {
 	if s.Kind == "plan" {
 		action = launch.ActionPlan
 	}
-	return launch.BuildIntent(action, []string{s.Slug}, "")
+	in := launch.BuildIntent(action, []string{s.Slug}, "")
+	in.Command += s.goSkipSuffix() // FR4 gate-skip params on the --attach go leg
+	return in
 }
 
 func (s *Session) featureRel() string { return ".gogo/work/feature-" + s.Slug }

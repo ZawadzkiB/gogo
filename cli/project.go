@@ -14,10 +14,18 @@ import (
 const projectHelp = `gogo project - manage home-folder projects (~/.gogo/projects/<name>/)
 
 usage:
-  gogo project add <repo> [--name <name>]   create a project (name defaults to the repo basename)
-                                            with <repo> as its first source (must contain .gogo/)
-  gogo project list                         print the projects and their sources
-  gogo project rm <name>                    remove a project (its home folder only, never a source's .gogo/)
+  gogo project add <name> [--source <repo>]   create an EMPTY project ~/.gogo/projects/<name>/
+                                              (config.json + .knowledge/ + .gogo/plans/); --source also
+                                              links <repo> as source #1 in one shot
+  gogo project add <repo> [--name <name>]     create a project with <repo> as source #1 (the repo must
+                                              contain .gogo/; name defaults to the repo basename)
+  gogo project list                           print the projects and their sources
+  gogo project rm <name>                      remove a project (its home folder only, never a source's .gogo/)
+
+NAME vs PATH: a bare token (no ` + "`/`" + ` or ` + "`\\`" + `, no leading ` + "`~`" + `/` + "`.`" + `, and not an
+existing repo dir that contains .gogo/) is read as a project NAME -> an EMPTY project you grow
+with ` + "`gogo source add`" + `. A path (a separator, a leading ` + "`~`" + `/` + "`.`" + `, or a dir that already
+contains .gogo/) is read as a repo -> source #1. Ambiguous bare tokens bias to NAME.
 
 A PROJECT is a home-folder entity that links many SOURCES (repos with their own
 .gogo/). Add more sources with ` + "`gogo source add`" + `. This writes ONLY
@@ -49,22 +57,63 @@ func cmdProject(args []string) int {
 	}
 }
 
-// projectAdd creates a home-folder project with <repo> as source #1 (D5): it
-// cleans the repo path to absolute and verifies it contains a .gogo/ dir,
-// defaulting the project name to the repo basename (or --name), the source's
-// concurrentWorkItems to the default (1), and mainBranch to the detected git
-// default (else "main"). Adding a source that is ALREADY registered under the
-// project is an idempotent no-op; if a DIFFERENT project already owns the name it
-// directs the user to `gogo source add` rather than clobbering.
+// projectAdd is the DUAL-MODE `gogo project add` (FR1, D=A). Its positional is read
+// as either a bare NAME (create an EMPTY project you grow later) or a repo PATH
+// (today's project+source-#1 flow, byte-for-byte):
+//   - a PATH (a separator, a leading ~/., or a dir that already contains .gogo/) →
+//     projectAddRepo (source #1, requires .gogo/).
+//   - a bare NAME → projectAddEmpty (~/.gogo/projects/<name>/ + .knowledge/ + plans);
+//     an ambiguous bare token biases to NAME ("create empty, add sources later").
+//
+// The optional --source <repo> links a repo as source #1 in one shot alongside a bare
+// name (`gogo project add sanoma --source ~/repos/sanoma-web`); it is not combined with
+// a PATH positional (the path is already the source).
 func projectAdd(args []string) int {
-	repo, name, err := parseRepoName("gogo project add", args)
+	pos, name, source, err := parseProjectAddArgs(args)
 	if err != nil {
 		return 2
 	}
-	if repo == "" {
-		fmt.Fprintln(os.Stderr, "gogo project add: needs a <repo> (the repo root that contains .gogo/)")
+
+	// PATH mode: the positional is a repo path → today's project+source-#1 flow.
+	if pos != "" && isPathArg(pos) {
+		if source != "" {
+			fmt.Fprintln(os.Stderr, "gogo project add: --source is for the bare-NAME form; a repo PATH is already source #1")
+			return 2
+		}
+		return projectAddRepo(pos, name)
+	}
+
+	// NAME mode. Resolve --source now (fail fast on a bad repo, before any create).
+	srcAbs := ""
+	if source != "" {
+		var code int
+		if srcAbs, code = resolveGogoRepo("gogo project add", source); code != 0 {
+			return code
+		}
+	}
+	projName := name // an explicit --name overrides the positional
+	if projName == "" {
+		projName = pos
+	}
+	if projName == "" && srcAbs != "" {
+		projName = filepath.Base(srcAbs) // `--source <repo>` only → derive the name
+	}
+	if projName == "" {
+		fmt.Fprintln(os.Stderr, "gogo project add: needs a <name> (e.g. `gogo project add sanoma`) or a <repo> path")
 		return 2
 	}
+	return projectAddEmpty(projName, srcAbs)
+}
+
+// projectAddRepo is the PATH-mode flow (byte-for-byte today's `gogo project add
+// <repo>`): create a home-folder project with <repo> as source #1 (D5) — cleans the
+// repo path to absolute, verifies it contains a .gogo/ dir, defaults the project name
+// to the repo basename (or --name), the source's concurrentWorkItems to the default
+// (1), and mainBranch to the detected git default (else "main"). Re-adding a repo
+// already registered under the project is an idempotent no-op; a DIFFERENT set of
+// sources on that name directs the user to `gogo source add` rather than clobbering.
+// FR2: the project's .knowledge/ + .gogo/plans/ scaffold is ensured too (idempotent).
+func projectAddRepo(repo, name string) int {
 	abs, code := resolveGogoRepo("gogo project add", repo)
 	if code != 0 {
 		return code
@@ -107,9 +156,147 @@ func projectAdd(args []string) int {
 		fmt.Fprintf(os.Stderr, "gogo project add: %v\n", err)
 		return 1
 	}
+	// FR2: scaffold .knowledge/ (seeded template) + .gogo/plans/ — ~/.gogo/ only,
+	// idempotent, best-effort (never blocks the add).
+	projects.EnsureProjectHome(name)
 	fmt.Printf("created project %q → source %s (branch %s, cap %s)\n",
 		name, abs, src.MainBranch, capLabel(src.ConcurrentWorkItems))
 	return 0
+}
+
+// projectAddEmpty is the NAME-mode flow (FR1): create an EMPTY project
+// ~/.gogo/projects/<name>/ (config.json with sources: [] + the .knowledge/ seed +
+// .gogo/plans/) — no repo, no path required. With srcAbs non-empty (from --source) it
+// also links that repo as source #1 in one shot. A name that COLLIDES with an existing
+// project preserves it (never clobbers): --source adds the repo like `gogo source add`,
+// no --source is a friendly idempotent note. Writes ONLY ~/.gogo/.
+func projectAddEmpty(name, srcAbs string) int {
+	if !projects.ValidName(name) {
+		fmt.Fprintf(os.Stderr, "gogo project add: %q is not a valid project name (a single path component - no `/`, `\\`, `.`, or `..`)\n", name)
+		return 2
+	}
+	// FR22 parity: an empty project add also initializes the cockpit home marker.
+	projects.EnsureHome()
+
+	if projects.Exists(name) {
+		projects.EnsureProjectHome(name) // idempotent re-scaffold, never clobbers
+		if srcAbs != "" {
+			src := newColoredSource(name, srcAbs)
+			added, err := projects.AddSource(name, src)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "gogo project add: %v\n", err)
+				return 1
+			}
+			verb := "added"
+			if !added {
+				verb = "updated"
+			}
+			fmt.Printf("%s source %s in project %q (branch %s, cap %s)\n",
+				verb, srcAbs, name, src.MainBranch, capLabel(src.ConcurrentWorkItems))
+			return 0
+		}
+		existing, _ := projects.Load(name)
+		fmt.Printf("project %q already exists (%d source%s) - add sources with `gogo source add <repo> --project %s`\n",
+			name, len(existing.Sources), sourcePlural(len(existing.Sources)), name)
+		return 0
+	}
+
+	all, _ := projects.List()
+	taken := projects.TakenColors(all)
+	p := projects.Project{Name: name, Color: projects.AssignColor(taken), Sources: []projects.Source{}}
+	if srcAbs != "" {
+		p.Sources = []projects.Source{{
+			Path:                srcAbs,
+			Name:                filepath.Base(srcAbs),
+			MainBranch:          detectMainBranch(srcAbs),
+			ConcurrentWorkItems: projects.DefaultConcurrentWorkItems,
+			Color:               projects.AssignColor(taken),
+		}}
+	}
+	if _, err := projects.Add(p); err != nil {
+		fmt.Fprintf(os.Stderr, "gogo project add: %v\n", err)
+		return 1
+	}
+	// FR2: scaffold .knowledge/ (seeded template) + .gogo/plans/ (idempotent, ~/.gogo/ only).
+	projects.EnsureProjectHome(name)
+	if srcAbs != "" {
+		s := p.Sources[0]
+		fmt.Printf("created project %q → source %s (branch %s, cap %s)\n",
+			name, s.Path, s.MainBranch, capLabel(s.ConcurrentWorkItems))
+	} else {
+		fmt.Printf("created empty project %q (~/.gogo/projects/%s/) - add sources with `gogo source add <repo> --project %s`\n",
+			name, name, name)
+	}
+	return 0
+}
+
+// isPathArg reports whether a `project add` positional is a repo PATH (vs a bare
+// project NAME): a path separator, a leading ~ (home-relative) or . (dot-relative),
+// or a bare token that resolves (relative to cwd) to a dir already containing .gogo/.
+// Everything else is a NAME — the empty-project bias (D=A).
+func isPathArg(arg string) bool {
+	if arg == "" {
+		return false
+	}
+	if strings.ContainsAny(arg, `/\`) {
+		return true // has a path separator
+	}
+	if strings.HasPrefix(arg, "~") || strings.HasPrefix(arg, ".") {
+		return true // ~home-relative or ./.. dot-relative
+	}
+	// A bare token that IS a real repo dir (has .gogo/) is a path, not a new name.
+	if info, err := os.Stat(filepath.Join(arg, ".gogo")); err == nil && info.IsDir() {
+		return true
+	}
+	return false
+}
+
+// parseProjectAddArgs pulls the positional plus the optional --name / --source flags
+// out of `gogo project add` argv. --name sets the project name (PATH mode) / overrides
+// it (NAME mode); --source names a repo to link as source #1. An unknown flag or a
+// flag with no value returns an error (a message is printed).
+func parseProjectAddArgs(args []string) (pos, name, source string, err error) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--name" || a == "--source":
+			if i+1 >= len(args) {
+				fmt.Fprintf(os.Stderr, "gogo project add: %s needs a value\n", a)
+				return "", "", "", fmt.Errorf("missing value for %s", a)
+			}
+			if a == "--name" {
+				name = args[i+1]
+			} else {
+				source = args[i+1]
+			}
+			i++
+		case strings.HasPrefix(a, "--name="):
+			name = strings.TrimPrefix(a, "--name=")
+		case strings.HasPrefix(a, "--source="):
+			source = strings.TrimPrefix(a, "--source=")
+		case strings.HasPrefix(a, "-"):
+			fmt.Fprintf(os.Stderr, "gogo project add: unknown flag %q\n", a)
+			return "", "", "", fmt.Errorf("unknown flag %q", a)
+		case pos == "":
+			pos = a
+		}
+	}
+	return pos, name, source, nil
+}
+
+// newColoredSource builds a Source for repo abs linked into project name, assigning
+// the next free palette color (or preserving the source's existing color on a re-add,
+// like `gogo source add`). Mirrors sourceAdd's color handling.
+func newColoredSource(project, abs string) projects.Source {
+	all, _ := projects.List()
+	taken := projects.TakenColors(all)
+	return projects.Source{
+		Path:                abs,
+		Name:                filepath.Base(abs),
+		MainBranch:          detectMainBranch(abs),
+		ConcurrentWorkItems: projects.DefaultConcurrentWorkItems,
+		Color:               existingSourceColor(project, abs, projects.AssignColor(taken)),
+	}
 }
 
 // projectList prints every project + its sources as a stable table.
@@ -160,15 +347,6 @@ func hasSourcePath(sources []projects.Source, path string) bool {
 		}
 	}
 	return false
-}
-
-// parseRepoName pulls a positional <repo> and an optional --name/--project flag
-// out of argv (shared by project add / source add). flagName selects which flag
-// this command accepts ("--name" for project, "--project" for source). An unknown
-// flag or a flag with no value returns an error (helped signalled to the caller
-// via a non-nil err + a printed message).
-func parseRepoName(cmd string, args []string) (repo, name string, err error) {
-	return parseRepoFlag(cmd, "--name", args)
 }
 
 // parseRepoFlag is the generic positional-<repo> + one-value-flag parser.
@@ -237,7 +415,7 @@ func FormatProjects(projs []projects.Project) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "gogo projects - %d project(s)  (~/.gogo/projects/)\n\n", len(projs))
 	if len(projs) == 0 {
-		b.WriteString("(none - create one with `gogo project add <repo>`)\n")
+		b.WriteString("(none - create one with `gogo project add <name>` (empty) or `gogo project add <repo>` (with source #1))\n")
 		return b.String()
 	}
 	for _, p := range projs {

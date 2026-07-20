@@ -72,6 +72,10 @@ type formBinding struct {
 	srcBranch string
 	srcColor  string
 	srcCap    string
+	// Per-source gate-skip toggles (FR4): opt this source out of the plan-acceptance /
+	// UAT gate. Bools bound heap-stably to two huh Confirm fields (TEST-001).
+	srcPlanSkip bool
+	srcUatSkip  bool
 	// Plans-tab new-plan form field (FR10 `n`): the plan title as a STRING the huh
 	// input binds heap-stably (TEST-001).
 	planTitle string
@@ -96,6 +100,15 @@ type sourceEdit struct {
 // project-level Color field.
 type projectEdit struct {
 	name string
+}
+
+// planDoneEdit marks an in-flight plans-tab project-UAT accept confirm (FR3, `D`):
+// project + id name the CLI-owned plan the MarkDone accept targets; title is shown in
+// the confirm. Analogous to sourceEdit/projectEdit but for the project-UAT gate.
+type planDoneEdit struct {
+	project string
+	id      string
+	title   string
 }
 
 // Picker sentinels — the non-empty values the attach/kill huh.NewSelect writes to
@@ -148,11 +161,12 @@ type Model struct {
 	// list view), the plan-detail target-source cursor, and the in-flight new-plan form
 	// marker. Reads/writes ONLY ~/.gogo/… via the plans store; spawning a work item is
 	// a claude -p launch (never a source's .gogo/ write).
-	plans         []plans.Plan
-	planIdx       int
-	planDetail    *plans.Plan
-	planSourceIdx int
-	pendingPlan   bool
+	plans           []plans.Plan
+	planIdx         int
+	planDetail      *plans.Plan
+	planSourceIdx   int
+	pendingPlan     bool
+	pendingPlanDone *planDoneEdit // in-flight project-UAT accept confirm (FR3, `D`)
 
 	// unified marks the multi-project cockpit board (0.23.0): the board aggregates
 	// EVERY registered project (LoadWorkspace) rather than one project's sources

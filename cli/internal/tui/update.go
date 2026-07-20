@@ -410,6 +410,11 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingPlan {
 			return m.finishPlanForm()
 		}
+		// A plans-tab project-UAT accept confirm (FR3 `D`) completes to finishPlanDone —
+		// its own path (stays on the plans tab), mutually exclusive with every path above.
+		if m.pendingPlanDone != nil {
+			return m.finishPlanDone()
+		}
 		if m.binding == nil || !m.binding.confirm {
 			// Completed on "Cancel" — same as an abort. Only a SHIP form reaches
 			// here (delete/kill forms are handled above), so the pending targets are
@@ -438,7 +443,7 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 // cancelling them must NOT wipe the user's multi-selection (only a SHIP form's
 // cancel does). REV-012.
 func (m Model) formPreservesSelection() bool {
-	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingProject != nil || m.pendingPlan
+	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingProject != nil || m.pendingPlan || m.pendingPlanDone != nil
 }
 
 // cancelForm returns to the board and clears the in-flight form state. For a SHIP
@@ -476,6 +481,7 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	m.pendingSource = nil
 	m.pendingProject = nil
 	m.pendingPlan = false
+	m.pendingPlanDone = nil
 	m.binding = nil
 	m.form = nil
 	m.mode = returnMode

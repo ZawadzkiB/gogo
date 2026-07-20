@@ -233,6 +233,49 @@ func TestConfigFormCancelReturnsToConfigTab(t *testing.T) {
 	}
 }
 
+// TestConfigTabSkipFlagsEditPersist (FR4): the source detail shows the two per-source
+// gate-skip flags (default `no`), the `e` edit form exposes them, and a completed edit
+// that toggles both on persists PlanAcceptanceSkip / UatAcceptanceSkip to config.json.
+func TestConfigTabSkipFlagsEditPersist(t *testing.T) {
+	seedDataHome(t)
+	repo := gogoRepoDir(t)
+	p := projects.Project{Name: "app", Sources: []projects.Source{{Name: "svc", Path: repo}}}
+	if err := projects.Save(&p); err != nil {
+		t.Fatal(err)
+	}
+
+	m := configTab(sizedWorkspace(t, &contract.Repo{}, p))
+	// A source with both flags false reads the detail with `no` (today's byte-for-byte).
+	if out := m.viewConfigRight(); !strings.Contains(out, "plan-accept skip") || !strings.Contains(out, "uat skip") {
+		t.Errorf("source detail missing the skip-flag labels:\n%s", out)
+	}
+	if got, _ := projects.Load("app"); got.Sources[0].PlanAcceptanceSkip || got.Sources[0].UatAcceptanceSkip {
+		t.Fatalf("fresh source already has a skip flag set: %+v", got.Sources[0])
+	}
+
+	// `e` seeds the form (both flags off), then we toggle both on and complete.
+	m = send(m, runes("e"))
+	if m.pendingSource == nil || m.pendingSource.op != "edit" {
+		t.Fatalf("e did not open an edit form (pending=%v)", m.pendingSource)
+	}
+	if m.binding.srcPlanSkip || m.binding.srcUatSkip {
+		t.Fatalf("edit form seeded a skip flag ON for an unflagged source: %+v", m.binding)
+	}
+	m.binding.srcPlanSkip = true
+	m.binding.srcUatSkip = true
+	nm, _ := m.finishSourceForm()
+	m = nm.(Model)
+
+	got, _ := projects.Load("app")
+	if len(got.Sources) != 1 || !got.Sources[0].PlanAcceptanceSkip || !got.Sources[0].UatAcceptanceSkip {
+		t.Fatalf("skip flags not persisted: %+v", got.Sources)
+	}
+	// The live detail now reflects both flags on.
+	if out := m.viewConfigRight(); !strings.Contains(out, "plan-accept skip  yes") || !strings.Contains(out, "uat skip          yes") {
+		t.Errorf("source detail did not reflect the toggled skip flags:\n%s", out)
+	}
+}
+
 // TestConfigTabProjectSwitcher: `p` cycles the focused home project across the store.
 func TestConfigTabProjectSwitcher(t *testing.T) {
 	seedDataHome(t)
@@ -402,5 +445,45 @@ func TestViewConfigTab(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("config tab view missing %q:\n%s", want, out)
 		}
+	}
+}
+
+// TestViewConfigKnowledgeGroupsSplit (FR2): the config-tab explorer shows the PROJECT
+// knowledge (~/.gogo/projects/<name>/.knowledge/) and the SOURCE knowledge
+// (<repo>/.gogo/knowledge/) in two SEPARATE labelled groups — not one flat mixed list.
+func TestViewConfigKnowledgeGroupsSplit(t *testing.T) {
+	seedDataHome(t)
+	repo := gogoRepoDir(t)
+	if err := os.MkdirAll(filepath.Join(repo, ".gogo", "knowledge"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".gogo", "knowledge", "coding-rules.md"), []byte("src rules"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := projects.Project{Name: "app", Sources: []projects.Source{{Name: "svc", Path: repo}}}
+	if err := projects.Save(&p); err != nil {
+		t.Fatal(err)
+	}
+	// Scaffold the PROJECT-level knowledge under ~/.gogo/projects/app/.knowledge/.
+	if err := projects.SeedProjectKnowledge("app"); err != nil {
+		t.Fatal(err)
+	}
+
+	m := configTab(sizedWorkspace(t, &contract.Repo{}, p))
+	out := m.viewConfigRight()
+	for _, want := range []string{"project knowledge", "project-knowledge.md", "source knowledge", "coding-rules.md"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("config right pane missing %q:\n%s", want, out)
+		}
+	}
+	// The two groups are distinct headers, and the source file is NOT listed under the
+	// project group (the split is real, not both in one list).
+	proj := strings.Index(out, "project knowledge")
+	srcG := strings.Index(out, "source knowledge")
+	if proj < 0 || srcG < 0 || srcG <= proj {
+		t.Fatalf("expected the project-knowledge group before the source-knowledge group:\n%s", out)
+	}
+	if cr := strings.Index(out, "coding-rules.md"); cr < srcG {
+		t.Errorf("coding-rules.md (a SOURCE file) appears before the source-knowledge header — groups not split:\n%s", out)
 	}
 }

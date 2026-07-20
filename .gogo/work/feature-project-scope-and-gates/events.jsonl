@@ -1,0 +1,11 @@
+{"ts":"2026-07-20T14:10:00Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"project-scope-and-gates"}
+{"ts":"2026-07-20T19:30:00Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"project-scope-and-gates","note":"FR1=A dual-mode, FR2=seeded template+author-read, FR3=gogo plan done+derive, FR4=B skill honors --skip param, all-in-one 0.24.0"}
+{"ts":"2026-07-20T21:00:00Z","event":"phase-started","phase":"review","status":"reviewing","slug":"project-scope-and-gates","note":"all 4 FRs green (2-pass implement + completion); 0.24.0 preview installed; fresh-eyes review incl. the skill change"}
+{"ts":"2026-07-20T21:40:00Z","event":"review-done","phase":"review","status":"reviewing","slug":"project-scope-and-gates","note":"round 1: CHANGES-REQUESTED (1 major test-gap + 3 minor + 1 nit); skill change verified sound; routing fixes"}
+{"ts":"2026-07-20T22:20:00Z","event":"review-done","phase":"review","status":"reviewing","slug":"project-scope-and-gates","note":"round 1 fixes verified (REV-001 skip-enforcement tests + REV-002/003/004/005); gate green; review resolved"}
+{"ts":"2026-07-20T22:21:00Z","event":"phase-started","phase":"test","status":"testing","slug":"project-scope-and-gates","note":"e2e: empty projects, project knowledge, project-UAT guard, gate-skip enforcement + skill-honor"}
+{"ts":"2026-07-20T23:00:00Z","event":"test-done","phase":"test","status":"testing","slug":"project-scope-and-gates","note":"PASS no issues; FR4 gate-skip reproduced with stub claude"}
+{"ts":"2026-07-20T23:01:00Z","event":"report-done","phase":"report","status":"reporting","slug":"project-scope-and-gates","note":"report written"}
+{"ts":"2026-07-20T23:02:00Z","event":"awaiting-uat","phase":"report","status":"awaiting-uat","slug":"project-scope-and-gates","note":"UAT: gogo project add <name>, plan done, config skip toggles; accept via /gogo:done to ship 0.24.0"}
+{"ts":"2026-07-20T23:30:00Z","event":"uat-passed","phase":"done","status":"shipped","slug":"project-scope-and-gates","note":"user accepted via /gogo:done"}
+{"ts":"2026-07-20T23:31:00Z","event":"shipped","phase":"done","status":"shipped","slug":"project-scope-and-gates","note":"0.24.0 changelog entry written"}

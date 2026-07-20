@@ -1,0 +1,15 @@
+stateDiagram-v2
+  [*] --> draft: gogo project add / gogo plan new
+  draft --> ready: gogo plan ready
+  ready --> active: first member spawned (/gogo:plan --correlation)
+  active --> awaiting_project_uat: all members shipped (DERIVED, read-time)
+  awaiting_project_uat --> done: gogo plan done id (CLI records project-UAT round)
+  active --> active: more members spawned / a member re-run
+  awaiting_project_uat --> active: a member un-ships / new member spawned
+  done --> [*]
+
+  note right of awaiting_project_uat
+    computed display status,
+    not persisted; the accept
+    is the only write to done
+  end note

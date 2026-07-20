@@ -1,0 +1,10 @@
+{
+  "slug": "project-scope-and-gates",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-is: project add requires a repo, no project .knowledge/, no project-UAT, no per-source skip"
+    }
+  ]
+}

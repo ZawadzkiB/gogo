@@ -1,0 +1,35 @@
+flowchart TD
+  subgraph home["~/.gogo/  (CLI-owned data)"]
+    proj["project sanoma\nconfig.json · .knowledge/ · .gogo/plans/"]
+    plan["plan-XXXX.md\ndraft → ready → active → (awaiting-project-uat*) → done"]
+    proj --> plan
+  end
+
+  subgraph srcA[".gogo/ in repo A  (skill-owned pipeline)"]
+    wiA["work item a\nstate.md"]
+    gA1{{"plan-accept gate"}}
+    gA2{{"UAT gate\nawaiting-uat"}}
+    wiA --> gA1 --> gA2 --> shipA["shipped"]
+  end
+  subgraph srcB[".gogo/ in repo B  (skill-owned pipeline)"]
+    wiB["work item b\nstate.md"]
+    gB1{{"plan-accept gate"}}
+    gB2{{"UAT gate"}}
+    wiB --> gB1 --> gB2 --> shipB["shipped"]
+  end
+
+  plan -- "gogo plan promote / plans-tab c\n/gogo:plan --correlation plan-XXXX" --> wiA
+  plan -- "spawn (correlation)" --> wiB
+
+  shipA -. "read state.md (contract)" .-> puat{{"project-UAT\nall members shipped?"}}
+  shipB -. "read state.md" .-> puat
+  puat -- "gogo plan done id (CLI records)" --> done["plan done"]
+
+  skip["source.planAcceptanceSkip / uatAcceptanceSkip\n(config.json, per-source)"]
+  skip -. "CLI auto-launch /gogo:accept" .-> gA1
+  skip -. "CLI auto-launch /gogo:done" .-> gA2
+
+  classDef cli fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef skill fill:#fff3d6,stroke:#caa54a,color:#111
+  class home,proj,plan,puat,done,skip cli
+  class srcA,srcB,wiA,wiB,gA1,gA2,gB1,gB2,shipA,shipB skill

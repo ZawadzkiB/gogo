@@ -1,8 +1,11 @@
 package plans
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 )
 
 // seedDataHome points the DATA home (projects.Home, and thus the plans dir) at a
@@ -148,5 +151,134 @@ func TestSaveRefusesInvalidID(t *testing.T) {
 	}
 	if _, ok := Get("proj", "../pwn"); ok {
 		t.Error("Get with a path-escaping id must be refused")
+	}
+}
+
+// --- project-UAT gate (FR3) -------------------------------------------------------
+
+// memberRepo builds an in-memory board repo of (source, status, correlation) tuples so
+// the pure MembersShippedIn / DerivedStatus / MarkDone tests never touch a source's
+// on-disk .gogo/.
+func memberRepo(feats ...*contract.Feature) *contract.Repo { return &contract.Repo{Features: feats} }
+
+func feat(source, status, planID string) *contract.Feature {
+	return &contract.Feature{Slug: source + "-item", Source: source, Status: status, Correlations: []string{planID}}
+}
+
+// TestMembersShippedInGuard: MembersShippedIn is all-shipped only when EVERY member's
+// work item reads state.md status shipped/done; it names any unshipped member, and a
+// memberless plan is never accepted.
+func TestMembersShippedInGuard(t *testing.T) {
+	p := Plan{ID: "plan-abcd1234", Status: StatusActive, Members: []Member{
+		{Source: "web", SlugHint: "web-item"}, {Source: "api", SlugHint: "api-item"},
+	}}
+
+	// One member still building → not all shipped, names the api member.
+	repo := memberRepo(feat("web", "shipped", p.ID), feat("api", "implementing", p.ID))
+	if all, unshipped := MembersShippedIn("", p, repo); all || len(unshipped) != 1 || !strings.Contains(unshipped[0], "api") {
+		t.Errorf("partial: all=%v unshipped=%v, want not-all + [api:…]", all, unshipped)
+	}
+
+	// Both shipped (one on the legacy `done` status) → all shipped.
+	repo = memberRepo(feat("web", "shipped", p.ID), feat("api", "done", p.ID))
+	if all, unshipped := MembersShippedIn("", p, repo); !all || len(unshipped) != 0 {
+		t.Errorf("all-shipped: all=%v unshipped=%v, want all + none", all, unshipped)
+	}
+
+	// A wrong correlation id is not a member match → unshipped.
+	repo = memberRepo(feat("web", "shipped", "plan-other"), feat("api", "shipped", p.ID))
+	if all, _ := MembersShippedIn("", p, repo); all {
+		t.Error("a feature carrying a DIFFERENT plan id must not count as this plan's member")
+	}
+
+	// A memberless plan is never all-shipped (nothing to accept).
+	if all, _ := MembersShippedIn("", Plan{ID: p.ID, Status: StatusActive}, memberRepo()); all {
+		t.Error("a memberless plan must not report all-shipped")
+	}
+}
+
+// TestMembersShippedInCrossProjectGuard (REV-002): on a workspace-spanning repo a source
+// NAME can collide across projects, so MembersShippedIn only counts a member whose feature
+// belongs to the PLAN's project. A same-named source's SHIPPED feature in a DIFFERENT
+// project must NOT satisfy the member (mirroring the guard tui.spawnedFeature carries),
+// while a project-less feature (single-repo seam) still matches by (source, correlation).
+func TestMembersShippedInCrossProjectGuard(t *testing.T) {
+	p := Plan{ID: "plan-deadbeef", Status: StatusActive, Members: []Member{
+		{Source: "web", SlugHint: "web-item"},
+	}}
+	withProject := func(source, project, status, planID string) *contract.Feature {
+		f := feat(source, status, planID)
+		f.Project = project
+		return f
+	}
+
+	// The ONLY shipped `web` feature carrying the plan id lives in ANOTHER project — it must
+	// not satisfy a member of a plan scoped to "app".
+	crossOnly := memberRepo(withProject("web", "other", "shipped", p.ID))
+	if all, unshipped := MembersShippedIn("app", p, crossOnly); all || len(unshipped) != 1 {
+		t.Errorf("a same-named source's shipped feature in another project must NOT count: all=%v unshipped=%v", all, unshipped)
+	}
+
+	// The plan's OWN project's shipped feature (same source name) DOES satisfy it, even with
+	// a sibling in another project still building.
+	rightProject := memberRepo(
+		withProject("web", "app", "shipped", p.ID),
+		withProject("web", "other", "implementing", p.ID),
+	)
+	if all, unshipped := MembersShippedIn("app", p, rightProject); !all || len(unshipped) != 0 {
+		t.Errorf("the plan's own project's shipped member must count: all=%v unshipped=%v", all, unshipped)
+	}
+
+	// Byte-for-byte fallback: a project-less feature (single-repo seam) still matches by
+	// (source, correlation) regardless of the project arg.
+	noProject := memberRepo(feat("web", "shipped", p.ID))
+	if all, _ := MembersShippedIn("app", p, noProject); !all {
+		t.Error("a project-less feature must still match by (source, correlation) — byte-for-byte fallback")
+	}
+}
+
+// TestDerivedStatus: only an active plan with ≥1 member and all shipped derives
+// awaiting-project-uat; every other combination returns the persisted status.
+func TestDerivedStatus(t *testing.T) {
+	withMember := Plan{Status: StatusActive, Members: []Member{{Source: "web", SlugHint: "web-item"}}}
+	if got := DerivedStatus(withMember, true); got != StatusAwaitingProjectUAT {
+		t.Errorf("active+member+shipped derived %q, want %s", got, StatusAwaitingProjectUAT)
+	}
+	if got := DerivedStatus(withMember, false); got != StatusActive {
+		t.Errorf("active+member not-all-shipped derived %q, want active", got)
+	}
+	if got := DerivedStatus(Plan{Status: StatusReady, Members: []Member{{Source: "web"}}}, true); got != StatusReady {
+		t.Errorf("a non-active plan must never derive the gate: got %q", got)
+	}
+	if got := DerivedStatus(Plan{Status: StatusActive}, true); got != StatusActive {
+		t.Errorf("a memberless active plan must not derive the gate: got %q", got)
+	}
+}
+
+// TestMarkDone: MarkDone appends a `## Project UAT` round to the plan body and flips the
+// persisted status to done; a second accept increments the round number.
+func TestMarkDone(t *testing.T) {
+	seedDataHome(t)
+	p, _ := New("proj", "Cross-repo migration", "the brief body")
+	SetStatus("proj", p.ID, StatusActive)
+
+	got, err := MarkDone("proj", p.ID)
+	if err != nil {
+		t.Fatalf("MarkDone: %v", err)
+	}
+	if got.Status != StatusDone {
+		t.Errorf("after MarkDone status = %q, want done", got.Status)
+	}
+	if !strings.Contains(got.Description, "## Project UAT") || !strings.Contains(got.Description, "UAT round 1") {
+		t.Errorf("MarkDone did not append the project-UAT round:\n%s", got.Description)
+	}
+	// The original brief is preserved (the round is appended, never a clobber).
+	if !strings.Contains(got.Description, "the brief body") {
+		t.Errorf("MarkDone clobbered the plan body:\n%s", got.Description)
+	}
+	// A second accept increments the round number (idempotent-ish append).
+	again, _ := MarkDone("proj", p.ID)
+	if !strings.Contains(again.Description, "UAT round 2") {
+		t.Errorf("second MarkDone did not increment the round:\n%s", again.Description)
 	}
 }

@@ -34,6 +34,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 )
 
@@ -46,6 +47,13 @@ const (
 	StatusActive = "active"
 	StatusDone   = "done"
 )
+
+// StatusAwaitingProjectUAT is the DERIVED (display-only, never persisted) status of a
+// plan whose every member work item is shipped and which is awaiting the project-UAT
+// accept (FR3). The persisted lifecycle stays draft → ready → active → done; this is
+// computed at read time by DerivedStatus and shown by the plans tab, so nothing new is
+// stored until `gogo plan done` (MarkDone) flips the plan to the persisted `done`.
+const StatusAwaitingProjectUAT = "awaiting-project-uat"
 
 // frontFence is the `---` line that opens and closes the front-matter block.
 const frontFence = "---"
@@ -451,4 +459,98 @@ func containsStr(ss []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// --- project-UAT gate (FR3) — derive at read; accept via MarkDone ----------------
+
+// MembersShipped reports whether EVERY member work item of p is shipped, plus the
+// labels (source:slug) of any that are not — the project-UAT guard (FR3). It READS
+// each member's source repo through the contract reader (contract.LoadProject) and
+// matches the member by the plan's correlation id (like the board's spawnedFeature),
+// NEVER writing a source's .gogo/. A plan with NO members returns (false, nil) —
+// nothing to accept yet. The member-shipped check keys on state.md status (shipped),
+// not artifact presence (TEST-004).
+func MembersShipped(project string, p Plan) (allShipped bool, unshipped []string) {
+	proj, _ := projects.Load(project)
+	return MembersShippedIn(project, p, contract.LoadProject(*proj))
+}
+
+// MembersShippedIn is the pure core of MembersShipped over an ALREADY-loaded board
+// repo (so the plans tab can pass its in-memory m.repo without a re-read). It matches
+// each member in repo by (Source, plan correlation id) — SCOPED to project — and checks
+// Shipped(). On a workspace-spanning repo (the unified board's contract.LoadWorkspace) a
+// source NAME can collide across projects, so project is threaded in and a feature whose
+// Project is set and differs is skipped (mirroring tui.spawnedFeature, REV-002). A
+// project-less feature (the single-project LoadProject / single-repo seam) stays inert,
+// so those callers behave byte-for-byte; project "" disables the scope guard entirely.
+func MembersShippedIn(project string, p Plan, repo *contract.Repo) (allShipped bool, unshipped []string) {
+	if len(p.Members) == 0 {
+		return false, nil
+	}
+	for _, m := range p.Members {
+		if f := memberFeature(repo, project, m.Source, p.ID); f == nil || !f.Shipped() {
+			unshipped = append(unshipped, m.Source+":"+m.SlugHint)
+		}
+	}
+	return len(unshipped) == 0, unshipped
+}
+
+// memberFeature finds the work item a plan spawned into source: a feature tagged with
+// that source whose state.md correlation list carries the plan id, or nil. The
+// cross-project scope guard (REV-002) skips a feature whose Project is set and differs
+// from the plan's project — on the workspace-spanning repo a same-named source in ANOTHER
+// project must not match. A feature with no Project (single-project/single-repo seam) or
+// an empty project arg leaves the match keyed on (Source, correlation) alone.
+func memberFeature(repo *contract.Repo, project, source, planID string) *contract.Feature {
+	if repo == nil {
+		return nil
+	}
+	for _, f := range repo.Features {
+		if f == nil || f.Source != source {
+			continue
+		}
+		if project != "" && f.Project != "" && f.Project != project {
+			continue
+		}
+		for _, c := range f.Correlations {
+			if c == planID {
+				return f
+			}
+		}
+	}
+	return nil
+}
+
+// DerivedStatus returns the DISPLAY status of p given whether all its members are
+// shipped (FR3, derive-at-read): `awaiting-project-uat` when p is `active` with ≥1
+// member and all shipped, else the persisted status. Display-only — nothing new is
+// persisted until MarkDone. Pure (the shipped decision is passed in, computed by
+// MembersShipped/MembersShippedIn) so it stays unit-testable without disk.
+func DerivedStatus(p Plan, allShipped bool) string {
+	if p.Status == StatusActive && len(p.Members) > 0 && allShipped {
+		return StatusAwaitingProjectUAT
+	}
+	return p.Status
+}
+
+// MarkDone records the project-UAT acceptance on a CLI-owned plan (FR3, accept-only
+// v1): it appends a `## Project UAT` round to the plan body and flips the persisted
+// status to `done`. It does NOT itself re-check members-shipped — the caller
+// (`gogo plan done` / plans-tab `D`) guards with MembersShipped first. Writes ONLY the
+// plan file under ~/.gogo/ (never a source's .gogo/). A missing plan is an error.
+func MarkDone(project, id string) (Plan, error) {
+	p, ok := Get(project, id)
+	if !ok {
+		return Plan{}, os.ErrNotExist
+	}
+	round := strings.Count(p.Description, "## UAT round") + 1
+	stamp := time.Now().UTC().Format("2006-01-02")
+	block := fmt.Sprintf("## Project UAT\n## UAT round %d - accepted (user, %s) - via gogo plan done", round, stamp)
+	body := strings.TrimRight(p.Description, "\n")
+	if body != "" {
+		body += "\n\n"
+	}
+	p.Description = body + block
+	p.Status = StatusDone
+	return p, Save(project, p)
 }

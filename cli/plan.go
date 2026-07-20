@@ -22,6 +22,7 @@ usage:
   gogo plan rm  <id> <source>[:<slug>] [--project <p>]      remove a target (or unlink a work item)
   gogo plan ready <id> [--project <p>]                      mark a draft ready to spawn
   gogo plan promote <id> <source> [--project <p>]           SPAWN a work item: launch /gogo:plan --correlation plan-<hash> in the source
+  gogo plan done <id> [--project <p>]                       accept the project-UAT (refuses unless every member work item is shipped)
   gogo plan delete <id> [--project <p>]                     delete a plan
 
 A PLAN is one lifecycle entity (draft → ready → active → done) owned by a home
@@ -43,7 +44,7 @@ var planLauncher func(root string, in launch.Intent) (launch.Result, error) = la
 // plan store (vs a bare `gogo plan <slug>` which launches a persistent session).
 func isPlanStoreVerb(v string) bool {
 	switch v {
-	case "new", "list", "ls", "show", "add", "rm", "remove", "delete", "del", "ready", "promote":
+	case "new", "list", "ls", "show", "add", "rm", "remove", "delete", "del", "ready", "promote", "done":
 		return true
 	case "-h", "--help", "help":
 		return true
@@ -76,11 +77,13 @@ func cmdPlanStore(args []string) int {
 		return planReady(args[1:])
 	case "promote":
 		return planPromote(args[1:])
+	case "done":
+		return planDone(args[1:])
 	case "-h", "--help", "help":
 		fmt.Print(planStoreHelp)
 		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "gogo plan: unknown subcommand %q (new | list | show | add | rm | ready | promote | delete)\n", args[0])
+		fmt.Fprintf(os.Stderr, "gogo plan: unknown subcommand %q (new | list | show | add | rm | ready | promote | done | delete)\n", args[0])
 		return 2
 	}
 }
@@ -398,6 +401,56 @@ func planPromote(args []string) int {
 		where = res.LogPath
 	}
 	fmt.Printf("spawned work item for plan %s in %s - launched %s (%s)\n", id, sname, intent.Command, where)
+	return 0
+}
+
+// planDone is the project-UAT acceptance (FR3, accept-only v1): it REFUSES (non-zero,
+// naming the unshipped members) unless EVERY member work item of the plan is shipped,
+// then records the accept via plans.MarkDone (appends a `## Project UAT` round to the
+// plan body + flips the plan to `done`). The member-shipped check READS each member's
+// source state.md (never writes a source's .gogo/). This is an ADDITIONAL gate on top
+// of each member's own /gogo:done UAT, not a replacement (FR3×FR4 orthogonality).
+func planDone(args []string) int {
+	pa, ok, code := parsePlanArgs("gogo plan done", args)
+	if !ok {
+		return code
+	}
+	if len(pa.pos) == 0 {
+		fmt.Fprintln(os.Stderr, "gogo plan done: needs an <id> (see `gogo plan list`)")
+		return 2
+	}
+	project, code := resolveProjectName("gogo plan done", pa.project)
+	if code != 0 {
+		return code
+	}
+	id := pa.pos[0]
+	p, found := plans.Get(project, id)
+	if !found {
+		fmt.Fprintf(os.Stderr, "gogo plan done: no plan %q in %q (see `gogo plan list`)\n", id, project)
+		return 1
+	}
+	if p.Status == plans.StatusDone {
+		fmt.Printf("plan %s is already done (project-UAT accepted)\n", id)
+		return 0
+	}
+	if len(p.Members) == 0 {
+		fmt.Fprintf(os.Stderr, "gogo plan done: refusing - plan %s has no work items yet; spawn + ship members first (`gogo plan promote %s <source>`)\n", id, id)
+		return 1
+	}
+	allShipped, unshipped := plans.MembersShipped(project, p)
+	if !allShipped {
+		fmt.Fprintf(os.Stderr, "gogo plan done: refusing - %d of %d member(s) not shipped yet: %s\n",
+			len(unshipped), len(p.Members), strings.Join(unshipped, ", "))
+		fmt.Fprintf(os.Stderr, "  ship each member (its own /gogo:done UAT), then re-run `gogo plan done %s`.\n", id)
+		return 1
+	}
+	updated, err := plans.MarkDone(project, id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gogo plan done: %v\n", err)
+		return 1
+	}
+	fmt.Printf("accepted project-UAT for plan %s - all %d member(s) shipped; plan is now %s\n",
+		id, len(updated.Members), updated.Status)
 	return 0
 }
 

@@ -265,6 +265,156 @@ func TestAllSourcesFlattens(t *testing.T) {
 	}
 }
 
+// TestEnsureProjectHomeScaffolds (FR2): EnsureProjectHome creates the project dir,
+// its .knowledge/ (seeded with project-knowledge.md) and its .gogo/plans/ dir — writing
+// ONLY under ~/.gogo/. It is idempotent and NEVER clobbers an edited knowledge file.
+func TestEnsureProjectHomeScaffolds(t *testing.T) {
+	seedDataHome(t)
+	if err := EnsureProjectHome("sanoma"); err != nil {
+		t.Fatalf("EnsureProjectHome: %v", err)
+	}
+	kf := filepath.Join(KnowledgeDir("sanoma"), "project-knowledge.md")
+	raw, err := os.ReadFile(kf)
+	if err != nil {
+		t.Fatalf("seed knowledge not written: %v", err)
+	}
+	// The seeded template carries the project name + the four headed sections.
+	for _, want := range []string{"Project knowledge - sanoma", "## Domain", "How the sources connect", "## Glossary", "Integration contracts"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("seeded template missing %q:\n%s", want, raw)
+		}
+	}
+	// .gogo/plans/ scaffolded for the CLI-owned plan store.
+	if info, err := os.Stat(filepath.Join(Dir("sanoma"), ".gogo", "plans")); err != nil || !info.IsDir() {
+		t.Errorf(".gogo/plans/ not scaffolded: err=%v", err)
+	}
+	// Idempotent + non-clobber: edit the file, re-run, the edit survives.
+	if err := os.WriteFile(kf, []byte("MY EDITS"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureProjectHome("sanoma"); err != nil {
+		t.Fatalf("second EnsureProjectHome: %v", err)
+	}
+	if raw, _ := os.ReadFile(kf); string(raw) != "MY EDITS" {
+		t.Errorf("EnsureProjectHome clobbered an edited knowledge file: %q", raw)
+	}
+}
+
+// TestSeedProjectKnowledgeIdempotent (FR2): SeedProjectKnowledge writes the template
+// only when absent; a second call is a no-op that preserves a hand-authored file.
+func TestSeedProjectKnowledgeIdempotent(t *testing.T) {
+	seedDataHome(t)
+	if err := SeedProjectKnowledge("app"); err != nil {
+		t.Fatal(err)
+	}
+	kf := filepath.Join(KnowledgeDir("app"), "project-knowledge.md")
+	if err := os.WriteFile(kf, []byte("hand written"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedProjectKnowledge("app"); err != nil {
+		t.Fatal(err)
+	}
+	if raw, _ := os.ReadFile(kf); string(raw) != "hand written" {
+		t.Errorf("SeedProjectKnowledge clobbered an existing file: %q", raw)
+	}
+}
+
+// TestScaffoldRefusesBadName: EnsureProjectHome / SeedProjectKnowledge refuse an
+// unsafe name (the write-scope guard) so a `..`/separator name can never escape the store.
+func TestScaffoldRefusesBadName(t *testing.T) {
+	seedDataHome(t)
+	for _, bad := range []string{"", ".", "..", "a/b", "../evil", `a\b`} {
+		if err := EnsureProjectHome(bad); err == nil {
+			t.Errorf("EnsureProjectHome(%q) = nil, want an error (invalid name)", bad)
+		}
+		if err := SeedProjectKnowledge(bad); err == nil {
+			t.Errorf("SeedProjectKnowledge(%q) = nil, want an error (invalid name)", bad)
+		}
+	}
+}
+
+// TestExistsReportsRegistered: Exists is true only once a project's config.json exists;
+// a bad name is always false.
+func TestExistsReportsRegistered(t *testing.T) {
+	seedDataHome(t)
+	if Exists("ghost") {
+		t.Error("Exists(ghost) = true before any add")
+	}
+	if _, err := Add(Project{Name: "app", Sources: []Source{{Path: "/a"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if !Exists("app") {
+		t.Error("Exists(app) = false after Add")
+	}
+	if Exists("../evil") {
+		t.Error("Exists on a traversal name = true, want false")
+	}
+}
+
+// TestSkipForSource (FR4, REV-001): the per-source gate-skip flags resolve by exact Path
+// match — a flagged source returns its (planSkip, uatSkip); an unflagged source or an
+// UNREGISTERED root returns (false, false), the fallback that keeps an unregistered /
+// single repo's gates byte-for-byte. Mirrors CapForSource's resolve-by-path discipline so
+// both `gogo go` launch paths share this one resolver.
+func TestSkipForSource(t *testing.T) {
+	sources := []Source{
+		{Name: "flagged", Path: "/repos/flagged", PlanAcceptanceSkip: true, UatAcceptanceSkip: true},
+		{Name: "plan-only", Path: "/repos/plan-only", PlanAcceptanceSkip: true},
+		{Name: "uat-only", Path: "/repos/uat-only", UatAcceptanceSkip: true},
+		{Name: "plain", Path: "/repos/plain"},
+	}
+	cases := []struct {
+		root              string
+		wantPlan, wantUAT bool
+	}{
+		{"/repos/flagged", true, true},
+		{"/repos/plan-only", true, false},
+		{"/repos/uat-only", false, true},
+		{"/repos/plain", false, false},
+		{"/repos/unregistered", false, false},
+	}
+	for _, c := range cases {
+		gotPlan, gotUAT := SkipForSource(sources, c.root)
+		if gotPlan != c.wantPlan || gotUAT != c.wantUAT {
+			t.Errorf("SkipForSource(%s) = (%v,%v), want (%v,%v)", c.root, gotPlan, gotUAT, c.wantPlan, c.wantUAT)
+		}
+	}
+	// nil sources (single-repo, no store) → never a skip (byte-for-byte fallback).
+	if p, u := SkipForSource(nil, "/repos/anything"); p || u {
+		t.Errorf("SkipForSource(nil) = (%v,%v), want (false,false)", p, u)
+	}
+}
+
+// TestSkipFlagsOmitemptyRoundTrip (FR4, REV-001): the two additive gate-skip flags
+// round-trip through config.json when set, and a FALSE flag OMITS its JSON key (omitempty)
+// so an opted-in-nowhere source keeps the on-disk shape byte-for-byte — schema stays 1.
+func TestSkipFlagsOmitemptyRoundTrip(t *testing.T) {
+	dir := seedDataHome(t)
+	// Both flags false → neither key on disk.
+	if err := Save(&Project{Name: "off", Sources: []Source{{Path: "/a", Name: "a"}}}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "projects", "off", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "planAcceptanceSkip") || strings.Contains(string(raw), "uatAcceptanceSkip") {
+		t.Errorf("a false skip flag must omit its JSON key (omitempty):\n%s", raw)
+	}
+	// Both flags true → round-trip, schema unchanged.
+	in := &Project{Name: "on", Sources: []Source{{Path: "/a", Name: "a", PlanAcceptanceSkip: true, UatAcceptanceSkip: true}}}
+	if err := Save(in); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := Load("on")
+	if got.Schema != Schema {
+		t.Errorf("schema = %d, want %d (additive fields must not bump it)", got.Schema, Schema)
+	}
+	if !got.Sources[0].PlanAcceptanceSkip || !got.Sources[0].UatAcceptanceSkip {
+		t.Errorf("skip flags did not round-trip: %+v", got.Sources[0])
+	}
+}
+
 // TestZeroCapOmitsField: a zero (unlimited) cap serializes WITHOUT the
 // concurrentWorkItems key (omitempty), keeping the on-disk shape minimal.
 func TestZeroCapOmitsField(t *testing.T) {

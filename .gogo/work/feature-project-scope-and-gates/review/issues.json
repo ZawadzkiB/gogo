@@ -1,0 +1,73 @@
+{
+  "slug": "project-scope-and-gates",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-20",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "FR4 gate-skip enforcement wiring has no direct test coverage",
+      "description": "FR4 is the highest-risk change (it auto-accepts the plan-acceptance / UAT gate on the user's behalf), yet the wiring that decides WHICH source gets its gate skipped is untested. There is no test for projects.SkipForSource (internal/projects/projects.go:421), launch.SkipParams (internal/launch/launch.go:133), orchestrator.Session.goSkipSuffix (internal/orchestrator/orchestrator.go:101 — including the plan-leg-returns-\"\" invariant), resolveSourceSkip (cli/go.go:199), or the board path move.go:intentFor appending the params for ActionGo (internal/tui/move.go:97). No test asserts the launched /gogo:go command actually carries --skip-acceptance/--skip-uat when a source flag is set, and — critically — does NOT carry them for an un-flagged / unregistered source. The only FR4 test is config_screen_test.go:TestConfigTabSkipFlagsEditPersist, which only proves the huh form persists the two bools to config.json. The omitempty round-trip of the new Source fields is also not directly unit-tested (only observed via the TUI test). plan.md Phase-C explicitly promised 'a go-path test that the auto-accept launch fires exactly once when the flag is set and never when it isn't'. Behaviour was traced and is correct today, but a gate-skip feature shipping with no regression net around the source->param resolution is a real gap: a future change to goSkipSuffix/SkipForSource could silently skip a gate the user never opted out of.",
+      "proposed_solution": "AGENT-FIXABLE. Add unit tests: (1) projects.SkipForSource returns the source's flags for a matching root and (false,false) for an unregistered root; (2) launch.SkipParams renders the exact ' --skip-acceptance'/' --skip-uat' tokens for each bool combination and '' when both false; (3) orchestrator goSkipSuffix returns '' for Kind==\"plan\" (byte-for-byte invariant) and the suffix for Kind==\"go\"; (4) an orchestrator/go-path test (via the injectable Runner/launcher seam) that the resolved /gogo:go Command carries the params exactly when the source is flagged and never otherwise, on BOTH the cli/go.go and move.go/board paths; (5) a projects field round-trip + omitempty assertion (false -> no JSON key, schema stays 1).",
+      "severity": "major",
+      "priority": "P1",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Added the full FR4 gate-skip regression net across every unit that resolves source→param. projects: TestSkipForSource (flagged/plan-only/uat-only/plain/unregistered/nil) + TestSkipFlagsOmitemptyRoundTrip (false omits the JSON key, true round-trips, schema stays 1) in internal/projects/projects_test.go. launch: TestSkipParams (every bool combo, '' when neither) in internal/launch/launch_test.go. orchestrator: TestGoSkipSuffix (internal/orchestrator/skip_test.go) pins the go-leg tokens AND the plan-leg-returns-'' invariant, plus TestLaunchedCommandCarriesSkipParams in orchestrator_test.go asserting the actual launched Invocation.Command carries the exact suffix for a go leg and NEVER for a plan leg. CLI: TestResolveSourceSkip + the e2e TestGoPathCarriesSkipParams (real cmdGo→ClaudeRunner→exec stub, reads argv) prove /gogo:go carries the params exactly when flagged and never for an unflagged/unregistered root — cli/skip_test.go. board: TestBoardGoIntentCarriesSkipParams (internal/tui/skip_test.go) proves move.go intentFor adds the same params via the shared resolver (no CLI/board drift) and only for ActionGo. All pure/no-TTY, GOGO_DATA_HOME→t.TempDir()."
+    },
+    {
+      "id": "REV-002",
+      "title": "memberFeature lacks the REV-002 cross-project scope guard its sibling spawnedFeature has",
+      "description": "plans.memberFeature (internal/plans/plans.go:497) matches a plan member only by (Feature.Source label, plan correlation id) with NO project filter. Its sibling matcher for the same purpose, tui.spawnedFeature (internal/tui/plans_tab.go:99), was hardened for exactly this (REV-002): on the unified/global board a source NAME can collide across projects, so it additionally requires f.Project == m.project.Name. MembersShippedIn's own doc comment (plans.go:478) states 'Callers that span multiple projects should pass a project-scoped repo', but the TUI caller passes m.repo (internal/tui/plans_tab.go:237,295,315), which in unified/global mode is contract.LoadWorkspace across EVERY project — violating that documented precondition. In practice the plan-<hex8> correlation id is effectively unique (hash of title+timestamp), so a wrong shipped-result is astronomically unlikely, but this diverges from the established REV-002 pattern and relies on id-uniqueness rather than an explicit scope guard.",
+      "proposed_solution": "AGENT-FIXABLE. Mirror spawnedFeature's guard: thread the project name into memberFeature/MembersShippedIn and skip a feature whose f.Project is set and != the plan's project, OR have the TUI pass a project-scoped repo (contract.LoadProject(*m.project)) to MembersShippedIn instead of the workspace-spanning m.repo. Add a unit test for the same-source-name-across-two-projects case.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Threaded the plan's project into plans.MembersShippedIn/memberFeature (internal/plans/plans.go) and added the cross-project scope guard mirroring tui.spawnedFeature: skip a feature whose Project is set and differs from the plan's project. A project-less feature (LoadProject single-project / single-repo seam) and project=='' leave the match keyed on (Source, correlation) alone, so those paths stay byte-for-byte. Updated the three TUI callers (planAcceptUAT→m.project.Name, finishPlanDone→edit.project, planDerivedStatus→nil-guarded m.project.Name) in plans_tab.go, and the existing TestMembersShippedInGuard call sites. Added TestMembersShippedInCrossProjectGuard proving a same-named source's shipped feature in ANOTHER project does not satisfy the member, the plan's own project's does, and the project-less fallback still matches."
+    },
+    {
+      "id": "REV-003",
+      "title": "gogo/SKILL.md --skip-uat wording risks a divergent second uat-passed emitter",
+      "description": "The orchestrator skill's new UAT skip block (skills/gogo/SKILL.md:223-232) instructs: 'perform the ship exactly as /gogo:done <slug> does (append the accept round to uat.md, emit the single-owner uat-passed event, and advance the work item to its terminal shipped state)'. Read literally, this tells the gogo orchestrator to INLINE the ship and emit uat-passed itself — a second emission path — which would break the event-ownership invariant that ONLY gogo-done owns uat-passed. The sibling skill frames it differently and correctly: skills/gogo-done/SKILL.md:82-88 says 'the gogo orchestrator auto-invokes this ship' (i.e. invokes the gogo-done skill), with the accept round + uat-passed 'byte-for-byte identical whether the ship was human-run or auto-invoked'. The two descriptions should not leave room for an inline duplicate emitter on the riskiest gate.",
+      "proposed_solution": "AGENT-FIXABLE. Reword skills/gogo/SKILL.md's --skip-uat block to say the orchestrator INVOKES the gogo-done skill (the single owner) to perform the accept-and-ship — not 'perform the ship exactly as /gogo:done does' — so uat-passed is emitted by exactly one owner, matching gogo-done's 'auto-invokes this ship' framing. Do the same sanity check on the --skip-acceptance block (it already routes through 'the single recording path in gogo-plan', which is fine).",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Reworded skills/gogo/SKILL.md's --skip-uat block so the orchestrator INVOKES the gogo-done skill (/gogo:done <slug>) to perform the accept-and-ship rather than 'perform the ship exactly as /gogo:done does'. It now states gogo-done stays the SOLE owner of the ship and 'you do not emit uat-passed yourself; the auto-invoked gogo-done does', matching gogo-done/SKILL.md's 'the gogo orchestrator auto-invokes this ship' framing — no room for an inline second uat-passed emitter. Prose-only; TestSkillsBashNoUnsafeRm + TestCLICommandEnumerationInSync stay green."
+    },
+    {
+      "id": "REV-004",
+      "title": "gogo-plan --skip-acceptance branch is unreachable via the current CLI wiring",
+      "description": "skills/gogo-plan/SKILL.md now parses --skip-acceptance (Step 0) and auto-accepts on it (Step 6), but the CLI never appends that param to a /gogo:plan command: orchestrator.goSkipSuffix returns \"\" for Kind==\"plan\" (internal/orchestrator/orchestrator.go:101), move.go appends only for ActionGo (internal/tui/move.go:97), and launch.PlanIntent (used by promote / plans-tab c) never appends SkipParams (internal/launch/launch.go PlanIntent). The plan-acceptance auto-skip is instead handled by the gogo ORCHESTRATOR skill at the ①-gate when /gogo:go carries --skip-acceptance (skills/gogo/SKILL.md:161-169). So the gogo-plan branch is dead relative to the wiring (harmless — no double-accept, since the flag is never passed to gogo-plan). Note decisions.md FR4=B said the CLI 'appends the param(s) to the launched /gogo:go(/gogo:plan) command', so either the plan-leg wiring is intentionally omitted (making the gogo-plan branch belt-and-suspenders for a direct /gogo:plan --skip-acceptance invocation) or it is unimplemented — the code and skills should agree.",
+      "proposed_solution": "AGENT-FIXABLE. Decide one: (a) if the gogo-plan branch is meant only for a direct /gogo:plan --skip-acceptance invocation, add a one-line comment/skill note saying the cockpit routes the plan-acceptance skip through the /gogo:go orchestrator gate and this branch covers direct invocation; or (b) remove the unreachable gogo-plan branch to avoid two owners of the plan-acceptance auto-skip. Either way keep exactly one recorded acceptance path.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Documented the gogo-plan --skip-acceptance branch as intentional direct-invocation coverage (option a). Corrected the inaccurate Step-0 parenthetical (it claimed the cockpit appends the flag to '/gogo:go / /gogo:plan') to state the cockpit routes a flagged source's plan-acceptance skip through the /gogo:go orchestrator ①-gate — it appends --skip-acceptance to /gogo:go, NOT /gogo:plan — so the gogo-plan branch covers a direct `/gogo:plan <goal> --skip-acceptance` invocation (belt-and-suspenders, one honored auto-accept path either way, never two). Gate behavior unchanged; the single recorded acceptance path is intact."
+    },
+    {
+      "id": "REV-005",
+      "title": "gogo go prints 'plan-acceptance auto-skipped' even when no gate is skipped this run",
+      "description": "cli/go.go:cmdGo (internal/go.go:181-186) prints 'gogo go: plan-acceptance auto-skipped for source X (planAcceptanceSkip)' unconditionally whenever the source has the flag set, on EVERY gogo go — including resumes where the feature is already past the plan-acceptance gate (e.g. re-running go to apply test fixes), where nothing is actually skipped this run. Same for the uat line. It is more a 'this source has skip enabled' announcement than a 'the gate was skipped' confirmation, so the wording ('auto-skipped') can mislead. Low severity — visibility is intentional (default false, per-source, printed) — but it fires even when the gate is not reachable this leg.",
+      "proposed_solution": "AGENT-FIXABLE (optional). Either soften the wording to 'source X has planAcceptanceSkip — /gogo:go will auto-accept if it hits the plan gate', or gate the print on the feature's classified status (only print the plan line when the feature is at awaiting-plan-acceptance). Keep it a print, never an error.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Softened the plan-acceptance note in cli/go.go cmdGo (chose the accurate wording, not a status gate — a gogo go is only runnable at plan-accepted or later, so the plan gate is always behind and 'auto-skipped' would over-claim on every leg). It now reads 'source X has planAcceptanceSkip — /gogo:go auto-accepts the plan if it hits the plan gate this run', preserving the opt-in visibility without falsely claiming a skip happened. The UAT-skip note is unchanged (its gate IS ahead in the run). Asserted in TestGoPathCarriesSkipParams (no 'plan-acceptance auto-skipped' string; still announces planAcceptanceSkip)."
+    }
+  ]
+}

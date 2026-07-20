@@ -9,6 +9,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/launch"
 	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
+	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 )
@@ -86,9 +87,17 @@ func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
 // intentFor builds a single-card launch intent for f, stamping its OWN repo root (via
 // rootFor) so the launch anchors at the FOCUSED card's source — never a slug re-lookup
 // that could grab a same-slug card from another project on the unified board (REV-001).
+// FR4: a go-launch also carries the SOURCE's gate-skip params (--skip-acceptance /
+// --skip-uat), resolved by the card's own root through the same shared resolver the
+// cap guard uses (so the board and `gogo go` never drift); they are visible in the
+// launch confirmation. Absent flags → the command is byte-for-byte today's.
 func (m *Model) intentFor(action launch.Action, f *contract.Feature) launch.Intent {
 	in := launch.BuildIntent(action, []string{f.Slug}, "")
 	in.Root = m.rootFor(f)
+	if action == launch.ActionGo {
+		planSkip, uatSkip := projects.SkipForSource(m.capWatchSources(), in.Root)
+		in.Command += launch.SkipParams(planSkip, uatSkip)
+	}
 	return in
 }
 

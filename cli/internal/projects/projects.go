@@ -63,6 +63,19 @@ type Source struct {
 	// Color is the optional card-tag color (hex) the board tints this source's
 	// cards with.
 	Color string `json:"color,omitempty"`
+	// PlanAcceptanceSkip, when true, opts this source OUT of the per-work-item
+	// plan-acceptance gate (FR4): the CLI appends `--skip-acceptance` to the launched
+	// `/gogo:go`, and the gogo skills auto-record the acceptance instead of stopping
+	// for the user. Additive + optional (omitempty, schema stays 1), default false —
+	// an absent field keeps the gate byte-for-byte.
+	PlanAcceptanceSkip bool `json:"planAcceptanceSkip,omitempty"`
+	// UatAcceptanceSkip, when true, opts this source OUT of the per-work-item UAT gate
+	// (FR4): the CLI appends `--skip-uat` to the launched `/gogo:go`, and the gogo
+	// skills auto-pass UAT (emit `uat-passed`, ship) instead of stopping at
+	// `awaiting-uat`. Additive + optional (omitempty), default false. NOTE the FR3×FR4
+	// orthogonality: this removes the per-WORK-ITEM UAT; the project-UAT still gates
+	// the whole plan.
+	UatAcceptanceSkip bool `json:"uatAcceptanceSkip,omitempty"`
 }
 
 // Project is a home-folder entity linking many sources. It is written to
@@ -156,11 +169,105 @@ func validName(name string) bool {
 		!strings.ContainsAny(name, `/\`) && filepath.Base(name) == name
 }
 
+// ValidName reports whether name is a safe single path component usable as a
+// project folder (no `/`, `\`, `.`, or `..`) — the exported write-scope guard the
+// CLI's dual-mode `gogo project add` uses to reject a bad bare NAME up front.
+func ValidName(name string) bool { return validName(name) }
+
 // hasConfig reports whether a project home folder actually holds a config.json
 // (so List skips a stray dir with no entity).
 func hasConfig(name string) bool {
 	info, err := os.Stat(configPath(name))
 	return err == nil && !info.IsDir()
+}
+
+// Exists reports whether a project with this name is registered (its config.json
+// exists). A missing / invalid name → false. The CLI's bare-NAME `project add`
+// uses it to dedupe/preserve an existing project instead of clobbering it.
+func Exists(name string) bool { return validName(name) && hasConfig(name) }
+
+// KnowledgeDir is a project's cross-repo knowledge dir
+// ~/.gogo/projects/<name>/.knowledge — the PROJECT-level domain knowledge (how the
+// sources connect), distinct from each SOURCE's own per-repo <repo>/.gogo/knowledge/.
+func KnowledgeDir(name string) string { return filepath.Join(Dir(name), ".knowledge") }
+
+// projectKnowledgeFile is the single seeded cross-repo knowledge file scaffolded at
+// `gogo project add` (FR2).
+const projectKnowledgeFile = "project-knowledge.md"
+
+// EnsureProjectHome scaffolds a project's home-folder LAYOUT idempotently (FR2): the
+// project dir, its cross-repo .knowledge/ dir seeded with project-knowledge.md, and
+// its .gogo/plans/ dir. It writes ONLY under ~/.gogo/ and NEVER clobbers an existing
+// knowledge file. It does NOT write config.json — the entity is persisted by
+// Add/Save; this only ensures the surrounding dirs + seed exist, so calling it on an
+// already-scaffolded (or knowledge-less legacy) project just re-ensures them, never a
+// crash. An invalid name is refused (the write-scope guard).
+func EnsureProjectHome(name string) error {
+	if !validName(name) {
+		return fmt.Errorf("projects: invalid project name %q", name)
+	}
+	for _, dir := range []string{
+		Dir(name),
+		KnowledgeDir(name),
+		filepath.Join(Dir(name), ".gogo", "plans"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	return SeedProjectKnowledge(name)
+}
+
+// SeedProjectKnowledge writes .knowledge/project-knowledge.md from a deterministic
+// seeded template (headed: domain · how the sources connect · glossary · integration
+// contracts), but ONLY when the file is absent — idempotent, so a user's own edits (or
+// a hand-authored file) are NEVER clobbered. Writes ONLY under ~/.gogo/.
+func SeedProjectKnowledge(name string) error {
+	if !validName(name) {
+		return fmt.Errorf("projects: invalid project name %q", name)
+	}
+	dir := KnowledgeDir(name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	path := filepath.Join(dir, projectKnowledgeFile)
+	if _, err := os.Stat(path); err == nil {
+		return nil // already present → never clobber
+	}
+	return os.WriteFile(path, []byte(projectKnowledgeTemplate(name)), 0o644)
+}
+
+// projectKnowledgeTemplate renders the deterministic seed for a project's
+// project-knowledge.md — the cross-repo DOMAIN brief the plan-author session reads so
+// a whole-domain understanding flows into each spawned work item's goal. Headed,
+// prompt-fillable, no LLM.
+func projectKnowledgeTemplate(name string) string {
+	return `# Project knowledge - ` + name + `
+
+<!-- Cross-repo DOMAIN knowledge for this gogo project: how its SOURCES connect,
+     the shared vocabulary, and the contracts between repos. This is distinct from
+     each source's own per-repo .gogo/knowledge/. Fill it in by hand or via the
+     plans-tab "A" plan-with-claude author, which reads this file before writing a
+     brief. Delete a heading you do not need. -->
+
+## Domain
+<!-- What is ` + name + `? The product / business domain the sources serve, in a few
+     lines — the context a plan should assume. -->
+
+## How the sources connect
+<!-- The repos (sources) in this project and how they relate: who calls whom, which
+     is the front-end / API / worker / data store, the request or data flow between
+     them. A cross-repo plan targets several of these at once. -->
+
+## Glossary
+<!-- Cross-cutting terms and their meaning across the sources (entities, roles,
+     domain nouns) — so the same word means the same thing in every repo. -->
+
+## Integration contracts
+<!-- The shared interfaces the sources agree on: API endpoints, event/topic names,
+     shared schemas or DTOs, auth/token flows. Changing one side is a cross-repo
+     change — note what must move together. -->
+`
 }
 
 // Load reads the project entity at ~/.gogo/projects/<name>/config.json. A missing,
@@ -303,6 +410,21 @@ func Remove(name string) (removed bool, err error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// SkipForSource resolves the per-source gate-skip flags of the SOURCE whose Path ==
+// root (FR4), or (false, false) when root is not a registered source — the fallback
+// that keeps an unregistered / single repo's gates byte-for-byte. Mirrors
+// orchestrator.CapForSource: both `gogo go` launch paths (the CLI and the board)
+// resolve their source from the projects store and share this one resolver so the
+// two never drift.
+func SkipForSource(sources []Source, root string) (planSkip, uatSkip bool) {
+	for _, s := range sources {
+		if s.Path == root {
+			return s.PlanAcceptanceSkip, s.UatAcceptanceSkip
+		}
+	}
+	return false, false
 }
 
 // AllSources flattens every project's sources into one slice — what the

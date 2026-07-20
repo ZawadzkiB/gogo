@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -174,8 +175,44 @@ func cmdGo(args []string) int {
 		Root: root, Slug: slug, Kind: "go",
 		Out: os.Stdout, Attach: attach, Takeover: takeover,
 	}
+	// FR4: resolve this SOURCE's gate-skip flags and thread them into the session so
+	// the launched /gogo:go carries --skip-acceptance / --skip-uat (the skills honor
+	// them). Explicit + visible: every fire prints a line so an auto-skip is never
+	// silent. Default false / unregistered source → today's gated command byte-for-byte.
+	planSkip, uatSkip, label := resolveSourceSkip(root)
+	sess.SkipAcceptance, sess.SkipUAT = planSkip, uatSkip
+	if planSkip {
+		// Announce the source's opt-in, conditionally: a `gogo go` is only runnable at
+		// plan-accepted or later (the plan gate is already behind on a resume/mid-pipeline
+		// leg), so state that /gogo:go auto-accepts IF it reaches the plan gate — never the
+		// over-claimed "auto-skipped" on a run that skips nothing this leg (REV-005).
+		fmt.Printf("gogo go: source %s has planAcceptanceSkip — /gogo:go auto-accepts the plan if it hits the plan gate this run\n", label)
+	}
+	if uatSkip {
+		fmt.Printf("gogo go: UAT auto-skipped for source %s (uatAcceptanceSkip)\n", label)
+	}
 	fmt.Printf("gogo go %s - launch-or-resume the persistent /gogo:go session (implement in-context + Task review/test + report)\n", slug)
 	return runSession(sess, "gogo go")
+}
+
+// resolveSourceSkip resolves the per-source gate-skip flags (FR4) for the repo at
+// root plus its display label (for the printed note), reading the projects store
+// through the same flattened source set the cap guard uses (projects.AllSources /
+// SkipForSource). An unregistered root → (false, false, "") — no skip, no note.
+func resolveSourceSkip(root string) (planSkip, uatSkip bool, label string) {
+	projs, _ := projects.List()
+	sources := projects.AllSources(projs)
+	planSkip, uatSkip = projects.SkipForSource(sources, root)
+	for _, s := range sources {
+		if s.Path == root {
+			label = s.Name
+			if label == "" {
+				label = filepath.Base(s.Path)
+			}
+			break
+		}
+	}
+	return planSkip, uatSkip, label
 }
 
 // capBlock returns a refusal message when a go-launch for slug in root would

@@ -78,7 +78,15 @@ mutates gogo state (D5). Pure `Read` / `Write` / `Bash` (+ `Skill` to reuse the
   **The UAT gate (from 0.11.0 — the plan-gate symmetry).** Phase ⑤ now ends at
   `state.md` `status: awaiting-uat`, and **running `/gogo:done` IS the UAT acceptance**
   (there is no extra confirmation question — mirroring how accepting a plan unlocks
-  `/gogo:go`). So for each named member require `status: awaiting-uat`. **Back-compat:**
+  `/gogo:go`). So for each named member require `status: awaiting-uat`.
+
+  **Pre-declared skip (`--skip-uat`).** When a member's SOURCE opted out of the UAT gate
+  via `uatAcceptanceSkip`, the gogo orchestrator auto-invokes this ship for that member
+  (rather than a human running `/gogo:done`) — the acceptance is **pre-declared in the
+  source's CLI config**, not a silent bypass. Nothing changes here: the accept round + the
+  single-owner `uat-passed` event recorded below are byte-for-byte identical whether the
+  ship was human-run or auto-invoked (see the gogo orchestrator's *UAT → Pre-declared
+  skip* note). **Back-compat:**
   a pre-0.11 feature reported at `status: done` (or any already-shipped `done`/`shipped`
   member) is **also accepted** — note in the run summary that it predates the UAT gate.
   **A report-complete member at `waiting-for-user` is REFUSED** — that status means a

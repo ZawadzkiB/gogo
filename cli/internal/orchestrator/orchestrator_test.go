@@ -234,6 +234,48 @@ func TestTakeoverReapsBoardSessionBySlug(t *testing.T) {
 	}
 }
 
+// TestLaunchedCommandCarriesSkipParams (REV-001, FR4): the whole launch-or-resume path
+// appends the SOURCE's gate-skip params to the launched /gogo:go command EXACTLY per flag
+// combination — a single injection-safe trailing element — and the PLAN leg NEVER carries
+// them even with both flags set (the goSkipSuffix plan-leg invariant). Both flags off → the
+// command is byte-for-byte today's. Asserted at the true launch seam (the Invocation the
+// runner is handed), not just the pure suffix helper.
+func TestLaunchedCommandCarriesSkipParams(t *testing.T) {
+	run := func(t *testing.T, kind string, planSkip, uatSkip bool) string {
+		root := t.TempDir()
+		writeState(t, root, "feat", "plan-accepted")
+		fake := &fakeRunner{root: root, slug: "feat", writeStatus: "awaiting-uat"}
+		sess, _ := newSession(root, "feat", fake)
+		sess.Kind = kind
+		sess.SkipAcceptance, sess.SkipUAT = planSkip, uatSkip
+		sess.Live = func(orchestrator.Owner, string) bool { return false }
+		if _, err := sess.LaunchOrResume(); err != nil {
+			t.Fatal(err)
+		}
+		if len(fake.calls) != 1 {
+			t.Fatalf("want exactly one launch, got %d", len(fake.calls))
+		}
+		return fake.calls[0].Command
+	}
+
+	if got := run(t, "go", true, true); got != "/gogo:go feat --skip-acceptance --skip-uat" {
+		t.Errorf("go+both launched %q, want both skip tokens appended", got)
+	}
+	if got := run(t, "go", true, false); got != "/gogo:go feat --skip-acceptance" {
+		t.Errorf("go+plan-only launched %q", got)
+	}
+	if got := run(t, "go", false, true); got != "/gogo:go feat --skip-uat" {
+		t.Errorf("go+uat-only launched %q", got)
+	}
+	if got := run(t, "go", false, false); got != "/gogo:go feat" {
+		t.Errorf("go+neither launched %q, want byte-for-byte today's command", got)
+	}
+	// The plan-leg invariant: even with BOTH flags set, /gogo:plan never carries them.
+	if got := run(t, "plan", true, true); got != "/gogo:plan feat" {
+		t.Errorf("plan leg launched %q, want NO skip params (goSkipSuffix plan-leg invariant)", got)
+	}
+}
+
 // --- 3. registry round-trip --------------------------------------------------
 
 func TestRegistryRoundTrip(t *testing.T) {

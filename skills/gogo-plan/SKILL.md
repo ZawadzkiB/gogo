@@ -43,6 +43,19 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
    cockpit CLI always appends it as the FINAL token of the invocation. If the goal
    BODY itself contains an earlier `--correlation plan-YYYY` lookalike substring, that
    one is ordinary prose (never a flag) - honor only the trailing token.
+
+   Also parse an optional **`--skip-acceptance`** flag - a fixed literal token with NO
+   value, set when this work item's SOURCE has opted OUT of the plan-acceptance gate via
+   its `planAcceptanceSkip` config. **Where it comes from:** the gogo cockpit routes a
+   flagged source's plan-acceptance skip through the `/gogo:go` orchestrator gate (①) — it
+   appends `--skip-acceptance` to the launched `/gogo:go`, **not** to `/gogo:plan` — so this
+   gogo-plan branch is the coverage for a **direct** `/gogo:plan <goal> --skip-acceptance`
+   invocation (intentional belt-and-suspenders, one honored auto-accept path either way,
+   never two). CAPTURE whether it is present and STRIP the token from the goal text (exactly
+   like `--correlation`); it is a trailing literal, so a body that merely mentions the words
+   is ordinary prose (never a flag). **Absent → the plan-acceptance gate is today's hard
+   gate, byte-for-byte.** Present → see Step 6, where it turns the acceptance stop into a
+   pre-declared auto-accept.
 1. **Slug + folder.** Derive a kebab-case slug from the goal. Create
    `.gogo/work/feature-<slug>/`. If it already exists, you are **revising** — read the
    existing `plan.md`/`adjustments.md`/`state.md`; don't overwrite blindly.
@@ -150,6 +163,19 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
      `plan-accepted` is the plan phase's **terminal** event — this skill owns both
      plan events and there is no separate `phase-done`/plan (the orchestrator emits
      none).
+
+   **Pre-declared auto-accept (`--skip-acceptance` captured in Step 0).** When the
+   invocation carried the `--skip-acceptance` flag, the plan-acceptance gate does **not**
+   stop for the user: this source's owner pre-declared consent through its
+   `planAcceptanceSkip` config, so record acceptance **exactly as the normal Accept
+   branch above does** (the same single recording path — `state.md` status=plan-accepted,
+   the `Status: **accepted** (user, <today>)` line on `plan.md`, and the ONE single-owner
+   `plan-accepted` event; there is never a second acceptance path). Then print a visible
+   line so the auto-skip is never silent — e.g. `plan-acceptance auto-skipped (source
+   opted out via planAcceptanceSkip)` — and proceed. This is **pre-declared consent via
+   the source's CLI config, not a silent bypass**: still exactly one recorded acceptance,
+   still the same terminal `plan-accepted` event, just no human stop. Absent the flag,
+   this whole branch does not apply and the gate stops as above, byte-for-byte.
 
 ## Hard rule
 Never start implementing in this phase. Acceptance is the gate between plan and

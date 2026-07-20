@@ -1,0 +1,15 @@
+{
+  "slug": "project-scope-and-gates",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Project → sources → plan-lifecycle model + the gate flows (CLI-owned vs skill-owned)"
+    },
+    {
+      "kind": "activity",
+      "file": "plan-lifecycle.mmd",
+      "title": "Project-plan lifecycle with the derived awaiting-project-uat gate (FR3)"
+    }
+  ]
+}

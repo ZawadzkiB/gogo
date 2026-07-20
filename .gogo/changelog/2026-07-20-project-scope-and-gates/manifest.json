@@ -1,0 +1,3 @@
+{ "schema": 2, "name": "project-scope-and-gates", "release": "0.24.0", "date": "2026-07-20",
+  "members": [ { "slug": "project-scope-and-gates", "title": "first-class projects, project-UAT & per-source gate skips", "version": "0.24.0" } ],
+  "diagrams": [ { "kind": "flow", "file": "project-scope-and-gates-flow.mmd" }, { "kind": "state", "file": "project-scope-and-gates-plan-lifecycle.mmd" } ] }

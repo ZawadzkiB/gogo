@@ -111,6 +111,13 @@ func (f *Feature) WaitingForUser() bool { return f.Status == "waiting-for-user" 
 // its badge takes waiting-for-user priority (docs/cli-contract.md §2/§3).
 func (f *Feature) AwaitingUAT() bool { return f.Status == "awaiting-uat" }
 
+// Shipped reports whether the work item has reached its terminal shipped state,
+// keyed on the state.md STATUS (`shipped`, or the legacy `done`) — NOT on artifact
+// presence (a changelog entry outlives a mid-UAT re-plan, so gating on it would lie;
+// TEST-004). The project-UAT gate (FR3) reads this to decide whether every member of
+// a plan is shipped before the plan can be accepted.
+func (f *Feature) Shipped() bool { return f.Status == "shipped" || f.Status == "done" }
+
 // WaitingForInput reports whether the feature is parked at a genuine USER gate —
 // the union of the three statuses that block on the user: awaiting-plan-acceptance
 // (the plan-acceptance gate), waiting-for-user (a decision gate / mid-UAT re-plan

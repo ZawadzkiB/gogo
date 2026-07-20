@@ -443,12 +443,24 @@ cd cli && go build -o gogo .
   truncates/collapses rather than crushing the slug. Source narrowing
   survives via the per-card source dot + the free-text `@name` token (which matches a **project or
   source**). A single registered project degrades cleanly to one project chip.
+- **Project scope + gates (since 0.24.0)** - a project is a lightweight NAME-based container you can
+  create empty and grow. **`gogo project add sanoma`** creates an EMPTY project (no repo) scaffolded
+  with a cross-repo **`.knowledge/`** (a seeded `project-knowledge.md`) + a `.gogo/plans/` dir; a path
+  arg (or `--source <repo>`) still creates the project with that repo as source #1. A cross-repo plan
+  gets a **project-UAT gate**: once every member work item is shipped it reads the derived status
+  **`awaiting-project-uat`**, and **`gogo plan done <id>`** (or the plans-tab **`D`** key) accepts it -
+  refusing unless every member is shipped, then flipping the plan to `done`. And a source can **opt out**
+  of its own per-work-item gates: `planAcceptanceSkip` / `uatAcceptanceSkip` (config-tab toggles) make
+  `gogo go` append `--skip-acceptance` / `--skip-uat` to the launched `/gogo:go`, which the gogo skills
+  honor as **pre-declared consent** (auto-record the plan acceptance / auto-pass UAT, exactly as a human
+  accept - never a silent bypass). All project data writes land under `~/.gogo/` only.
 - **Plans tab + spawn (since 0.21.0)** - a **plan** is a project-scoped, hand-editable markdown file
   at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
   The plans tab lists them grouped by status; keys: `n` new plan · `A` **plan-with-claude** (mints a
   draft, then opens a plain `claude` session anchored at a source to author the plan file in place -
-  never a `/gogo:plan` scaffold) · `r` mark ready · `x` delete · `enter` open the detail. In a plan's
+  never a `/gogo:plan` scaffold) · `r` mark ready · `D` **accept project-UAT** (since 0.24.0) · `x`
+  delete · `enter` open the detail. In a plan's
   **detail** you target the project's sources and press `c` **create work item** on a source row - the
   CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the analyst derives
   the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+` adds a target,
@@ -461,8 +473,10 @@ cd cli && go build -o gogo .
   id, and filters to a plan's members across sources with a `#plan-<hash>` token. An absent
   `correlation:` line is byte-for-byte the pre-correlation board.
 - **Config tab (since 0.21.0)** - per-source settings (add `a` · remove `x` · edit `e` a source's
-  `concurrentWorkItems` cap / `mainBranch` / color / permission mode) plus a project switcher and a
-  **knowledge explorer** over the sources' `.gogo/knowledge/` and the project's `.knowledge/`. The
+  `concurrentWorkItems` cap / `mainBranch` / color / and, since 0.24.0, its **plan-accept skip** /
+  **uat skip** flags) plus a project switcher and a **knowledge explorer** that splits **project
+  knowledge** (the project's `.knowledge/`) from **source knowledge** (each source's `.gogo/knowledge/`)
+  into two labelled groups. The
   per-source **concurrency cap** refuses a `gogo go` (or board `m`→go) that would start work on an
   **(N+1)th** live in-progress feature in that source (so two build sessions can't clobber one shared
   working tree); `--force` overrides. Default cap `1`; `0` = unlimited; an uncapped source is inert.
@@ -470,10 +484,10 @@ cd cli && go build -o gogo .
 - **Scriptable** - `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
   `gogo events <slug>`, `gogo go [<slug>] [--attach] [--takeover]`,
   `gogo sweep [--dry-run] [<slug>...]`, `gogo trash [restore <entry>]`,
-  `gogo project [add <repo> [--name <name>] | list | rm <name>]`,
+  `gogo project [add <name|repo> [--source <repo>] [--name <name>] | list | rm <name>]`,
   `gogo global [init | board]` (set up / open the cross-project cockpit - `gogo` in a repo shows THAT repo),
   `gogo source [add <repo> [--project <name>] | rm <repo|name> [--project <name>]]`,
-  `gogo plan [new "<title>" | list | show <id> | add <id> <source>[:<slug>] | rm <id> <source>[:<slug>] | ready <id> | promote <id> <source> | delete <id>]`
+  `gogo plan [new "<title>" | list | show <id> | add <id> <source>[:<slug>] | rm <id> <source>[:<slug>] | ready <id> | promote <id> <source> | done <id> | delete <id>]`
   (or `gogo plan <slug>` - a bare feature slug - to launch the feature's persistent `/gogo:plan` session),
   `gogo draft [new "<title>" | list | show <id> | ready <id> | rm <id>]` (a thin alias into `gogo plan`, narrowed to `status: draft`),
   `gogo epic [new "<title>" | list | show <id> | add <id> <source>:<slug> | rm <id> <source>:<slug> | delete <id>]` (a thin alias into `gogo plan`, `list` = member-bearing plans),

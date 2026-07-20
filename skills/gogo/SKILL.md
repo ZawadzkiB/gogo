@@ -158,6 +158,16 @@ acceptance** — you (the orchestrator) own that gate. Changes/clarification →
 `adjustments.md`, revise, re-present. **Do not implement until the user accepts.**
 Hard gate.
 
+**Pre-declared skip (`--skip-acceptance`).** When the run's invocation carries the
+`--skip-acceptance` flag (the gogo cockpit appends it when this work item's SOURCE opted
+out of the plan-acceptance gate via `planAcceptanceSkip`), the plan-acceptance gate does
+**not** stop for the user: the source owner pre-declared consent in CLI config. Record
+acceptance **exactly as a normal accept** — the single recording path in `gogo-plan`
+(`state.md` → `plan-accepted`, the single-owner `plan-accepted` event) — print a visible
+`plan-acceptance auto-skipped (source opted out via planAcceptanceSkip)` line, and
+proceed to ②. This is pre-declared consent, not a silent bypass (one recorded acceptance,
+one terminal event). **Absent the flag → the gate is the hard stop above, byte-for-byte.**
+
 ### ② Implement → skill `gogo-implement` (you run it in-context)
 Build the accepted `plan.md` following `coding-rules.md`; keep changes scoped;
 keep build/typecheck/unit green. **Run this yourself, in-context** — do not delegate
@@ -208,7 +218,23 @@ prerequisite).
 ### UAT → the gate between ⑤ and ship (the plan-gate symmetry)
 ⑤ leaves the feature at **`status: awaiting-uat`** — the user verifies the shipped work.
 This mirrors the ① plan-acceptance gate, at the *exit* instead of the entrance, and there
-is **no extra confirmation question**. The user does exactly one of two things:
+is **no extra confirmation question**.
+
+**Pre-declared skip (`--skip-uat`).** When the run's invocation carries the `--skip-uat`
+flag (the gogo cockpit appends it when this work item's SOURCE opted out of the UAT gate
+via `uatAcceptanceSkip`), phase ⑤ does **not** stop at `awaiting-uat` for the user: the
+source owner pre-declared consent in CLI config, so **auto-pass UAT as if the user
+accepted** — **invoke the `gogo-done` skill** (`/gogo:done <slug>`) to perform the
+accept-and-ship. `gogo-done` stays the SOLE owner of the ship (it appends the accept round
+to `uat.md`, emits the single-owner `uat-passed` event, and advances the work item to its
+terminal `shipped` state) — you do **not** emit `uat-passed` yourself; the auto-invoked
+`gogo-done` does, byte-for-byte identical to a human-run ship. Print a visible `UAT
+auto-skipped (source opted out via uatAcceptanceSkip)` line, and finish. This is
+pre-declared consent, not a silent bypass: exactly the accept-and-ship `/gogo:done`
+performs, just with no human stop (see `gogo-done`'s *Pre-declared skip* note). **Absent the
+flag → ⑤ stops at `awaiting-uat`, byte-for-byte** (below).
+
+Otherwise (no `--skip-uat`), the user does exactly one of two things:
 
 - **Accepts by running `/gogo:done`** — that command *is* the acceptance (its validate-in
   requires `awaiting-uat`; it appends the accept round to `uat.md`, emits `uat-passed`, and

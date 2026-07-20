@@ -209,6 +209,12 @@ func TestPlanWithClaudeMintsAndFires(t *testing.T) {
 	if !strings.Contains(gotIntent.Command, id) {
 		t.Errorf("command = %q, want it to reference the correlation id %s", gotIntent.Command, id)
 	}
+	// FR2 author-read: the seed references the project's cross-repo .knowledge/ dir so
+	// the whole-domain context flows into the brief (and each spawned work item's goal).
+	if !strings.Contains(gotIntent.Command, projects.KnowledgeDir("app")) {
+		t.Errorf("command = %q, want it to reference the project .knowledge/ path %q (FR2 author-read)",
+			gotIntent.Command, projects.KnowledgeDir("app"))
+	}
 	// Anchored at the project's FIRST SOURCE root (trusted repo), never the ~/.gogo home.
 	if gotRoot != "/repos/web" {
 		t.Errorf("anchored at %q, want the first source root /repos/web (never the ~/.gogo home)", gotRoot)
@@ -357,6 +363,95 @@ func TestPlanCardPerSourceDotStates(t *testing.T) {
 	}
 	if !strings.Contains(det, "not created") || !strings.Contains(det, "create work item") {
 		t.Errorf("un-spawned api row missing the `not created` / create affordance:\n%s", det)
+	}
+}
+
+// TestPlansTabDerivedAwaitingProjectUAT (FR3): a plan whose every member work item is
+// shipped derives the display status `awaiting-project-uat` on its card + detail
+// (distinct from a still-building `active`), while a plan with an unshipped member keeps
+// showing `active`.
+func TestPlansTabDerivedAwaitingProjectUAT(t *testing.T) {
+	seedDataHome(t)
+	p, _ := plans.New("app", "Cross-repo migration", "")
+	plans.AddMember("app", p.ID, plans.Member{Source: "web", SlugHint: "cross-repo-migration"})
+	plans.SetStatus("app", p.ID, plans.StatusActive)
+
+	// The web member is SHIPPED (state.md status: shipped) → the plan derives the gate.
+	shipped := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "cross-web", Title: "Web side", Source: "web", Root: "/r/web",
+			Class: contract.ClassShipped, Status: "shipped", Correlations: []string{p.ID}},
+	}}
+	m := sizedWorkspace(t, shipped, proj("app", src("web", "/r/web")))
+	m = tab(m) // → plans
+	if out := m.View(); !strings.Contains(out, plans.StatusAwaitingProjectUAT) {
+		t.Errorf("plans list did not derive awaiting-project-uat for an all-shipped plan:\n%s", out)
+	}
+	if det := send(m, tea.KeyMsg{Type: tea.KeyEnter}).View(); !strings.Contains(det, plans.StatusAwaitingProjectUAT) {
+		t.Errorf("plan detail did not derive awaiting-project-uat:\n%s", det)
+	}
+
+	// A member still building keeps the plan at `active` (no derived gate).
+	building := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "cross-web", Title: "Web side", Source: "web", Root: "/r/web",
+			Class: contract.ClassInProgress, Phase: "implement", Status: "implementing", Correlations: []string{p.ID}},
+	}}
+	m2 := sizedWorkspace(t, building, proj("app", src("web", "/r/web")))
+	m2 = tab(m2)
+	if det := send(m2, tea.KeyMsg{Type: tea.KeyEnter}).View(); strings.Contains(det, plans.StatusAwaitingProjectUAT) {
+		t.Errorf("plan detail derived the UAT gate with an unshipped member:\n%s", det)
+	}
+}
+
+// TestPlansTabAcceptProjectUAT (FR3, `D`): the TUI project-UAT accept mirrors `gogo plan
+// done`. It REFUSES (a status naming the unshipped member, no confirm, plan stays active)
+// while a member is unshipped, and — once every member ships — `D` opens the accept
+// confirm whose completion records the accept (MarkDone: a `## Project UAT` round + the
+// persisted `done`).
+func TestPlansTabAcceptProjectUAT(t *testing.T) {
+	seedDataHome(t)
+	p, _ := plans.New("app", "Cross-repo migration", "")
+	plans.AddMember("app", p.ID, plans.Member{Source: "web", SlugHint: "cross-repo-migration"})
+	plans.SetStatus("app", p.ID, plans.StatusActive)
+
+	// Refuse: the web member is not shipped yet.
+	building := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "cross-web", Title: "Web side", Source: "web", Root: "/r/web",
+			Class: contract.ClassInProgress, Phase: "implement", Status: "implementing", Correlations: []string{p.ID}},
+	}}
+	m := sizedWorkspace(t, building, proj("app", src("web", "/r/web")))
+	m = tab(m) // → plans
+	m = send(m, runes("D"))
+	if m.pendingPlanDone != nil {
+		t.Fatalf("D opened a confirm despite an unshipped member (pending=%v)", m.pendingPlanDone)
+	}
+	if !strings.Contains(m.status, "not shipped") {
+		t.Errorf("refuse status = %q, want a 'not shipped' message naming the member", m.status)
+	}
+	if got, _ := plans.Get("app", p.ID); got.Status != plans.StatusActive {
+		t.Errorf("plan flipped despite the members-shipped guard: %s", got.Status)
+	}
+
+	// Accept: the member ships → D opens the confirm → completing it records the accept.
+	shipped := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "cross-web", Title: "Web side", Source: "web", Root: "/r/web",
+			Class: contract.ClassShipped, Status: "shipped", Correlations: []string{p.ID}},
+	}}
+	m2 := sizedWorkspace(t, shipped, proj("app", src("web", "/r/web")))
+	m2 = tab(m2)
+	m2 = send(m2, runes("D"))
+	if m2.pendingPlanDone == nil || m2.mode != modeForm {
+		t.Fatalf("D did not open the project-UAT accept confirm (mode=%d pending=%v)", m2.mode, m2.pendingPlanDone)
+	}
+	// Confirm through the heap-stable binding (TEST-001) and complete.
+	m2.binding.confirm = true
+	fm, _ := m2.finishPlanDone()
+	m2 = fm.(Model)
+	got, _ := plans.Get("app", p.ID)
+	if got.Status != plans.StatusDone {
+		t.Fatalf("after D-accept the plan is %s, want done", got.Status)
+	}
+	if !strings.Contains(got.Description, "Project UAT") {
+		t.Errorf("MarkDone did not append a project-UAT round:\n%s", got.Description)
 	}
 }
 
