@@ -80,11 +80,8 @@ func TestBoardSurfacesCarryColoredDots(t *testing.T) {
 		{Slug: "a", Title: "Alpha", Source: "web", Root: "/r/web", Class: contract.ClassInProgress, Phase: "implement", Status: "implementing"},
 	}}
 	m := sizedWorkspace(t, repo, proj("app", src("web", "/r/web"), src("api", "/r/api")))
-	// Filter chips carry a dot per source.
-	if chips := m.viewSourceChips(); !strings.Contains(chips, "● web") || !strings.Contains(chips, "● api") {
-		t.Errorf("source chips missing a colored dot per source:\n%s", chips)
-	}
-	// The board card source tag carries its dot.
+	// The board card source tag carries its dot (a single-project seam card has a Source
+	// but no Project, so the origin tag is the single `● source` form).
 	if out := m.viewBoard(); !strings.Contains(out, "● web") {
 		t.Errorf("board card missing the source dot:\n%s", out)
 	}

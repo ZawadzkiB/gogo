@@ -1,0 +1,12 @@
+{
+  "slug": "unified-board",
+  "updated": "2026-07-20",
+  "note": "As-is baseline (0.22.1): gogo global opens ONE project's board. chooseBoard / globalBoard call NewProjectBoard(projs[0]) (first project only); m.project = projs[0], m.allProjects feeds only the header count + the config switcher. reload runs contract.LoadProject(m.project) aggregating that one project's sources. Feature carries Source + Root but NO Project field. Board p cycles the SOURCE chip within the focused project; cards + changelog show a single source dot. Header says 'N features (one project) . M projects (all)' - the mismatch the user sees. capBounce + watchDirs read m.sources() (focused project only). config tab p -> switchProject re-aggregates to another single project.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Before: NewProjectBoard(projs[0]) -> LoadProject(one project) -> single-source-dot cards; board p cycles source; header count mismatch; cap/watch over focused project only"
+    }
+  ]
+}

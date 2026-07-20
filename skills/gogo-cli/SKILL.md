@@ -66,12 +66,14 @@ session's permission mode.
 **Board keys:** `←→`/`h` columns · `↑↓`/`jk` cards · `space` select (ready) ·
 `enter` drill-in · `v` quick-view · `w` web page · `m` move/launch · `d` ship ·
 `a` attach session · `l` peek log · `x` delete→trash · `tab`/`shift+tab` cycle the
-**board · plans · config** tabs · `p` cycles the board's **source chips** (`all` +
-one per source) / the config-tab **project switcher** · `/` filter (a `#plan-<id>`
-token narrows to that plan's members across sources) · `G` glow · `q` quit. A `⏸`
-marks a card waiting on you (plan-acceptance / decision / UAT). On a **lone repo**
-with no home project there are no tabs / chips - just the single-repo board
-(byte-for-byte).
+**board · plans · config** tabs · `p` cycles the board's **project chips** (`all` +
+one per project) / the config-tab **project switcher** (they share one focus) · `/`
+filter (an `@name` token narrows to a project **or** source; a `#plan-<id>` token to
+that plan's members across sources) · `G` glow · `q` quit. A `⏸` marks a card waiting
+on you (plan-acceptance / decision / UAT). Since **0.23.0** `gogo global` opens ONE
+**unified board across every project** - each card + changelog row tagged
+`●project ●source`. On a **lone repo** with no home project there are no tabs / chips -
+just the single-repo board (byte-for-byte).
 
 **Plans tab keys:** `↑↓` plans · `enter` open the detail · `n` new plan · `A`
 **plan-with-claude** (mints a draft, then opens a plain `claude` session anchored at

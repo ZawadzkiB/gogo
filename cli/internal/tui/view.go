@@ -52,11 +52,13 @@ func (m Model) viewTabBar() string {
 	return strings.Join(parts, dimStyle.Render("  ·  "))
 }
 
-// viewSourceChips renders the FR7 board source filter chips: `all` + one per source
-// of the focused project, the active chip highlighted. "" (no chips) for a lone repo
-// or a single-source project — so the single-repo board stays byte-for-byte.
-func (m Model) viewSourceChips() string {
-	chips := m.sourceChips()
+// viewProjectChips renders the FR3 board PROJECT filter chips: `all` + one per
+// registered project (each with its project-color dot), the active chip highlighted.
+// "" (no chips) off the unified board — so the single-repo + single-project seams stay
+// byte-for-byte. It supersedes the retired interactive source-chip row (D3=A): source
+// narrowing survives via the per-card source dot + the free-text `@name` token.
+func (m Model) viewProjectChips() string {
+	chips := m.projectChips()
 	if len(chips) <= 1 {
 		return ""
 	}
@@ -67,17 +69,17 @@ func (m Model) viewSourceChips() string {
 		if c == "" {
 			label = "all"
 		} else {
-			// Each source chip carries its colored origin dot (design 3a). The chip style's
+			// Each project chip carries its colored origin dot (design 3a). The chip style's
 			// Padding(0,1) supplies the space between the dot and the label.
-			prefix = m.sourceDot(c)
+			prefix = m.projectDot(c)
 		}
-		if c == m.sourceChip {
+		if c == m.projectChip {
 			parts = append(parts, prefix+chipActiveStyle.Render(label))
 		} else {
 			parts = append(parts, prefix+chipStyle.Render(label))
 		}
 	}
-	return dimStyle.Render("sources ") + strings.Join(parts, " ")
+	return dimStyle.Render("project ") + strings.Join(parts, " ")
 }
 
 func (m Model) viewBoard() string {
@@ -108,13 +110,13 @@ func (m Model) viewBoard() string {
 
 	// Header · columns · status · contextual footer. The needs-you strip is gone —
 	// the header count (⏸ K need you) plus each gate card's left-border stripe carry
-	// the "act now" signal now. A project board prepends the tab bar + the source
+	// the "act now" signal now. A project board prepends the tab bar + the project
 	// chips (both invisible on a lone repo → single-repo parity).
 	var parts []string
 	if m.global() {
 		parts = append(parts, m.viewTabBar())
 		parts = append(parts, header)
-		if chips := m.viewSourceChips(); chips != "" {
+		if chips := m.viewProjectChips(); chips != "" {
 			parts = append(parts, chips)
 		}
 	} else {
@@ -306,11 +308,13 @@ func (m Model) renderChangelogColumn(i, colWidth int) string {
 // (`▸ ` when focused, else blank), `✓ slug` (truncated) left, `MM-DD` (faint) right
 // — no box.
 //
-// D3=A (cockpit-colors): on a PROJECT board (the row has a Source) the row LEADS with a
-// SOURCE-colored origin dot (`● ✓ slug`), the design's fast origin cue, and the
-// live-session cue moves to a TRAILING green `●` just before the date (`… ● MM-DD`), so
-// origin reads left and liveness right. A SINGLE-REPO row (no source) keeps today's
-// leading session dot — byte-for-byte unchanged (changelogRowSingle).
+// D3=A / D5=B (cockpit-colors): on the UNIFIED board (the row carries a Project) the row
+// LEADS with the two-dot `●project ●source` origin (`● ● ✓ slug`) — the design's "we
+// need both project + source" cue — via originDots; the live-session cue stays a
+// TRAILING green `●` just before the date (`… ● MM-DD`), so origin reads left and
+// liveness right. A single-project row (a Source but no Project) keeps the single source
+// dot (`● ✓ slug`, byte-for-byte with the pre-0.23 project board); a SINGLE-REPO row (no
+// source) keeps today's leading session dot — byte-for-byte unchanged (changelogRowSingle).
 //
 // A focused row renders as a full-width selection bar: plain inner text under a single
 // focus fg+bg fill so the bar has no per-segment background holes.
@@ -324,18 +328,30 @@ func (m Model) changelogRow(f *contract.Feature, width int, focused, hasSession 
 		return changelogRowSingle(f, width, focused, hasSession, date, dateW)
 	}
 
-	// Project board: leading source dot + ✓ + slug, trailing green session dot + date.
+	// Origin lead: `●project ●source` (two dots) only when the project + source names
+	// DIFFER; a deduped (Project == Source) or source-only row shows a single source dot
+	// — the same never-blank colors originDots resolves (no doubled same-color dot).
+	var projColor lipgloss.TerminalColor
+	originPlain := "●"
+	if originIsTwoName(f) {
+		projColor = m.projectColor(f.Project)
+		originPlain = "● ●"
+	}
+	originStyled := originDots(projColor, m.sourceColor(f.Source), false)
+	originW := len([]rune(originPlain))
+
+	// Project board: origin dots + ✓ + slug, trailing green session dot + date.
 	trailing := ""
 	if hasSession {
 		trailing = "● " // relocated live-session cue (D3=A)
 	}
-	// Reserve: cursor(2) + source-dot "● "(2) + "✓ "(2) + trailing + a 1-cell gap + date.
-	slugMax := width - 2 - 2 - 2 - len([]rune(trailing)) - 1 - dateW
+	// Reserve: cursor(2) + origin dots + a space + "✓ "(2) + trailing + a 1-cell gap + date.
+	slugMax := width - 2 - originW - 1 - 2 - len([]rune(trailing)) - 1 - dateW
 	if slugMax < 4 {
 		slugMax = 4
 	}
 	slug := truncate(f.Slug, slugMax)
-	leftPlain := "● " + "✓ " + slug
+	leftPlain := originPlain + " " + "✓ " + slug
 	rightPlain := trailing + date
 	gap := width - 2 - lipgloss.Width(leftPlain) - lipgloss.Width(rightPlain) // -2 for the cursor gutter
 	if gap < 1 {
@@ -345,7 +361,7 @@ func (m Model) changelogRow(f *contract.Feature, width int, focused, hasSession 
 		row := "▸ " + leftPlain + strings.Repeat(" ", gap) + rightPlain
 		return changelogFocusStyle.Width(width).Render(row)
 	}
-	styledLeft := m.sourceDot(f.Source) + " " + secondaryStyle.Render("✓ ") + secondaryStyle.Render(slug)
+	styledLeft := originStyled + " " + secondaryStyle.Render("✓ ") + secondaryStyle.Render(slug)
 	styledRight := ""
 	if hasSession {
 		styledRight = sessionStyle.Render("●") + " "
@@ -415,48 +431,128 @@ func (m Model) columnHeader(i int, hint string) string {
 	return head
 }
 
-// sourceTag renders the compact per-card SOURCE tag shown ONLY on the project board
-// (FR7): a colored dot + the source label, tinted with the source's configured color
-// when one is set, else dim. It returns ("","") whenever f.Source == "" — i.e. always
-// in single-repo mode — so the single-repo card is byte-for-byte unchanged. `plain`
-// is the untinted form (used by the focused card, whose single fg/bg fill would punch
-// a hole through a colored chip) and carries the rune width for the title truncation
-// math.
-func (m Model) sourceTag(f *contract.Feature) (styled, plain string) {
+// originTag renders the compact per-card ORIGIN tag on the name row (D5=B), shown ONLY
+// on a project/cockpit board. When a feature's project + source names DIFFER (e.g.
+// project "gogo" + source "gogo-cli") the tag names BOTH — `●<project> ●<source>` — each
+// dot in its own never-blank origin color (projectColor / sourceColor), the user's "we
+// need both project + source" ask. When they are EQUAL (a single-source project named
+// after its repo — the common case, e.g. "very-nice-mermaid"/"very-nice-mermaid") the tag
+// DEDUPES to a single `● <name>` — one dot, one name — rather than printing the same name
+// twice (their colors are equal too, since the fallback is name-stable). A source-only
+// feature (legacy single-project seam) is likewise the single `● <source>` form; a
+// source-less feature (single-repo mode) returns ("","") so the card tag is invisible
+// (byte-for-byte parity). The focused card uses the plain (2nd) return, whose single
+// fg/bg focus fill owns the color (a tinted chip would punch a hole through it).
+func (m Model) originTag(f *contract.Feature) (styled, plain string) {
 	if f.Source == "" {
 		return "", ""
 	}
-	plain = "● " + f.Source
-	// The source palette is never-blank (cockpit-colors FR2), so the tag always
-	// carries its source's color — never the old grey "no color" fallback.
-	return lipgloss.NewStyle().Foreground(m.sourceColor(f.Source)).Render(plain), plain
+	if f.Project == "" || f.Project == f.Source {
+		plain = "● " + f.Source
+		// The source palette is never-blank (cockpit-colors FR2), so the tag always
+		// carries its source's color — never the old grey "no color" fallback.
+		return lipgloss.NewStyle().Foreground(m.sourceColor(f.Source)).Render(plain), plain
+	}
+	return m.composeOriginTag(f, f.Project, f.Source)
 }
 
-// fitSourceTag truncates a card's right-aligned source tag (styled+plain) so the
-// composed NAME row — `mark + slug + dot`, a forced 1-col gap, then the tag — can never
-// exceed the card text width and wrap (REV-006). It only kicks in when the slug budget
-// would be floored (slugBudget < minSlug, i.e. the tag is so wide the slug can't get its
-// minimum); otherwise the tag is returned untouched. A budget too small for even a
-// 3-rune tag drops it entirely (the slug takes the whole row). A lone-repo card (empty
-// tag) is a no-op — byte-for-byte unchanged. markW/dotW are the display widths of the
-// (styled or plain) mark/dot prefixes already computed by the caller.
-func (m Model) fitSourceTag(f *contract.Feature, styled, plain string, textW, markW, dotW int) (fStyled, fPlain string) {
+// originIsTwoName reports whether f's origin tag carries two DISTINCT names
+// (`●project ●source`) vs the deduped/single `● name`. The single sentinel the tag
+// shrink + the card fit branch on.
+func originIsTwoName(f *contract.Feature) bool {
+	return f.Project != "" && f.Project != f.Source
+}
+
+// composeOriginTag builds the two-name `●<proj> ●<src>` origin tag from the (already
+// resolved, possibly truncated) project + source display names, returning the colored +
+// plain forms. Each `●name` segment carries its OWN origin color — the project dot+name
+// in the project hue, the source dot+name in the source hue — keyed on the feature's
+// full Project/Source identity, so the two read apart even when a name is shortened.
+func (m Model) composeOriginTag(f *contract.Feature, proj, src string) (styled, plain string) {
+	plain = "●" + proj + " ●" + src
+	projPart := lipgloss.NewStyle().Foreground(m.projectColor(f.Project)).Render("●" + proj)
+	srcPart := lipgloss.NewStyle().Foreground(m.sourceColor(f.Source)).Render("●" + src)
+	return projPart + " " + srcPart, plain
+}
+
+// slugFloor is the healthy minimum runes the ticket slug (the name row's PRIMARY
+// identity) is guaranteed on a card wide enough to give it — the origin tag fits in the
+// REMAINING width and never crushes the slug below this to make room for itself.
+const slugFloor = 14
+
+// fitOriginTag caps a card's right-aligned origin tag (styled+plain) so the ticket SLUG
+// stays readable and the composed name row never wraps (REV-006). The slug is PRIMARY:
+// it reserves min(len(slug), slugFloor) runes up front, and the tag is fit into whatever
+// is left. When the full tag does not fit that remainder it shrinks — NAMES first (the
+// source kept over the project, D5=B), then a compact dots-only cue (`●●`, or a single
+// `●` when deduped), then drops entirely — but the slug is NEVER truncated below its
+// reserve to widen the tag (the earlier bug crushed the slug to ~4 while the tag
+// dominated). A lone-repo card (empty tag) is a no-op. markW/dotW are the display widths
+// of the mark/dot prefixes already computed by the caller.
+func (m Model) fitOriginTag(f *contract.Feature, styled, plain string, textW, markW, dotW int) (fStyled, fPlain string) {
 	if plain == "" {
 		return "", ""
 	}
-	const minSlug = 4 // matches truncate()'s floor — the widest a floored slug can be
-	slugBudget := textW - markW - dotW - lipgloss.Width(plain) - 1
-	if slugBudget >= minSlug {
-		return styled, plain // the slug floor won't kick in → no wrap possible
+	// [slug] + a forced 1-col gap + [tag] must fit textW (after the mark/dot prefixes).
+	avail := textW - markW - dotW - 1
+	if avail < 1 {
+		return "", ""
 	}
-	// The slug is floored to minSlug, so the name row is wider than the reserved budget
-	// assumed. Shrink the tag so markW + minSlug + dotW + 1(gap) + tag <= textW.
-	maxTag := textW - markW - minSlug - dotW - 1
-	if maxTag < 3 {
-		return "", "" // no room for a meaningful tag → drop it
+	// Reserve the slug's readable floor (a short slug reserves only its own length; a
+	// long one reserves slugFloor). The tag gets the rest.
+	slugReserve := len([]rune(f.Slug))
+	if slugReserve > slugFloor {
+		slugReserve = slugFloor
 	}
-	tp := truncateRunes(plain, maxTag)
-	return m.styleSourceTag(f, tp), tp
+	tagBudget := avail - slugReserve
+	if tagBudget < 1 {
+		return "", "" // the slug's floor takes the whole row → no tag (slug wins)
+	}
+	if lipgloss.Width(plain) <= tagBudget {
+		return styled, plain // the full tag fits without dipping into the slug reserve
+	}
+	return m.shrinkOriginTag(f, tagBudget)
+}
+
+// shrinkOriginTag builds the origin tag capped to `budget` runes (>=1). A two-name tag
+// truncates its NAMES first (source over project — the exact origin), then collapses to
+// a compact dots-only `●●`, then a single `●`; a deduped/single-source tag truncates the
+// one name, then a single `●`. Below one dot it returns ("",""). Colors are keyed on the
+// feature's full identity so a shortened tag keeps its origin hues.
+func (m Model) shrinkOriginTag(f *contract.Feature, budget int) (styled, plain string) {
+	if originIsTwoName(f) {
+		// `●<proj> ●<src>`: two dots + the middle space cost 3; split the rest.
+		if nameBudget := budget - 3; nameBudget >= 4 {
+			proj, src := fitTwoNames(f.Project, f.Source, nameBudget)
+			return m.composeOriginTag(f, proj, src)
+		}
+		if budget >= 2 { // dots-only `●●` — both origins, no names
+			pd := lipgloss.NewStyle().Foreground(m.projectColor(f.Project)).Render("●")
+			sd := lipgloss.NewStyle().Foreground(m.sourceColor(f.Source)).Render("●")
+			return pd + sd, "●●"
+		}
+		return m.sourceDot(f.Source), "●" // last resort: one dot
+	}
+	// Deduped / single source: `● <name>` → truncated name → a lone `●`.
+	if budget >= 3 {
+		tp := truncateRunes("● "+f.Source, budget)
+		return m.styleSourceTag(f, tp), tp
+	}
+	return m.sourceDot(f.Source), "●"
+}
+
+// fitTwoNames splits a rune budget across the origin tag's project + source names,
+// keeping the SOURCE readable (it names the exact origin) and truncating the PROJECT
+// first, while leaving the project a legible ≥2-rune share when the budget allows.
+// budget >= 4 (the caller's guard), so both names get a real (non-ellipsis-only) slice.
+func fitTwoNames(proj, src string, budget int) (p, s string) {
+	pReserve := 2
+	if pReserve > budget-1 {
+		pReserve = budget - 1
+	}
+	s = truncateRunes(src, budget-pReserve)
+	p = truncateRunes(proj, budget-len([]rune(s)))
+	return p, s
 }
 
 // styleSourceTag re-applies a source's tag tint to an (already truncated) plain tag —
@@ -512,7 +608,7 @@ func correlationCountFallback(n int) string {
 // selected-for-ship card gets the select accent border + a ✓; a card with a
 // live tmux session shows an unmissable green ● session marker (TEST-006).
 func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width int) string {
-	selected := f.Class == contract.ClassReadyToShip && m.selected[f.Slug]
+	selected := f.Class == contract.ClassReadyToShip && m.selected[featureKey(f)]
 	hasSession := hasLiveSession(f.Slug, m.sessions)
 
 	title := f.Title
@@ -549,12 +645,12 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		// carries one fg/bg), and its width is reserved from the slug's budget. Right-
 		// alignment pads to the card's TEXT area (width minus the style's Padding(0,1)),
 		// so the padded line never overruns the frame and wraps.
-		_, tag := m.sourceTag(f)
+		_, tag := m.originTag(f)
 		textW := width - 2
 		mw, dw := lipgloss.Width(mark), lipgloss.Width(dot)
-		// Truncate the tag if a long source name at a narrow width would wrap the row
-		// (REV-006). The focused card renders the tag plain (the focus fill owns fg/bg).
-		_, tag = m.fitSourceTag(f, tag, tag, textW, mw, dw)
+		// Truncate the tag if a long ●project ●source pair at a narrow width would wrap
+		// the row (REV-006). The focused card renders the tag plain (focus fill owns fg/bg).
+		_, tag = m.fitOriginTag(f, tag, tag, textW, mw, dw)
 		slugBudget := textW - mw - dw
 		if tag != "" {
 			slugBudget -= lipgloss.Width(tag) + 1
@@ -586,17 +682,17 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		if hasSession {
 			dot = " " + sessionStyle.Render("●")
 		}
-		// Name row: mark + slug + live ● dot, with the (styled) SOURCE tag right-
+		// Name row: mark + slug + live ● dot, with the (styled) ORIGIN tag right-
 		// aligned; its width is reserved from the slug's budget so nothing overruns.
 		// Right-alignment pads to the card TEXT area (width minus the Padding(0,1)) so
 		// the padded line stays inside the frame (no wrap).
-		styled, plain := m.sourceTag(f)
+		styled, plain := m.originTag(f)
 		textW := width - 2
 		mw, dw := lipgloss.Width(mark), lipgloss.Width(dot)
-		// Truncate the tag if a long source name at a narrow width would wrap the row
-		// (REV-006) — the composed name row must never exceed textW (the window height
-		// math depends on it). Lone-repo (empty tag) is a no-op.
-		styled, plain = m.fitSourceTag(f, styled, plain, textW, mw, dw)
+		// Truncate the tag if a long ●project ●source pair at a narrow width would wrap
+		// the row (REV-006) — the composed name row must never exceed textW (the window
+		// height math depends on it). Lone-repo (empty tag) is a no-op.
+		styled, plain = m.fitOriginTag(f, styled, plain, textW, mw, dw)
 		slugBudget := textW - mw - dw
 		if plain != "" {
 			slugBudget -= lipgloss.Width(plain) + 1

@@ -8,7 +8,6 @@ package tui
 
 import (
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -155,16 +154,26 @@ type Model struct {
 	planSourceIdx int
 	pendingPlan   bool
 
-	// sourceChip is the active board source filter (FR7): "" = all sources, else the
-	// source label the `p`-cycled chip narrows the board to. Distinct from the free-
-	// text filter (m.filter) — both AND together in rebuild.
-	sourceChip string
+	// unified marks the multi-project cockpit board (0.23.0): the board aggregates
+	// EVERY registered project (LoadWorkspace) rather than one project's sources
+	// (LoadProject). It gates the project-chip filter row + the `●project ●source`
+	// two-dot origin (every feature carries a Project only in this mode) and points
+	// reload()/capBounce/watchDirs at the whole workspace. false = the single-repo
+	// board (m.root != "") or the legacy single-project test seam.
+	unified bool
+
+	// projectChip is the active board PROJECT filter (FR3, D3=A): "" = all projects,
+	// else the project name the `p`-cycled chip narrows the board to. Unified board
+	// only (source narrowing survives via the per-card source dot + the free-text
+	// `@name` token). Distinct from the free-text filter (m.filter) — both AND in
+	// rebuild. The interactive source-chip row it supersedes is retired.
+	projectChip string
 
 	cols      [4][]*contract.Feature
 	colIdx    int
 	cardIdx   [4]int
 	colOffset [4]int          // per-column scroll offset (first visible card) — TEST-014
-	selected  map[string]bool // selected ready-to-ship slugs (space)
+	selected  map[string]bool // selected ready-to-ship cards, keyed by featureKey (Root\x00Slug — workspace-unique, REV-001)
 
 	filter    string
 	filtering bool
@@ -267,6 +276,43 @@ func NewWorkspace(repo *contract.Repo, proj projects.Project) Model {
 	return newFromRepo(repo, "", &proj, []projects.Project{proj})
 }
 
+// NewCockpit is the real entrypoint for `gogo global` (0.23.0): it builds the UNIFIED
+// board across EVERY registered project (contract.LoadWorkspace) — each feature tagged
+// with BOTH its project + source. projs[0] is the DEFAULT focus for the plans/config
+// tabs (the project-chip / config switcher share this m.project, D4). It replaces
+// NewProjectBoard(projs[0]) at the two call sites (main.chooseBoard, global.globalBoard).
+// A single registered project degrades cleanly (the project chip row collapses to
+// `all` + one). Callers guard against an empty project set (a friendly hint), but this
+// stays crash-safe with none.
+func NewCockpit(projs []projects.Project) Model {
+	var focus *projects.Project
+	var repo *contract.Repo
+	if len(projs) > 0 {
+		focus = &projs[0]
+		repo = contract.LoadWorkspace(projs)
+	} else {
+		repo = &contract.Repo{}
+	}
+	m := newFromRepo(repo, "", focus, projs)
+	m.unified = true
+	return m
+}
+
+// NewWorkspaceAll is the unified-board test seam: it injects a MERGED in-memory
+// *contract.Repo (features already carrying Project + Source, as LoadWorkspace stamps
+// them) plus the full project set, so a test drives the aggregate board — project chip
+// filter, two-dot origin, cross-project cap/watch — without disk. projs[0] is the
+// default focus. The real entrypoint is NewCockpit.
+func NewWorkspaceAll(repo *contract.Repo, projs []projects.Project) Model {
+	var focus *projects.Project
+	if len(projs) > 0 {
+		focus = &projs[0]
+	}
+	m := newFromRepo(repo, "", focus, projs)
+	m.unified = true
+	return m
+}
+
 // newFromRepo is the shared Model constructor: New (single-repo, root != "",
 // project == nil) and NewProjectBoard/NewWorkspace (project board, root == "", a
 // non-nil focused project). Keeping one constructor guarantees the two boards are
@@ -316,8 +362,8 @@ func newFromRepo(repo *contract.Repo, root string, project *projects.Project, al
 	return m
 }
 
-// sources returns the focused project's sources (nil in single-repo mode) — what
-// the cap guard (CapForSource) and the config tab read.
+// sources returns the focused project's sources (nil in single-repo mode) — what the
+// config tab reads.
 func (m *Model) sources() []projects.Source {
 	if m.project == nil {
 		return nil
@@ -325,39 +371,83 @@ func (m *Model) sources() []projects.Source {
 	return m.project.Sources
 }
 
-// sourceChips is the ordered set of source-filter chip labels (FR7): "all" first,
-// then one per source of the focused project. "" for single-repo (no chips).
-func (m *Model) sourceChips() []string {
-	if m.project == nil {
+// capWatchSources is the source set the concurrency-cap guard (capBounce) + the
+// fsnotify watch (watchDirs) resolve against (FR5). On the UNIFIED board a card's
+// source can live in a NON-focused project, so both must span EVERY project's sources
+// (projects.AllSources) — resolving from only the focused project (m.sources()) left
+// such a card uncapped + unwatched. Off the unified board it stays the focused
+// project's sources (nil in single-repo mode), so those paths are byte-for-byte. One
+// helper so the cap guard and the watch never drift.
+func (m *Model) capWatchSources() []projects.Source {
+	if m.unified {
+		return projects.AllSources(m.allProjects)
+	}
+	return m.sources()
+}
+
+// projectChips is the ordered set of PROJECT-filter chip labels (FR3, D3=A): "all"
+// first, then one per registered project. nil off the unified board (no chips), so the
+// single-repo + legacy single-project seams stay byte-for-byte (source-narrowing there
+// never had a project row).
+func (m *Model) projectChips() []string {
+	if !m.unified {
 		return nil
 	}
 	out := []string{""} // "" renders as the "all" chip
-	for _, s := range m.project.Sources {
-		label := s.Name
-		if label == "" {
-			label = filepath.Base(s.Path)
-		}
-		out = append(out, label)
+	for _, p := range m.allProjects {
+		out = append(out, p.Name)
 	}
 	return out
 }
 
-// cycleChip advances the active source chip (FR7 `p`): all → source-1 → … → all.
-// A no-op on a project with no sources.
-func (m *Model) cycleChip(dir int) {
-	chips := m.sourceChips()
+// cycleProjectChip advances the board PROJECT filter (FR3 `p`): all → proj-1 → … → all,
+// narrowing the board to that project's features. Per D4 it ALSO moves the shared focus
+// (m.project) to the chip's project — or to allProjects[0] when returning to "all" — so
+// the plans/config tabs act on the chip's project. A no-op off the unified board / with
+// no projects.
+func (m *Model) cycleProjectChip(dir int) {
+	chips := m.projectChips()
 	if len(chips) <= 1 {
 		return
 	}
 	cur := 0
 	for i, c := range chips {
-		if c == m.sourceChip {
+		if c == m.projectChip {
 			cur = i
 			break
 		}
 	}
-	m.sourceChip = chips[((cur+dir)%len(chips)+len(chips))%len(chips)]
+	m.projectChip = chips[((cur+dir)%len(chips)+len(chips))%len(chips)]
+	m.focusProject(m.projectChip) // D4: the board chip + config switcher share m.project
 	m.rebuild()
+}
+
+// focusProject points the shared focus (m.project / projIdx) at the named project — or
+// allProjects[0] when name is "" (the board's "all" chip) — re-deriving the source
+// colors, clamping the source cursor, and resetting the plans-tab cursor/detail (a
+// different plan set). It does NOT re-read the repo (the unified board already holds
+// every project's features; the projectChip filters them) — the caller rebuilds. This
+// is the single focus mover the board project chip and the config switcher share (D4).
+func (m *Model) focusProject(name string) {
+	if len(m.allProjects) == 0 {
+		return
+	}
+	idx := 0
+	if name != "" {
+		for i := range m.allProjects {
+			if m.allProjects[i].Name == name {
+				idx = i
+				break
+			}
+		}
+	}
+	m.projIdx = idx
+	m.project = &m.allProjects[idx]
+	m.sourceColors = sourceColorMap(m.project.Sources)
+	m.sourceIdx = clamp(m.sourceIdx, 0, len(m.project.Sources)-1)
+	m.planIdx = 0
+	m.planDetail = nil
+	m.loadPlans()
 }
 
 // cycleTab advances the active tab board → plans → config (FR8/D6). Project board
@@ -403,22 +493,22 @@ func (m *Model) refreshProject() {
 	m.reload()
 }
 
-// switchProject points the board at allProjects[idx] (the config-tab `p` switcher),
-// re-deriving sources/colors and re-aggregating. Clamps to range; a no-op with no
-// projects.
+// switchProject points the shared focus at allProjects[idx] (the config-tab `p`
+// switcher, D4), re-deriving sources/colors and reloading. Clamps to range; a no-op
+// with no projects. On the unified board it ALSO narrows the board project chip to the
+// focused project so the board + config never disagree (they share m.project); on the
+// legacy single-project seam reload() re-aggregates to the newly focused project
+// (LoadProject), the pre-0.23 behaviour.
 func (m *Model) switchProject(idx int) {
 	if len(m.allProjects) == 0 {
 		return
 	}
-	m.projIdx = ((idx % len(m.allProjects)) + len(m.allProjects)) % len(m.allProjects)
-	m.project = &m.allProjects[m.projIdx]
-	m.sourceColors = sourceColorMap(m.project.Sources)
+	idx = ((idx % len(m.allProjects)) + len(m.allProjects)) % len(m.allProjects)
 	m.projectColors = projectColorMap(m.allProjects)
-	m.sourceIdx = clamp(m.sourceIdx, 0, len(m.project.Sources)-1)
-	m.sourceChip = ""
-	// A project switch invalidates the plans-tab cursor/detail (a different plan set).
-	m.planIdx = 0
-	m.planDetail = nil
+	m.focusProject(m.allProjects[idx].Name)
+	if m.unified {
+		m.projectChip = m.project.Name // board chip follows the config switcher (D4)
+	}
 	m.reload()
 }
 
@@ -477,9 +567,10 @@ func (m *Model) rebuild() {
 	known := m.knownCorrelationIDs()
 	var cols [4][]*contract.Feature
 	for _, f := range m.repo.Features {
-		// The `p`-cycled source chip narrows to one source (FR7); it ANDs with the
-		// free-text filter. "" (all) never hides anything — single-repo parity.
-		if m.sourceChip != "" && f.Source != m.sourceChip {
+		// The `p`-cycled PROJECT chip narrows to one project (FR3, D3=A); it ANDs with
+		// the free-text filter. "" (all) never hides anything. Only ever set on the
+		// unified board, so the single-repo + single-project seams are unaffected.
+		if m.projectChip != "" && f.Project != m.projectChip {
 			continue
 		}
 		if m.filter != "" && !matchFilter(f, m.filter, m.global(), known) {
@@ -503,18 +594,24 @@ func (m *Model) rebuild() {
 	m.colIdx = clamp(m.colIdx, 0, 3)
 }
 
-// reload re-reads the repo + sessions and rebuilds, preserving filter/focus. In
-// the project board it re-runs the multi-source merge (LoadProject) so a change in
-// any source is picked up live; in single-repo mode it re-reads the one root exactly
-// as before.
+// reload re-reads the repo + sessions and rebuilds, preserving filter/focus. On the
+// UNIFIED board it re-runs the multi-project merge (LoadWorkspace) so a change in ANY
+// project's source is picked up live; on the legacy single-project seam it re-runs the
+// single-project source merge (LoadProject); in single-repo mode it re-reads the one
+// root exactly as before.
 func (m *Model) reload() {
-	if m.project != nil {
-		m.repo = contract.LoadProject(*m.project) // re-aggregate the project's sources
-	} else if repo, err := contract.LoadRepo(m.root); err == nil {
-		m.repo = repo
+	switch {
+	case m.unified:
+		m.repo = contract.LoadWorkspace(m.allProjects) // re-aggregate every project
+	case m.project != nil:
+		m.repo = contract.LoadProject(*m.project) // re-aggregate the one project's sources
+	default:
+		if repo, err := contract.LoadRepo(m.root); err == nil {
+			m.repo = repo
+		}
 	}
 	m.sessions = launch.ListSessions()
-	m.loadPlans() // re-read the project's plans after the reload
+	m.loadPlans() // re-read the focused project's plans after the reload
 	m.rebuild()
 }
 
@@ -543,23 +640,52 @@ func (m *Model) focusedCard() *contract.Feature {
 	return col[clamp(m.cardIdx[m.colIdx], 0, len(col)-1)]
 }
 
-func (m *Model) selectedSlugs() []string {
-	var out []string
-	for slug, on := range m.selected {
-		if on {
-			out = append(out, slug)
+// featureKey is a feature's WORKSPACE-UNIQUE identity: a slug alone is unique only
+// per-source, so on the unified board two projects that share a slug (e.g. both have
+// `feature-cli`) would collide (REV-001). Root is unique per source, so `Root\x00Slug`
+// disambiguates them everywhere a per-feature lookup must be workspace-unique — the
+// selection set, above all. The NUL separator can never appear in a path or a slug, so
+// the composite is unambiguous. nil → "" (never keys a real selection).
+func featureKey(f *contract.Feature) string {
+	if f == nil {
+		return ""
+	}
+	return f.Root + "\x00" + f.Slug
+}
+
+// selectedFeatures returns the loaded features currently selected for ship, resolved by
+// their composite featureKey (so two same-slug cards from different projects never
+// collapse into one — REV-001), sorted by slug for a deterministic merged-release name.
+func (m *Model) selectedFeatures() []*contract.Feature {
+	var out []*contract.Feature
+	for _, f := range m.repo.Features {
+		if m.selected[featureKey(f)] {
+			out = append(out, f)
 		}
 	}
-	sort.Strings(out)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
+	return out
+}
+
+// selectedSlugs returns the slugs of the selected features (composite-keyed), sorted.
+// A merged ship is guaranteed same-root by attemptAction's selectionSpansProjects guard,
+// so the slugs are unambiguous within that one repo.
+func (m *Model) selectedSlugs() []string {
+	feats := m.selectedFeatures()
+	out := make([]string, 0, len(feats))
+	for _, f := range feats {
+		out = append(out, f.Slug)
+	}
 	return out
 }
 
 // matchFilter reports whether feature f matches the board filter q (FR5). The
-// `@name` project token is an AGGREGATE-board concept only: it is honored solely
+// `@name` origin token is an AGGREGATE-board concept only: it is honored solely
 // when global is true. There a leading `@fragment` narrows to features whose
-// project label contains it (case-insensitive substring), the remaining non-@
-// words keep the slug+title substring match, and when both are present they AND
-// together. In single-repo mode (global == false) every feature's Project is ""
+// PROJECT or SOURCE label contains it (case-insensitive substring — D3=A extends it
+// past the old Source-only match), the remaining non-@ words keep the slug+title
+// substring match, and when both are present they AND together. In single-repo mode
+// (global == false) every feature's Project + Source is ""
 // so an `@` token could never match — treating `@` as a token would hide EVERY
 // card (REV-002), so the whole query, `@` and all, is instead matched literally
 // over slug+title, byte-for-byte as before the token existed (FR7 parity). A bare
@@ -584,8 +710,14 @@ func matchFilter(f *contract.Feature, q string, global bool, knownCorrelations m
 		}
 		return strings.Contains(strings.ToLower(f.Slug+" "+f.Title), strings.ToLower(rest))
 	}
-	project, text := splitFilter(rest)
-	if project != "" && !strings.Contains(strings.ToLower(f.Source), project) {
+	token, text := splitFilter(rest)
+	// The `@name` token narrows to a feature's PROJECT or SOURCE (D3=A fixes the
+	// long-standing drift where the "project token" only ever matched Source): on the
+	// unified board source labels collide across projects, so the token must reach both
+	// — an @fragment hits when it is a case-insensitive substring of EITHER.
+	if token != "" &&
+		!strings.Contains(strings.ToLower(f.Source), token) &&
+		!strings.Contains(strings.ToLower(f.Project), token) {
 		return false
 	}
 	if text != "" && !strings.Contains(strings.ToLower(f.Slug+" "+f.Title), text) {

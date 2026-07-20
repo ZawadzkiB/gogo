@@ -1,0 +1,4 @@
+{ "schema": 2, "name": "unified-board", "release": "0.23.0", "date": "2026-07-20",
+  "members": [ { "slug": "unified-board", "title": "unified all-projects board", "version": "0.23.0" } ],
+  "diagrams": [ { "kind": "flow", "file": "unified-board-flow.mmd" } ],
+  "before": [ { "kind": "flow", "file": "before/unified-board-flow.mmd" } ] }

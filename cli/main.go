@@ -19,7 +19,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.22.1"
+const Version = "0.23.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -104,8 +104,8 @@ type boardChoice struct {
 //  1. Inside a repo (rootFound) → THAT repo's single board, ALWAYS - even when the
 //     repo is a registered project's source. Per-repo stays simple (no auto-route to
 //     the project cockpit); the graceful single-repo board is byte-for-byte unchanged.
-//  2. Outside any repo + the global cockpit initialized + ≥1 project → the global
-//     cockpit (the first project's board, `p`-switchable across the rest).
+//  2. Outside any repo + the global cockpit initialized + ≥1 project → the UNIFIED
+//     cockpit board across EVERY project (NewCockpit), `p` cycles the project filter.
 //  3. Outside + initialized + 0 projects → a "add a project" hint (no crash).
 //  4. Outside + NOT initialized → a "run gogo global init" hint (no crash).
 //
@@ -129,7 +129,7 @@ func chooseBoard(root string, rootFound bool, dataHome string, listProjects func
 	if len(projs) == 0 {
 		return boardChoice{kind: "none", err: "gogo: global cockpit is empty - add a project with `gogo project add <repo>`"}
 	}
-	return boardChoice{model: tui.NewProjectBoard(projs[0]), kind: "project"}
+	return boardChoice{model: tui.NewCockpit(projs), kind: "project"}
 }
 
 // sameDir reports whether two paths point at the same directory (cleaned compare) -
@@ -190,7 +190,7 @@ view flags:
 board keys:
   ←→/h columns · ↑↓/jk cards · space select (ready) · enter drill-in · v quick-view
   w web page · m move/launch (accepts a plan-pending card) · d ship · a attach session
-  l peek log · x delete→trash · p source chip · tab board/plans/config · #plan-<id> filter to a plan · / filter · G glow · q quit
+  l peek log · x delete→trash · p project chip (unified board) · tab board/plans/config · @name / #plan-<id> filter · / filter · G glow · q quit
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
 
 plans tab keys:

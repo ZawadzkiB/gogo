@@ -1,0 +1,22 @@
+flowchart TD
+  projs["projects.List() → [projA, projB, …]"]
+  projs --> pick["chooseBoard / globalBoard\nNewProjectBoard(projs[0])  ← FIRST project only"]
+  pick --> focus["m.project = projs[0]\nm.allProjects = all (header count only)"]
+
+  focus --> lp["contract.LoadProject(m.project)\naggregates ONE project's sources"]
+  lp --> repo["*contract.Repo\nFeatures carry Source + Root (NO Project field)"]
+
+  repo --> rebuild["rebuild(): filter"]
+  schip["m.sourceChip (all | source) — board p cycles SOURCE"] --> rebuild
+  rebuild --> cols["4 columns"]
+  cols --> card["renderCard: sourceTag = ● source (single dot)"]
+  cols --> clog["changelogRow: ● source ✓ slug (single dot)"]
+  hdr["header: N features (ONE project) · M projects (all)  ← mismatch"] --- card
+
+  focus --> cap["capBounce: CapForSource(m.sources(), root)\n← only the focused project's sources"]
+  focus --> watch["watchDirs: only focused project's source trees"]
+
+  cfgp["config tab p → switchProject\nre-aggregates to ONE other project"] --> focus
+
+  classDef gap fill:#ffe0e0,stroke:#d98a8a,color:#111
+  class pick,hdr,cap,watch gap

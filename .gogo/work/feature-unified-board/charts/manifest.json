@@ -1,0 +1,12 @@
+{
+  "slug": "unified-board",
+  "updated": "2026-07-20",
+  "note": "Intended design (0.23.0 unified all-projects board): gogo global aggregates EVERY registered project's sources into ONE board. contract.LoadWorkspace(projs) loops the existing LoadProject(p) per project, stamps a NEW Feature.Project field (alongside Source + Root), and merges + sorts all features into one *Repo. NewCockpit(projs) / reload point the board at LoadWorkspace(m.allProjects). rebuild() gains a projectChip guard mirroring the sourceChip one; board p cycles the project chip (all -> proj1 -> proj2 -> all) and moves the m.project focus that the plans + config tabs read (all -> allProjects[0]). Every render site carries the two-dot origin via the existing originDots(project,source): renderCard's originTag (dots + source label) and changelogRow (lead dots). Cross-project cap + watch read projects.AllSources(m.allProjects). Presentation + aggregation only: no contract-file format change, no pipeline-state mutation, LLM-free read path. flow.mmd = the aggregation + filter + render model.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Unified board: projects.List -> LoadWorkspace (stamp Feature.Project) -> merged Repo -> rebuild (projectChip + text filter) -> cards/changelog two-dot origin + header; p cycles project + moves plans/config focus; cap/watch over AllSources"
+    }
+  ]
+}

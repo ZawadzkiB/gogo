@@ -106,3 +106,52 @@ func TestLoadProjectEmpty(t *testing.T) {
 		t.Errorf("empty project → %v, want a non-nil board with no features", repo)
 	}
 }
+
+// TestLoadWorkspaceMergesProjects (0.23.0): LoadWorkspace merges EVERY project's
+// features, stamps each feature's Project (alongside the Source + Root that LoadProject
+// already stamps), keeps the newest-first order across projects, and skips a project
+// with no readable sources gracefully — the unified cockpit reader.
+func TestLoadWorkspaceMergesProjects(t *testing.T) {
+	rootA := t.TempDir()
+	rootB := t.TempDir()
+	bare := t.TempDir() // no .gogo/ → contributes nothing
+	writeFeature(t, rootA, "alpha-old", "2026-07-01", "implement", "implementing")
+	writeFeature(t, rootB, "beta-new", "2026-07-14", "plan", "plan-accepted")
+
+	repo := LoadWorkspace([]projects.Project{
+		{Name: "projA", Sources: []projects.Source{{Path: rootA, Name: "svc-a"}}},
+		{Name: "projB", Sources: []projects.Source{{Path: rootB, Name: "svc-b"}}},
+		{Name: "projBare", Sources: []projects.Source{{Path: bare, Name: "svc-bare"}}},
+	})
+
+	if len(repo.Features) != 2 {
+		t.Fatalf("merged features = %d, want 2 (bare project skipped)", len(repo.Features))
+	}
+	// Newest-first across projects.
+	if repo.Features[0].Slug != "beta-new" || repo.Features[1].Slug != "alpha-old" {
+		t.Errorf("merge order = [%s, %s], want [beta-new, alpha-old]",
+			repo.Features[0].Slug, repo.Features[1].Slug)
+	}
+	if repo.Root != "" {
+		t.Errorf("workspace Root = %q, want empty (each feature carries its own)", repo.Root)
+	}
+	byslug := map[string]*Feature{}
+	for _, f := range repo.Features {
+		byslug[f.Slug] = f
+	}
+	if got := byslug["beta-new"]; got.Project != "projB" || got.Source != "svc-b" || got.Root != rootB {
+		t.Errorf("beta-new stamped {Project:%q Source:%q Root:%q}, want {projB svc-b %q}",
+			got.Project, got.Source, got.Root, rootB)
+	}
+	if got := byslug["alpha-old"]; got.Project != "projA" || got.Source != "svc-a" || got.Root != rootA {
+		t.Errorf("alpha-old stamped {Project:%q Source:%q Root:%q}, want {projA svc-a %q}",
+			got.Project, got.Source, got.Root, rootA)
+	}
+}
+
+// TestLoadWorkspaceEmpty: no projects (or all unreadable) → an empty board, never a crash.
+func TestLoadWorkspaceEmpty(t *testing.T) {
+	if repo := LoadWorkspace(nil); repo == nil || len(repo.Features) != 0 {
+		t.Errorf("empty workspace → %v, want a non-nil board with no features", repo)
+	}
+}

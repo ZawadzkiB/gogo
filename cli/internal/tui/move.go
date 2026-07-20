@@ -22,18 +22,25 @@ type launchDoneMsg struct{ status string }
 //	ship=false (m): plan-pending → accept · other unfinished (plan-accepted) → go · in-progress → go(resume) · ready → done · shipped → bounce
 //	ship=true  (d): ready(+selection) → done · everything else → bounce
 func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
-	sel := m.selectedSlugs()
+	sel := m.selectedFeatures()
 	if len(sel) > 0 {
 		// A ready selection ships as one (merged if >1) entry — but ONLY within a
-		// single project. The merged /gogo:done launches in ONE repo (doLaunch roots
-		// it from the first slug's feature), so a selection spanning >1 project would
-		// silently run the other projects' slugs in the wrong repo. Cross-repo merged
-		// ship is later-phase work (P4 correlation id); Phase 1 refuses it with a
-		// clear bounce and launches nothing (REV-001).
-		if m.selectionSpansProjects(sel) {
+		// single project. The merged /gogo:done launches in ONE repo (doLaunch anchors
+		// it at the intent's Root), so a selection spanning >1 project would silently
+		// run the other projects' slugs in the wrong repo. Cross-repo merged ship is
+		// later-phase work (P4 correlation id); Phase 1 refuses it with a clear bounce
+		// and launches nothing (REV-001). Computed from the actual selected features
+		// (composite-keyed), never a slug re-lookup that collapses a same-slug pair.
+		if selectionSpansProjects(sel) {
 			return launch.Intent{}, false, "select ready cards from one project to ship together"
 		}
-		return launch.BuildIntent(launch.ActionDone, sel, ""), true, ""
+		slugs := make([]string, len(sel))
+		for i, f := range sel {
+			slugs[i] = f.Slug
+		}
+		in := launch.BuildIntent(launch.ActionDone, slugs, "")
+		in.Root = m.rootFor(sel[0]) // all share one root (the guard above)
+		return in, true, ""
 	}
 
 	f := m.focusedCard()
@@ -45,7 +52,7 @@ func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
 		if f.Class != contract.ClassReadyToShip {
 			return launch.Intent{}, false, "only ready cards can ship (d) — " + f.Slug + " is " + f.Class
 		}
-		return launch.BuildIntent(launch.ActionDone, []string{f.Slug}, ""), true, ""
+		return m.intentFor(launch.ActionDone, f), true, ""
 	}
 
 	switch f.Class {
@@ -57,35 +64,45 @@ func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
 		// goes — behind the concurrency-cap guard. Branch on status, not class, because
 		// both share ClassUnfinished.
 		if f.Status == "awaiting-plan-acceptance" {
-			return launch.BuildIntent(launch.ActionAccept, []string{f.Slug}, ""), false, ""
+			return m.intentFor(launch.ActionAccept, f), false, ""
 		}
 		if bounce := m.capBounce(f); bounce != "" {
 			return launch.Intent{}, false, bounce
 		}
-		return launch.BuildIntent(launch.ActionGo, []string{f.Slug}, ""), false, ""
+		return m.intentFor(launch.ActionGo, f), false, ""
 	case contract.ClassInProgress:
 		if bounce := m.capBounce(f); bounce != "" {
 			return launch.Intent{}, false, bounce
 		}
-		return launch.BuildIntent(launch.ActionGo, []string{f.Slug}, ""), false, ""
+		return m.intentFor(launch.ActionGo, f), false, ""
 	case contract.ClassReadyToShip:
-		return launch.BuildIntent(launch.ActionDone, []string{f.Slug}, ""), true, ""
+		return m.intentFor(launch.ActionDone, f), true, ""
 	case contract.ClassShipped:
 		return launch.Intent{}, false, "already shipped — no move (illegal)"
 	}
 	return launch.Intent{}, false, "no legal move for " + f.Slug
 }
 
-// selectionSpansProjects reports whether the selected ready slugs resolve to more
-// than one distinct repo root. A merged ship builds a SINGLE /gogo:done that
-// doLaunch roots from the first slug's feature, so a selection crossing project
-// roots would mis-root every other project's slug. Phase 1 refuses such a ship
-// (REV-001); a per-root fan-out is later-phase work. Single-repo mode never trips
-// this (every feature shares m.root), so its ship path is byte-for-byte unchanged.
-func (m *Model) selectionSpansProjects(slugs []string) bool {
+// intentFor builds a single-card launch intent for f, stamping its OWN repo root (via
+// rootFor) so the launch anchors at the FOCUSED card's source — never a slug re-lookup
+// that could grab a same-slug card from another project on the unified board (REV-001).
+func (m *Model) intentFor(action launch.Action, f *contract.Feature) launch.Intent {
+	in := launch.BuildIntent(action, []string{f.Slug}, "")
+	in.Root = m.rootFor(f)
+	return in
+}
+
+// selectionSpansProjects reports whether the selected ready features resolve to more
+// than one distinct repo root. A merged ship builds a SINGLE /gogo:done anchored at one
+// root, so a selection crossing project roots would mis-root every other project's slug.
+// Phase 1 refuses such a ship (REV-001); a per-root fan-out is later-phase work. It reads
+// the ACTUAL selected features (composite-keyed by the caller), never a slug re-lookup —
+// on the unified board a slug re-lookup collapses a same-slug cross-project pair into one
+// and would let the guard silently pass. Single-repo mode never trips this (every feature
+// shares one root), so its ship path is byte-for-byte unchanged.
+func selectionSpansProjects(feats []*contract.Feature) bool {
 	root, seen := "", false
-	for _, s := range slugs {
-		f := m.repo.Feature(s)
+	for _, f := range feats {
 		if f == nil {
 			continue
 		}
@@ -104,8 +121,9 @@ func (m *Model) selectionSpansProjects(slugs []string) bool {
 // its source's concurrency cap (FR4/FR5) — the board analog of cmdGo's capBlock.
 // BOTH launch paths enforce the SAME orchestrator.CapExceeded rule (over the one
 // shared pure helper, CapForSource) so they never drift: two live build sessions
-// clobber a repo's shared working tree. It resolves the cap from the focused
-// project's SOURCES (by the target feature's OWN root — rootFor) and counts that
+// clobber a repo's shared working tree. It resolves the cap from EVERY project's
+// SOURCES on the unified board (else the focused project's — capWatchSources, FR5), by
+// the target feature's OWN root (rootFor), and counts that
 // root's active in-progress+live features EXCLUDING f itself (so resuming an
 // already-active feature is never blocked). Empty when uncapped / unregistered — the
 // byte-for-byte single-repo fallback (a lone repo has no sources, so CapForSource
@@ -117,7 +135,9 @@ func (m *Model) capBounce(f *contract.Feature) string {
 		return ""
 	}
 	root := m.rootFor(f)
-	cap := orchestrator.CapForSource(m.sources(), root)
+	// FR5: resolve the cap from EVERY project's sources on the unified board — a card's
+	// source may live in a non-focused project — else the focused project's (byte-for-byte).
+	cap := orchestrator.CapForSource(m.capWatchSources(), root)
 	if cap <= 0 {
 		return ""
 	}
@@ -180,8 +200,16 @@ func (m *Model) confirmSummary(intent launch.Intent) string {
 	if !m.hasTmux {
 		where = "background (claude -p + log)"
 	}
+	// Name the target REPO (intent.Root) so a mis-anchored launch is catchable at the
+	// confirm — on the unified board a same-slug card in another project must never be
+	// launched into the wrong repo unnoticed (REV-001). Empty root falls back silently
+	// (single-repo mode, where the CLI roots the launch itself).
+	at := ""
+	if intent.Root != "" {
+		at = "  at " + intent.Root
+	}
 	// FR8: state the effective permission mode the launch runs under.
-	return "will run: claude \"" + intent.Command + "\"  in " + where + "  · " + launch.PermissionSummary()
+	return "will run: claude \"" + intent.Command + "\"  in " + where + at + "  · " + launch.PermissionSummary()
 }
 
 // doLaunch rebuilds the intent with the (possibly edited) release name and
@@ -190,21 +218,21 @@ func (m *Model) confirmSummary(intent launch.Intent) string {
 // on the model it returns — this closure only captures the resolved intent.
 func (m Model) doLaunch() tea.Cmd {
 	intent := m.pending
+	// The launch anchors at the intent's OWN Root — captured from the FOCUSED / selected
+	// card when the intent was built (attemptAction). NEVER re-resolve the root by a slug
+	// re-lookup: on the unified board a slug is unique only per-source, so the first
+	// match could be a same-slug card in the WRONG project and silently launch there
+	// (REV-001). In single-repo mode this Root == m.root, so the resolution is unchanged.
+	root := intent.Root
 	if m.pendingShip && len(intent.Slugs) >= 2 && m.binding != nil {
-		intent = launch.BuildIntent(launch.ActionDone, intent.Slugs, m.binding.release)
+		rebuilt := launch.BuildIntent(launch.ActionDone, intent.Slugs, m.binding.release)
+		rebuilt.Root = root // preserve the captured root across the release-name rebuild
+		intent = rebuilt
 	}
-	// Root the launch at the target feature's OWN repo (rootFor) — in the
-	// aggregate board a card belongs to one of several projects; in single-repo
-	// mode f.Root == m.root, so this resolves to the same root as before.
-	var f *contract.Feature
-	if len(intent.Slugs) > 0 {
-		f = m.repo.Feature(intent.Slugs[0])
-	}
-	root := m.rootFor(f)
 	if root == "" {
-		// The target feature vanished from the merged repo between confirming and
-		// launching (aggregate board: m.root is "" so rootFor has no fallback). Never
-		// launch relative to the process cwd — bounce, launching nothing (REV-004).
+		// No target root captured (the feature vanished between confirm and launch, or a
+		// bare intent). Never launch relative to the process cwd — bounce, launching
+		// nothing (REV-004).
 		return func() tea.Msg {
 			return launchDoneMsg{status: "feature no longer present, nothing launched"}
 		}

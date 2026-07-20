@@ -58,18 +58,20 @@ func watchPaths(root string, repo *contract.Repo) []string {
 	return paths
 }
 
-// watchDirs is the full directory set this board watches: the single root's tree
-// in single-repo mode, or the UNION across every SOURCE root of the focused project
-// (each source's per-root path set from watchPaths, deduped). fsnotify is
-// non-recursive, so watchPaths enumerates the subdirs per root and this only unions
-// them — the project board keeps every source live.
+// watchDirs is the full directory set this board watches: the single root's tree in
+// single-repo mode, or the UNION across every SOURCE root the board spans (each source's
+// per-root path set from watchPaths, deduped). On the UNIFIED board that is EVERY
+// project's sources (capWatchSources / projects.AllSources) — a card's source may live
+// in a non-focused project, so watching only the focused project's sources left it
+// unwatched (FR5); off the unified board it is the focused project's sources. fsnotify
+// is non-recursive, so watchPaths enumerates the subdirs per root and this only unions them.
 func (m Model) watchDirs() []string {
 	if !m.global() {
 		return watchPaths(m.root, m.repo)
 	}
 	seen := map[string]bool{}
 	var out []string
-	for _, s := range m.sources() {
+	for _, s := range m.capWatchSources() {
 		for _, path := range watchPaths(s.Path, m.repo) {
 			if !seen[path] {
 				seen[path] = true

@@ -353,8 +353,8 @@ func TestDrillAttachPicker(t *testing.T) {
 		m.hasTmux = true
 		m.registry = fakeReg(nil)
 		m.sessions = []string{"gogo-go-ready", "gogo-plan-ready"} // ≥2 exact matches for "ready"
-		m.selected["ready"] = true
-		m.selected["legacy-ready"] = true
+		m.selected[selKey(m, "ready")] = true
+		m.selected[selKey(m, "legacy-ready")] = true
 
 		nm, _ := m.Update(runes("a")) // board a → attach picker (≥2)
 		m = nm.(Model)

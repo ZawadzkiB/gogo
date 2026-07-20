@@ -1,0 +1,11 @@
+{"ts":"2026-07-19T22:48:00Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"unified-board"}
+{"ts":"2026-07-20T14:00:00Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"unified-board","note":"D1-D4=A, D5=B (card shows both project+source NAMES); ship 0.23.0"}
+{"ts":"2026-07-20T15:30:00Z","event":"phase-started","phase":"review","status":"reviewing","slug":"unified-board","note":"implement green + rendered (dedup+slug-first origin tag) + 0.23.0 preview installed; fresh-eyes review"}
+{"ts":"2026-07-20T16:00:00Z","event":"review-done","phase":"review","status":"reviewing","slug":"unified-board","note":"round 1: CHANGES-REQUESTED (1 major same-slug collision + 1 nit); rest clean; routing fix to implement"}
+{"ts":"2026-07-20T16:40:00Z","event":"review-done","phase":"review","status":"reviewing","slug":"unified-board","note":"round 1 fixes verified (REV-001 same-slug launch/selection/guard + REV-002); gate green; review resolved"}
+{"ts":"2026-07-20T16:41:00Z","event":"phase-started","phase":"test","status":"testing","slug":"unified-board","note":"e2e: multi-project unified board, same-slug launch safety, FR5 cross-project cap/watch, fallbacks, design fidelity"}
+{"ts":"2026-07-20T17:20:00Z","event":"test-done","phase":"test","status":"testing","slug":"unified-board","note":"PASS live e2e; REV-001 closed live; no new issues"}
+{"ts":"2026-07-20T17:21:00Z","event":"report-done","phase":"report","status":"reporting","slug":"unified-board","note":"report written"}
+{"ts":"2026-07-20T17:22:00Z","event":"awaiting-uat","phase":"report","status":"awaiting-uat","slug":"unified-board","note":"visual UAT: gogo global across projects; accept via /gogo:done to ship 0.23.0"}
+{"ts":"2026-07-20T18:00:00Z","event":"uat-passed","phase":"done","status":"shipped","slug":"unified-board","note":"user accepted via /gogo:done"}
+{"ts":"2026-07-20T18:01:00Z","event":"shipped","phase":"done","status":"shipped","slug":"unified-board","note":"0.23.0 changelog entry written"}

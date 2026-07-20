@@ -1,0 +1,38 @@
+flowchart TD
+  subgraph store["~/.gogo/projects/ (home store)"]
+    projs["projects.List() → [projA, projB, …]"]
+    allsrc["projects.AllSources(allProjects)"]
+  end
+
+  projs --> lw["contract.LoadWorkspace(projs)"]
+
+  subgraph load["per project: LoadProject → LoadRepo per source"]
+    lw --> lp["for each project p:\nLoadProject(p) stamps f.Source + f.Root"]
+    lp --> stamp["stamp f.Project = p.Name\n(the new Feature.Project field)"]
+  end
+
+  stamp --> repo["merged *contract.Repo\nFeatures carry Project + Source + Root"]
+
+  repo --> rebuild["rebuild(): filter features"]
+  pchip["m.projectChip (all | projName)"] --> rebuild
+  ftext["free-text @token + text (AND)"] --> rebuild
+  rebuild --> cols["4 columns: plan · in progress · ready · changelog"]
+
+  cols --> card["renderCard: originTag = ●project ●source + label"]
+  cols --> clog["changelogRow: ●project ●source ✓ slug"]
+  hdr["header: N features · M projects · ⏸K · ●S"] --- card
+
+  subgraph nav["project filter + focus (FR3/FR4)"]
+    pkey["board p → cycleProjectChip"] --> pchip
+    pkey --> focus["m.project = chip's project\n(all → allProjects[0])"]
+    focus --> tabs["plans + config tabs\nread the focused project"]
+  end
+
+  allsrc --> cap["capBounce: CapForSource(AllSources, root)"]
+  allsrc --> watch["watchDirs: arm every project's source tree"]
+  repo --> cap
+
+  classDef new fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef reuse fill:#e8ecff,stroke:#7c8bd9,color:#111
+  class lw,stamp,pchip,card,clog,pkey new
+  class repo,rebuild,cols,focus,tabs,cap,watch,allsrc reuse

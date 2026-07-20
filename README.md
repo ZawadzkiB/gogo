@@ -430,10 +430,19 @@ cd cli && go build -o gogo .
   project is enough). The CLI writes ONLY `~/.gogo/` (its own data) - never a source's `.gogo/`
   pipeline state.
 - **Tabbed cockpit - board · plans · config (since 0.21.0)** - on a project board, `tab` /
-  `shift+tab` cycle three tabs: **board** (the kanban of the project's sources), **plans** (the
-  project's plan store), and **config** (per-source settings + a knowledge explorer). `p` cycles the
-  board's **source chips** (`all` + one per source) and, on the config tab, the **project switcher**.
+  `shift+tab` cycle three tabs: **board** (the kanban), **plans** (the project's plan store), and
+  **config** (per-source settings + a knowledge explorer). `p` cycles the board's **project chips**
+  (`all` + one per project) and, on the config tab, the **project switcher** - they share one focus, so
+  the plans/config tabs act on the project the board chip selects (`all` defaults to the first project).
   A lone repo with no home project shows just the single-repo board (no tabs, no chips) - byte-for-byte.
+- **Unified cross-project board (since 0.23.0)** - `gogo global` (and bare `gogo` outside a repo) opens
+  ONE **unified board across EVERY registered project** at once - each card + changelog row tagged with
+  its **`●project ●source`** origin (project color + source color, both names; a single-source project
+  named after its repo dedupes to one `●name`), the header counting every project's features, and `p`
+  cycling the **project filter** (`all → proj1 → …`). The ticket slug stays primary - a long origin tag
+  truncates/collapses rather than crushing the slug. Source narrowing
+  survives via the per-card source dot + the free-text `@name` token (which matches a **project or
+  source**). A single registered project degrades cleanly to one project chip.
 - **Plans tab + spawn (since 0.21.0)** - a **plan** is a project-scoped, hand-editable markdown file
   at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
@@ -475,7 +484,7 @@ cd cli && go build -o gogo .
 glamour view is the fallback). Keymap: `←→`/`h` columns · `↑↓`/`jk` cards ·
 `space` select · `enter` drill-in · `v` view · `w` web · `m` move · `d` ship ·
 `a` attach · `l` peek · `x` delete→trash · `tab`/`shift+tab` board·plans·config ·
-`p` source chip / project switcher · `/` filter (incl. `#plan-<id>`) · `G` glow · `q` quit.
+`p` project chip / project switcher · `/` filter (incl. `@name`, `#plan-<id>`) · `G` glow · `q` quit.
 
 **CLI companion reference** - an installed Claude also carries an on-demand
 `gogo-cli` skill (`skills/gogo-cli/SKILL.md`) documenting the full command

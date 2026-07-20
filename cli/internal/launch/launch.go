@@ -40,6 +40,11 @@ type Intent struct {
 	Release string   // release name for a merged done ("" otherwise)
 	Command string   // the claude slash command, e.g. "/gogo:done a+b+c"
 	Session string   // sanitized tmux session name, e.g. "gogo-done-my-release"
+	// Root is the repo root the launch must anchor at — the target card's OWN root,
+	// captured when the intent is built. The board threads it through so a launch never
+	// re-resolves the root by a (possibly colliding) slug on the unified board (REV-001);
+	// "" when the caller roots the launch itself (e.g. the CLI inside a repo).
+	Root string
 }
 
 // Result records what was actually launched so the TUI can surface it.

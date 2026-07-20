@@ -25,11 +25,28 @@ func src(name, path string, cap ...int) projects.Source {
 	return s
 }
 
+// selKey returns the composite selection key (featureKey = Root\x00Slug) for the first
+// feature with slug in m.repo — the workspace-unique key m.selected is keyed by after
+// REV-001. Test convenience so a test can select a card by slug.
+func selKey(m Model, slug string) string {
+	return featureKey(m.repo.Feature(slug))
+}
+
 // sizedWorkspace builds a source-native project board over an in-memory repo + a
 // focused project and gives it a render size.
 func sizedWorkspace(t *testing.T, repo *contract.Repo, p projects.Project) Model {
 	t.Helper()
 	m := NewWorkspace(repo, p)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 200, Height: 40})
+	return nm.(Model)
+}
+
+// sizedWorkspaceAll builds the UNIFIED cockpit board (0.23.0) over an in-memory MERGED
+// repo (features already carrying Project + Source, as LoadWorkspace stamps them) + the
+// full project set, and gives it a render size.
+func sizedWorkspaceAll(t *testing.T, repo *contract.Repo, projs []projects.Project) Model {
+	t.Helper()
+	m := NewWorkspaceAll(repo, projs)
 	nm, _ := m.Update(tea.WindowSizeMsg{Width: 200, Height: 40})
 	return nm.(Model)
 }
@@ -217,13 +234,13 @@ func TestAttemptActionRefusesCrossProjectShip(t *testing.T) {
 	m := NewWorkspace(repo, proj("myproj", src("projA", "/repos/a"), src("projB", "/repos/b")))
 
 	// Two roots selected (a @ /repos/a, b @ /repos/b) → refused, no ship intent.
-	m.selected = map[string]bool{"a": true, "b": true}
+	m.selected = map[string]bool{selKey(m, "a"): true, selKey(m, "b"): true}
 	if _, isShip, bounce := m.attemptAction(true); isShip || bounce == "" {
 		t.Errorf("cross-source ship: isShip=%v bounce=%q, want refused with a bounce", isShip, bounce)
 	}
 
 	// Same-source multi-select (a + c, both @ /repos/a) → still ships as a merge.
-	m.selected = map[string]bool{"a": true, "c": true}
+	m.selected = map[string]bool{selKey(m, "a"): true, selKey(m, "c"): true}
 	in, isShip, bounce := m.attemptAction(true)
 	if !isShip || bounce != "" {
 		t.Fatalf("same-source ship: isShip=%v bounce=%q, want a clean ship", isShip, bounce)

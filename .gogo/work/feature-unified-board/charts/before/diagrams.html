@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams — unified-board (before)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams — <code>unified-board (before)</code></h1>
+    <p class="hint">Offline viewer · mermaid is vendored with the plugin (no network, no CLI) · regenerate via the gogo-mermaid skill.</p>
+  </header>
+
+  <h2>Before (as-is): single-project board</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  projs["projects.List() → [projA, projB, …]"]
+  projs --> pick["chooseBoard / globalBoard\nNewProjectBoard(projs[0])  ← FIRST project only"]
+  pick --> focus["m.project = projs[0]\nm.allProjects = all (header count only)"]
+
+  focus --> lp["contract.LoadProject(m.project)\naggregates ONE project's sources"]
+  lp --> repo["*contract.Repo\nFeatures carry Source + Root (NO Project field)"]
+
+  repo --> rebuild["rebuild(): filter"]
+  schip["m.sourceChip (all | source) — board p cycles SOURCE"] --> rebuild
+  rebuild --> cols["4 columns"]
+  cols --> card["renderCard: sourceTag = ● source (single dot)"]
+  cols --> clog["changelogRow: ● source ✓ slug (single dot)"]
+  hdr["header: N features (ONE project) · M projects (all)  ← mismatch"] --- card
+
+  focus --> cap["capBounce: CapForSource(m.sources(), root)\n← only the focused project's sources"]
+  focus --> watch["watchDirs: only focused project's source trees"]
+
+  cfgp["config tab p → switchProject\nre-aggregates to ONE other project"] --> focus
+
+  classDef gap fill:#ffe0e0,stroke:#d98a8a,color:#111
+  class pick,hdr,cap,watch gap
+</pre></div>
+
+  <script src="../../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

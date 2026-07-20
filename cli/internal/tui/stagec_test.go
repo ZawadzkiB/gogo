@@ -182,8 +182,8 @@ func TestDeleteCancelKeepsCard(t *testing.T) {
 func TestDeleteCancelPreservesSelection(t *testing.T) {
 	// --- Esc path ---
 	m := newModel(t)
-	m.selected["ready"] = true
-	m.selected["legacy-ready"] = true
+	m.selected[selKey(m, "ready")] = true
+	m.selected[selKey(m, "legacy-ready")] = true
 	m.colIdx = 0 // a plan (work) card — deletable, not the changelog column
 	nm, _ := m.deleteFocused()
 	m = nm.(Model)
@@ -200,8 +200,8 @@ func TestDeleteCancelPreservesSelection(t *testing.T) {
 
 	// --- Cancel-button path (n → finishDelete, confirmed=false) ---
 	m2 := newModel(t)
-	m2.selected["ready"] = true
-	m2.selected["legacy-ready"] = true
+	m2.selected[selKey(m2, "ready")] = true
+	m2.selected[selKey(m2, "legacy-ready")] = true
 	m2.colIdx = 0
 	nm, _ = m2.deleteFocused()
 	m2 = nm.(Model)

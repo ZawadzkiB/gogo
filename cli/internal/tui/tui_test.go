@@ -176,8 +176,8 @@ func TestAttemptActionGuards(t *testing.T) {
 
 func TestAttemptActionMergedShip(t *testing.T) {
 	m := newModel(t)
-	m.selected["ready"] = true
-	m.selected["legacy-ready"] = true
+	m.selected[selKey(m, "ready")] = true
+	m.selected[selKey(m, "legacy-ready")] = true
 	in, ship, bounce := m.attemptAction(false)
 	if bounce != "" || !ship {
 		t.Fatalf("merged ship bounce=%q ship=%v", bounce, ship)
@@ -668,8 +668,8 @@ func TestFormSingleConfirmLaunches(t *testing.T) {
 // single-argv merged command.
 func TestFormMergedReleaseLaunches(t *testing.T) {
 	m, rl := launchable(t)
-	m.selected["ready"] = true
-	m.selected["legacy-ready"] = true
+	m.selected[selKey(m, "ready")] = true
+	m.selected[selKey(m, "legacy-ready")] = true
 
 	nm, _ := m.Update(runes("d"))
 	m = nm.(Model)
@@ -703,8 +703,8 @@ func TestFormMergedReleaseLaunches(t *testing.T) {
 // abandoned target list.
 func TestFormAbortClearsSelectionNoRelaunch(t *testing.T) {
 	m, rl := launchable(t)
-	m.selected["ready"] = true
-	m.selected["legacy-ready"] = true
+	m.selected[selKey(m, "ready")] = true
+	m.selected[selKey(m, "legacy-ready")] = true
 
 	nm, _ := m.Update(runes("d"))
 	m = nm.(Model)
@@ -740,8 +740,8 @@ func TestFormAbortClearsSelectionNoRelaunch(t *testing.T) {
 // no launch and a cleared selection.
 func TestFormEscAborts(t *testing.T) {
 	m, rl := launchable(t)
-	m.selected["ready"] = true
-	m.selected["legacy-ready"] = true
+	m.selected[selKey(m, "ready")] = true
+	m.selected[selKey(m, "legacy-ready")] = true
 
 	nm, _ := m.Update(runes("d"))
 	m = nm.(Model)

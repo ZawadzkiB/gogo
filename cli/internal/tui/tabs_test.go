@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
+	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -67,54 +68,64 @@ func TestPlansTabScaffold(t *testing.T) {
 	}
 }
 
-// TestSourceChipNarrows (FR7): `p` cycles the board source chip and rebuild narrows
-// the columns to that one source; the chips render on the board.
-func TestSourceChipNarrows(t *testing.T) {
+// TestProjectChipNarrows (FR3, D3=A): `p` cycles the board PROJECT chip and rebuild
+// narrows the columns to that one project; the chip row renders on the unified board;
+// and per D4 the chip moves the shared focus (m.project), defaulting back to
+// allProjects[0] on "all".
+func TestProjectChipNarrows(t *testing.T) {
 	repo := &contract.Repo{Features: []*contract.Feature{
-		{Slug: "a", Title: "A", Source: "projA", Root: "/r/a", Class: contract.ClassUnfinished, Status: "plan-accepted"},
-		{Slug: "b", Title: "B", Source: "projB", Root: "/r/b", Class: contract.ClassUnfinished, Status: "plan-accepted"},
+		{Slug: "a", Title: "A", Project: "alpha", Source: "web", Root: "/r/a", Class: contract.ClassUnfinished, Status: "plan-accepted"},
+		{Slug: "b", Title: "B", Project: "beta", Source: "api", Root: "/r/b", Class: contract.ClassUnfinished, Status: "plan-accepted"},
 	}}
-	m := sizedWorkspace(t, repo, proj("app", src("projA", "/r/a"), src("projB", "/r/b")))
+	projs := []projects.Project{proj("alpha", src("web", "/r/a")), proj("beta", src("api", "/r/b"))}
+	m := sizedWorkspaceAll(t, repo, projs)
 
-	// Both sources visible → both plan cards.
+	// Both projects visible → both plan cards.
 	if len(m.cols[0]) != 2 {
 		t.Fatalf("all-chip plan column = %d, want 2", len(m.cols[0]))
 	}
-	if !strings.Contains(m.View(), "sources") {
-		t.Errorf("board missing the source chips row:\n%s", m.View())
+	if !strings.Contains(m.View(), "project") {
+		t.Errorf("board missing the project chips row:\n%s", m.View())
 	}
 
-	// p → narrow to projA (the first source chip after "all").
+	// p → narrow to alpha (the first project chip after "all") + move the focus (D4).
 	m = send(m, runes("p"))
-	if m.sourceChip != "projA" {
-		t.Fatalf("after p sourceChip = %q, want projA", m.sourceChip)
+	if m.projectChip != "alpha" {
+		t.Fatalf("after p projectChip = %q, want alpha", m.projectChip)
 	}
 	if len(m.cols[0]) != 1 || m.cols[0][0].Slug != "a" {
 		t.Errorf("narrowed plan column = %v, want just [a]", m.cols[0])
 	}
+	if m.project == nil || m.project.Name != "alpha" {
+		t.Errorf("p did not move the shared focus to alpha: %v", m.project)
+	}
 
-	// p → projB, then p → back to all (empty chip).
+	// p → beta, then p → back to all (empty chip → focus defaults to allProjects[0]).
 	m = send(m, runes("p"))
-	if m.sourceChip != "projB" || len(m.cols[0]) != 1 || m.cols[0][0].Slug != "b" {
-		t.Errorf("after 2×p: chip=%q cols=%v, want projB → [b]", m.sourceChip, m.cols[0])
+	if m.projectChip != "beta" || len(m.cols[0]) != 1 || m.cols[0][0].Slug != "b" {
+		t.Errorf("after 2×p: chip=%q cols=%v, want beta → [b]", m.projectChip, m.cols[0])
 	}
 	m = send(m, runes("p"))
-	if m.sourceChip != "" || len(m.cols[0]) != 2 {
-		t.Errorf("after 3×p: chip=%q cols=%d, want all → 2", m.sourceChip, len(m.cols[0]))
+	if m.projectChip != "" || len(m.cols[0]) != 2 {
+		t.Errorf("after 3×p: chip=%q cols=%d, want all → 2", m.projectChip, len(m.cols[0]))
+	}
+	if m.project == nil || m.project.Name != "alpha" {
+		t.Errorf("all-chip did not default the focus to allProjects[0] (alpha): %v", m.project)
 	}
 }
 
-// TestSingleRepoParity is the FR7 hard invariant: a lone repo with no home project
-// renders the single-repo board byte-for-byte — NO tab bar, NO source chips, NO
-// project-count note, and NO source tags leak in. The tab key is inert.
+// TestSingleRepoParity is the FR5 hard invariant: a lone repo with no home project
+// renders the single-repo board byte-for-byte — NO tab bar, NO project chips, NO
+// project-count note, and NO origin tags leak in. The tab key is inert.
 func TestSingleRepoParity(t *testing.T) {
 	m := newModel(t) // New(fixtureRoot) — a lone repo, m.root != ""
 	if m.global() {
 		t.Fatalf("single-repo board must not be global")
 	}
 	out := m.View()
-	// The tab bar's non-board labels must be absent (no tabs on a lone repo).
-	for _, leak := range []string{"plans", "config", "sources ", "· 0 project", "· 1 project"} {
+	// The tab bar's non-board labels + the project chip row must be absent (no tabs /
+	// chips on a lone repo).
+	for _, leak := range []string{"plans", "config", "project ", "· 0 project", "· 1 project"} {
 		if strings.Contains(out, leak) {
 			t.Errorf("single-repo board leaked tabbed chrome %q:\n%s", leak, out)
 		}
@@ -124,13 +135,13 @@ func TestSingleRepoParity(t *testing.T) {
 	if m.tab != tabBoard {
 		t.Errorf("tab moved the tab on a lone repo (tab=%d), want inert board", m.tab)
 	}
-	// No source tag prefix on any card (features carry no Source in single-repo mode).
+	// No origin tag prefix on any card (features carry no Project/Source in single-repo).
 	if strings.Contains(out, "● proj") {
-		t.Errorf("single-repo card leaked a source tag:\n%s", out)
+		t.Errorf("single-repo card leaked an origin tag:\n%s", out)
 	}
-	// p (source chip cycle) is a no-op on a lone repo.
+	// p (project chip cycle) is a no-op on a lone repo.
 	m = send(m, runes("p"))
-	if m.sourceChip != "" {
-		t.Errorf("p set a source chip on a lone repo: %q", m.sourceChip)
+	if m.projectChip != "" {
+		t.Errorf("p set a project chip on a lone repo: %q", m.projectChip)
 	}
 }

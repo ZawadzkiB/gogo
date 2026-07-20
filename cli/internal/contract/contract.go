@@ -64,6 +64,14 @@ type Feature struct {
 	// Project as part of the corrected project→sources model (a card is tagged by its
 	// source, not a flat repo-project).
 	Source string
+	// Project is the home PROJECT this feature's source belongs to — stamped once by
+	// LoadWorkspace when it merges every project's sources into the unified cockpit
+	// board (0.23.0). "" in single-repo mode AND in the single-project LoadProject view
+	// (only the multi-project workspace merge knows the project), so the two-dot
+	// `●project ●source` origin cue degrades to a single source dot there (byte-for-byte
+	// parity). Presentation-only: it drives the card/changelog origin tag + the project
+	// chip filter, never a .gogo write or a pipeline-state mutation.
+	Project string
 	// Correlations are the plan ids (plan-<hash>) this work item belongs to — read
 	// DIRECTLY from state.md's additive optional `correlation:` list by the parser
 	// (FR13/L1), NOT a CLI-side overlay. Many-to-many: a ticket in two plans carries
@@ -238,6 +246,33 @@ func LoadProject(p projects.Project) *Repo {
 			agg.Features = append(agg.Features, f)
 		}
 		agg.Changelog = append(agg.Changelog, repo.Changelog...)
+	}
+	sortFeaturesNewestFirst(agg.Features)
+	return agg
+}
+
+// LoadWorkspace builds the UNIFIED cockpit board across EVERY registered project (the
+// multi-project aggregate, 0.23.0): it calls the existing per-project LoadProject(p)
+// once per project — no fork of the reader, since LoadProject already stamps each
+// Feature's Source + Root — then stamps f.Project = p.Name on every returned feature
+// and merges all features + changelog into ONE newest-first *Repo with an empty Root
+// (each Feature carries its own project + source + root — everything the tags, the
+// project filter, and rootFor need). A project with no readable sources contributes
+// nothing (skipped gracefully, never a crash) — the defensive reader style. This is
+// presentation/aggregation ONLY: no .gogo contract-file change, no pipeline-state
+// mutation, no LLM in the read path.
+func LoadWorkspace(projs []projects.Project) *Repo {
+	agg := &Repo{}
+	for _, p := range projs {
+		one := LoadProject(p)
+		if one == nil {
+			continue
+		}
+		for _, f := range one.Features {
+			f.Project = p.Name // Source + Root already stamped by LoadProject/LoadRepo
+			agg.Features = append(agg.Features, f)
+		}
+		agg.Changelog = append(agg.Changelog, one.Changelog...)
 	}
 	sortFeaturesNewestFirst(agg.Features)
 	return agg

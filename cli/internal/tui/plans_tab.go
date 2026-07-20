@@ -104,6 +104,13 @@ func (m *Model) spawnedFeature(sourceName, planID string) *contract.Feature {
 		if f.Source != sourceName {
 			continue
 		}
+		// On the unified board a source NAME can collide across projects (m.repo spans
+		// every project), so scope the member lookup to the FOCUSED project — a same-named
+		// source in another project must not match (REV-002). A feature with no Project
+		// (the single-project seam, where m.repo is already one project's) is inert here.
+		if f.Project != "" && m.project != nil && f.Project != m.project.Name {
+			continue
+		}
 		for _, id := range f.Correlations {
 			if id == planID {
 				return f
@@ -646,4 +653,11 @@ func containsString(ss []string, want string) bool {
 // FR2), dropping the old grey "no color" fallback.
 func (m Model) sourceDot(sourceName string) string {
 	return lipgloss.NewStyle().Foreground(m.sourceColor(sourceName)).Render("●")
+}
+
+// projectDot is the small colored origin dot the board project-filter chips prefix a
+// project with — always the project's never-blank palette color (FR3), mirroring
+// sourceDot over the project palette.
+func (m Model) projectDot(projectName string) string {
+	return lipgloss.NewStyle().Foreground(m.projectColor(projectName)).Render("●")
 }

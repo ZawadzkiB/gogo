@@ -202,9 +202,9 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filtering = true
 		m.status = "filter: type to narrow · enter keeps · esc clears"
 	case "p":
-		// FR7: cycle the board's source filter chip (all → source-1 → … → all). A
-		// no-op on a lone repo / a project with a single source.
-		m.cycleChip(1)
+		// FR3 (D3=A): cycle the board's PROJECT filter chip (all → proj-1 → … → all) and
+		// move the shared focus to the chip's project (D4). A no-op off the unified board.
+		m.cycleProjectChip(1)
 	case "enter":
 		if f := m.focusedCard(); f != nil {
 			m.openDrill(f)
@@ -242,10 +242,11 @@ func (m *Model) toggleSelect() {
 		m.status = "select only ready cards (space) — this card is " + f.Class
 		return
 	}
-	if m.selected[f.Slug] {
-		delete(m.selected, f.Slug)
+	key := featureKey(f)
+	if m.selected[key] {
+		delete(m.selected, key)
 	} else {
-		m.selected[f.Slug] = true
+		m.selected[key] = true
 	}
 	m.status = ""
 }

@@ -1,0 +1,30 @@
+{
+  "slug": "unified-board",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-20",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "Duplicate feature slug across projects mis-routes launches and collides selection on the unified board",
+      "description": "On the unified board a feature's identity is its Slug ALONE, but a slug is unique only per-source, not across the merged workspace — so two projects that each own a feature with the same slug collide. Three verified manifestations (empirically reproduced with a throwaway test): (1) SILENT WRONG-REPO LAUNCH — doLaunch (cli/internal/tui/move.go:203-206) re-resolves the launch root via m.repo.Feature(intent.Slugs[0]), which returns the FIRST feature matching the slug (contract.go:282-289), NOT the focused card. Focusing project beta's card (Root /r/b) and pressing d (ship) or m (go/accept) launches /gogo:done | /gogo:go in project alpha's repo (/r/a) instead. The huh confirm (move.go:181-188 confirmSummary) shows no repo path, so the user cannot catch it — a state-mutating action runs against the wrong repo/feature. (2) SELECTION COLLISION — m.selected is keyed by f.Slug (model.go:176, update.go:245-248, view.go:611); one space toggle marks BOTH same-slug cards selected, and the user cannot select just one. (3) CROSS-PROJECT SHIP GUARD DEFEATED — selectionSpansProjects (move.go:85-101) resolves each selected slug via m.repo.Feature and collapses the same-slug pair to a single feature, so it returns false and the plan's stated safety net (\"Out of scope: cross-project merged ship stays refused by the existing selectionSpansProjects bounce\") does NOT fire. Also: LoadWorkspace does not dedup a repo that is a Source in >=2 projects, so such a repo's features appear as duplicate cards (same slug+root, different Project stamp); the concurrency cap is NOT inflated (orchestrator.ActiveWorkSlugs dedups by slug), but the board shows doubles. The pattern predates 0.23.0 (a single-project multi-source board could collide too) but the unified board makes collisions likely — independent projects commonly reuse slug names, and a shared repo can be registered under two projects. The plan flagged this as THE highest-risk area; the implementation left selection/launch keyed by slug alone and added no dup-slug test.",
+      "proposed_solution": "AGENT-FIXABLE. Minimal, high-value fix first: root every launch from the FOCUSED card's OWN resolved root instead of re-resolving by slug — carry rootFor(focusedCard) (or the feature pointer) through startForm/doLaunch so a single-card d/m never lands in another project's repo. Then make feature identity composite on the board: key m.selected by a stable composite (e.g. f.Root+\"\\x00\"+f.Slug) and update toggleSelect (update.go:245-248), selectedSlugs (model.go:643-652), the selected check in renderCard (view.go:611), and selectionSpansProjects/attemptAction/doLaunch (move.go) to resolve features by that composite — so same-slug cards select independently and the cross-project ship guard holds. Optionally dedup LoadWorkspace output when the same Root appears under multiple projects (or accept the double-card and document it). Add a test covering two projects with an identical ready-to-ship slug: assert (a) a focused-card ship roots at the focused card's Root, (b) one toggle selects exactly one card, (c) a selection spanning the two projects bounces. If the team prefers to defer the multi-select composite-key rework, the single-card mis-route (manifestation 1) must still be fixed now — it silently mutates the wrong repo.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "new",
+      "origin": "review",
+      "found_in_round": 1
+    },
+    {
+      "id": "REV-002",
+      "title": "plans-tab spawnedFeature matches by source-name only across the merged repo (not project-scoped)",
+      "description": "spawnedFeature (cli/internal/tui/plans_tab.go:99-114) scans the whole merged m.repo.Features and matches on f.Source == sourceName plus a correlation-id match. On the unified board m.repo.Features now holds EVERY project's features, and D3=A explicitly notes source labels collide across projects (two projects can both have a source named e.g. \"web\"). The lookup is not constrained to the focused project's roots, so it relies entirely on plan-id uniqueness to avoid cross-project mismatch. In practice plan ids are hash-based (plan-<hash>) and effectively unique, so the mismatch is very unlikely to trigger today — hence a nit — but the query is no longer correctly scoped to the focused project it belongs to.",
+      "proposed_solution": "AGENT-FIXABLE. Constrain the match to the focused project — e.g. also require f.Project == m.project.Name (or match against the focused project's source Roots) so a same-named source in another project can never be picked up regardless of any future plan-id overlap. One-line hardening; keeps the plans tab strictly project-scoped.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "new",
+      "origin": "review",
+      "found_in_round": 1
+    }
+  ]
+}
