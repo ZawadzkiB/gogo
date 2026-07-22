@@ -2,15 +2,17 @@ package tui
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/launch"
 	"github.com/ZawadzkiB/gogo/cli/internal/plans"
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 )
 
 // TestPlansTabListRendersGrouped: the plans tab lists the project's plans grouped by
@@ -147,17 +149,107 @@ func TestPlanListNewAndDelete(t *testing.T) {
 	}
 }
 
-// TestPlanWithClaudeMintsAndFires pins the FR-D `A` plan-with-claude authoring
-// trigger (REV-002): it MINTS a fresh draft plan up front (so its plan-<hash> exists)
-// and fires the launcher seam EXACTLY ONCE with a PLAIN authoring intent — a prompt
-// referencing the CLI-owned plan-file path + the correlation id, and explicitly NOT a
-// /gogo:plan slash command and NOT a --correlation flag (that skill would scaffold a
-// source work item). The session is anchored at the project's FIRST SOURCE root (a
-// trusted repo), never the untrusted ~/.gogo/ home; no real claude/tmux spawn.
-func TestPlanWithClaudeMintsAndFires(t *testing.T) {
+// TestPlanNewCapturesDescription pins the 0.25.1 description gap: the `n` quick-draft form
+// captures a DESCRIPTION (not only a title), plans.New persists it, and the plan detail
+// RENDERS it (no longer the "no description" placeholder).
+func TestPlanNewCapturesDescription(t *testing.T) {
+	seedDataHome(t)
+	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("svc", "/r/svc")))
+	m = tab(m) // → plans
+
+	m = send(m, runes("n"))
+	if m.mode != modeForm || !m.pendingPlan {
+		t.Fatalf("n did not open the new-plan form (mode=%d pendingPlan=%v)", m.mode, m.pendingPlan)
+	}
+	// Fill the heap-stable binding (TEST-001): title + the new description field.
+	m.binding.planTitle = "Auth rework"
+	m.binding.planDesc = "Rework the auth flow across web and api."
+	nm, _ := m.finishPlanForm()
+	m = nm.(Model)
+
+	got, _ := plans.List("app")
+	if len(got) != 1 || strings.TrimSpace(got[0].Description) != "Rework the auth flow across web and api." {
+		t.Fatalf("n did not persist the description: %+v", got)
+	}
+	// The plan detail renders the actual description (not the placeholder).
+	m.planIdx = 0
+	det := send(m, tea.KeyMsg{Type: tea.KeyEnter}).View()
+	if !strings.Contains(det, "Rework the auth flow across web and api.") {
+		t.Errorf("plan detail did not render the description:\n%s", det)
+	}
+	if strings.Contains(det, "no description") {
+		t.Errorf("plan detail still shows the no-description placeholder despite a set description:\n%s", det)
+	}
+}
+
+// authWithClaude drives the plans-tab `A` goal form to completion (0.25.1): press A (opens
+// the form, mints NOTHING yet), fill the heap-stable binding (TEST-001), complete via
+// finishPlanWithClaude, run the returned launch cmd, and feed the resulting message back
+// through Update so the attach (or the no-tmux headless status) lands. Returns the final
+// model, the launch cmd's message, and the launch cmd (nil when goal was empty/cancelled).
+func authWithClaude(t *testing.T, m Model, goal, title string) (Model, tea.Msg) {
+	t.Helper()
+	nm, cmd := m.Update(runes("A"))
+	m = nm.(Model)
+	if !m.pendingPlanWithClaude || m.mode != modeForm {
+		t.Fatalf("A did not open the goal form (mode=%d pending=%v)", m.mode, m.pendingPlanWithClaude)
+	}
+	if cmd == nil {
+		t.Fatal("A returned no form-init cmd")
+	}
+	m.binding.planGoal = goal
+	m.binding.planTitle = title
+	fm, lcmd := m.finishPlanWithClaude()
+	m = fm.(Model)
+	if lcmd == nil {
+		return m, nil // empty goal / cancel — nothing launched
+	}
+	msg := lcmd() // fires the launcher exactly once
+	nm2, _ := m.Update(msg)
+	return nm2.(Model), msg
+}
+
+// TestPlanWithClaudeOpensGoalForm pins the 0.25.1 bug-1 fix: `A` opens a GOAL form and
+// mints NOTHING up front (no blank "Untitled plan"), and does NOT fire the launcher until
+// the goal is submitted.
+func TestPlanWithClaudeOpensGoalForm(t *testing.T) {
 	seedDataHome(t)
 	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/repos/web")))
-	m.hasClaude = true // deterministic — the spawn guard must not bounce on a CI box without claude
+	m.hasClaude = true
+	m.tab = tabPlans
+	fired := false
+	m.launcher = func(string, launch.Intent) (launch.Result, error) { fired = true; return launch.Result{}, nil }
+
+	nm, cmd := m.Update(runes("A"))
+	m = nm.(Model)
+	if !m.pendingPlanWithClaude || m.mode != modeForm {
+		t.Fatalf("A did not open the goal form (mode=%d pending=%v)", m.mode, m.pendingPlanWithClaude)
+	}
+	if cmd == nil {
+		t.Error("A returned no form-init cmd")
+	}
+	// The form is open — NOTHING minted and NOTHING launched yet (no blank draft).
+	if list, _ := plans.List("app"); len(list) != 0 {
+		t.Errorf("A minted a plan before the goal was given: %+v", list)
+	}
+	if fired {
+		t.Error("A fired the launcher before the goal was submitted")
+	}
+	if out := m.View(); !strings.Contains(out, "goal") {
+		t.Errorf("goal form did not render a goal prompt:\n%s", out)
+	}
+}
+
+// TestPlanWithClaudeSubmitMintsSeedsAndAttaches pins the 0.25.1 fix end-to-end: submitting
+// the goal form mints a draft whose DESCRIPTION IS THE GOAL (never blank), fires the
+// launcher EXACTLY ONCE with a PLAIN AuthorPlanIntent that NAMES the goal (and the plan
+// path / correlation / knowledge / source paths, no --correlation flag), anchored at the
+// first source root — and, because the launcher returned a session name, ATTACHES the user
+// into it (the "attaching <session>" observable). No real claude/tmux spawn.
+func TestPlanWithClaudeSubmitMintsSeedsAndAttaches(t *testing.T) {
+	seedDataHome(t)
+	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/repos/web")))
+	m.hasClaude = true
 	m.tab = tabPlans
 
 	var calls int
@@ -169,119 +261,149 @@ func TestPlanWithClaudeMintsAndFires(t *testing.T) {
 		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
 	}
 
-	if list, _ := plans.List("app"); len(list) != 0 {
-		t.Fatalf("expected no plans before A, got %d", len(list))
-	}
+	const goal = "Migrate the shared token store to the new auth service"
+	m, _ = authWithClaude(t, m, goal, "") // blank title → derived from the goal
 
-	nm, cmd := m.Update(runes("A"))
-	m = nm.(Model)
-	if cmd == nil {
-		t.Fatal("`A` returned a nil cmd — no authoring session was scheduled")
-	}
-	// Executing the returned cmd is what fires the launcher (fire-exactly-once).
-	if _, ok := cmd().(launchDoneMsg); !ok {
-		t.Fatal("plan-with-claude cmd did not resolve to a launchDoneMsg")
-	}
 	if calls != 1 {
 		t.Fatalf("launcher fired %d times, want exactly 1", calls)
 	}
 
-	// A fresh DRAFT plan was minted up front.
+	// Exactly one DRAFT minted, its description == the goal (never blank), title derived.
 	list, _ := plans.List("app")
 	if len(list) != 1 || list[0].Status != plans.StatusDraft {
 		t.Fatalf("A did not mint exactly one draft plan: %+v", list)
 	}
-	id := list[0].ID
-
-	if gotIntent.Action != launch.ActionAuthor {
-		t.Errorf("intent action = %v, want ActionAuthor (a plain authoring session)", gotIntent.Action)
+	p := list[0]
+	if strings.TrimSpace(p.Description) != goal {
+		t.Errorf("plan description = %q, want the goal %q (never blank)", p.Description, goal)
 	}
-	// A PLAIN authoring prompt — NOT a slash-command launch, and NOT a --correlation flag.
+	if p.Title == "" || p.Title == "Untitled plan" {
+		t.Errorf("plan title = %q, want a title derived from the goal (not blank/Untitled)", p.Title)
+	}
+
+	// The seed is a PLAIN prompt naming the goal — never a slash command / --correlation flag.
+	if gotIntent.Action != launch.ActionAuthor {
+		t.Errorf("intent action = %v, want ActionAuthor", gotIntent.Action)
+	}
 	if strings.HasPrefix(gotIntent.Command, "/") {
-		t.Errorf("command = %q, must be a plain prompt, not a slash-command launch (e.g. /gogo:plan scaffolds a source work item)", gotIntent.Command)
+		t.Errorf("command = %q, must be a plain prompt (not a slash command)", gotIntent.Command)
 	}
 	if strings.Contains(gotIntent.Command, "--correlation") {
-		t.Errorf("command = %q, must NOT carry a --correlation flag (a plain session, not a spawn)", gotIntent.Command)
+		t.Errorf("command = %q, must NOT carry a --correlation flag", gotIntent.Command)
 	}
-	// It references the plan file path + the correlation id (in prose).
-	if !strings.Contains(gotIntent.Command, plans.Path("app", id)) {
-		t.Errorf("command = %q, want it to reference the plan file path %q", gotIntent.Command, plans.Path("app", id))
+	// The GOAL is NAMED in the prompt (bug-2: the analyst plans FOR THE GOAL).
+	if !strings.Contains(gotIntent.Command, goal) {
+		t.Errorf("command = %q, want it to NAME the user's goal %q", gotIntent.Command, goal)
 	}
-	if !strings.Contains(gotIntent.Command, id) {
-		t.Errorf("command = %q, want it to reference the correlation id %s", gotIntent.Command, id)
+	for _, want := range []string{plans.Path("app", p.ID), p.ID, projects.KnowledgeDir("app"), "gogo-project-plan", "/repos/web"} {
+		if !strings.Contains(gotIntent.Command, want) {
+			t.Errorf("command = %q, want it to reference %q", gotIntent.Command, want)
+		}
 	}
-	// FR2 author-read: the seed references the project's cross-repo .knowledge/ dir so
-	// the whole-domain context flows into the brief (and each spawned work item's goal).
-	if !strings.Contains(gotIntent.Command, projects.KnowledgeDir("app")) {
-		t.Errorf("command = %q, want it to reference the project .knowledge/ path %q (FR2 author-read)",
-			gotIntent.Command, projects.KnowledgeDir("app"))
-	}
-	// 0.25.0 FR1: the analyst seed directs the session to the gogo-project-plan skill AND
-	// carries each source's absolute PATH (not just its label) so it can READ the repos.
-	if !strings.Contains(gotIntent.Command, "gogo-project-plan") {
-		t.Errorf("command = %q, want the gogo-project-plan skill directive (0.25.0 FR1)", gotIntent.Command)
-	}
-	if !strings.Contains(gotIntent.Command, "/repos/web") {
-		t.Errorf("command = %q, want it to carry the source PATH /repos/web (analyst reads the repo)", gotIntent.Command)
-	}
-	// Anchored at the project's FIRST SOURCE root (trusted repo), never the ~/.gogo home.
+	// Anchored at the first source root (trusted repo), never the ~/.gogo home.
 	if gotRoot != "/repos/web" {
-		t.Errorf("anchored at %q, want the first source root /repos/web (never the ~/.gogo home)", gotRoot)
+		t.Errorf("anchored at %q, want the first source root /repos/web", gotRoot)
 	}
-	if gotRoot == projects.Dir("app") {
-		t.Errorf("anchored at the untrusted project home %q — must anchor at a source root", gotRoot)
+	// The whole prompt is ONE trailing argv element (injection-safe even with the goal's spaces).
+	if argv := launch.TmuxNewSessionArgs(gotRoot, gotIntent); argv[len(argv)-1] != gotIntent.Command {
+		t.Errorf("author prompt was split across argv: last element = %q", argv[len(argv)-1])
+	}
+	// Bug-2 fix: a session name came back → the TUI ATTACHED the user in (status observable).
+	if !strings.Contains(m.status, "attaching "+gotIntent.Session) {
+		t.Errorf("status = %q, want it to attach the analyst session %q", m.status, gotIntent.Session)
 	}
 }
 
-// TestPlanWithClaudePersistsDraftBeforeLaunch (cockpit-colors extra check): the `A`
-// trigger must persist the draft plan to disk (plans.New writes
-// ~/.gogo/projects/<name>/.gogo/plans/<id>.md) SYNCHRONOUSLY — before, and independent
-// of, the launcher cmd ever running. This pins the "author sessions launched but the
-// plans dir was empty" report: the draft is on disk the instant `A` returns, whether or
-// not the launch cmd is later executed.
-func TestPlanWithClaudePersistsDraftBeforeLaunch(t *testing.T) {
+// TestPlanWithClaudeCancelMintsNothing pins the 0.25.1 cancel path: an empty goal (or an
+// Esc-cancel) mints NO plan and fires NO launcher — no half-authored blank draft is left.
+func TestPlanWithClaudeCancelMintsNothing(t *testing.T) {
 	seedDataHome(t)
 	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/repos/web")))
 	m.hasClaude = true
 	m.tab = tabPlans
+	fired := false
+	m.launcher = func(string, launch.Intent) (launch.Result, error) { fired = true; return launch.Result{}, nil }
 
-	launched := 0
-	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
-		launched++
-		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
+	// Submit with an empty goal → treated as cancel (nothing minted, nothing launched).
+	m, msg := authWithClaude(t, m, "", "")
+	if msg != nil {
+		t.Errorf("empty-goal submit scheduled a launch (%v), want none", msg)
+	}
+	if fired {
+		t.Error("empty-goal submit fired the launcher")
+	}
+	if list, _ := plans.List("app"); len(list) != 0 {
+		t.Errorf("empty-goal submit minted a plan: %+v", list)
 	}
 
-	nm, cmd := m.Update(runes("A"))
+	// Esc-cancel of the open form also mints nothing.
+	nm, _ := m.Update(runes("A"))
 	m = nm.(Model)
-
-	// The draft is minted + persisted before the launcher cmd runs.
-	list, _ := plans.List("app")
-	if len(list) != 1 {
-		t.Fatalf("A did not persist a draft before launch: %d plans on disk", len(list))
+	m = send(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.pendingPlanWithClaude {
+		t.Error("Esc did not clear the pending A form")
 	}
-	id := list[0].ID
-	if _, err := os.Stat(plans.Path("app", id)); err != nil {
-		t.Errorf("plan file %s not on disk before launch: %v", plans.Path("app", id), err)
-	}
-	if launched != 0 {
-		t.Errorf("launcher already ran (%d) — the draft must persist independent of the launch", launched)
-	}
-	// The launch is still scheduled (fire-once) when its cmd is executed.
-	if cmd == nil {
-		t.Fatal("A returned no launch cmd")
-	}
-	if _, ok := cmd().(launchDoneMsg); !ok {
-		t.Fatal("A cmd did not resolve to a launchDoneMsg")
-	}
-	if launched != 1 {
-		t.Errorf("launcher fired %d times, want exactly 1", launched)
+	if list, _ := plans.List("app"); len(list) != 0 {
+		t.Errorf("Esc-cancel minted a plan: %+v", list)
 	}
 }
 
-// TestPlanWithClaudeFallsBackToProjectHome pins the rare no-sources case (REV-002): a
-// project with zero sources has no trusted repo to anchor at, so the author session
-// falls back to the project home (with a note) — still a plain authoring intent, no
-// /gogo:plan, no source `.gogo/work/`.
+// TestPlanWithClaudeNoTmuxHeadless pins the no-tmux fallback (0.25.1): when the launcher
+// returns no session name (backgrounded `claude -p`), the TUI does NOT attempt an attach —
+// it surfaces the headless status so the user knows the analyst is running in the background.
+func TestPlanWithClaudeNoTmuxHeadless(t *testing.T) {
+	seedDataHome(t)
+	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/repos/web")))
+	m.hasClaude = true
+	m.tab = tabPlans
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		// No tmux → background mode: no Session name.
+		return launch.Result{Mode: "background", LogPath: "/tmp/author.log", Command: in.Command}, nil
+	}
+
+	m, _ = authWithClaude(t, m, "Add a rate limiter across the gateway sources", "")
+	if strings.Contains(m.status, "attaching") {
+		t.Errorf("no-tmux path attempted an attach: %q", m.status)
+	}
+	if !strings.Contains(m.status, "no tmux") || !strings.Contains(m.status, "headless") {
+		t.Errorf("status = %q, want the no-tmux headless note", m.status)
+	}
+	// REV-006: the headless status NAMES the background log path so a stalled/failed run
+	// is inspectable (the pre-0.25.1 `A` surfaced it; the patch had dropped it).
+	if !strings.Contains(m.status, "/tmp/author.log") {
+		t.Errorf("status = %q, want it to name the background log path /tmp/author.log", m.status)
+	}
+	// The draft is still minted (the analyst has a file to write).
+	if list, _ := plans.List("app"); len(list) != 1 {
+		t.Errorf("no-tmux path did not mint the draft: %+v", list)
+	}
+}
+
+// TestPlanWithClaudeNoTmuxNoSourceSurfacesAnchorNote pins REV-008: on the no-tmux + no-source
+// path the headless status restores the dropped anchor heads-up ("runs in the project home;
+// approve it if Claude prompts") so a backgrounded run that could stall on a first-run trust
+// prompt in the untrusted ~/.gogo home warns the user — alongside the REV-006 log path.
+func TestPlanWithClaudeNoTmuxNoSourceSurfacesAnchorNote(t *testing.T) {
+	seedDataHome(t)
+	m := NewWorkspace(&contract.Repo{}, proj("solo")) // no sources → falls back to the project home
+	m.hasClaude = true
+	m.tab = tabPlans
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		return launch.Result{Mode: "background", LogPath: "/tmp/author.log", Command: in.Command}, nil
+	}
+
+	m, _ = authWithClaude(t, m, "Stand up the project scaffolding", "")
+	if !strings.Contains(m.status, "project home") || !strings.Contains(m.status, "approve it if Claude prompts") {
+		t.Errorf("status = %q, want the no-source anchor heads-up (project home / trust prompt)", m.status)
+	}
+	if !strings.Contains(m.status, "/tmp/author.log") {
+		t.Errorf("status = %q, want it to still name the background log path", m.status)
+	}
+}
+
+// TestPlanWithClaudeFallsBackToProjectHome pins the rare no-sources case: a project with
+// zero sources has no trusted repo to anchor at, so the author session falls back to the
+// project home — still a plain authoring intent, no /gogo:plan, no source `.gogo/work/`.
 func TestPlanWithClaudeFallsBackToProjectHome(t *testing.T) {
 	seedDataHome(t)
 	m := NewWorkspace(&contract.Repo{}, proj("solo")) // no sources
@@ -294,14 +416,7 @@ func TestPlanWithClaudeFallsBackToProjectHome(t *testing.T) {
 		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
 	}
 
-	nm, cmd := m.Update(runes("A"))
-	m = nm.(Model)
-	if cmd == nil {
-		t.Fatal("`A` returned a nil cmd on a source-less project")
-	}
-	if _, ok := cmd().(launchDoneMsg); !ok {
-		t.Fatal("plan-with-claude cmd did not resolve to a launchDoneMsg")
-	}
+	authWithClaude(t, m, "Stand up the project scaffolding", "")
 	if gotRoot != projects.Dir("solo") {
 		t.Errorf("anchored at %q, want the project home %q (no source to anchor at)", gotRoot, projects.Dir("solo"))
 	}
@@ -752,5 +867,151 @@ func TestPlansTabAcceptSpawnFormMessageDriven(t *testing.T) {
 	}
 	if got, _ := plans.Get("cancelapp", id2); len(got.Members) != 0 || got.Status == plans.StatusActive {
 		t.Errorf("cancel spawned/activated the plan: %+v", got)
+	}
+}
+
+// TestDeriveTitle pins REV-005: deriveTitle truncates a long goal on RUNE boundaries, so a
+// multibyte first line with no late ASCII space never ships an INVALID-UTF-8 title (the old
+// byte-slice sheared a rune → mojibake). Every derived title must stay valid UTF-8 and a sane
+// length, while short/ASCII goals are unchanged and the word-safe cut is preserved.
+func TestDeriveTitle(t *testing.T) {
+	cases := []struct {
+		name string
+		goal string
+		want string // "" when we only assert the invariants (valid UTF-8 + length)
+	}{
+		{"short ascii passes through", "Add a rate limiter", "Add a rate limiter"},
+		{"blank goal falls back", "\n  \n", "Untitled plan"},
+		{"first non-blank line wins", "\n\nMigrate the token store\nmore", "Migrate the token store"},
+		{"long ascii cuts on a word boundary", "Migrate the shared token store to the brand new auth service layer", "Migrate the shared token store to the brand new…"},
+		// A >50-rune space-free multibyte first line (Japanese) — the REV-005 mojibake case.
+		{"long space-free multibyte stays valid utf8", "これはとても長い日本語のゴールでスペースがまったくないので途中で切れてしまうかもしれないテストケースです", ""},
+		// Multibyte with Polish diacritics past 50 runes.
+		{"long polish stays valid utf8", "Zaimplementuj ograniczanie przepustowości żądań na wszystkich źródłach bramki API projektu", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := deriveTitle(tc.goal)
+			if !utf8.ValidString(got) {
+				t.Fatalf("deriveTitle(%q) = %q — NOT valid UTF-8 (mojibake)", tc.goal, got)
+			}
+			if n := utf8.RuneCountInString(got); n == 0 || n > 51 { // ≤50 runes + one ellipsis
+				t.Errorf("deriveTitle(%q) = %q has %d runes, want 1..51", tc.goal, got, n)
+			}
+			if tc.want != "" && got != tc.want {
+				t.Errorf("deriveTitle(%q) = %q, want %q", tc.goal, got, tc.want)
+			}
+		})
+	}
+}
+
+// pumpNoBlink drains cmds through m.Update, feeding back each resulting message, but DROPS any
+// command that blocks past a short deadline. A huh TEXT/INPUT field arms a cursor BlinkCmd that
+// waits on a timer channel (bubbles/cursor) — the blink-free `drive` helper deadlocks on it,
+// so this pump is the `A` goal-form (text-input) equivalent. Dropping a blink never feeds its
+// BlinkMsg back, so it does not re-arm; the useful async messages (huh field-advance /
+// group-completion, the launch cmd) resolve immediately and drive the form to StateCompleted.
+func pumpNoBlink(t *testing.T, m Model, cmds ...tea.Cmd) Model {
+	t.Helper()
+	queue := append([]tea.Cmd(nil), cmds...)
+	for steps := 0; len(queue) > 0; steps++ {
+		if steps > 6000 {
+			t.Fatalf("no-blink form pump did not settle in 6000 steps (mode=%d)", m.mode)
+		}
+		c := queue[0]
+		queue = queue[1:]
+		if c == nil {
+			continue
+		}
+		done := make(chan tea.Msg, 1)
+		go func() { done <- c() }() // a blink cmd blocks here on a timer — we abandon it below
+		var msg tea.Msg
+		select {
+		case msg = <-done:
+		case <-time.After(40 * time.Millisecond):
+			continue // blocking cursor-blink / tick cmd — not needed to reach completion
+		}
+		switch tm := msg.(type) {
+		case nil:
+			continue
+		case tea.BatchMsg:
+			queue = append(queue, tm...)
+		case launchDoneMsg:
+			continue // already invoked the (fake) launcher — re-feeding would list tmux
+		default:
+			nm, next := m.Update(tm)
+			m = nm.(Model)
+			if next != nil {
+				queue = append(queue, next)
+			}
+		}
+	}
+	return m
+}
+
+// TestPlanWithClaudeSubmitFormMessageDriven pins REV-009 (the REV-004 class for the `A` path):
+// the shipped updateForm → pendingPlanWithClaude → finishPlanWithClaude dispatch is exercised
+// end-to-end through a REAL huh goal-form completion, NOT a direct finishPlanWithClaude call.
+// It TYPES the goal + title into the focused fields and drives the group to completion via huh's
+// own field-advance / group messages (huh.NextField/PrevField), so the plan is minted from the
+// typed goal, the launcher fires exactly once, and the headless message lands (no-tmux launcher
+// so no ExecProcess attach fires during the pump).
+func TestPlanWithClaudeSubmitFormMessageDriven(t *testing.T) {
+	seedDataHome(t)
+	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/repos/web")))
+	m.hasClaude = true
+	m.tab = tabPlans
+	calls := 0
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		calls++
+		// No tmux → background: no Session name, so Update surfaces the headless status
+		// instead of an ExecProcess attach (which the pump would otherwise try to spawn).
+		return launch.Result{Mode: "background", LogPath: "/tmp/author.log", Command: in.Command}, nil
+	}
+
+	const goal = "Migrate the shared token store to the new auth service"
+	const title = "Token migration"
+
+	// Open the goal form. huh's field-advance FOCUSES the newly selected field, so hop to the
+	// title field and back to focus the goal Text field, then TYPE the goal into it.
+	m = send(m, runes("A"))
+	if !m.pendingPlanWithClaude || m.mode != modeForm {
+		t.Fatalf("A did not open the goal form (mode=%d pending=%v)", m.mode, m.pendingPlanWithClaude)
+	}
+	m = send(m, huh.NextField()) // → title Input focused
+	m = send(m, huh.PrevField()) // → goal Text focused
+	m = send(m, runes(goal))     // type the goal into the focused textarea
+	m = send(m, huh.NextField()) // blur goal (writes the binding) → title Input focused
+	m = send(m, runes(title))    // type the title
+
+	// Advance off the LAST field → huh emits its group-completion message; draining it routes
+	// through the shipped updateForm StateCompleted dispatch to finishPlanWithClaude.
+	nm, cmd := m.Update(huh.NextField())
+	m = pumpNoBlink(t, nm.(Model), cmd)
+
+	// The shipped dispatch routed through finishPlanWithClaude: one launch, plan minted.
+	if calls != 1 {
+		t.Fatalf("message-driven submit fired the launcher %d times, want exactly 1", calls)
+	}
+	if m.pendingPlanWithClaude {
+		t.Errorf("pendingPlanWithClaude not cleared after completion")
+	}
+	if m.mode != modeBoard || m.tab != tabPlans {
+		t.Errorf("after submit mode=%d tab=%d, want back on the plans tab", m.mode, m.tab)
+	}
+	list, _ := plans.List("app")
+	if len(list) != 1 {
+		t.Fatalf("message-driven submit did not mint exactly one plan: %+v", list)
+	}
+	p := list[0]
+	if strings.TrimSpace(p.Description) != goal {
+		t.Errorf("plan description = %q, want the TYPED goal %q", p.Description, goal)
+	}
+	if p.Title != title {
+		t.Errorf("plan title = %q, want the typed title %q", p.Title, title)
+	}
+	// The attach/headless message landed (no-tmux launcher → the REV-006 headless status).
+	if !strings.Contains(m.status, "headless") {
+		t.Errorf("status = %q, want the headless message produced by the shipped dispatch", m.status)
 	}
 }

@@ -578,29 +578,36 @@ func (m Model) planAddTarget() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// startPlanForm opens the huh new-plan form (FR10 `n`): a single title input under
-// modeForm. It marks pendingPlan (so updateForm routes completion to finishPlanForm
-// and a cancel returns to the plans tab) and binds the title through a heap-stable
-// *formBinding (TEST-001).
+// startPlanForm opens the huh new-plan form (FR10 `n`): a title input plus an optional
+// DESCRIPTION textarea (0.25.1 — so a quick draft can carry a real brief, not only a bare
+// title) under modeForm. It marks pendingPlan (so updateForm routes completion to
+// finishPlanForm and a cancel returns to the plans tab) and binds both fields through a
+// heap-stable *formBinding (TEST-001).
 func (m *Model) startPlanForm() {
 	m.pendingPlan = true
 	m.binding = &formBinding{}
 	m.form = huh.NewForm(huh.NewGroup(
 		huh.NewInput().
 			Title("New plan title").
-			Description("creates a draft plan in " + m.project.Name + " — target sources + spawn from its detail").
+			Description("creates a draft plan in "+m.project.Name+" — target sources + spawn from its detail").
 			Value(&m.binding.planTitle),
+		huh.NewText().
+			Title("Description (optional)").
+			Description("the plan's goal / brief — shown in the plan detail; edit later with e").
+			Lines(4).
+			Value(&m.binding.planDesc),
 	))
 	m.mode = modeForm
 }
 
 // finishPlanForm applies a completed new-plan form: a non-blank title creates a
-// draft plan in the focused project (a write to ~/.gogo/ only), reloads the list,
-// and lands back on the plans tab.
+// draft plan in the focused project (a write to ~/.gogo/ only) carrying the optional
+// description, reloads the list, and lands back on the plans tab.
 func (m Model) finishPlanForm() (tea.Model, tea.Cmd) {
-	title := ""
+	title, desc := "", ""
 	if m.binding != nil {
 		title = strings.TrimSpace(m.binding.planTitle)
+		desc = strings.TrimSpace(m.binding.planDesc)
 	}
 	m.pendingPlan = false
 	m.binding = nil
@@ -614,7 +621,7 @@ func (m Model) finishPlanForm() (tea.Model, tea.Cmd) {
 		m.status = "no project — cannot create a plan"
 		return m, nil
 	}
-	p, err := plans.New(m.project.Name, title, "")
+	p, err := plans.New(m.project.Name, title, desc)
 	if err != nil {
 		m.status = "create failed: " + err.Error()
 		return m, nil
@@ -625,22 +632,28 @@ func (m Model) finishPlanForm() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// planAuthorLaunchedMsg carries the outcome of the plans-tab `A` analyst launch (0.25.1)
+// back to Update so it can ATTACH the user into the live session. session is the created
+// tmux session name (attachable) or "" when the launcher fell back to a backgrounded
+// `claude -p` (no tmux → nothing to attach). logPath is that backgrounded run's log
+// (res.LogPath) — the one diagnostic pointer surfaced on the headless path so a stalled/
+// failed run is inspectable (REV-006). homeNote carries the no-source anchor heads-up
+// ("runs in the project home; approve it if Claude prompts", REV-008) when the session
+// fell back to the untrusted project home. Distinct from launchDoneMsg because the attach
+// must happen on the UI goroutine (tea.ExecProcess), after the launcher fired.
+type planAuthorLaunchedMsg struct {
+	session  string
+	logPath  string
+	homeNote string
+}
+
 // planWithClaude is the plans-tab `A` plan-with-claude authoring trigger (FR-D — the
-// user's "start a claude session and prepare a plan" ask). It authors the PROJECT
-// PLAN, not a source work item: it MINTS a fresh draft plan up front (so its
-// plan-<hash> correlation id exists in ~/.gogo/projects/<name>/.gogo/plans/<id>.md
-// before anything spawns), then fires — through the launcher seam, EXACTLY ONCE — a
-// PLAIN interactive `claude` session (NOT a slash command) seeded by
-// launch.AuthorPlanIntent to READ + EDIT that plan file IN PLACE. It deliberately does
-// NOT launch /gogo:plan: that skill's Step 1 unconditionally scaffolds a source
-// `.gogo/work/feature-<slug>/`, the wrong thing for a project-plan file (and the
-// D3-rejected "prose is ignorable" failure). The session is ANCHORED at the focused
-// project's FIRST SOURCE root — a real repo the user already trusts in Claude — NOT the
-// untrusted `~/.gogo/projects/<name>/` home (first-run trust prompts would park the
-// session there, TEST-013); the plan file is edited by its absolute ~/.gogo/ path, so
-// anchoring at a source is safe and never touches that source's `.gogo/work/`. With no
-// sources yet (rare), it falls back to the project home with a note. `n` stays the
-// quick inline draft.
+// user's "start a claude session and prepare a plan" ask). It authors the PROJECT PLAN,
+// not a source work item. 0.25.1 fixes the two UAT-critical bugs: it FIRST opens a goal
+// form (no more blank "Untitled plan" mint) and, on submit, launches AND ATTACHES the
+// session (no more detached, unseen run). This handler only guards + opens the form; the
+// mint/launch/attach happens in finishPlanWithClaude once the goal is captured. `n` stays
+// the quick inline draft.
 func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 	if m.project == nil {
 		m.status = "no project — cannot author a plan"
@@ -650,7 +663,68 @@ func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 		m.status = "claude CLI not on PATH — cannot start a plan-with-claude session (use `n` for a quick draft)"
 		return m, nil
 	}
-	p, err := plans.New(m.project.Name, "Untitled plan", "")
+	m.startPlanWithClaudeForm()
+	return m, m.form.Init()
+}
+
+// startPlanWithClaudeForm opens the huh `A` goal form (0.25.1) under modeForm: a required
+// GOAL textarea (what to build/change across the project's sources) plus an optional short
+// title (derived from the goal when blank). It marks pendingPlanWithClaude (so updateForm
+// routes completion to finishPlanWithClaude and a cancel mints NOTHING) and binds both
+// fields through a heap-stable *formBinding (TEST-001).
+func (m *Model) startPlanWithClaudeForm() {
+	m.pendingPlanWithClaude = true
+	m.binding = &formBinding{}
+	m.form = huh.NewForm(huh.NewGroup(
+		huh.NewText().
+			Title("What should gogo plan for this project? (the goal — what to build or change across its sources)").
+			Description("the analyst reads the project's sources and writes the plan for this goal").
+			Lines(5).
+			Value(&m.binding.planGoal),
+		huh.NewInput().
+			Title("Plan title (optional)").
+			Description("defaults to a short title derived from the goal").
+			Value(&m.binding.planTitle),
+	))
+	m.mode = modeForm
+}
+
+// finishPlanWithClaude applies a completed `A` goal form (0.25.1). On CANCEL / empty goal
+// it mints NOTHING (no blank draft, no launch). On submit it mints a draft plan whose
+// DESCRIPTION IS THE GOAL (never blank/"Untitled") with the typed-or-derived title, then
+// fires — through the launcher seam, EXACTLY ONCE — a PLAIN interactive `claude` session
+// (NOT a slash command) seeded by launch.AuthorPlanIntent NAMING the goal, to READ + EDIT
+// the plan file IN PLACE. It deliberately does NOT launch /gogo:plan (that skill scaffolds
+// a source `.gogo/work/`, the wrong thing for a project-plan file). The session is ANCHORED
+// at the project's FIRST SOURCE root — a real repo the user already trusts in Claude — NOT
+// the untrusted `~/.gogo/projects/<name>/` home (first-run trust prompts would park the
+// session there, TEST-013); the plan file is edited by its absolute ~/.gogo/ path, so
+// anchoring at a source is safe. With no sources (rare) it falls back to the project home.
+// The launch returns a planAuthorLaunchedMsg so Update can ATTACH the user in.
+func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
+	goal, title := "", ""
+	if m.binding != nil {
+		goal = strings.TrimSpace(m.binding.planGoal)
+		title = strings.TrimSpace(m.binding.planTitle)
+	}
+	m.pendingPlanWithClaude = false
+	m.binding = nil
+	m.form = nil
+	m.mode = modeBoard // renders the active tab (tabPlans)
+	if m.project == nil {
+		m.status = "no project — cannot author a plan"
+		return m, nil
+	}
+	if goal == "" {
+		m.status = "cancelled — no goal given, nothing created"
+		return m, nil
+	}
+	if title == "" {
+		title = deriveTitle(goal)
+	}
+	// The DESCRIPTION is the goal, so the plan is never blank/"Untitled" and BriefFor /
+	// the detail view have real content to show.
+	p, err := plans.New(m.project.Name, title, goal)
 	if err != nil {
 		m.status = "create failed: " + err.Error()
 		return m, nil
@@ -658,22 +732,24 @@ func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 	m.loadPlans()
 	m.planIdx = 0
 
-	// Seed a plain authoring session to flesh out the brief IN the plan's own file. The
-	// whole prompt reaches claude as ONE trailing argv element (AuthorPlanIntent —
-	// injection-safe); the correlation id rides in the prose (already in front-matter),
-	// NOT as a --correlation flag (that is a /gogo:plan spawn param, not a plain session).
+	// Seed a plain authoring session to flesh out the brief IN the plan's own file, NAMING
+	// the goal so the analyst plans FOR IT. The whole prompt reaches claude as ONE trailing
+	// argv element (AuthorPlanIntent — injection-safe); the correlation id rides in the prose
+	// (already in front-matter), NOT as a --correlation flag (that is a /gogo:plan spawn param).
 	planPath := plans.Path(m.project.Name, p.ID)
 	// FR2: seed the author to READ the project's cross-repo .knowledge/ first, so the
 	// whole-domain context flows into the brief (and each spawned work item's goal).
-	intent := launch.AuthorPlanIntent(p.Title, planPath, p.ID, projects.KnowledgeDir(m.project.Name), m.sourceRefs())
+	intent := launch.AuthorPlanIntent(p.Title, goal, planPath, p.ID, projects.KnowledgeDir(m.project.Name), m.sourceRefs())
 
 	// Anchor at a real source root (trusted repo) so the session doesn't park on a
 	// first-run trust prompt for the ~/.gogo/ home. No source yet → fall back to the
-	// project home (with a note); the plan file is edited by its absolute path regardless.
+	// project home; the plan file is edited by its absolute path regardless. Carry the
+	// anchor heads-up (REV-008) so the headless path can still warn about the trust prompt.
 	root, atSource := m.firstSourcePath()
+	homeNote := ""
 	if !atSource {
 		root = projects.Dir(m.project.Name)
-		m.status = "authoring " + p.ID + " (no source to anchor at — session runs in the project home; approve it if Claude prompts)"
+		homeNote = "no source to anchor at — the session runs in the project home; approve it if Claude prompts"
 	}
 	launcher := m.launcher
 
@@ -682,12 +758,41 @@ func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 		if err != nil {
 			return launchDoneMsg{status: "plan-with-claude failed: " + err.Error()}
 		}
-		where := res.Session
-		if where == "" {
-			where = res.LogPath
-		}
-		return launchDoneMsg{status: "authoring " + p.ID + " with claude → " + res.Command + " (" + where + ")"}
+		// Hand the created session name to Update so it can ATTACH the user in (tmux) or
+		// surface the headless status (no tmux → res.Session == "") — naming the log path
+		// (REV-006) + the no-source anchor note (REV-008) so a stalled headless run is
+		// diagnosable.
+		return planAuthorLaunchedMsg{session: res.Session, logPath: res.LogPath, homeNote: homeNote}
 	}
+}
+
+// deriveTitle makes a short plan title from the goal's first non-blank line, trimmed to
+// ~50 chars (word-safe when possible) — the default when the `A` form's title is left
+// blank. Never empty (a goal that is all blank lines yields "Untitled plan", but the caller
+// only reaches here with a non-empty goal).
+func deriveTitle(goal string) string {
+	first := "Untitled plan"
+	for _, ln := range strings.Split(goal, "\n") {
+		if s := strings.TrimSpace(ln); s != "" {
+			first = s
+			break
+		}
+	}
+	// Cut on RUNES, not bytes (REV-005): a >50-byte multibyte first line with no late
+	// ASCII space (e.g. Japanese/Polish) byte-sliced at maxLen split a rune and shipped
+	// an INVALID-UTF-8 title. []rune(first)[:maxRunes] never splits a rune. The word-safe
+	// LastIndex runs over an already rune-safe slice and space is single-byte, so cut[:i]
+	// stays a valid rune boundary.
+	const maxRunes = 50
+	r := []rune(first)
+	if len(r) <= maxRunes {
+		return first
+	}
+	cut := strings.TrimRight(string(r[:maxRunes]), " ")
+	if i := strings.LastIndex(cut, " "); i > 20 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ") + "…"
 }
 
 // sourceRefs returns the focused project's sources as label+absolute-path pairs in
@@ -752,7 +857,7 @@ func (m Model) viewPlans() string {
 	if m.status != "" {
 		parts = append(parts, statusStyle(m.status), "")
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · enter open · n new · A plan-with-claude · r accept+spawn · D accept UAT · x delete · tab board/config · q quit")
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · enter open · n new · A plan-with-claude (goal → attach) · r accept+spawn · D accept UAT · x delete · tab board/config · q quit")
 	parts = append(parts, help)
 	return strings.Join(parts, "\n")
 }

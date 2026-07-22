@@ -1,0 +1,2 @@
+{ "schema": 2, "name": "plan-with-claude-goal-and-attach", "release": "0.25.1", "date": "2026-07-22",
+  "members": [ { "slug": "smart-project-plans", "title": "A plan-with-claude: goal input + attach the session (fix)", "version": "0.25.1" } ] }

@@ -405,9 +405,20 @@ type SourceRef struct {
 // read the actual repos; knowledgePath (when non-empty) points the session at the
 // project's cross-repo .knowledge/ FIRST so the whole-domain context grounds the
 // analysis. Both are spliced into the same single trailing argv element.
-func AuthorPlanIntent(label, planPath, correlation, knowledgePath string, sources []SourceRef) Intent {
+//
+// goal is the user's plan goal (what to build/change across the sources), captured by the
+// plans-tab `A` form before minting. It is NAMED explicitly in the prompt (and also lives
+// in the plan file's body) so the analyst plans FOR THAT GOAL instead of guessing from the
+// repos alone; an empty goal degrades to the pre-0.25.1 prose (the plan file still carries
+// the goal). It rides in the same single trailing argv element (injection-safe).
+func AuthorPlanIntent(label, goal, planPath, correlation, knowledgePath string, sources []SourceRef) Intent {
 	var b strings.Builder
 	b.WriteString("Load and follow the gogo-project-plan skill (use the Skill tool) to author this gogo PROJECT PLAN in place.")
+	if g := strings.TrimSpace(goal); g != "" {
+		b.WriteString(" The user's goal for this plan: ")
+		b.WriteString(g)
+		b.WriteString(". Analyze the project's sources and write the plan FOR THIS GOAL.")
+	}
 	b.WriteString(" The project-plan markdown file is at ")
 	b.WriteString(planPath)
 	b.WriteString(" - read and edit ONLY that one file.")

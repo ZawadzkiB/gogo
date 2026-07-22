@@ -19,7 +19,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.25.0"
+const Version = "0.25.1"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -194,7 +194,7 @@ board keys:
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
 
 plans tab keys:
-  ↑↓ plans · enter open · n new · A plan-with-claude · r mark ready · x delete
+  ↑↓ plans · enter open · n new (title + description) · A plan-with-claude (prompts for the goal, then attaches the analyst session) · r mark ready · x delete
   in a plan: ↑↓ target sources · c create work item (spawn /gogo:plan --correlation) · + add source · e edit · esc back
 
 drill-in keys (enter on a card - shows description / folder / status / sessions / events):

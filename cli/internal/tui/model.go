@@ -79,6 +79,11 @@ type formBinding struct {
 	// Plans-tab new-plan form field (FR10 `n`): the plan title as a STRING the huh
 	// input binds heap-stably (TEST-001).
 	planTitle string
+	// Plans-tab description/goal Text-field values, bound heap-stably (TEST-001): planDesc
+	// is the `n` quick-draft's optional description; planGoal is the `A` plan-with-claude
+	// goal (what to build/change across the project's sources) captured before minting.
+	planDesc string
+	planGoal string
 	// Config-tab project label-color form field (cockpit-colors FR4): the project's
 	// origin color (hex or a swatch name) as a STRING bound heap-stably (TEST-001).
 	projColor string
@@ -172,13 +177,14 @@ type Model struct {
 	// list view), the plan-detail target-source cursor, and the in-flight new-plan form
 	// marker. Reads/writes ONLY ~/.gogo/… via the plans store; spawning a work item is
 	// a claude -p launch (never a source's .gogo/ write).
-	plans            []plans.Plan
-	planIdx          int
-	planDetail       *plans.Plan
-	planSourceIdx    int
-	pendingPlan      bool
-	pendingPlanDone  *planDoneEdit  // in-flight project-UAT accept confirm (FR3, `D`)
-	pendingPlanSpawn *planSpawnEdit // in-flight accept+spawn confirm (0.25.0 FR2, `r`)
+	plans                 []plans.Plan
+	planIdx               int
+	planDetail            *plans.Plan
+	planSourceIdx         int
+	pendingPlan           bool
+	pendingPlanWithClaude bool           // in-flight `A` goal form (0.25.1) — mint+launch+attach on submit
+	pendingPlanDone       *planDoneEdit  // in-flight project-UAT accept confirm (FR3, `D`)
+	pendingPlanSpawn      *planSpawnEdit // in-flight accept+spawn confirm (0.25.0 FR2, `r`)
 
 	// unified marks the multi-project cockpit board (0.23.0): the board aggregates
 	// EVERY registered project (LoadWorkspace) rather than one project's sources

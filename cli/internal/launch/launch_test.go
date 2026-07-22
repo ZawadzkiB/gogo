@@ -206,7 +206,8 @@ func TestAuthorPlanIntentCarriesSkillAndSourcePaths(t *testing.T) {
 		{Label: "web", Path: "/repos/web app"}, // a space in the path exercises injection-safety
 		{Label: "api", Path: "/repos/api"},
 	}
-	in := AuthorPlanIntent("Cross-repo migration", "/home/.gogo/projects/app/.gogo/plans/plan-7f3a.md",
+	in := AuthorPlanIntent("Cross-repo migration", "Migrate the shared token store to the new service",
+		"/home/.gogo/projects/app/.gogo/plans/plan-7f3a.md",
 		"plan-7f3a", "/home/.gogo/projects/app/.knowledge", sources)
 
 	if in.Action != ActionAuthor {
@@ -222,6 +223,7 @@ func TestAuthorPlanIntentCarriesSkillAndSourcePaths(t *testing.T) {
 	// It directs the session to the analyst skill + carries every seeded input.
 	for _, want := range []string{
 		"gogo-project-plan", // the skill directive
+		"Migrate the shared token store to the new service", // the user's GOAL, named explicitly (0.25.1)
 		"/home/.gogo/projects/app/.gogo/plans/plan-7f3a.md", // the plan-file path
 		"/home/.gogo/projects/app/.knowledge",               // the project .knowledge/ dir
 		"/repos/web app", "/repos/api",                      // each source PATH (not just label)

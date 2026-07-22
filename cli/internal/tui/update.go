@@ -118,6 +118,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadPlans()
 		return m, nil
 
+	case planAuthorLaunchedMsg:
+		// The plans-tab `A` analyst session launched (0.25.1). With a tmux session name we
+		// SUSPEND the TUI and drop the user INTO the live claude session (attachSession) so
+		// they see + steer the analyst; on detach the launchDoneMsg handler reloads m.plans
+		// so the board reflects what the analyst wrote. With no session (the launcher fell
+		// back to a backgrounded `claude -p`) there is nothing to attach to — surface the
+		// headless status and reload so the plan updates when the run finishes.
+		m.sessions = launch.ListSessions()
+		if msg.session == "" {
+			// No session to attach — NAME the background log path (REV-006) + the no-source
+			// anchor heads-up (REV-008) so a stalled/failed headless run is diagnosable.
+			status := "no tmux — the analyst is running headless in the background"
+			if msg.homeNote != "" {
+				status += " (" + msg.homeNote + ")"
+			}
+			if msg.logPath != "" {
+				status += " — log: " + msg.logPath
+			}
+			status += "; the plan updates when it finishes; `tmux` recommended for the interactive session"
+			m.status = status
+			m.loadPlans()
+			return m, nil
+		}
+		return m.attachSession(msg.session)
+
 	case tea.KeyMsg:
 		switch m.mode {
 		case modeForm:
@@ -410,6 +435,11 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingPlan {
 			return m.finishPlanForm()
 		}
+		// A plans-tab `A` goal form (0.25.1) completes to finishPlanWithClaude — mints the
+		// plan from the typed goal+title, then launches + attaches the analyst session.
+		if m.pendingPlanWithClaude {
+			return m.finishPlanWithClaude()
+		}
 		// A plans-tab project-UAT accept confirm (FR3 `D`) completes to finishPlanDone —
 		// its own path (stays on the plans tab), mutually exclusive with every path above.
 		if m.pendingPlanDone != nil {
@@ -448,7 +478,7 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 // cancelling them must NOT wipe the user's multi-selection (only a SHIP form's
 // cancel does). REV-012.
 func (m Model) formPreservesSelection() bool {
-	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingProject != nil || m.pendingPlan || m.pendingPlanDone != nil || m.pendingPlanSpawn != nil
+	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingProject != nil || m.pendingPlan || m.pendingPlanWithClaude || m.pendingPlanDone != nil || m.pendingPlanSpawn != nil
 }
 
 // cancelForm returns to the board and clears the in-flight form state. For a SHIP
@@ -486,6 +516,7 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	m.pendingSource = nil
 	m.pendingProject = nil
 	m.pendingPlan = false
+	m.pendingPlanWithClaude = false
 	m.pendingPlanDone = nil
 	m.pendingPlanSpawn = nil
 	m.binding = nil

@@ -86,12 +86,16 @@ on you (plan-acceptance / decision / UAT). Since **0.23.0** `gogo global` opens 
 `●project ●source`. On a **lone repo** with no home project there are no tabs / chips -
 just the single-repo board (byte-for-byte).
 
-**Plans tab keys:** `↑↓` plans · `enter` open the detail · `n` new plan · `A`
-**plan-with-claude** (since 0.25.0 an analyst-grade session: mints a draft, then opens a
-`claude` session anchored at a source that **loads the `gogo-project-plan` skill**, reads
-+ analyzes the project's real source repos read-only, **auto-selects** the sources the
-plan needs, and writes the plan file in place with front-matter `targets:` + a
-`## Source briefs` section per target - not a `/gogo:plan` scaffold) · `r` **accept**
+**Plans tab keys:** `↑↓` plans · `enter` open the detail · `n` new plan (title **+ an
+optional description**) · `A` **plan-with-claude** (since 0.25.0 an analyst-grade session;
+since **0.25.1** it FIRST prompts for the plan **goal** - what to build/change across the
+sources - so the plan is minted with that goal as its description, never a blank "Untitled
+plan"; then it launches AND **attaches** you into the live `claude` session anchored at a
+source that **loads the `gogo-project-plan` skill**, reads + analyzes the project's real
+source repos read-only, **auto-selects** the sources the plan needs, and writes the plan
+file in place with front-matter `targets:` + a `## Source briefs` section per target - not a
+`/gogo:plan` scaffold; with no `tmux` the analyst runs headless in the background) · `r`
+**accept**
 (since 0.25.0 - a plan WITH targets confirms then **auto-spawns** a work item into each
 un-spawned target: one `/gogo:plan <brief> --correlation plan-<hash>` per source honoring
 that source's `--skip-acceptance`, recording a member + flipping the plan active; a

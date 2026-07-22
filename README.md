@@ -457,11 +457,14 @@ cd cli && go build -o gogo .
 - **Plans tab + spawn (since 0.21.0)** - a **plan** is a project-scoped, hand-editable markdown file
   at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
-  The plans tab lists them grouped by status; keys: `n` new plan · `A` **plan-with-claude** (since
-  0.25.0 an **analyst-grade** session: mints a draft, then opens a `claude` session anchored at a source
+  The plans tab lists them grouped by status; keys: `n` new plan (title **+ optional description**) ·
+  `A` **plan-with-claude** (since 0.25.0 an **analyst-grade** session; since **0.25.1** it FIRST prompts
+  for the plan **goal** - so the plan is minted with that goal as its description, never a blank
+  "Untitled plan" - then launches AND **attaches** you into the `claude` session anchored at a source
   that **loads the `gogo-project-plan` skill**, READS + ANALYZES the project's real source repos
   read-only, **auto-selects** the sources the plan needs, and writes the plan file in place with
-  front-matter `targets:` + a `## Source briefs` section per target - never a `/gogo:plan` scaffold) ·
+  front-matter `targets:` + a `## Source briefs` section per target - never a `/gogo:plan` scaffold; with
+  no `tmux` the analyst runs headless in the background) ·
   `r` **accept** (since 0.25.0: a plan with targets confirms then **auto-spawns** a work item into each
   un-spawned target - one `/gogo:plan <brief> --correlation plan-<hash>` per source, honoring that
   source's `--skip-acceptance`, recording a member + flipping the plan active; a **targetless** plan is

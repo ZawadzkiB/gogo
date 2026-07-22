@@ -1,7 +1,7 @@
 {
   "slug": "smart-project-plans",
   "track": "review",
-  "round": 1,
+  "round": 2,
   "updated": "2026-07-22",
   "issues": [
     {
@@ -55,6 +55,71 @@
       "found_in_round": 1,
       "fixed_in_round": 1,
       "fix_summary": "Added TestPlansTabAcceptSpawnFormMessageDriven (cli/internal/tui/plans_tab_test.go) driving the confirm through huh's real async completion via keyPress: pressing `y` completes the form → updateForm routes through the shipped `if m.pendingPlanSpawn != nil` dispatch → finishPlanSpawn fires the launcher once per target (asserts 2 fires, plan active with 2 members, back on tabPlans); pressing `n` completes to the cancel branch (asserts 0 fires, plan un-spawned, back on tabPlans). Each sub-case uses its own project so the plans-list cursor is deterministic."
+    },
+    {
+      "id": "REV-005",
+      "title": "deriveTitle byte-slices the goal — a multibyte (non-ASCII) goal first line can produce an INVALID-UTF-8 plan title (mojibake), not a rune-safe cut",
+      "description": "cli/internal/tui/plans_tab.go:772-781 (deriveTitle, 0.25.1) truncates a >50-char goal with `cut := strings.TrimRight(first[:maxLen], \" \")` and, when no space sits past byte 20, keeps that byte-offset slice. `first[:maxLen]` and `cut[:i]` cut at BYTE offsets, not rune boundaries, so a goal whose first line is >50 bytes of multibyte text with no ASCII space after byte 20 (e.g. Japanese/Chinese/Thai) is sliced mid-rune, yielding an INVALID UTF-8 title. Verified empirically: deriveTitle(\"これはとても長い日本語のゴール…\") returns \"これはとても長い日本語のゴールで\\xe3\\x82…\" with utf8.ValidString == false. It does NOT panic (byte slicing is in-bounds — the `len(first) <= maxLen` early-return guarantees maxLen < len(first)), and the title is cosmetic + user-editable, so impact is minor; but the derived title is persisted to the plan file and shown in the detail/board, so a broken rune ships for any non-ASCII goal that lacks a late space. The task's 'deriveTitle handles a very-long goal safely (sane title)' bar is only met for ASCII goals.",
+      "proposed_solution": "AGENT-FIXABLE. Make the truncation rune-aware: operate on []rune(first) (cap at 50 runes), or use utf8.RuneCountInString / utf8.DecodeLastRuneInString to back the cut off any partial rune before appending the ellipsis. Add a table-driven deriveTitle test case with a long space-free multibyte goal asserting utf8.ValidString(out).",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 2,
+      "fix_summary": "deriveTitle (cli/internal/tui/plans_tab.go) now truncates on RUNES, not bytes: `r := []rune(first)`; if len(r) <= 50 return; else cut = TrimRight(string(r[:50]), \" \") and the word-safe LastIndex(cut, \" \") runs over that already rune-safe slice (space is single-byte, so cut[:i] stays a valid rune boundary). A >50-byte multibyte first line with no late ASCII space no longer ships an invalid-UTF-8 title. New table-driven TestDeriveTitle asserts utf8.ValidString(out) + 1..51 runes for a space-free Japanese goal and a Polish-diacritic goal, plus the unchanged short/ASCII word-boundary cases (verified: Japanese case = 51 runes, valid; the old byte-slice returned utf8.ValidString==false)."
+    },
+    {
+      "id": "REV-006",
+      "title": "No-tmux headless status drops the background log path — a headless analyst leaves the user no pointer to inspect (or diagnose a failed) run",
+      "description": "cli/internal/tui/update.go:129-132 (planAuthorLaunchedMsg handler, 0.25.1) surfaces a generic status on the no-tmux path — 'no tmux — the analyst is running headless in the background; the plan updates when it finishes; `tmux` recommended…' — but NEVER names the background log path. The pre-0.25.1 `A` status did (`… (\" + where + \")` with where = res.LogPath when Session was empty). The regression is structural: planAuthorLaunchedMsg (plans_tab.go:640-643) carries only `session` (and an unused `id`), never res.LogPath, so the handler cannot surface it. For a backgrounded `claude -p` that fails or stalls (e.g. a first-run trust prompt in the ~/.gogo home on a source-less project), the user is told only that 'the plan updates when it finishes' with no way to find or tail the run. This is the exact class of gap the whole 0.25.1 fix targets (the user never sees the session); the tmux path now attaches, but the headless path lost its one diagnostic pointer. Minor observability regression; no state/write-scope impact.",
+      "proposed_solution": "AGENT-FIXABLE. Carry res.LogPath on planAuthorLaunchedMsg (it already has an unused `id` field — repurpose or add a `logPath string`) and include it in the no-tmux status (e.g. '… running headless in the background — log: <path>; the plan updates when it finishes'). Assert the log path appears in the status in TestPlanWithClaudeNoTmuxHeadless (the fake launcher already returns LogPath: \"/tmp/author.log\").",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 2,
+      "fix_summary": "planAuthorLaunchedMsg's dead `id` field is repurposed as `logPath` (covers REV-007 too), and finishPlanWithClaude (cli/internal/tui/plans_tab.go) now passes `logPath: res.LogPath` on the message. The no-tmux handler (cli/internal/tui/update.go) NAMES it: 'no tmux — the analyst is running headless in the background … — log: <path>; the plan updates when it finishes …', restoring the pre-0.25.1 diagnostic pointer a stalled/failed headless run needs. TestPlanWithClaudeNoTmuxHeadless now asserts the status contains '/tmp/author.log'."
+    },
+    {
+      "id": "REV-007",
+      "title": "planAuthorLaunchedMsg carries an unused `id` field (dead code)",
+      "description": "cli/internal/tui/plans_tab.go:640-643 declares `type planAuthorLaunchedMsg struct { session string; id string }` and finishPlanWithClaude (plans_tab.go:756) populates `id: planID`, but the Update handler (cli/internal/tui/update.go:121-134) reads ONLY msg.session — `msg.id` is never referenced anywhere (grep-confirmed). The field is dead: the plan is already loaded + focused (loadPlans + planIdx=0) at mint time, and the detach-reload path goes through launchDoneMsg. Harmless but violates the coding-rules 'no dead/mocked-out code' expectation and adds a field a reader must reason about. Closely related to REV-006 — the `id` slot is exactly where a `logPath` the handler actually needs could live.",
+      "proposed_solution": "AGENT-FIXABLE. Either drop the `id` field entirely, or repurpose it as `logPath` (see REV-006) so the struct carries only what the handler consumes.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 2,
+      "fix_summary": "Repurposed (option 2): planAuthorLaunchedMsg (cli/internal/tui/plans_tab.go) no longer carries the never-read `id` field — the struct is now { session, logPath, homeNote }, every field consumed by the update.go handler (session → attach; logPath → REV-006 diagnostic; homeNote → REV-008 anchor note). finishPlanWithClaude's now-unused `planID := p.ID` local was dropped with it. No dead code remains; go vet clean."
+    },
+    {
+      "id": "REV-008",
+      "title": "The no-source `A` fallback dropped its user-facing anchor note — a source-less project now anchors at the untrusted ~/.gogo home with no heads-up",
+      "description": "cli/internal/tui/plans_tab.go:742-745 (finishPlanWithClaude, 0.25.1) still falls back to `root = projects.Dir(m.project.Name)` (the untrusted ~/.gogo project home) when the project has no source to anchor at, but the pre-0.25.1 status note that accompanied it ('… no source to anchor at — session runs in the project home; approve it if Claude prompts') was deleted and NOT replaced. The task's stated intent is 'a no-source project falls back to the project-home anchor WITH THE NOTE'. In the tmux path the loss is largely moot — the user now attaches and sees any first-run trust prompt live — but in the no-tmux + no-source case a backgrounded `claude -p` can silently stall on that trust prompt in the ~/.gogo home with neither a note nor (per REV-006) a log path. Minor UX gap; anchoring itself is correct.",
+      "proposed_solution": "AGENT-FIXABLE. When !atSource, set a note the modeBoard/tabPlans view renders (e.g. stash it and prepend to the eventual status, or set it on the no-tmux headless branch): 'no source to anchor at — the session runs in the project home; approve it if Claude prompts'. Restores the dropped heads-up without changing the (correct) fallback anchor.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 2,
+      "fix_summary": "finishPlanWithClaude (cli/internal/tui/plans_tab.go) now, on the !atSource fallback to projects.Dir(project), sets homeNote = 'no source to anchor at — the session runs in the project home; approve it if Claude prompts' and carries it on planAuthorLaunchedMsg. The no-tmux handler (update.go) appends it to the headless status, so a backgrounded source-less run that could stall on a first-run trust prompt in the ~/.gogo home warns the user (moot under tmux, where the user attaches and sees the prompt live). The (correct) fallback anchor is unchanged. New test TestPlanWithClaudeNoTmuxNoSourceSurfacesAnchorNote (no-source + no-tmux) asserts the status names 'project home' + 'approve it if Claude prompts' alongside the REV-006 log path."
+    },
+    {
+      "id": "REV-009",
+      "title": "The updateForm -> finishPlanWithClaude completion routing is not driven by a real huh-completion message in tests (REV-004 recurrence for the `A` path)",
+      "description": "cli/internal/tui/update.go:428-432 adds `if m.pendingPlanWithClaude { return m.finishPlanWithClaude() }` to the modeForm StateCompleted dispatch (the actual line shipped for `A`). The new tests exercise submit by calling `m.finishPlanWithClaude()` DIRECTLY (the authWithClaude helper in plans_tab_test.go), never driving the goal form to completion through a huh message via m.Update — so the shipped dispatch line is not asserted end-to-end. This is the same class REV-004 flagged (and fixed) for the spawn confirm; the Esc-cancel of the `A` form IS driven through Update (TestPlanWithClaudeCancelMintsNothing), but the submit dispatch is not. Low risk (a 3-line mutually-exclusive dispatch adjacent to already-tested siblings), but for parity the message-driven submit path is uncovered.",
+      "proposed_solution": "AGENT-FIXABLE. Mirror TestPlansTabAcceptSpawnFormMessageDriven: fill the heap-stable binding, then complete the goal form through a real huh key/completion message via m.Update (not a direct finishPlanWithClaude call), asserting the mint + single launcher fire + attach status land through the shipped updateForm routing.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 2,
+      "fix_summary": "New TestPlanWithClaudeSubmitFormMessageDriven (cli/internal/tui/plans_tab_test.go) drives the `A` goal form to completion through REAL huh messages, not a direct finishPlanWithClaude call: it TYPES the goal + title into the focused fields (using huh.NextField/PrevField to focus each — huh's field-advance focuses the newly selected field) and completes the group via huh's own group-completion message, so the shipped updateForm StateCompleted → `if m.pendingPlanWithClaude` dispatch fires end-to-end. Asserts the plan is minted with the TYPED goal as its description + typed title, the launcher fires exactly once, pendingPlanWithClaude is cleared, it lands back on tabPlans, and the headless message is produced. A no-tmux launcher (Session=\"\") keeps the pump off the ExecProcess attach path; a new pumpNoBlink test helper drains the real huh async chain while dropping the text-field cursor BlinkCmd that would otherwise deadlock the blink-free `drive` helper. Green under -race."
     }
   ]
 }
