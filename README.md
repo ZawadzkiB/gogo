@@ -457,15 +457,21 @@ cd cli && go build -o gogo .
 - **Plans tab + spawn (since 0.21.0)** - a **plan** is a project-scoped, hand-editable markdown file
   at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
-  The plans tab lists them grouped by status; keys: `n` new plan · `A` **plan-with-claude** (mints a
-  draft, then opens a plain `claude` session anchored at a source to author the plan file in place -
-  never a `/gogo:plan` scaffold) · `r` mark ready · `D` **accept project-UAT** (since 0.24.0) · `x`
+  The plans tab lists them grouped by status; keys: `n` new plan · `A` **plan-with-claude** (since
+  0.25.0 an **analyst-grade** session: mints a draft, then opens a `claude` session anchored at a source
+  that **loads the `gogo-project-plan` skill**, READS + ANALYZES the project's real source repos
+  read-only, **auto-selects** the sources the plan needs, and writes the plan file in place with
+  front-matter `targets:` + a `## Source briefs` section per target - never a `/gogo:plan` scaffold) ·
+  `r` **accept** (since 0.25.0: a plan with targets confirms then **auto-spawns** a work item into each
+  un-spawned target - one `/gogo:plan <brief> --correlation plan-<hash>` per source, honoring that
+  source's `--skip-acceptance`, recording a member + flipping the plan active; a **targetless** plan is
+  today's plain mark-ready with zero launches) · `D` **accept project-UAT** (since 0.24.0) · `x`
   delete · `enter` open the detail. In a plan's
   **detail** you target the project's sources and press `c` **create work item** on a source row - the
   CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the analyst derives
   the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+` adds a target,
   `e` edits the plan file. `gogo plan new/list/show/add/rm/ready/promote/delete` is the scriptable
-  surface for the same store.
+  surface for the same store (`gogo plan ready` mirrors the `r` auto-spawn headlessly).
 - **Correlation in `state.md` (since 0.21.0)** - when a plan spawns/links a work item, the
   `/gogo:plan --correlation` skill stamps `- **correlation:** [plan-<hash>, …]` - an additive,
   optional **list** - into that work item's `state.md` (many-to-many: a ticket can belong to several

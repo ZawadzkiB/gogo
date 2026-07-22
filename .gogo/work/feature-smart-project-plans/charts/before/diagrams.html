@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gogo diagrams (before) — smart-project-plans</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+           margin: 0; padding: 2rem; background: #0b0e14; color: #e6e6e6; line-height: 1.4; }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.2rem; font-weight: 600; margin: 0 0 .25rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin: 2rem 0 .5rem; opacity: .9; }
+    .hint { opacity: .55; font-size: .82rem; margin: 0; }
+    .diagram { background: #ffffff; border-radius: 10px; padding: 1.25rem; margin: .5rem 0 2rem;
+               overflow: auto; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .err { background: #2a1416; color: #ffb4b4; padding: 1rem; border-radius: 8px; white-space: pre-wrap;
+           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gogo diagrams (before / as-is) — <code>smart-project-plans</code></h1>
+    <p class="hint">The baseline the change touches, captured before any code changes. Offline viewer · mermaid is vendored with the plugin.</p>
+  </header>
+
+  <h2>As-is: A is a plain prose session; targets are hand-picked and spawned one by one</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  user["user picks project — plans-tab: A"]
+
+  subgraph cli["gogo CLI  (writes ONLY ~/.gogo/) — TODAY"]
+    mint["planWithClaude:\nmint draft plan-XXXX.md"]
+    intent["AuthorPlanIntent (ActionAuthor)\nPLAIN prose seed: read .knowledge/,\nLIST source LABELS, edit plan in place"]
+    ready["r = MarkReady\n(status flip only, NO spawn)"]
+    add["+ add source (manual, one at a time)"]
+    c["c create work item\n(manual, one FOCUSED target at a time)"]
+    mint --> intent
+  end
+
+  subgraph session["plain claude session  (first source root)"]
+    edit["edit plan-XXXX.md in place:\ntitle · goal · BDD · targets\n(NO source-repo analysis)"]
+  end
+
+  intent -- "Launch (plain interactive claude)" --> edit
+  edit --> planfile[("plan-XXXX.md\ntargets hand-listed by the session/user")]
+
+  planfile --> add --> c
+  c -- "/gogo:plan --correlation plan-XXXX\n(one source, manual)" --> wi["work item (per source, pressed c each time)"]
+
+  planfile -. "targets NOT auto-selected\nno per-source brief" .-> gap["(user hand-picks every target\n+ spawns each one by one)"]
+
+  classDef cli fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef skill fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gap fill:#f3d6d6,stroke:#c07a7a,color:#111
+  class cli,mint,intent,ready,add,c,planfile,user cli
+  class session,edit,wi skill
+  class gap gap
+  </pre></div>
+
+  <script src="../../../../resources/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (!window.mermaid) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="err">Could not load mermaid from: ../../../../resources/mermaid.min.js\n' +
+          'Re-run the gogo-mermaid skill, or read the .mmd source files directly.</div>');
+        return;
+      }
+      window.mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    })();
+  </script>
+</body>
+</html>

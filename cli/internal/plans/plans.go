@@ -461,6 +461,77 @@ func containsStr(ss []string, want string) bool {
 	return false
 }
 
+// BriefFor extracts a target source's per-source brief from a plan BODY (0.25.0 FR2):
+// the text under the `### <sourceName>` subsection of the `## Source briefs` section the
+// gogo-project-plan analyst writes. It is a PURE reader — no front-matter/schema change —
+// so a hand-authored or `n`-drafted plan (no `## Source briefs` section) yields "" and the
+// spawn caller falls back to the plan's Description/Title (today's PlanIntent body).
+//
+// Matching is case-insensitive on the source name and tolerant of the `##`/`###` heading
+// levels: it finds the first `##` (or deeper) "Source briefs" heading, then within that
+// section the first `###` heading whose text equals sourceName, and returns everything up
+// to the next same-or-higher heading, trimmed. A brief present but empty returns "".
+func BriefFor(p Plan, sourceName string) string {
+	want := strings.ToLower(strings.TrimSpace(sourceName))
+	if want == "" {
+		return ""
+	}
+	lines := strings.Split(p.Description, "\n")
+
+	// 1. Find the "Source briefs" section (any heading level, case-insensitive).
+	briefsLevel, start := 0, -1
+	for i, ln := range lines {
+		lvl, text := headingOf(ln)
+		if lvl > 0 && strings.EqualFold(text, "Source briefs") {
+			briefsLevel, start = lvl, i+1
+			break
+		}
+	}
+	if start < 0 {
+		return ""
+	}
+
+	// 2. Within it, find the `### <sourceName>` subsection and collect its body until the
+	//    next heading at the subsection's level or shallower (or the section's end).
+	subLevel, from := 0, -1
+	for i := start; i < len(lines); i++ {
+		lvl, text := headingOf(lines[i])
+		if lvl == 0 {
+			continue
+		}
+		if lvl <= briefsLevel {
+			break // left the Source briefs section without a match
+		}
+		if from < 0 {
+			if strings.ToLower(strings.TrimSpace(text)) == want {
+				subLevel, from = lvl, i+1
+			}
+			continue
+		}
+		if lvl <= subLevel {
+			return strings.TrimSpace(strings.Join(lines[from:i], "\n"))
+		}
+	}
+	if from < 0 {
+		return ""
+	}
+	return strings.TrimSpace(strings.Join(lines[from:], "\n"))
+}
+
+// headingOf returns the markdown ATX heading level (number of leading `#`) and the
+// trimmed heading text for a line, or (0, "") when the line is not a heading.
+func headingOf(line string) (level int, text string) {
+	s := strings.TrimSpace(line)
+	n := 0
+	for n < len(s) && s[n] == '#' {
+		n++
+	}
+	if n == 0 || n >= len(s) || s[n] != ' ' {
+		return 0, ""
+	}
+	return n, strings.TrimSpace(s[n+1:])
+}
+
 // --- project-UAT gate (FR3) — derive at read; accept via MarkDone ----------------
 
 // MembersShipped reports whether EVERY member work item of p is shipped, plus the

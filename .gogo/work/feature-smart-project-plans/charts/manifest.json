@@ -1,0 +1,15 @@
+{
+  "slug": "smart-project-plans",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Smart A → analyst reads sources → auto-selects targets + per-source briefs → accept auto-spawns per source"
+    },
+    {
+      "kind": "activity",
+      "file": "plan-lifecycle.mmd",
+      "title": "Plan lifecycle: r ACCEPT auto-spawns all targets (draft→active), project-UAT still gates done"
+    }
+  ]
+}

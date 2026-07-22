@@ -195,6 +195,52 @@ func TestPlanIntentCorrelation(t *testing.T) {
 	}
 }
 
+// TestAuthorPlanIntentCarriesSkillAndSourcePaths pins the 0.25.0 FR1 analyst seed: the
+// `A` authoring intent is a PLAIN prompt (not a slash command, no --correlation flag)
+// that directs the session to LOAD the gogo-project-plan skill and carries the plan-file
+// path, the .knowledge/ dir, and each source's LABEL + absolute PATH — all in ONE
+// trailing argv element (injection-safe even with a space in a path).
+func TestAuthorPlanIntentCarriesSkillAndSourcePaths(t *testing.T) {
+	t.Setenv(PermissionModeEnv, "auto")
+	sources := []SourceRef{
+		{Label: "web", Path: "/repos/web app"}, // a space in the path exercises injection-safety
+		{Label: "api", Path: "/repos/api"},
+	}
+	in := AuthorPlanIntent("Cross-repo migration", "/home/.gogo/projects/app/.gogo/plans/plan-7f3a.md",
+		"plan-7f3a", "/home/.gogo/projects/app/.knowledge", sources)
+
+	if in.Action != ActionAuthor {
+		t.Errorf("action = %v, want ActionAuthor", in.Action)
+	}
+	// A PLAIN prompt — never a slash-command launch, never a --correlation flag.
+	if strings.HasPrefix(in.Command, "/") {
+		t.Errorf("command = %q, must be a plain prompt (not a slash command)", in.Command)
+	}
+	if strings.Contains(in.Command, "--correlation") {
+		t.Errorf("command = %q, must NOT carry a --correlation flag (a plain session)", in.Command)
+	}
+	// It directs the session to the analyst skill + carries every seeded input.
+	for _, want := range []string{
+		"gogo-project-plan", // the skill directive
+		"/home/.gogo/projects/app/.gogo/plans/plan-7f3a.md", // the plan-file path
+		"/home/.gogo/projects/app/.knowledge",               // the project .knowledge/ dir
+		"/repos/web app", "/repos/api",                      // each source PATH (not just label)
+		"web", "api", // each source label
+		"targets:", "Source briefs", // the strict output contract
+		"plan-7f3a", // the correlation id (in prose)
+	} {
+		if !strings.Contains(in.Command, want) {
+			t.Errorf("command missing %q:\n%s", want, in.Command)
+		}
+	}
+	// The whole prompt stays ONE trailing argv element — no shell splitting on the
+	// space inside a source path (injection-safe).
+	got := TmuxNewSessionArgs("/repos/web app", in)
+	if last := got[len(got)-1]; last != in.Command {
+		t.Errorf("author prompt was split across argv: last element = %q", last)
+	}
+}
+
 // setEnv sets or unsets an env var for a test and restores it after. t.Setenv
 // cannot represent "unset", which the default-mode case needs.
 func setEnv(t *testing.T, key string, val *string) {

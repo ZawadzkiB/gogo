@@ -111,6 +111,17 @@ type planDoneEdit struct {
 	title   string
 }
 
+// planSpawnEdit marks an in-flight plans-tab accept+spawn confirm (0.25.0 FR2, `r`):
+// project + id name the CLI-owned plan the auto-spawn fans out from; targets is the set
+// of UN-spawned target sources the confirm will launch a `/gogo:plan` into. Analogous to
+// planDoneEdit but for the accept-and-spawn gate.
+type planSpawnEdit struct {
+	project string
+	id      string
+	title   string
+	targets []string
+}
+
 // Picker sentinels — the non-empty values the attach/kill huh.NewSelect writes to
 // binding.selected for its non-session options. Plain ASCII, and deliberately NOT
 // valid tmux session names or repo paths (a leading space never occurs in
@@ -161,12 +172,13 @@ type Model struct {
 	// list view), the plan-detail target-source cursor, and the in-flight new-plan form
 	// marker. Reads/writes ONLY ~/.gogo/… via the plans store; spawning a work item is
 	// a claude -p launch (never a source's .gogo/ write).
-	plans           []plans.Plan
-	planIdx         int
-	planDetail      *plans.Plan
-	planSourceIdx   int
-	pendingPlan     bool
-	pendingPlanDone *planDoneEdit // in-flight project-UAT accept confirm (FR3, `D`)
+	plans            []plans.Plan
+	planIdx          int
+	planDetail       *plans.Plan
+	planSourceIdx    int
+	pendingPlan      bool
+	pendingPlanDone  *planDoneEdit  // in-flight project-UAT accept confirm (FR3, `D`)
+	pendingPlanSpawn *planSpawnEdit // in-flight accept+spawn confirm (0.25.0 FR2, `r`)
 
 	// unified marks the multi-project cockpit board (0.23.0): the board aggregates
 	// EVERY registered project (LoadWorkspace) rather than one project's sources

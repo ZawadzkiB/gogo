@@ -369,51 +369,73 @@ func PlanIntent(label, body, correlation string) Intent {
 	}
 }
 
+// SourceRef pairs a source's display label with its absolute repo PATH — the pairs
+// the AuthorPlanIntent analyst seed lists so the loaded gogo-project-plan skill can
+// READ each source repo (by absolute path, read-only) and key its per-source brief
+// (by label). Carrying the path (not just the label) is what lets the session ANALYZE
+// the real repos and auto-select targets (0.25.0 FR1).
+type SourceRef struct {
+	Label string
+	Path  string
+}
+
 // AuthorPlanIntent builds the Intent for the plans-tab `A` "plan-with-claude"
-// authoring trigger (FR-D — the user's "start a claude session and prepare a plan"
-// ask). Unlike PlanIntent (a /gogo:plan SPAWN that has the skill scaffold a SOURCE
-// work item), this AUTHORS a PROJECT-LEVEL plan brief, so it launches a PLAIN
-// interactive `claude` session — NOT a slash command. /gogo:plan Step 1 would
-// unconditionally scaffold a source `.gogo/work/feature-<slug>/` (the wrong thing for
-// a project-plan file, and the advisory-prose-ignored failure D3 rejected), so the
-// authoring session is a plain prompt seeded to READ + EDIT the CLI-owned project-plan
-// markdown at planPath (fill in the goal / which of the listed sources to target / the
-// work items to spawn), keeping its front-matter correlation id, and to create NO
-// `.gogo/work/` scaffolding. The whole prompt reaches claude as ONE trailing argv
-// element (no shell — injection-safe, exactly like PlanIntent, even with spaces/
-// newlines in planPath or a source name). correlation rides in the PROSE only (the plan
-// file already carries it in front-matter); there is NO `--correlation` flag — that
-// param is a /gogo:plan spawn contract, meaningless to a plain session. Session name is
-// derived from label (sessionName("author", label)); like PlanIntent this is the
-// fire-once, non-persistent Launch path (no lock/registry, no resume key).
+// authoring trigger — now an analyst-grade session (0.25.0 FR1). Unlike PlanIntent (a
+// /gogo:plan SPAWN that has the skill scaffold a SOURCE work item), this AUTHORS a
+// PROJECT-LEVEL plan, so it launches a PLAIN interactive `claude` session — NOT a slash
+// command — and directs it to LOAD + FOLLOW the `gogo-project-plan` skill (via the
+// Skill tool). /gogo:plan Step 1 would unconditionally scaffold a source
+// `.gogo/work/feature-<slug>/` (the wrong thing for a project-plan file, and the
+// advisory-prose-ignored failure D3 rejected), so the session is seeded to READ +
+// ANALYZE the project's SOURCE repos (by absolute path, read-only), decide WHICH the
+// plan needs, and write the CLI-owned project-plan markdown at planPath IN PLACE with
+// the strict output contract the FR2 auto-spawn parses: a front-matter `targets:` line
+// (only the chosen sources) plus a `## Source briefs` body section keyed `### <name>`.
+// It keeps the front-matter correlation id and creates NO `.gogo/work/` scaffolding.
 //
-// FR2 (project-knowledge author-read): when knowledgePath is non-empty the seed prose
-// instructs the session to READ the project's cross-repo .knowledge/ FIRST, so the
-// whole-domain context (how the sources connect, glossary, integration contracts)
-// flows INTO the authored brief (and thus into each spawned work item's goal body).
-// The path is spliced into the same single trailing argv element (injection-safe).
-func AuthorPlanIntent(label, planPath, correlation, knowledgePath string, sources []string) Intent {
+// The whole prompt reaches claude as ONE trailing argv element (no shell —
+// injection-safe, exactly like PlanIntent, even with spaces/newlines in planPath or a
+// source path). correlation rides in the PROSE only (the plan file already carries it in
+// front-matter); there is NO `--correlation` flag — that param is a /gogo:plan spawn
+// contract, meaningless to a plain session. Session name is derived from label
+// (sessionName("author", label)); like PlanIntent this is the fire-once, non-persistent
+// Launch path (no lock/registry, no resume key).
+//
+// sources carries each source's LABEL + absolute PATH (SourceRef) so the analyst can
+// read the actual repos; knowledgePath (when non-empty) points the session at the
+// project's cross-repo .knowledge/ FIRST so the whole-domain context grounds the
+// analysis. Both are spliced into the same single trailing argv element.
+func AuthorPlanIntent(label, planPath, correlation, knowledgePath string, sources []SourceRef) Intent {
 	var b strings.Builder
-	b.WriteString("Author a gogo PROJECT PLAN in place. Read and edit the plan markdown file at ")
+	b.WriteString("Load and follow the gogo-project-plan skill (use the Skill tool) to author this gogo PROJECT PLAN in place.")
+	b.WriteString(" The project-plan markdown file is at ")
 	b.WriteString(planPath)
-	b.WriteString(" directly: set its front-matter title, then write the goal, BDD scenarios, and the target sources into that same file.")
+	b.WriteString(" - read and edit ONLY that one file.")
 	if kp := strings.TrimSpace(knowledgePath); kp != "" {
-		b.WriteString(" Before writing, READ the project's cross-repo domain knowledge under ")
+		b.WriteString(" First READ the project's cross-repo domain knowledge under ")
 		b.WriteString(kp)
-		b.WriteString(" (e.g. project-knowledge.md) so the brief carries the whole-domain context - how the sources connect, the shared glossary, and the integration contracts.")
+		b.WriteString(" (e.g. project-knowledge.md) - how the sources connect, the shared glossary, and the integration contracts.")
 	}
 	if len(sources) > 0 {
-		b.WriteString(" The project's sources you may target are: ")
-		b.WriteString(strings.Join(sources, ", "))
+		b.WriteString(" ANALYZE these SOURCE repos read-only by absolute path (code = source of truth) and decide which the plan needs - name -> path: ")
+		parts := make([]string, len(sources))
+		for i, s := range sources {
+			lbl := strings.TrimSpace(s.Label)
+			if lbl == "" {
+				lbl = s.Path
+			}
+			parts[i] = lbl + " -> " + s.Path
+		}
+		b.WriteString(strings.Join(parts, "; "))
 		b.WriteString(".")
 	}
 	if c := strings.TrimSpace(correlation); c != "" {
 		b.WriteString(" The plan's correlation id is ")
 		b.WriteString(c)
-		b.WriteString(" — it is already in the file's front-matter; keep it.")
+		b.WriteString(" - it is already in the file's front-matter; keep it.")
 	}
-	b.WriteString(" This is a PROJECT-LEVEL plan under the gogo data home: edit ONLY that one markdown file.")
-	b.WriteString(" Do NOT create any .gogo/work/ scaffolding and do NOT run the gogo-plan skill here — a work item is spawned separately, later, per target source.")
+	b.WriteString(" Output contract: set the front-matter targets: line to only the chosen source NAMES, and write a `## Source briefs` body section with a `### <source-name>` subsection per target giving that source's work-item brief.")
+	b.WriteString(" This is a PROJECT-LEVEL plan under the gogo data home: edit ONLY that one markdown file. Do NOT write any source's .gogo/ and do NOT scaffold a .gogo/work/ - a work item is spawned separately, later, per target source.")
 	return Intent{
 		Action:  ActionAuthor,
 		Command: b.String(),

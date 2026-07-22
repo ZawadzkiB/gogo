@@ -1,0 +1,3 @@
+{ "schema": 2, "name": "smart-project-plans", "release": "0.25.0", "date": "2026-07-22",
+  "members": [ { "slug": "smart-project-plans", "title": "analyst-driven project plans + auto-spawn on accept", "version": "0.25.0" } ],
+  "diagrams": [ { "kind": "flow", "file": "smart-project-plans-flow.mmd" }, { "kind": "state", "file": "smart-project-plans-plan-lifecycle.mmd" } ] }

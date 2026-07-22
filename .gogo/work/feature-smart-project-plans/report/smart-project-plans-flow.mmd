@@ -1,0 +1,34 @@
+flowchart TD
+  user["user picks PROJECT only\nplans-tab: A"]
+
+  subgraph cli["gogo CLI  (writes ONLY ~/.gogo/)"]
+    mint["planWithClaude:\nmint draft plan-XXXX.md"]
+    intent["AuthorPlanIntent\nseed: load gogo-project-plan\n+ source PATHS + .knowledge/ + planPath"]
+    accept["r / gogo plan ready\n= ACCEPT + auto-spawn"]
+    brief["plans.BriefFor(plan, target)"]
+    mint --> intent
+  end
+
+  subgraph session["claude session  (anchored at first source root)"]
+    skill["gogo-project-plan skill"]
+    read[".knowledge/ + read each SOURCE repo\n(read-only, absolute paths)"]
+    write["write plan-XXXX.md:\ntargets: a, b   +   ## Source briefs\n### a / ### b"]
+    skill --> read --> write
+  end
+
+  intent -- "Launch (fire-once, tmux/-p)" --> skill
+  write -- "front-matter targets + per-source briefs" --> planfile[("plan-XXXX.md\n~/.gogo/")]
+
+  planfile --> accept
+  accept --> brief
+  brief --> spawnA["PlanIntent(brief_a) + --skip-acceptance?"]
+  brief --> spawnB["PlanIntent(brief_b) + --skip-acceptance?"]
+  spawnA -- "/gogo:plan --correlation plan-XXXX\n(skill writes repo A .gogo/work/)" --> wiA["work item A\nrepo A"]
+  spawnB -- "/gogo:plan --correlation plan-XXXX\n(skill writes repo B .gogo/work/)" --> wiB["work item B\nrepo B"]
+  spawnA -. record member + status=active .-> planfile
+  spawnB -. record member .-> planfile
+
+  classDef cli fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef skill fill:#fff3d6,stroke:#caa54a,color:#111
+  class cli,mint,intent,accept,brief,planfile,user cli
+  class session,skill,read,write,spawnA,spawnB,wiA,wiB skill

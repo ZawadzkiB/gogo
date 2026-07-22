@@ -282,3 +282,57 @@ func TestMarkDone(t *testing.T) {
 		t.Errorf("second MarkDone did not increment the round:\n%s", again.Description)
 	}
 }
+
+// TestBriefFor pins the 0.25.0 FR2 per-source brief extractor: it returns the text
+// under a `### <sourceName>` subsection of the `## Source briefs` section (the shape the
+// gogo-project-plan analyst writes), "" when absent, ignores unrelated sections, and is
+// case-insensitive on the source name.
+func TestBriefFor(t *testing.T) {
+	body := `## Goal
+Cross-repo token migration.
+
+## Source briefs
+### web
+Swap the web token client to the new store.
+Touch: src/auth/*.ts. Accept: login still works.
+
+### api
+Expose the new token endpoint.
+
+## Out of scope
+Nothing here.`
+	p := Plan{Description: body}
+
+	cases := []struct {
+		name, source, wantHas string
+		wantEmpty             bool
+	}{
+		{"present-web", "web", "Swap the web token client", false},
+		{"present-api", "api", "Expose the new token endpoint", false},
+		{"case-insensitive", "WEB", "Swap the web token client", false},
+		{"absent-source", "worker", "", true},
+	}
+	for _, c := range cases {
+		got := BriefFor(p, c.source)
+		if c.wantEmpty {
+			if got != "" {
+				t.Errorf("%s: BriefFor(%q) = %q, want empty", c.name, c.source, got)
+			}
+			continue
+		}
+		if !strings.Contains(got, c.wantHas) {
+			t.Errorf("%s: BriefFor(%q) = %q, want it to contain %q", c.name, c.source, got, c.wantHas)
+		}
+		// The web brief must not bleed the api subsection or the Out-of-scope section.
+		if c.source == "web" && (strings.Contains(got, "token endpoint") || strings.Contains(got, "Out of scope")) {
+			t.Errorf("%s: BriefFor(web) leaked a neighbouring section: %q", c.name, got)
+		}
+	}
+
+	// A plan with NO `## Source briefs` section yields "" for every source (the
+	// hand-authored / n-drafted fallback path).
+	plain := Plan{Description: "## Goal\nJust a goal, no briefs."}
+	if got := BriefFor(plain, "web"); got != "" {
+		t.Errorf("BriefFor on a brief-less plan = %q, want empty", got)
+	}
+}

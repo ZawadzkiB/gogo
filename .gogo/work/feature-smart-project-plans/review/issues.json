@@ -1,0 +1,60 @@
+{
+  "slug": "smart-project-plans",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-22",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "TUI auto-spawn resolves the per-source skip flag via AllSources (cross-project path collision) instead of the source it already holds",
+      "description": "cli/internal/tui/plans_tab.go finishPlanSpawn resolves the plan-acceptance skip with `planSkip, _ := projects.SkipForSource(projects.AllSources(m.allProjects), src.Path)` after it has already resolved `src := m.sourceByName(target)` (a *projects.Source that carries src.PlanAcceptanceSkip directly). On a gogo home, a single repo may be linked as a source to MORE THAN ONE project (many-to-many is the documented model), each with its own config and possibly opposite PlanAcceptanceSkip. AllSources flattens EVERY project's sources and SkipForSource returns the FIRST entry whose Path matches, so when another project's identically-pathed source precedes the focused one in the flattened order, the spawn rides (or omits) --skip-acceptance from the WRONG project's config. The headless CLI mirror (cli/plan.go planReady) does this correctly: it scopes to `projects.SkipForSource(proj.Sources, src.Path)` for the loaded project. Impact is bounded (the flag only decides whether the spawned /gogo:plan auto-records its acceptance vs stops at the gate — not a write-scope or injection safety property), so this is minor, but the two mirrors should agree and the correct value is already in hand.",
+      "proposed_solution": "AGENT-FIXABLE. In finishPlanSpawn use the source already resolved: `planSkip := src.PlanAcceptanceSkip` (drop the AllSources round-trip), or at minimum scope the resolver to the focused project: `projects.SkipForSource(m.project.Sources, src.Path)`. Either brings the TUI in line with the CLI mirror and removes the cross-project bleed.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "finishPlanSpawn (cli/internal/tui/plans_tab.go:504-518) now rides `src.PlanAcceptanceSkip` from the source m.sourceByName already resolved (scoped to the FOCUSED project) instead of `SkipForSource(AllSources(m.allProjects), src.Path)`. The cross-project first-path-match round-trip is gone, so a repo linked to two projects with opposite PlanAcceptanceSkip now carries the focused project's flag. The two mirrors (TUI + CLI planReady) agree. No new test needed — TestPlansTabAcceptSpawnsPerTarget already asserts the per-source --skip-acceptance and stays green."
+    },
+    {
+      "id": "REV-002",
+      "title": "CLI `gogo plan ready` idempotency checks only recorded members, not board features (weaker than the TUI's member-OR-spawnedFeature guard)",
+      "description": "cli/plan.go planReady skips an already-spawned target with planHasMember(p, target) — a members-only check. The plans-tab `r` path (plans_tab.go targetSpawned) skips on a recorded member OR a board feature carrying the plan id (m.spawnedFeature). So a target spawned OUT OF BAND (a work item whose state.md correlation lists the plan id but with no member recorded back into the plan store) is skipped by the TUI but RE-LAUNCHED by `gogo plan ready`, producing a duplicate /gogo:plan work item in that source. Every sanctioned spawn path (`c`, `promote`, the auto-spawn itself) records a member, so in normal use planHasMember is sufficient and this matches the plan's stated member-based idempotency contract; the gap is only the retroactive-link case the TUI additionally guards. Verified by reading both idempotency helpers; real but low-frequency.",
+      "proposed_solution": "AGENT-FIXABLE (borderline NEEDS-USER-DECISION). Either (a) accept the member-based contract as sufficient for the headless CLI (document that `gogo plan ready` idempotency is member-scoped and the board-feature guard is TUI-only), or (b) have planReady also consult the source's contract features for the plan correlation (via contract.LoadProject) before re-spawning, matching the TUI. Given the CLI is a deterministic reader, (a) with an explicit note is the lighter fix.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Chose option (b): planReady (cli/plan.go) now also skips a target whose source already carries a work item stamped with the plan's correlation id, via a new pure-READ helper planFeatureSpawned(root, planID) that contract.LoadRepo's the source and scans f.Correlations. Idempotency is now member-OR-feature, matching the plans-tab targetSpawned guard; a re-run never re-launches an out-of-band spawn. Never writes a source. New test: TestCmdPlanReadyIdempotentOnBoardFeature (a correlated feature on disk, no member → skipped, only the fresh target launches)."
+    },
+    {
+      "id": "REV-003",
+      "title": "CLI `gogo plan ready` reports \"all targets already spawned\" when spawned==0 was actually caused by unresolved/invalid targets, and swallows a projects.Load error",
+      "description": "cli/plan.go planReady loads the project with `proj, _ := projects.Load(project)` (error ignored) and, in the fan-out loop, skips a target that is not a source via a stderr warning + continue. After the loop, `if spawned == 0` unconditionally prints `plan %s: all %d target(s) already spawned - nothing to do` and returns 0. When spawned==0 is caused by targets that failed to resolve as sources (or a mix of already-membered and invalid targets, or a failed projects.Load that empties proj.Sources), the stdout summary falsely claims everything was already spawned, contradicting the stderr `... is not a source ... skipping` lines and exiting 0. Minor UX/observability inaccuracy; no state corruption.",
+      "proposed_solution": "AGENT-FIXABLE. Track skipped-as-already-membered vs skipped-as-invalid separately and word the zero-spawn summary accordingly (e.g. `N already spawned, M invalid target(s) skipped`); consider returning non-zero when a target was invalid. Also handle the projects.Load error explicitly (a missing project should be a clear error, not a silent empty source set).",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "planReady (cli/plan.go) now: (1) loads the project with an explicit error check (`proj, err := projects.Load(project)`) and refuses on a source-less project up front with a clear 'no sources' error + non-zero, instead of swallowing an empty source set; (2) counts alreadySpawned vs invalid targets separately, so the zero-spawn path only prints the 'all already spawned - nothing to do' success when there are genuinely NO invalid targets — otherwise it names the unresolved targets on stderr and returns non-zero; (3) when some spawned but a target was unresolved, prints a partial-success stderr line naming the skipped targets and returns non-zero. New tests: TestCmdPlanReadyInvalidTargetsReported (mixed already-membered + invalid → non-zero, names 'ghost', no misreport) and TestCmdPlanReadyMissingProjectSources (source-less project → 'no sources' + non-zero)."
+    },
+    {
+      "id": "REV-004",
+      "title": "The updateForm -> finishPlanSpawn form-completion routing has no test that drives a completed huh form message",
+      "description": "cli/internal/tui/update.go adds `if m.pendingPlanSpawn != nil { return m.finishPlanSpawn() }` to the form-completion path. Every new test (plans_tab_test.go) exercises the spawn by opening the confirm with `r`, then setting `m.binding.confirm = true` and calling `m.finishPlanSpawn()` DIRECTLY — none drives the confirm through the updateForm completion routing (the actual line shipped). This mirrors the existing planDone pattern and the risk is low (a 3-line mutually-exclusive dispatch), but the routing itself — including that a cancelled confirm returns to the plans tab without launching — is not asserted end-to-end. TEST-001 heap-stable binding is exercised; the message-driven dispatch is not.",
+      "proposed_solution": "AGENT-FIXABLE. Add one test that opens the accept+spawn confirm, feeds the form's completion message through m.Update (not a direct finishPlanSpawn call), and asserts (a) confirm=true routes to the fan-out cmd, and (b) confirm=false / cancel returns to tabPlans with zero launcher fires and the plan left un-spawned.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Added TestPlansTabAcceptSpawnFormMessageDriven (cli/internal/tui/plans_tab_test.go) driving the confirm through huh's real async completion via keyPress: pressing `y` completes the form → updateForm routes through the shipped `if m.pendingPlanSpawn != nil` dispatch → finishPlanSpawn fires the launcher once per target (asserts 2 fires, plan active with 2 members, back on tabPlans); pressing `n` completes to the cancel branch (asserts 0 fires, plan un-spawned, back on tabPlans). Each sub-case uses its own project so the plans-list cursor is deterministic."
+    }
+  ]
+}

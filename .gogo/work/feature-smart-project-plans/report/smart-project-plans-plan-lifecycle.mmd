@@ -1,0 +1,18 @@
+stateDiagram-v2
+  [*] --> draft: A mints plan\n(gogo-project-plan session authoring)
+
+  draft --> draft: analyst writes\ntargets: + per-source briefs
+  draft --> ready: r on a TARGETLESS plan\n(plain MarkReady, no spawn)
+  draft --> active: r ACCEPT + auto-spawn\n(confirm → PlanIntent per target)
+  ready --> active: c / gogo plan promote\n(manual spawn, fallback)
+
+  active --> active: more members spawned\n(--skip-acceptance per source)
+  active --> awaiting_project_uat: every member shipped\n(DERIVED at read time)
+  awaiting_project_uat --> done: D / gogo plan done\n(CLI records project-UAT)
+  done --> [*]
+
+  note right of active
+    each member = /gogo:plan --correlation plan-XXXX
+    (skill writes the source .gogo/work/)
+    uatAcceptanceSkip applies at member /gogo:go
+  end note

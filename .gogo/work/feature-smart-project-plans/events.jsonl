@@ -1,0 +1,12 @@
+{"ts":"2026-07-22T08:19:15Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"smart-project-plans"}
+{"ts":"2026-07-22T09:00:00Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"smart-project-plans","note":"D1=a new gogo-project-plan skill, D3=a auto-spawn on r; D2/D4/D5 rec; all-in-one 0.25.0"}
+{"ts":"2026-07-22T10:00:00Z","event":"phase-started","phase":"review","status":"reviewing","slug":"smart-project-plans","note":"green + 0.25.0 preview installed; fresh-eyes review of auto-spawn + new skill contract"}
+{"ts":"2026-07-22T10:40:00Z","event":"review-done","phase":"review","status":"reviewing","slug":"smart-project-plans","note":"APPROVE 0/0/3-minor/1-nit; auto-spawn + new skill hold; fixing the 4 before ship"}
+{"ts":"2026-07-22T11:10:00Z","event":"review-done","phase":"review","status":"reviewing","slug":"smart-project-plans","note":"round 1 fixes verified (REV-001..004); gate green; review resolved"}
+{"ts":"2026-07-22T11:11:00Z","event":"phase-started","phase":"test","status":"testing","slug":"smart-project-plans","note":"e2e: r-accept auto-spawn fan-out, BriefFor, AuthorPlanIntent wiring, additive fallbacks"}
+{"ts":"2026-07-22T11:50:00Z","event":"test-done","phase":"test","status":"testing","slug":"smart-project-plans","note":"PASS; core fan-out verified w/ real binary+stub claude; 1 minor (TEST-001 exit-0-on-launch-failure) to fix"}
+{"ts":"2026-07-22T12:20:00Z","event":"test-done","phase":"test","status":"testing","slug":"smart-project-plans","note":"TEST-001 fixed; all findings resolved; gate green"}
+{"ts":"2026-07-22T12:21:00Z","event":"report-done","phase":"report","status":"reporting","slug":"smart-project-plans","note":"report written"}
+{"ts":"2026-07-22T12:22:00Z","event":"awaiting-uat","phase":"report","status":"awaiting-uat","slug":"smart-project-plans","note":"UAT: A on the plans tab (drives the analyst), r to auto-spawn; accept via /gogo:done to ship 0.25.0"}
+{"ts":"2026-07-22T13:00:00Z","event":"uat-passed","phase":"done","status":"shipped","slug":"smart-project-plans","note":"user accepted via /gogo:done"}
+{"ts":"2026-07-22T13:01:00Z","event":"shipped","phase":"done","status":"shipped","slug":"smart-project-plans","note":"0.25.0 changelog entry written"}

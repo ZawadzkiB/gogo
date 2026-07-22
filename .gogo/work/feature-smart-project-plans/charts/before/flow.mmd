@@ -1,0 +1,30 @@
+flowchart TD
+  user["user picks project — plans-tab: A"]
+
+  subgraph cli["gogo CLI  (writes ONLY ~/.gogo/) — TODAY"]
+    mint["planWithClaude:\nmint draft plan-XXXX.md"]
+    intent["AuthorPlanIntent (ActionAuthor)\nPLAIN prose seed: read .knowledge/,\nLIST source LABELS, edit plan in place"]
+    ready["r = MarkReady\n(status flip only, NO spawn)"]
+    add["+ add source (manual, one at a time)"]
+    c["c create work item\n(manual, one FOCUSED target at a time)"]
+    mint --> intent
+  end
+
+  subgraph session["plain claude session  (first source root)"]
+    edit["edit plan-XXXX.md in place:\ntitle · goal · BDD · targets\n(NO source-repo analysis)"]
+  end
+
+  intent -- "Launch (plain interactive claude)" --> edit
+  edit --> planfile[("plan-XXXX.md\ntargets hand-listed by the session/user")]
+
+  planfile --> add --> c
+  c -- "/gogo:plan --correlation plan-XXXX\n(one source, manual)" --> wi["work item (per source, pressed c each time)"]
+
+  planfile -. "targets NOT auto-selected\nno per-source brief" .-> gap["(user hand-picks every target\n+ spawns each one by one)"]
+
+  classDef cli fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef skill fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef gap fill:#f3d6d6,stroke:#c07a7a,color:#111
+  class cli,mint,intent,ready,add,c,planfile,user cli
+  class session,edit,wi skill
+  class gap gap

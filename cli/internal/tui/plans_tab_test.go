@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -214,6 +215,14 @@ func TestPlanWithClaudeMintsAndFires(t *testing.T) {
 	if !strings.Contains(gotIntent.Command, projects.KnowledgeDir("app")) {
 		t.Errorf("command = %q, want it to reference the project .knowledge/ path %q (FR2 author-read)",
 			gotIntent.Command, projects.KnowledgeDir("app"))
+	}
+	// 0.25.0 FR1: the analyst seed directs the session to the gogo-project-plan skill AND
+	// carries each source's absolute PATH (not just its label) so it can READ the repos.
+	if !strings.Contains(gotIntent.Command, "gogo-project-plan") {
+		t.Errorf("command = %q, want the gogo-project-plan skill directive (0.25.0 FR1)", gotIntent.Command)
+	}
+	if !strings.Contains(gotIntent.Command, "/repos/web") {
+		t.Errorf("command = %q, want it to carry the source PATH /repos/web (analyst reads the repo)", gotIntent.Command)
 	}
 	// Anchored at the project's FIRST SOURCE root (trusted repo), never the ~/.gogo home.
 	if gotRoot != "/repos/web" {
@@ -477,5 +486,271 @@ func TestPlanListSingleCursor(t *testing.T) {
 	det := send(m, tea.KeyMsg{Type: tea.KeyEnter}).View()
 	if strings.Contains(det, "▸ ▸") {
 		t.Errorf("plan detail doubled the target-row cursor (`▸ ▸`):\n%s", det)
+	}
+}
+
+// TestPlansTabAcceptSpawnsPerTarget pins the 0.25.0 FR2 auto-spawn (`r` accept): a plan
+// with 3 analyst-chosen targets opens a confirm listing them, and on accept fires the
+// launcher ONCE per target — each `/gogo:plan` carrying that target's per-source BRIEF as
+// the goal + the plan correlation id, the plan-acceptance-skip source getting
+// `--skip-acceptance` — records 3 members, and flips the plan `active`.
+func TestPlansTabAcceptSpawnsPerTarget(t *testing.T) {
+	seedDataHome(t)
+	body := `## Goal
+Roll out the new token flow.
+
+## Source briefs
+### web
+Rewire the web token client.
+
+### api
+Add the token endpoint.
+
+### worker
+Rotate tokens on schedule.`
+	p, _ := plans.New("app", "Rollout", body)
+	plans.AddTarget("app", p.ID, "web")
+	plans.AddTarget("app", p.ID, "api")
+	plans.AddTarget("app", p.ID, "worker")
+
+	project := projects.Project{Name: "app", Sources: []projects.Source{
+		{Name: "web", Path: "/r/web"},
+		{Name: "api", Path: "/r/api", PlanAcceptanceSkip: true}, // opted OUT of the plan-acceptance gate
+		{Name: "worker", Path: "/r/worker"},
+	}}
+	m := NewWorkspace(&contract.Repo{}, project)
+	m.hasClaude = true
+	m.tab = tabPlans
+
+	var calls int
+	cmds := map[string]string{}
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		calls++
+		cmds[root] = in.Command
+		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
+	}
+
+	// r opens the accept+spawn confirm listing the 3 un-spawned targets.
+	nm, _ := m.Update(runes("r"))
+	m = nm.(Model)
+	if m.pendingPlanSpawn == nil || m.mode != modeForm {
+		t.Fatalf("r did not open the accept+spawn confirm (mode=%d pending=%v)", m.mode, m.pendingPlanSpawn)
+	}
+	if len(m.pendingPlanSpawn.targets) != 3 {
+		t.Fatalf("confirm targets = %v, want the 3 un-spawned sources", m.pendingPlanSpawn.targets)
+	}
+
+	// Confirm through the heap-stable binding (TEST-001), then run the fan-out cmd.
+	m.binding.confirm = true
+	fm, cmd := m.finishPlanSpawn()
+	m = fm.(Model)
+	if cmd == nil {
+		t.Fatal("finishPlanSpawn returned a nil cmd on confirm")
+	}
+	if _, ok := cmd().(launchDoneMsg); !ok {
+		t.Fatal("spawn cmd did not resolve to a launchDoneMsg")
+	}
+
+	if calls != 3 {
+		t.Fatalf("launcher fired %d times, want exactly 3 (one per un-spawned target)", calls)
+	}
+	// Each spawn rooted at its source, carrying the plan correlation id + its OWN brief.
+	for root, brief := range map[string]string{
+		"/r/web":    "Rewire the web token client",
+		"/r/api":    "Add the token endpoint",
+		"/r/worker": "Rotate tokens on schedule",
+	} {
+		got := cmds[root]
+		if got == "" {
+			t.Errorf("no spawn rooted at %s", root)
+			continue
+		}
+		if !strings.Contains(got, brief) {
+			t.Errorf("spawn at %s missing its per-source brief %q: %q", root, brief, got)
+		}
+		if !strings.Contains(got, "--correlation "+p.ID) {
+			t.Errorf("spawn at %s missing --correlation %s: %q", root, p.ID, got)
+		}
+	}
+	// A brief is per-source: web's spawn must NOT carry api's brief text.
+	if strings.Contains(cmds["/r/web"], "Add the token endpoint") {
+		t.Errorf("web spawn leaked api's brief: %q", cmds["/r/web"])
+	}
+	// The plan-acceptance-skip source (api) carries --skip-acceptance; the plain ones don't.
+	if !strings.Contains(cmds["/r/api"], "--skip-acceptance") {
+		t.Errorf("api (planAcceptanceSkip) spawn missing --skip-acceptance: %q", cmds["/r/api"])
+	}
+	if strings.Contains(cmds["/r/web"], "--skip-acceptance") {
+		t.Errorf("web (no skip) spawn wrongly carries --skip-acceptance: %q", cmds["/r/web"])
+	}
+	// 3 members recorded + plan flipped active (store-only writes to ~/.gogo/).
+	got, _ := plans.Get("app", p.ID)
+	if got.Status != plans.StatusActive || len(got.Members) != 3 {
+		t.Errorf("after accept plan = %+v, want active with 3 members", got)
+	}
+}
+
+// TestPlansTabAcceptTargetlessJustMarksReady pins the additive fallback (FR3): a plan
+// with NO analyst-chosen targets keeps today's plain `r` → MarkReady with ZERO launches
+// (no confirm, no spawn).
+func TestPlansTabAcceptTargetlessJustMarksReady(t *testing.T) {
+	seedDataHome(t)
+	p, _ := plans.New("app", "Solo idea", "just an idea")
+
+	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/r/web")))
+	m.hasClaude = true
+	m.tab = tabPlans
+	fired := false
+	m.launcher = func(string, launch.Intent) (launch.Result, error) { fired = true; return launch.Result{}, nil }
+
+	nm, _ := m.Update(runes("r"))
+	m = nm.(Model)
+	if m.pendingPlanSpawn != nil {
+		t.Fatalf("targetless r opened a spawn confirm (%v)", m.pendingPlanSpawn)
+	}
+	if fired {
+		t.Error("targetless r fired the launcher (want zero launches)")
+	}
+	if got, _ := plans.Get("app", p.ID); got.Status != plans.StatusReady {
+		t.Errorf("targetless r: status = %q, want ready (plain MarkReady)", got.Status)
+	}
+}
+
+// TestPlansTabAcceptSkipsAlreadySpawned pins the idempotency (D3=a): a re-`r` on a plan
+// whose `web` target was already spawned confirms + fans out ONLY the still-un-spawned
+// `api`, never re-launching web.
+func TestPlansTabAcceptSkipsAlreadySpawned(t *testing.T) {
+	seedDataHome(t)
+	p, _ := plans.New("app", "Rollout", "body")
+	plans.AddTarget("app", p.ID, "web")
+	plans.AddTarget("app", p.ID, "api")
+	plans.AddMember("app", p.ID, plans.Member{Source: "web", SlugHint: "rollout"}) // web already spawned
+	plans.SetStatus("app", p.ID, plans.StatusActive)
+
+	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/r/web"), src("api", "/r/api")))
+	m.hasClaude = true
+	m.tab = tabPlans
+
+	var calls int
+	var roots []string
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		calls++
+		roots = append(roots, root)
+		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
+	}
+
+	nm, _ := m.Update(runes("r"))
+	m = nm.(Model)
+	if m.pendingPlanSpawn == nil {
+		t.Fatalf("r did not open a confirm for the remaining un-spawned target")
+	}
+	if len(m.pendingPlanSpawn.targets) != 1 || m.pendingPlanSpawn.targets[0] != "api" {
+		t.Fatalf("confirm targets = %v, want only [api] (web already spawned)", m.pendingPlanSpawn.targets)
+	}
+	m.binding.confirm = true
+	fm, cmd := m.finishPlanSpawn()
+	m = fm.(Model)
+	cmd()
+	if calls != 1 || len(roots) != 1 || roots[0] != "/r/api" {
+		t.Fatalf("fired %d times %v, want exactly 1 into /r/api (web skipped)", calls, roots)
+	}
+	if got, _ := plans.Get("app", p.ID); len(got.Members) != 2 {
+		t.Errorf("after accept members = %d, want 2 (web + api)", len(got.Members))
+	}
+}
+
+// TestPlansTabAcceptLaunchErrorRecordsNoMember pins REV-005: a spawn whose launch fails
+// records NO member (never a phantom active member the store would over-report).
+func TestPlansTabAcceptLaunchErrorRecordsNoMember(t *testing.T) {
+	seedDataHome(t)
+	p, _ := plans.New("app", "Rollout", "body")
+	plans.AddTarget("app", p.ID, "web")
+
+	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/r/web")))
+	m.hasClaude = true
+	m.tab = tabPlans
+	m.launcher = func(string, launch.Intent) (launch.Result, error) {
+		return launch.Result{}, errors.New("boom")
+	}
+
+	nm, _ := m.Update(runes("r"))
+	m = nm.(Model)
+	if m.pendingPlanSpawn == nil {
+		t.Fatal("r did not open the accept+spawn confirm")
+	}
+	m.binding.confirm = true
+	fm, cmd := m.finishPlanSpawn()
+	m = fm.(Model)
+	cmd()
+	if got, _ := plans.Get("app", p.ID); len(got.Members) != 0 {
+		t.Errorf("a failed launch recorded a phantom member: %+v", got.Members)
+	}
+}
+
+// TestPlansTabAcceptSpawnFormMessageDriven pins REV-004: the accept+spawn confirm
+// completes through a REAL huh form message (not a direct finishPlanSpawn call),
+// exercising the shipped updateForm → pendingPlanSpawn → finishPlanSpawn dispatch line
+// (and its cancel branch) end-to-end. Confirm (y) fans out one launch per target and
+// lands back on the plans tab; a separate cancel (n) fires nothing and leaves the plan
+// un-spawned.
+func TestPlansTabAcceptSpawnFormMessageDriven(t *testing.T) {
+	seedDataHome(t)
+
+	// A fresh project per sub-case, so the plans-list cursor deterministically lands on
+	// the one plan under test (an isolated store, not a shared one whose ordering shifts).
+	setup := func(project string) (Model, string, *int) {
+		p, _ := plans.New(project, "Rollout", "roll it out")
+		plans.AddTarget(project, p.ID, "web")
+		plans.AddTarget(project, p.ID, "api")
+		m := NewWorkspace(&contract.Repo{}, proj(project, src("web", "/r/web"), src("api", "/r/api")))
+		m.hasClaude = true
+		m.tab = tabPlans
+		calls := 0
+		m.launcher = func(string, launch.Intent) (launch.Result, error) {
+			calls++
+			return launch.Result{Mode: "tmux"}, nil
+		}
+		return m, p.ID, &calls
+	}
+
+	// Confirm (y): huh's async completion message routes through updateForm to the fan-out.
+	m, id, calls := setup("confirmapp")
+	m = send(m, runes("r"))
+	if m.pendingPlanSpawn == nil || m.mode != modeForm {
+		t.Fatalf("r did not open the accept+spawn confirm (mode=%d pending=%v)", m.mode, m.pendingPlanSpawn)
+	}
+	m = keyPress(t, m, runes("y")) // affirmative → huh completes → finishPlanSpawn fan-out
+	if *calls != 2 {
+		t.Fatalf("message-driven confirm fired the launcher %d times, want 2 (one per target)", *calls)
+	}
+	if m.mode != modeBoard || m.tab != tabPlans {
+		t.Errorf("after confirm mode=%d tab=%d, want back on the plans tab", m.mode, m.tab)
+	}
+	if m.pendingPlanSpawn != nil {
+		t.Errorf("pendingPlanSpawn not cleared after completion: %v", m.pendingPlanSpawn)
+	}
+	if got, _ := plans.Get("confirmapp", id); got.Status != plans.StatusActive || len(got.Members) != 2 {
+		t.Errorf("after confirm plan = %+v, want active with 2 members", got)
+	}
+
+	// Cancel (n): the negative completion routes to finishPlanSpawn's cancel branch —
+	// zero launches, plan left un-spawned, back on the plans tab.
+	m2, id2, calls2 := setup("cancelapp")
+	m2 = send(m2, runes("r"))
+	if m2.pendingPlanSpawn == nil {
+		t.Fatalf("r did not open the confirm for the cancel case")
+	}
+	m2 = keyPress(t, m2, runes("n")) // negative → huh completes → cancel branch
+	if *calls2 != 0 {
+		t.Errorf("cancel fired the launcher %d times, want 0", *calls2)
+	}
+	if m2.mode != modeBoard || m2.tab != tabPlans {
+		t.Errorf("after cancel mode=%d tab=%d, want back on the plans tab", m2.mode, m2.tab)
+	}
+	if m2.pendingPlanSpawn != nil {
+		t.Errorf("pendingPlanSpawn not cleared after cancel: %v", m2.pendingPlanSpawn)
+	}
+	if got, _ := plans.Get("cancelapp", id2); len(got.Members) != 0 || got.Status == plans.StatusActive {
+		t.Errorf("cancel spawned/activated the plan: %+v", got)
 	}
 }

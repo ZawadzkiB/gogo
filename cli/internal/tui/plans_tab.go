@@ -146,7 +146,7 @@ func (m Model) updatePlans(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // updatePlanList handles the plans list keys: ↑↓ nav · enter open · n new · A
-// plan-with-claude · r mark-ready · x delete.
+// plan-with-claude · r accept (mark-ready + auto-spawn) · x delete.
 func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	g := m.groupedPlans()
 	switch msg.String() {
@@ -171,14 +171,7 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "D":
 		return m.planAcceptUAT(m.focusedPlan())
 	case "r":
-		if p := m.focusedPlan(); p != nil && m.project != nil {
-			if _, err := plans.MarkReady(m.project.Name, p.ID); err != nil {
-				m.status = "mark-ready failed: " + err.Error()
-			} else {
-				m.loadPlans()
-				m.status = "marked " + p.ID + " ready"
-			}
-		}
+		return m.planReadyAndSpawn()
 	case "x":
 		if p := m.focusedPlan(); p != nil && m.project != nil {
 			id := p.ID
@@ -382,6 +375,178 @@ func (m Model) planCreateWorkItem() (tea.Model, tea.Cmd) {
 	}
 }
 
+// planReadyAndSpawn is the plans-tab `r` ACCEPT step (0.25.0 FR2, D3=a). It overloads
+// the old plain draft→ready flip to AUTO-SPAWN a work item into each target the analyst
+// chose:
+//   - A TARGETLESS plan → today's plain MarkReady (zero launches), byte-for-byte.
+//   - A plan with ≥1 target → open a huh confirm listing the UN-spawned targets; on
+//     accept, finishPlanSpawn loops the fire-once launcher seam (mirroring
+//     planCreateWorkItem) once per un-spawned target with its per-source brief + skip.
+//   - Every target already spawned → a no-op status (the plan is already active); a
+//     re-`r` never re-launches (idempotent).
+//
+// Spawning needs claude on PATH; without it the targeted path surfaces a hint (a
+// targetless plan still marks ready). c (spawn one focused target) stays the manual
+// fallback, unchanged.
+func (m Model) planReadyAndSpawn() (tea.Model, tea.Cmd) {
+	p := m.focusedPlan()
+	if p == nil || m.project == nil {
+		return m, nil
+	}
+	// A targetless (hand-authored / n-drafted) plan spawns nothing — today's MarkReady.
+	if len(p.Targets) == 0 {
+		if _, err := plans.MarkReady(m.project.Name, p.ID); err != nil {
+			m.status = "mark-ready failed: " + err.Error()
+		} else {
+			m.loadPlans()
+			m.status = "marked " + p.ID + " ready"
+		}
+		return m, nil
+	}
+	todo := m.unspawnedTargets(*p)
+	if len(todo) == 0 {
+		m.status = fmt.Sprintf("all %d target(s) already spawned for %s", len(p.Targets), p.ID)
+		return m, nil
+	}
+	if !m.hasClaude {
+		m.status = "claude CLI not on PATH — cannot spawn work items (use `gogo plan promote`, or `c` per source)"
+		return m, nil
+	}
+	m.startPlanSpawnForm(p, todo)
+	return m, m.form.Init()
+}
+
+// unspawnedTargets returns the plan's targets that have NOT been spawned into yet — the
+// fan-out set the `r` accept confirms. A target counts as spawned when the plan already
+// records a member for it OR a board feature carries the plan id in that source (the same
+// signal the plan card's dot strip uses), so a re-`r` (or a target spawned earlier via
+// `c`) is skipped (idempotent).
+func (m Model) unspawnedTargets(p plans.Plan) []string {
+	var out []string
+	for _, t := range p.Targets {
+		if m.targetSpawned(p, t) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// targetSpawned reports whether the plan already has a work item for source t — a
+// recorded member (the store-side, launcher-driven idempotency signal) or a board
+// feature carrying the plan id (the out-of-band `c` / retroactive-link signal).
+func (m Model) targetSpawned(p plans.Plan, t string) bool {
+	for _, mem := range p.Members {
+		if mem.Source == t {
+			return true
+		}
+	}
+	return m.spawnedFeature(t, p.ID) != nil
+}
+
+// startPlanSpawnForm opens the huh accept+spawn confirm under modeForm (0.25.0 FR2, `r`).
+// It marks pendingPlanSpawn (so updateForm routes completion to finishPlanSpawn and a
+// cancel returns to the plans tab) and binds the confirm through a heap-stable
+// *formBinding (TEST-001). Reached only with ≥1 un-spawned target + claude on PATH.
+func (m *Model) startPlanSpawnForm(p *plans.Plan, targets []string) {
+	m.pendingPlanSpawn = &planSpawnEdit{project: m.project.Name, id: p.ID, title: p.Title, targets: targets}
+	b := &formBinding{}
+	m.binding = b
+	m.form = huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title(fmt.Sprintf("Accept %s and spawn %d work item(s)?", p.ID, len(targets))).
+			Description("into: " + strings.Join(targets, ", ") + " — launches /gogo:plan per source, records members, flips the plan active").
+			Affirmative("Spawn").
+			Negative("Cancel").
+			Value(&b.confirm),
+	))
+	m.mode = modeForm
+}
+
+// finishPlanSpawn applies a completed accept+spawn confirm (0.25.0 FR2, D3=a). On Spawn
+// it LOOPS the fire-once launcher seam once per un-spawned target — building
+// PlanIntent(title, BriefFor(target) or body, planID) + the target source's per-source
+// `--skip-acceptance` — and records a member + flips the plan `active` ONLY on a
+// SUCCESSFUL launch (REV-005: a failed launch leaves no phantom member). The CLI writes
+// NOTHING under a source's .gogo/: each launched `gogo:plan` skill writes the work item +
+// stamps the correlation. The launchDoneMsg handler reloads m.plans so the Model catches
+// up to the store writes.
+func (m Model) finishPlanSpawn() (tea.Model, tea.Cmd) {
+	edit := m.pendingPlanSpawn
+	b := m.binding
+	m.pendingPlanSpawn = nil
+	m.binding = nil
+	m.form = nil
+	m.mode = modeBoard // renders the active tab (tabPlans)
+	if edit == nil || b == nil {
+		return m, nil
+	}
+	if !b.confirm {
+		m.status = "cancelled"
+		return m, nil
+	}
+	p, ok := plans.Get(edit.project, edit.id)
+	if !ok {
+		m.status = "no plan " + edit.id + " in " + edit.project
+		return m, nil
+	}
+	body := p.Description
+	if strings.TrimSpace(body) == "" {
+		body = p.Title
+	}
+	// Resolve each target's root + intent NOW (the Model still carries project/sources);
+	// the fired cmd only touches the launcher + the ~/.gogo/ store.
+	type spawn struct {
+		source string
+		root   string
+		intent launch.Intent
+	}
+	var spawns []spawn
+	for _, target := range edit.targets {
+		src := m.sourceByName(target)
+		if src == nil {
+			continue // source vanished from the project — skip (never a phantom member)
+		}
+		goal := plans.BriefFor(p, target)
+		if strings.TrimSpace(goal) == "" {
+			goal = body
+		}
+		intent := launch.PlanIntent(p.Title, goal, p.ID)
+		// Ride the skip flag of the source ALREADY in hand (m.sourceByName scopes to the
+		// FOCUSED project), not a first-path-match across EVERY project's sources (REV-001):
+		// a repo linked to two projects with opposite PlanAcceptanceSkip must carry the
+		// focused project's flag, never whichever identically-pathed source sorts first.
+		intent.Command += launch.SkipParams(src.PlanAcceptanceSkip, false)
+		spawns = append(spawns, spawn{source: target, root: src.Path, intent: intent})
+	}
+	if len(spawns) == 0 {
+		m.status = "no spawnable targets for " + edit.id
+		return m, nil
+	}
+	launcher := m.launcher
+	project := edit.project
+	planID := edit.id
+	slugHint := planSlugHint(p.Title)
+
+	return m, func() tea.Msg {
+		launched, failed := 0, 0
+		for _, s := range spawns {
+			if _, err := launcher(s.root, s.intent); err != nil {
+				failed++
+				continue // leave this target un-recorded (no phantom member, REV-005)
+			}
+			plans.AddMember(project, planID, plans.Member{Source: s.source, SlugHint: slugHint})
+			plans.SetStatus(project, planID, plans.StatusActive)
+			launched++
+		}
+		status := fmt.Sprintf("accepted %s — spawned %d work item(s)", planID, launched)
+		if failed > 0 {
+			status += fmt.Sprintf(" (%d failed)", failed)
+		}
+		return launchDoneMsg{status: status}
+	}
+}
+
 // planAddTarget adds the next project source not yet targeted to the plan's targets
 // (FR11 `+ add source`), persists it, and refreshes the open detail. A no-op with a
 // status when every source is already a target.
@@ -500,7 +665,7 @@ func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 	planPath := plans.Path(m.project.Name, p.ID)
 	// FR2: seed the author to READ the project's cross-repo .knowledge/ first, so the
 	// whole-domain context flows into the brief (and each spawned work item's goal).
-	intent := launch.AuthorPlanIntent(p.Title, planPath, p.ID, projects.KnowledgeDir(m.project.Name), m.sourceNames())
+	intent := launch.AuthorPlanIntent(p.Title, planPath, p.ID, projects.KnowledgeDir(m.project.Name), m.sourceRefs())
 
 	// Anchor at a real source root (trusted repo) so the session doesn't park on a
 	// first-run trust prompt for the ~/.gogo/ home. No source yet → fall back to the
@@ -525,20 +690,21 @@ func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 	}
 }
 
-// sourceNames returns the focused project's source labels (Name, else the path
-// basename) in order — the choice of targets the plan-with-claude author is offered in
-// the seeded prompt. Nil in single-repo mode (no project).
-func (m *Model) sourceNames() []string {
+// sourceRefs returns the focused project's sources as label+absolute-path pairs in
+// order — what the analyst-grade plan-with-claude session (0.25.0 FR1) needs to READ +
+// ANALYZE each source repo (by path) and key its per-source brief (by label). Nil in
+// single-repo mode (no project).
+func (m *Model) sourceRefs() []launch.SourceRef {
 	if m.project == nil {
 		return nil
 	}
-	out := make([]string, 0, len(m.project.Sources))
+	out := make([]launch.SourceRef, 0, len(m.project.Sources))
 	for _, s := range m.project.Sources {
 		label := s.Name
 		if label == "" {
 			label = filepath.Base(s.Path)
 		}
-		out = append(out, label)
+		out = append(out, launch.SourceRef{Label: label, Path: s.Path})
 	}
 	return out
 }
@@ -586,7 +752,7 @@ func (m Model) viewPlans() string {
 	if m.status != "" {
 		parts = append(parts, statusStyle(m.status), "")
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · enter open · n new · A plan-with-claude · r ready · D accept UAT · x delete · tab board/config · q quit")
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · enter open · n new · A plan-with-claude · r accept+spawn · D accept UAT · x delete · tab board/config · q quit")
 	parts = append(parts, help)
 	return strings.Join(parts, "\n")
 }

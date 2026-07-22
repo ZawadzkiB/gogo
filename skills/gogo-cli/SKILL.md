@@ -43,7 +43,7 @@ list in sync with `cli/main.go`, `README.md` `## The gogo CLI`, and
 |---|---|
 | `gogo` | open the interactive **board** - kanban of `plan · in progress · ready · changelog`, live-refreshed while the pipeline runs; `enter` drills into a card, action keys launch Claude. |
 | `gogo go [<slug>]` | **launch-or-`--resume` ONE persistent `/gogo:go` session** for the feature (implement warm in-context + review/test as nested `Task` subagents + report). Enforces the same acceptance gate `/gogo:go` does; on the session's exit surfaces the outcome (`awaiting-uat` → run `/gogo:done`; a decision gate → the parked question; an error → halt). |
-| `gogo plan …` | **two surfaces off one verb.** `gogo plan <slug>` (a bare feature SLUG) is the same persistent-session machinery for a `/gogo:plan` leg. `gogo plan <verb>` (a reserved store verb: `new "<title>"` · `list` · `show <id>` · `add <id> <source>[:<slug>]` · `rm <id> <source>[:<slug>]` · `ready <id>` · `promote <id> <source>` · `done <id>` · `delete <id>`) manages the **project-scoped plan store** at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` - a plan targets the project's sources, and `promote` **launches** `/gogo:plan <body> --correlation plan-<hash>` in a source (the skill writes `.gogo/work/` + stamps the correlation; the CLI never writes a source's `.gogo/`). Since **0.24.0** `gogo plan done <id>` is the **project-UAT accept**: it REFUSES unless every member work item is shipped (naming any that aren't), then records a `## Project UAT` round in the plan body + flips the plan to `done`. A slug that IS a reserved verb resolves to the store (launch such a feature via `gogo go` / the board). `gogo plan -h` shows both surfaces. |
+| `gogo plan …` | **two surfaces off one verb.** `gogo plan <slug>` (a bare feature SLUG) is the same persistent-session machinery for a `/gogo:plan` leg. `gogo plan <verb>` (a reserved store verb: `new "<title>"` · `list` · `show <id>` · `add <id> <source>[:<slug>]` · `rm <id> <source>[:<slug>]` · `ready <id>` · `promote <id> <source>` · `done <id>` · `delete <id>`) manages the **project-scoped plan store** at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` - a plan targets the project's sources, and `promote` **launches** `/gogo:plan <body> --correlation plan-<hash>` in a source (the skill writes `.gogo/work/` + stamps the correlation; the CLI never writes a source's `.gogo/`). Since **0.25.0** `gogo plan ready <id>` is the headless **accept**: a plan WITH targets auto-spawns a work item into each un-spawned target (its per-source brief as the goal, `--skip-acceptance` when the source opted out, records a member + flips the plan active); a **targetless** plan is today's plain mark-ready. `promote` stays the single-source manual spawn. Since **0.24.0** `gogo plan done <id>` is the **project-UAT accept**: it REFUSES unless every member work item is shipped (naming any that aren't), then records a `## Project UAT` round in the plan body + flips the plan to `done`. A slug that IS a reserved verb resolves to the store (launch such a feature via `gogo go` / the board). `gogo plan -h` shows both surfaces. |
 | `gogo status` | print the work-index classifier table (every feature's phase / status / iterations / resume hint). |
 | `gogo view <target>` | view a plan/report - glamour in the terminal, or `--web [--open]` builds the self-contained interactive HTML page. Targets: `<slug>` · `<slug>:plan` · `<slug>:report` · `<date>-<name>` changelog entry. |
 | `gogo events <slug>` | print a feature's `events.jsonl` timeline (the same renderer the board's drill-in tail reuses). |
@@ -87,11 +87,18 @@ on you (plan-acceptance / decision / UAT). Since **0.23.0** `gogo global` opens 
 just the single-repo board (byte-for-byte).
 
 **Plans tab keys:** `↑↓` plans · `enter` open the detail · `n` new plan · `A`
-**plan-with-claude** (mints a draft, then opens a plain `claude` session anchored at
-a source to author the plan file in place - not a `/gogo:plan` scaffold) · `r` mark
-ready · `D` **accept project-UAT** (since 0.24.0 - the same gate as `gogo plan done`:
-refuses unless every member is shipped, else a confirm → flips the plan to `done`) ·
-`x` delete. A plan whose members are all shipped renders the derived
+**plan-with-claude** (since 0.25.0 an analyst-grade session: mints a draft, then opens a
+`claude` session anchored at a source that **loads the `gogo-project-plan` skill**, reads
++ analyzes the project's real source repos read-only, **auto-selects** the sources the
+plan needs, and writes the plan file in place with front-matter `targets:` + a
+`## Source briefs` section per target - not a `/gogo:plan` scaffold) · `r` **accept**
+(since 0.25.0 - a plan WITH targets confirms then **auto-spawns** a work item into each
+un-spawned target: one `/gogo:plan <brief> --correlation plan-<hash>` per source honoring
+that source's `--skip-acceptance`, recording a member + flipping the plan active; a
+**targetless** plan is today's plain mark-ready with zero launches; idempotent - an
+already-spawned target is skipped) · `D` **accept project-UAT** (since 0.24.0 - the same
+gate as `gogo plan done`: refuses unless every member is shipped, else a confirm → flips
+the plan to `done`) · `x` delete. A plan whose members are all shipped renders the derived
 **`awaiting-project-uat`** status (distinct from `active`). In a plan's detail: `↑↓`
 target sources · `c` **create work item** (launches `/gogo:plan <body> --correlation
 plan-<hash>` in that source) · `+` add a target source · `D` accept project-UAT · `e`

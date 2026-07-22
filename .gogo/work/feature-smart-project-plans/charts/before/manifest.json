@@ -1,0 +1,10 @@
+{
+  "slug": "smart-project-plans",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-is: A is a plain prose session that only LISTS sources; user hand-picks every target (+) and spawns each (c)"
+    }
+  ]
+}
