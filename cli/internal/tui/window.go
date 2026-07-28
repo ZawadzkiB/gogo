@@ -89,6 +89,43 @@ func (m *Model) reflowColumns() {
 	}
 }
 
+// reflowPlanColumns re-clamps each plans-kanban column's scroll offset so every window
+// stays valid and the focused column keeps its focused card fully visible — the plans-tab
+// analog of reflowColumns over m.planCols (plans-board FR1). Runs on plans-tab navigation,
+// reload, and resize.
+func (m *Model) reflowPlanColumns() {
+	if m.height <= 0 {
+		return // no size yet — View renders everything; offsets stay 0
+	}
+	avail := m.colAvail()
+	if avail < 1 {
+		avail = 1
+	}
+	cardW := m.cardWidth()
+	for i := 0; i < 4; i++ {
+		n := len(m.planCols[i])
+		if n == 0 {
+			m.planColOffset[i] = 0
+			continue
+		}
+		heights := m.planCardHeights(i, cardW)
+		cur := clamp(m.planCardIdx[i], 0, n-1)
+		m.planColOffset[i] = scrollWindow(heights, cur, m.planColOffset[i], avail, i == m.planColIdx)
+	}
+}
+
+// planCardHeights measures each plan card's rendered height in kanban column i (the
+// windowing input, like cardHeights for the work board).
+func (m Model) planCardHeights(i, cardW int) []int {
+	col := m.planCols[i]
+	hs := make([]int, len(col))
+	for j := range col {
+		focused := i == m.planColIdx && j == m.planCardIdx[i]
+		hs[j] = lipgloss.Height(m.renderPlanCard(i, col[j], focused, cardW))
+	}
+	return hs
+}
+
 // --- pure windowing ----------------------------------------------------------
 
 // fitEnd returns the exclusive end index of the visible window [start, end):

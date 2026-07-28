@@ -457,7 +457,9 @@ cd cli && go build -o gogo .
 - **Plans tab + spawn (since 0.21.0)** - a **plan** is a project-scoped, hand-editable markdown file
   at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
-  The plans tab lists them grouped by status; keys: `n` new plan (title **+ optional description**) ·
+  Since **0.26.0** the plans tab is a **4-column KANBAN** (drafts · ready · active · done) mirroring the
+  work board, with an **all-manual** lifecycle: keys `←→` columns · `↑↓` cards · `enter` open the detail ·
+  `n` new plan (title **+ optional description**) ·
   `A` **plan-with-claude** (since 0.25.0 an **analyst-grade** session; since **0.25.1** it FIRST prompts
   for the plan **goal** - so the plan is minted with that goal as its description, never a blank
   "Untitled plan" - then launches AND **attaches** you into the `claude` session anchored at a source
@@ -465,16 +467,20 @@ cd cli && go build -o gogo .
   read-only, **auto-selects** the sources the plan needs, and writes the plan file in place with
   front-matter `targets:` + a `## Source briefs` section per target - never a `/gogo:plan` scaffold; with
   no `tmux` the analyst runs headless in the background) ·
-  `r` **accept** (since 0.25.0: a plan with targets confirms then **auto-spawns** a work item into each
-  un-spawned target - one `/gogo:plan <brief> --correlation plan-<hash>` per source, honoring that
-  source's `--skip-acceptance`, recording a member + flipping the plan active; a **targetless** plan is
-  today's plain mark-ready with zero launches) · `D` **accept project-UAT** (since 0.24.0) · `x`
-  delete · `enter` open the detail. In a plan's
-  **detail** you target the project's sources and press `c` **create work item** on a source row - the
-  CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the analyst derives
-  the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+` adds a target,
-  `e` edits the plan file. `gogo plan new/list/show/add/rm/ready/promote/delete` is the scriptable
-  surface for the same store (`gogo plan ready` mirrors the `r` auto-spawn headlessly).
+  `m` **move** the focused plan one column right, resolving by its status: **draft→ready** marks it ready
+  (waits for implementation, **no spawn**), **ready→active** is the **go** step that **auto-spawns** a
+  work item into each un-spawned target (one `/gogo:plan <brief> --correlation plan-<hash>` per source,
+  honoring that source's `--skip-acceptance`, recording a member + flipping the plan active; idempotent),
+  **active→done** accepts the project-UAT (refuses until every member ships) and writes a deterministic
+  project changelog under `~/.gogo/projects/<name>/.gogo/changelog/` · `x` delete. In a plan's
+  **detail** the **WORK ITEMS** list shows each member + its live status; press `c` **create work item**
+  on a source row - the CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the
+  analyst derives the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+`
+  adds a target, `m` moves the plan, `e` edits the plan file. `gogo plan new/list/show/add/rm/ready/go/
+  promote/done/delete` is the scriptable surface (`gogo plan ready` marks ready; `gogo plan go` fans out
+  the spawn). **Auto-pickup:** a work item spawned into a source with `planAcceptanceSkip` auto-runs
+  `/gogo:go` on the next board reload when its source is **under its `concurrentWorkItems` cap**; when the
+  source is at cap it shows a **"trigger manually"** cue instead (and auto-fires later once a slot frees).
 - **Correlation in `state.md` (since 0.21.0)** - when a plan spawns/links a work item, the
   `/gogo:plan --correlation` skill stamps `- **correlation:** [plan-<hash>, …]` - an additive,
   optional **list** - into that work item's `state.md` (many-to-many: a ticket can belong to several

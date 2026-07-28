@@ -734,6 +734,18 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 	}
 
+	// plans-board FR6: a member work item auto-pickup-blocked by its source's cap (repo
+	// busy) shows a "needs manual trigger" cue — the user starts it with a manual go once a
+	// slot frees. Transient (cleared the moment a slot opens and it auto-fires).
+	if m.autoPickupBlocked(f) {
+		cue := waitingMarker + " trigger manually"
+		if focused {
+			badgeLine += "  " + cue // plain — the focus fill carries one fg/bg
+		} else {
+			badgeLine += "  " + pillRed.Render(cue)
+		}
+	}
+
 	body := strings.Join([]string{head, titleLine, badgeLine}, "\n")
 
 	style := columnStyles[colIdx].card

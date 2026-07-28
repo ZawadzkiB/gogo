@@ -172,19 +172,31 @@ type Model struct {
 	pendingSource  *sourceEdit
 	pendingProject *projectEdit // in-flight project label-color form (cockpit-colors FR4)
 
-	// Plans tab (FR10/FR11): the focused project's plans (grouped ACTIVE·READY·DRAFTS),
-	// the list cursor (planIdx, over the grouped order), the open plan detail (nil =
-	// list view), the plan-detail target-source cursor, and the in-flight new-plan form
-	// marker. Reads/writes ONLY ~/.gogo/… via the plans store; spawning a work item is
-	// a claude -p launch (never a source's .gogo/ write).
+	// Plans tab (plans-board FR1): the focused project's plans rendered as a 4-column
+	// KANBAN (drafts·ready·active·done) mirroring the work board — planCols partitions
+	// m.plans by lifecycle status, planColIdx/planCardIdx are the board-style column+card
+	// cursors, planColOffset the per-column scroll window. planDetail (nil = the kanban)
+	// drills into a plan; planSourceIdx is its target-source cursor. Reads/writes ONLY
+	// ~/.gogo/… via the plans store; spawning a work item is a claude -p launch (never a
+	// source's .gogo/ write).
 	plans                 []plans.Plan
-	planIdx               int
+	planCols              [4][]plans.Plan
+	planColIdx            int
+	planCardIdx           [4]int
+	planColOffset         [4]int
 	planDetail            *plans.Plan
 	planSourceIdx         int
 	pendingPlan           bool
 	pendingPlanWithClaude bool           // in-flight `A` goal form (0.25.1) — mint+launch+attach on submit
-	pendingPlanDone       *planDoneEdit  // in-flight project-UAT accept confirm (FR3, `D`)
-	pendingPlanSpawn      *planSpawnEdit // in-flight accept+spawn confirm (0.25.0 FR2, `r`)
+	pendingPlanDone       *planDoneEdit  // in-flight project-UAT accept confirm (plans-board `m` on active)
+	pendingPlanSpawn      *planSpawnEdit // in-flight go/spawn confirm (plans-board `m` on ready)
+
+	// autoPickedUp is the fire-once set for the reload-driven auto-pickup (plans-board
+	// FR6, D4=B): the composite featureKey of every member work item this cockpit has
+	// already auto-launched a `/gogo:go` for, so a later reload never relaunches it.
+	// Cap-skipped (repo-busy) members are NOT recorded — a freed slot auto-fires on the
+	// next reload. Nil until the first pickup (never keyed on a single-repo board).
+	autoPickedUp map[string]bool
 
 	// unified marks the multi-project cockpit board (0.23.0): the board aggregates
 	// EVERY registered project (LoadWorkspace) rather than one project's sources
@@ -477,7 +489,11 @@ func (m *Model) focusProject(name string) {
 	m.project = &m.allProjects[idx]
 	m.sourceColors = sourceColorMap(m.project.Sources)
 	m.sourceIdx = clamp(m.sourceIdx, 0, len(m.project.Sources)-1)
-	m.planIdx = 0
+	// A different project = a different plan set: reset the kanban cursors + close any
+	// open detail so the plans tab starts fresh on the new project.
+	m.planColIdx = 0
+	m.planCardIdx = [4]int{}
+	m.planColOffset = [4]int{}
 	m.planDetail = nil
 	m.loadPlans()
 }
@@ -544,16 +560,39 @@ func (m *Model) switchProject(idx int) {
 	m.reload()
 }
 
-// loadPlans reads the focused project's plans (FR10) for the plans tab and clamps
-// the plan cursor. Project board only — a lone repo has no plans tab, so it degrades
-// to an empty slice (never a crash). Run at construction and on every reload.
+// loadPlans reads the focused project's plans (plans-board FR1) for the plans tab and
+// re-partitions them into the kanban columns (rebuildPlans clamps the cursors). Project
+// board only — a lone repo has no plans tab, so it degrades to an empty slice (never a
+// crash). Run at construction and on every reload.
 func (m *Model) loadPlans() {
 	if m.project == nil {
 		m.plans = nil
+		m.rebuildPlans()
 		return
 	}
 	m.plans, _ = plans.List(m.project.Name)
-	m.planIdx = clamp(m.planIdx, 0, len(m.groupedPlans())-1)
+	m.rebuildPlans()
+}
+
+// rebuildPlans partitions the focused project's plans into the 4 kanban columns
+// (drafts·ready·active·done, planColumnStatus order) and clamps the column/card cursors
+// into range — the plans-tab analog of rebuild() over the work board. m.plans is already
+// newest-first, so each column preserves that order.
+func (m *Model) rebuildPlans() {
+	var cols [4][]plans.Plan
+	for _, p := range m.plans {
+		for i, st := range planColumnStatus {
+			if p.Status == st {
+				cols[i] = append(cols[i], p)
+				break
+			}
+		}
+	}
+	m.planCols = cols
+	for i := range m.planCardIdx {
+		m.planCardIdx[i] = clamp(m.planCardIdx[i], 0, len(cols[i])-1)
+	}
+	m.planColIdx = clamp(m.planColIdx, 0, 3)
 }
 
 // knownCorrelationIDs is the set of plan-correlation ids actually present on the

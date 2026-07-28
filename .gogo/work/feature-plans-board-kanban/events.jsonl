@@ -1,0 +1,12 @@
+{"ts":"2026-07-23T00:00:00Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"plans-board-kanban"}
+{"ts":"2026-07-23T00:00:00Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"plans-board-kanban"}
+{"ts":"2026-07-23T00:00:00Z","event":"phase-started","phase":"implement","status":"implementing","slug":"plans-board-kanban"}
+{"ts":"2026-07-23T00:00:00Z","event":"phase-done","phase":"implement","status":"implementing","slug":"plans-board-kanban"}
+{"ts":"2026-07-23T20:17:24Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"plans-board-kanban"}
+{"ts":"2026-07-23T20:20:00Z","event":"issues-found","phase":"test","status":"testing","round":1,"note":"1 nit","slug":"plans-board-kanban"}
+{"ts":"2026-07-23T00:00:00Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"plans-board-kanban"}
+{"ts":"2026-07-23T00:00:00Z","event":"phase-started","phase":"report","status":"awaiting-uat","slug":"plans-board-kanban"}
+{"ts":"2026-07-23T00:00:00Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"plans-board-kanban"}
+{"ts":"2026-07-23T00:00:00Z","event":"phase-started","phase":"report","status":"awaiting-uat","note":"awaiting-uat gate","slug":"plans-board-kanban"}
+{"ts":"2026-07-28T00:00:00Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"plans-board-kanban"}
+{"ts":"2026-07-28T00:00:00Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-23-plans-board-kanban/","slug":"plans-board-kanban"}

@@ -53,15 +53,15 @@ func TestTabBarRendersAcrossTabs(t *testing.T) {
 	}
 }
 
-// TestPlansTabScaffold (FR10): the plans tab renders the titled skeleton with the
-// three lifecycle section headers Phase C fills.
+// TestPlansTabScaffold (plans-board FR1): the plans tab renders the 4-column kanban
+// skeleton with the drafts · ready · active · done column headers.
 func TestPlansTabScaffold(t *testing.T) {
 	m := tab(sizedWorkspace(t, &contract.Repo{}, proj("app", src("svc", "/r/svc"))))
 	if m.tab != tabPlans {
 		t.Fatalf("tab did not reach plans, tab=%d", m.tab)
 	}
 	out := m.View()
-	for _, want := range []string{"plans", "DRAFTS", "READY", "ACTIVE"} {
+	for _, want := range []string{"plans", "drafts", "ready", "active", "done"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("plans scaffold missing %q:\n%s", want, out)
 		}

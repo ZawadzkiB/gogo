@@ -17,6 +17,12 @@ const fixtureRoot = "../contract/testdata/repo"
 func newModel(t *testing.T) Model {
 	t.Helper()
 	m := New(fixtureRoot)
+	// New() discovers live tmux sessions (launch.ListSessions), so the rendered
+	// footer would otherwise carry whatever "gogo-*" sessions the DEVELOPER happens
+	// to have running - host state leaking into assertions over View(). Zero it so
+	// the fixture board renders deterministically; the tests that exercise sessions
+	// set m.sessions explicitly.
+	m.sessions = nil
 	// give it a size so View + viewport are exercised
 	nm, _ := m.Update(tea.WindowSizeMsg{Width: 200, Height: 40})
 	return nm.(Model)

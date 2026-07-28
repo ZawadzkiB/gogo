@@ -1,0 +1,24 @@
+{
+  "slug": "plans-board-kanban",
+  "phase": "test",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-plans-board-kanban/plan.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    ".gogo/work/feature-plans-board-kanban/review/issues.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-plans-board-kanban/test/issues.json",
+    ".gogo/work/feature-plans-board-kanban/test-01.md",
+    "cli/internal/plans/changelog_test.go",
+    "cli/internal/tui/pickup_test.go"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 1,
+  "summary": "Full Go suite green (-race -count=1, 407 tests); real-binary CLI e2e (mark-ready/go re-sequence, idempotency, 3 error paths, help, done+changelog) and a live tmux drive of the actual kanban board both passed; added 2 tests closing coverage gaps (FR5 bare-fallback, FR6 case-e temporal sequence); 1 nit found (TEST-001, em-dash) - no hands-on check blocked."
+}

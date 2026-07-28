@@ -42,8 +42,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Width = msg.Width
 		m.viewport.Height = maxInt(msg.Height-3, 1)
 		m.viewerReady = true
-		// A resize changes how many cards fit per column — re-window (TEST-014).
+		// A resize changes how many cards fit per column — re-window (TEST-014); the
+		// plans kanban windows from the same size, so re-window it too.
 		m.reflowColumns()
+		m.reflowPlanColumns()
 		// A live form lays itself out from the window size too.
 		if m.mode == modeForm {
 			return m.updateForm(msg)
@@ -102,12 +104,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reload()
 		m.refocus(slug)
 		m.reflowColumns()
+		m.reflowPlanColumns()
 		// Re-arm the watch so features/entries born mid-session keep the board
 		// live (REV-010); reconcile also drops any that vanished.
 		if m.watch != nil {
 			m.watch.reconcile(m.watchDirs())
 		}
+		// plans-board FR6: after the reload picks up any newly-spawned members, auto-fire
+		// a `/gogo:go` for each eligible skip-source work item into a free slot (fire-once).
+		pickups := m.autoPickupCmds()
+		if len(pickups) > 0 {
+			return m, tea.Batch(append(pickups, waitForReload(m.reloadCh))...)
+		}
 		return m, waitForReload(m.reloadCh)
+
+	case autoPickupResultMsg:
+		// An auto-pickup launch resolved (plans-board FR6). On FAILURE un-record the
+		// fire-once key so the next reload retries it (REV-001) — a launcher error must not
+		// strand the member permanently marked fired-but-never-launched; on success the key
+		// stays recorded (fire-once holds).
+		m.status = msg.status
+		if !msg.ok {
+			delete(m.autoPickedUp, msg.key)
+		}
+		m.sessions = launch.ListSessions()
+		return m, nil
 
 	case launchDoneMsg:
 		m.status = msg.status

@@ -19,7 +19,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.25.1"
+const Version = "0.26.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -152,7 +152,7 @@ func printHelp() {
 usage:
   gogo                 open the kanban board (plan | in progress | ready | changelog) - in a repo → THAT repo; outside a repo → the global cockpit
   gogo go [<slug>]     launch-or-resume the feature's persistent /gogo:go session (implement + review/test + report)
-  gogo plan <cmd>      manage project plans (new | list | show | add | rm | ready | promote | delete) - a plan targets sources & spawns work items
+  gogo plan <cmd>      manage project plans (new | list | show | add | rm | ready | go | promote | done | delete) - ready→go spawns a work item per target
   gogo plan <slug>     (bare slug) launch-or-resume the feature's persistent /gogo:plan session
   gogo sweep           reap orphaned / shipped persistent sessions (kill-at-ship backstop)
   gogo status          print the work-index classifier table
@@ -193,9 +193,11 @@ board keys:
   l peek log · x delete→trash · p project chip (unified board) · tab board/plans/config · @name / #plan-<id> filter · / filter · G glow · q quit
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
 
-plans tab keys:
-  ↑↓ plans · enter open · n new (title + description) · A plan-with-claude (prompts for the goal, then attaches the analyst session) · r mark ready · x delete
-  in a plan: ↑↓ target sources · c create work item (spawn /gogo:plan --correlation) · + add source · e edit · esc back
+plans tab keys (a 4-column KANBAN: drafts · ready · active · done):
+  ←→ columns · ↑↓ cards · enter open · n new (title + description) · A plan-with-claude (prompts for the goal, then attaches the analyst session)
+  m move (draft→ready: mark ready, no spawn · ready→active: go, spawns a work item per target · active→done: accept project-UAT + write a project changelog) · x delete
+  in a plan: ↑↓ work items · c create work item (spawn /gogo:plan --correlation) · + add source · m move · e edit · esc back
+  auto-pickup: a work item spawned into a source with planAcceptanceSkip auto-runs /gogo:go on reload when its source is under cap; at cap it shows "trigger manually"
 
 drill-in keys (enter on a card - shows description / folder / status / sessions / events):
   ↑↓/jk files · enter open file · a attach session (picker if ≥2) · K kill session (confirm; one/all picker if ≥2)

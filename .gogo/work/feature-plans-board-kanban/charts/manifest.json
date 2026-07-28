@@ -1,0 +1,15 @@
+{
+  "slug": "plans-board-kanban",
+  "diagrams": [
+    {
+      "kind": "activity",
+      "file": "plan-lifecycle.mmd",
+      "title": "Plan lifecycle (intended): draft -m-> ready (mark only) -m/go-> active (SPAWN) -m/done-> done; spawn re-sequenced off ready onto go"
+    },
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Intended control flow: m move dispatches mark-ready / go-spawn / project-UAT; Phase-B done-archive + Phase-C reload auto-pickup (cap two-branch); spawn + pickup are launched claude -p, never CLI state-flips"
+    }
+  ]
+}

@@ -27,16 +27,13 @@ import (
 // a ⛓ chip. m.plans is loaded on construction/reload (loadPlans); m.planDetail nil =
 // the list, non-nil = the detail.
 
-// planSections fixes the plans-tab section order (lifecycle order, FR10) and maps
-// each section header to its plan status.
-var planSections = [3]struct {
-	title  string
-	status string
-}{
-	{"ACTIVE", plans.StatusActive},
-	{"READY", plans.StatusReady},
-	{"DRAFTS", plans.StatusDraft},
-}
+// planColumnTitles / planColumnStatus fix the plans KANBAN's 4-column layout left→right
+// (plans-board FR1): drafts · ready · active · done, mirroring the work board's columns.
+// planColumnStatus[i] is the lifecycle status that partitions into column i (rebuildPlans).
+var (
+	planColumnTitles = [4]string{"drafts", "ready", "active", "done"}
+	planColumnStatus = [4]string{plans.StatusDraft, plans.StatusReady, plans.StatusActive, plans.StatusDone}
+)
 
 var planSlugUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -50,28 +47,15 @@ func planSlugHint(title string) string {
 	return s
 }
 
-// groupedPlans flattens the project's plans into the plans-tab display order
-// (ACTIVE, then READY, then DRAFTS — each newest-first, since m.plans is already
-// newest-first). `done` plans are terminal and omitted from the three sections.
-func (m *Model) groupedPlans() []plans.Plan {
-	var out []plans.Plan
-	for _, sec := range planSections {
-		for _, p := range m.plans {
-			if p.Status == sec.status {
-				out = append(out, p)
-			}
-		}
-	}
-	return out
-}
-
-// focusedPlan returns the plan under the list cursor (over groupedPlans), or nil.
+// focusedPlan returns the plan under the kanban cursor (planColIdx, planCardIdx), or nil
+// when the focused column is empty.
 func (m *Model) focusedPlan() *plans.Plan {
-	g := m.groupedPlans()
-	if m.planIdx < 0 || m.planIdx >= len(g) {
+	col := m.planCols[m.planColIdx]
+	if len(col) == 0 {
 		return nil
 	}
-	return &g[m.planIdx]
+	idx := clamp(m.planCardIdx[m.planColIdx], 0, len(col)-1)
+	return &col[idx]
 }
 
 // sourceByName returns the focused project's source with that label (default
@@ -120,21 +104,6 @@ func (m *Model) spawnedFeature(sourceName, planID string) *contract.Feature {
 	return nil
 }
 
-// planCounts returns the ACTIVE/READY/DRAFT counts for the plans-tab header.
-func (m *Model) planCounts() (active, ready, draft int) {
-	for _, p := range m.plans {
-		switch p.Status {
-		case plans.StatusActive:
-			active++
-		case plans.StatusReady:
-			ready++
-		case plans.StatusDraft:
-			draft++
-		}
-	}
-	return active, ready, draft
-}
-
 // updatePlans drives the plans tab (FR10/FR11). It dispatches to the plan-detail
 // handler when a detail is open, else the list handler. The persistent keys (q / tab
 // / ?) are handled one level up in updateActive.
@@ -145,16 +114,21 @@ func (m Model) updatePlans(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.updatePlanList(msg)
 }
 
-// updatePlanList handles the plans list keys: ↑↓ nav · enter open · n new · A
-// plan-with-claude · r accept (mark-ready + auto-spawn) · x delete.
+// updatePlanList handles the plans KANBAN keys (plans-board FR1/FR2): ←→/h l move
+// columns · ↑↓/j k move cards · enter open detail · n new · A plan-with-claude · m move
+// (draft→ready→go→done) · x delete. The persistent keys (q / tab / ?) are handled one
+// level up in updateActive.
 func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	g := m.groupedPlans()
 	switch msg.String() {
+	case "left", "h":
+		m.planColIdx = clamp(m.planColIdx-1, 0, 3)
+	case "right", "l":
+		m.planColIdx = clamp(m.planColIdx+1, 0, 3)
 	case "up", "k":
-		m.planIdx = clamp(m.planIdx-1, 0, len(g)-1)
+		m.planCardIdx[m.planColIdx] = clamp(m.planCardIdx[m.planColIdx]-1, 0, len(m.planCols[m.planColIdx])-1)
 	case "down", "j":
-		m.planIdx = clamp(m.planIdx+1, 0, len(g)-1)
-	case "enter", "right", "l":
+		m.planCardIdx[m.planColIdx] = clamp(m.planCardIdx[m.planColIdx]+1, 0, len(m.planCols[m.planColIdx])-1)
+	case "enter":
 		if p := m.focusedPlan(); p != nil {
 			cp := *p
 			m.planDetail = &cp
@@ -168,10 +142,8 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "A":
 		return m.planWithClaude()
-	case "D":
-		return m.planAcceptUAT(m.focusedPlan())
-	case "r":
-		return m.planReadyAndSpawn()
+	case "m":
+		return m.planMove(m.focusedPlan())
 	case "x":
 		if p := m.focusedPlan(); p != nil && m.project != nil {
 			id := p.ID
@@ -179,16 +151,16 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.status = "delete failed: " + err.Error()
 			} else {
 				m.loadPlans()
-				m.planIdx = clamp(m.planIdx, 0, len(m.groupedPlans())-1)
 				m.status = "deleted " + id
 			}
 		}
 	}
+	m.reflowPlanColumns()
 	return m, nil
 }
 
-// updatePlanDetail handles the plan-detail keys: ↑↓ target nav · c create work item
-// · + add source · e edit plan · esc/q/← back to the list.
+// updatePlanDetail handles the plan-detail keys: ↑↓ work-item nav · c create work item
+// · + add source · m move (advance the plan's lifecycle) · e edit plan · esc/q/← back.
 func (m Model) updatePlanDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.planDetail
 	switch msg.String() {
@@ -203,11 +175,51 @@ func (m Model) updatePlanDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.planCreateWorkItem()
 	case "+":
 		return m.planAddTarget()
-	case "D":
-		return m.planAcceptUAT(p)
+	case "m":
+		return m.planMove(p)
 	case "e":
 		m.status = "edit the plan by hand at " + plans.Path(m.project.Name, p.ID) + " (or `gogo plan show " + p.ID + "`)"
 	}
+	return m, nil
+}
+
+// planMove is the plans-tab `m` move (plans-board FR2): it advances the given plan one
+// column right, resolving the phase action by its CURRENT (persisted) status — draft→ready
+// (mark ready, no spawn), ready→active (go: fan-out spawn), active→done (project-UAT
+// accept). A done plan is terminal (a status bounce). Shared by the kanban (focused plan)
+// and the plan detail, so both surfaces move a plan the same way.
+func (m Model) planMove(p *plans.Plan) (tea.Model, tea.Cmd) {
+	if p == nil || m.project == nil {
+		return m, nil
+	}
+	switch p.Status {
+	case plans.StatusDraft:
+		return m.planMarkReady(p)
+	case plans.StatusReady:
+		return m.planGo(p)
+	case plans.StatusActive:
+		return m.planAcceptUAT(p)
+	case plans.StatusDone:
+		m.status = "plan " + p.ID + " is already done"
+		return m, nil
+	}
+	return m, nil
+}
+
+// planMarkReady is the draft→ready move (plans-board FR3): it marks the plan ready WITHOUT
+// spawning anything — the plan waits for implementation. This RE-SEQUENCES the 0.25.0
+// behaviour (which fired the auto-spawn on the old `r`); the fan-out now lives on planGo
+// (ready→active).
+func (m Model) planMarkReady(p *plans.Plan) (tea.Model, tea.Cmd) {
+	if p == nil || m.project == nil {
+		return m, nil
+	}
+	if _, err := plans.MarkReady(m.project.Name, p.ID); err != nil {
+		m.status = "mark-ready failed: " + err.Error()
+		return m, nil
+	}
+	m.loadPlans()
+	m.status = "marked " + p.ID + " ready - press m again to go (spawn its work items)"
 	return m, nil
 }
 
@@ -265,7 +277,7 @@ func (m *Model) startPlanDoneForm(p *plans.Plan) {
 // re-guards the members-shipped invariant (defensive — the board may have moved since
 // the confirm opened), records the accept via plans.MarkDone (a ~/.gogo/ write only,
 // never a source's .gogo/), reloads the plans list, and lands back on the plans tab.
-// The now-`done` plan drops out of the ACTIVE/READY/DRAFTS sections.
+// The now-`done` plan moves into the kanban's 4th `done` column (it stays in the store).
 func (m Model) finishPlanDone() (tea.Model, tea.Cmd) {
 	edit := m.pendingPlanDone
 	b := m.binding
@@ -295,7 +307,8 @@ func (m Model) finishPlanDone() (tea.Model, tea.Cmd) {
 	}
 	m.loadPlans()
 	m.planDetail = nil
-	m.planIdx = clamp(m.planIdx, 0, len(m.groupedPlans())-1)
+	// The now-`done` plan stays in the store (rebuildPlans clamps the cursors) and shows
+	// in the kanban's 4th `done` column — no cursor reset needed.
 	m.status = "accepted project-UAT for " + edit.id + " — plan is now done"
 	return m, nil
 }
@@ -375,32 +388,20 @@ func (m Model) planCreateWorkItem() (tea.Model, tea.Cmd) {
 	}
 }
 
-// planReadyAndSpawn is the plans-tab `r` ACCEPT step (0.25.0 FR2, D3=a). It overloads
-// the old plain draft→ready flip to AUTO-SPAWN a work item into each target the analyst
-// chose:
-//   - A TARGETLESS plan → today's plain MarkReady (zero launches), byte-for-byte.
-//   - A plan with ≥1 target → open a huh confirm listing the UN-spawned targets; on
-//     accept, finishPlanSpawn loops the fire-once launcher seam (mirroring
-//     planCreateWorkItem) once per un-spawned target with its per-source brief + skip.
-//   - Every target already spawned → a no-op status (the plan is already active); a
-//     re-`r` never re-launches (idempotent).
-//
-// Spawning needs claude on PATH; without it the targeted path surfaces a hint (a
-// targetless plan still marks ready). c (spawn one focused target) stays the manual
-// fallback, unchanged.
-func (m Model) planReadyAndSpawn() (tea.Model, tea.Cmd) {
-	p := m.focusedPlan()
+// planGo is the ready→active move (plans-board FR3): it fans out a work item into each
+// UN-spawned target the analyst chose — a huh confirm listing the targets, then
+// finishPlanSpawn loops the fire-once launcher seam (mirroring planCreateWorkItem) once
+// per un-spawned target with its per-source brief + skip, recording a member + flipping
+// the plan active ONLY on a successful launch. A targetless plan has nothing to spawn (a
+// hint pointing at + to add a target); every target already spawned is a no-op (idempotent
+// — a re-move never re-launches). Spawning needs claude on PATH; c (spawn one focused
+// target) stays the manual fallback, unchanged.
+func (m Model) planGo(p *plans.Plan) (tea.Model, tea.Cmd) {
 	if p == nil || m.project == nil {
 		return m, nil
 	}
-	// A targetless (hand-authored / n-drafted) plan spawns nothing — today's MarkReady.
 	if len(p.Targets) == 0 {
-		if _, err := plans.MarkReady(m.project.Name, p.ID); err != nil {
-			m.status = "mark-ready failed: " + err.Error()
-		} else {
-			m.loadPlans()
-			m.status = "marked " + p.ID + " ready"
-		}
+		m.status = "plan " + p.ID + " has no targets - open it (enter) and press + to add one before go"
 		return m, nil
 	}
 	todo := m.unspawnedTargets(*p)
@@ -627,7 +628,8 @@ func (m Model) finishPlanForm() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loadPlans()
-	m.planIdx = 0
+	m.planColIdx = 0 // a new plan is a draft — focus the drafts column
+	m.planCardIdx[0] = 0
 	m.status = "created draft " + p.ID
 	return m, nil
 }
@@ -730,7 +732,8 @@ func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loadPlans()
-	m.planIdx = 0
+	m.planColIdx = 0 // a fresh authored plan is a draft — focus the drafts column
+	m.planCardIdx[0] = 0
 
 	// Seed a plain authoring session to flesh out the brief IN the plan's own file, NAMING
 	// the goal so the analyst plans FOR IT. The whole prompt reaches claude as ONE trailing
@@ -824,70 +827,137 @@ func (m *Model) firstSourcePath() (string, bool) {
 	return m.project.Sources[0].Path, true
 }
 
-// viewPlans renders the plans tab (FR10/FR11): the plan detail when one is open, else
-// the grouped list. Pure / substring-assertable (no TTY under go test → lipgloss
+// viewPlans renders the plans tab (plans-board FR1): the plan detail when one is open,
+// else the 4-column KANBAN. Pure / substring-assertable (no TTY under go test → lipgloss
 // emits plain text).
 func (m Model) viewPlans() string {
 	if m.planDetail != nil {
 		return m.viewPlanDetail()
 	}
-	active, ready, draft := m.planCounts()
-	header := colTitleStyle.Render("plans") + "  " +
-		dimStyle.Render(fmt.Sprintf("%d active · %d ready · %d drafts", active, ready, draft))
-	parts := []string{header, ""}
+	return m.viewPlansBoard()
+}
 
-	idx := 0 // running index into groupedPlans (== the planIdx cursor space)
-	for _, sec := range planSections {
-		parts = append(parts, colTitleStyle.Render(sec.title))
-		any := false
-		for _, p := range m.plans {
-			if p.Status != sec.status {
-				continue
-			}
-			any = true
-			parts = append(parts, m.planCardRow(p, idx == m.planIdx))
-			idx++
-		}
-		if !any {
-			parts = append(parts, dimStyle.Render("  (none)"))
-		}
-		parts = append(parts, "")
+// viewPlansBoard renders the plans KANBAN (plans-board FR1): four columns
+// (drafts·ready·active·done) reusing the work board's column width + vertical separators
+// + card box styles, with a contextual help line below. Each column windows its plan
+// cards (reflowPlanColumns) with the focused card highlighted.
+func (m Model) viewPlansBoard() string {
+	colWidth := m.boardColWidth()
+	rendered := make([]string, 4)
+	for i := 0; i < 4; i++ {
+		rendered[i] = m.renderPlanColumn(i, colWidth)
 	}
-
+	body := lipgloss.JoinHorizontal(lipgloss.Top, interleaveSeparators(rendered)...)
+	parts := []string{body}
 	if m.status != "" {
-		parts = append(parts, statusStyle(m.status), "")
+		parts = append(parts, statusStyle(m.status))
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · enter open · n new · A plan-with-claude (goal → attach) · r accept+spawn · D accept UAT · x delete · tab board/config · q quit")
+	help := lipgloss.NewStyle().Faint(true).Render("←→ cols · ↑↓ cards · enter open · n new · A plan-with-claude · m move (ready→go→done) · x delete · tab board/config · q quit")
 	parts = append(parts, help)
 	return strings.Join(parts, "\n")
 }
 
-// planCardRow renders one plan in the list. The list cursor `▸ ` (present ONLY on the
-// focused row) is the SINGLE focus indicator — the always-on `▸` glyph that used to
-// double it (`▸ ▸ …`) is gone. A DRAFT keeps a dashed `◌` marker (FR10); active/ready
-// carry none (their section header conveys status). Each card shows the ⛓ plan-XXXX
-// chip and, per status, its trailing meta (drafts: `draft · edited <ago>`; ready/
-// active: `K of M work items` + the per-source dot strip).
-func (m Model) planCardRow(p plans.Plan, focused bool) string {
-	glyph := " " // ready/active: no leading glyph (the cursor owns ▸; the section conveys status)
-	if p.Status == plans.StatusDraft {
-		glyph = "◌"
+// renderPlanColumn renders one kanban column (plans-board FR1): its header + windowed
+// plan cards, mirroring the work board's renderColumn (same width, windowing, and
+// per-column card box styles). An empty column shows `(none)`.
+func (m Model) renderPlanColumn(i, colWidth int) string {
+	col := m.planCols[i]
+	if len(col) == 0 {
+		parts := []string{m.planColumnHeader(i, ""), "", dimStyle.Render("(none)")}
+		return lipgloss.NewStyle().Width(colWidth).Render(strings.Join(parts, "\n"))
 	}
+	cardW := colWidth - 4
+	if cardW < 14 {
+		cardW = 14
+	}
+	cards := make([]string, len(col))
+	heights := make([]int, len(col))
+	for j := range col {
+		focused := i == m.planColIdx && j == m.planCardIdx[i]
+		cards[j] = m.renderPlanCard(i, col[j], focused, cardW)
+		heights[j] = lipgloss.Height(cards[j])
+	}
+	start, end := 0, len(col)
+	if m.height > 0 {
+		avail := m.colAvail()
+		if avail < 1 {
+			avail = 1
+		}
+		start = clamp(m.planColOffset[i], 0, len(col)-1)
+		end = fitEnd(heights, start, avail)
+	}
+	hint := ""
+	if start > 0 || end < len(col) {
+		hint = fmt.Sprintf("%d–%d", start+1, end)
+	}
+	parts := []string{m.planColumnHeader(i, hint), ""}
+	if start > 0 {
+		parts = append(parts, dimStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
+	}
+	parts = append(parts, cards[start:end]...)
+	if below := len(col) - end; below > 0 {
+		parts = append(parts, dimStyle.Render(fmt.Sprintf("  ↓ %d more", below)))
+	}
+	return lipgloss.NewStyle().Width(colWidth).Render(strings.Join(parts, "\n"))
+}
+
+// planColumnHeader renders a kanban column's title + count + a ▸ focus marker + an
+// optional overflow hint — the plans-tab analog of columnHeader (the same per-column
+// accent header style, so the two boards read alike).
+func (m Model) planColumnHeader(i int, hint string) string {
+	st := columnStyles[i]
+	marker := "  "
+	if i == m.planColIdx {
+		marker = "▸ "
+	}
+	head := marker + st.header.Underline(true).Render(planColumnTitles[i]) + dimStyle.Render(fmt.Sprintf(" %d", len(m.planCols[i])))
+	if hint != "" {
+		head += dimStyle.Render(" · " + hint)
+	}
+	return head
+}
+
+// renderPlanCard draws one plan as a bordered card (plans-board FR1) reusing the work
+// board's per-column card box styles: the plan title + its ⛓ plan-XXXX chip on the name
+// row, and the status-specific meta (draft → `draft · edited <ago>`; ready/active/done →
+// `K of M work items` + the per-source dot strip, or the `awaiting-project-uat` cue) on
+// the second row. The focused card gets the full-card highlight (plain inner text under
+// the single fg/bg focus fill). A member work item blocked by its source's cap surfaces
+// the "needs manual trigger" cue (plans-board FR6).
+func (m Model) renderPlanCard(colIdx int, p plans.Plan, focused bool, width int) string {
 	title := p.Title
 	if title == "" {
 		title = "(untitled)"
 	}
-	cursor := "  "
+	textW := width - 2
+	chipPlain := "⛓ " + p.ID
+	// Name row: title left, ⛓ chip right-aligned; the chip drops when the card is too
+	// narrow to keep the title readable.
+	var head string
+	titleBudget := textW - lipgloss.Width(chipPlain) - 1
 	if focused {
-		cursor = "▸ "
+		if titleBudget >= 8 {
+			head = placeApart(truncate(title, titleBudget), chipPlain, textW)
+		} else {
+			head = truncate(title, textW)
+		}
+	} else {
+		if titleBudget >= 8 {
+			head = placeApart(slugStyle.Render(truncate(title, titleBudget)), correlationChipStyle.Render(chipPlain), textW)
+		} else {
+			head = slugStyle.Render(truncate(title, textW))
+		}
 	}
+	meta := m.planCardMeta(p, focused)
+	if cue := m.planPickupCue(p, focused); cue != "" {
+		meta += "  " + cue
+	}
+	body := strings.Join([]string{head, meta}, "\n")
+	style := columnStyles[colIdx].card
 	if focused {
-		// The focus fill carries one fg/bg, so render plain (no per-segment tints).
-		return changelogFocusStyle.Render(fmt.Sprintf("%s%s %s   ⛓ %s   %s",
-			cursor, glyph, title, p.ID, m.planCardMeta(p, true)))
+		style = columnStyles[colIdx].cardFocused
 	}
-	return fmt.Sprintf("%s%s %s   %s   %s", cursor, glyph, slugStyle.Render(title),
-		correlationChipStyle.Render("⛓ "+p.ID), m.planCardMeta(p, false))
+	return style.Width(width).Render(body)
 }
 
 // planCardMeta is the plan card's trailing metadata (FR10): a DRAFT shows the
@@ -909,7 +979,7 @@ func (m Model) planCardMeta(p plans.Plan, plain bool) string {
 	// it `awaiting-project-uat` on the card (distinct from a still-building `active`),
 	// so the ACTIVE section makes the ready-to-accept plan visible at a glance (FR3).
 	if m.planDerivedStatus(p) == plans.StatusAwaitingProjectUAT {
-		label := plans.StatusAwaitingProjectUAT + " · press D"
+		label := plans.StatusAwaitingProjectUAT + " · press m"
 		if plain {
 			return label
 		}
@@ -977,9 +1047,9 @@ func relAgo(ts string) string {
 	}
 }
 
-// viewPlanDetail renders a plan's detail (FR11): breadcrumb + ⛓ chip, description,
-// and the TARGET SOURCES list — each row a source dot + name + (work-item slug +
-// status pill) OR (slug:<hint> + ＋ create work item).
+// viewPlanDetail renders a plan's detail (plans-board FR4): breadcrumb + ⛓ chip,
+// description, and the WORK ITEMS list — each row a source dot + name + (work-item slug +
+// its live status pill) OR (slug:<hint> + ＋ create work item).
 func (m Model) viewPlanDetail() string {
 	p := m.planDetail
 	title := p.Title
@@ -996,10 +1066,10 @@ func (m Model) viewPlanDetail() string {
 		"",
 	)
 	// Project-UAT affordance: when every member is shipped, the plan is at the
-	// project-UAT gate — spell out the shipped tally + the `D` accept key (FR3).
+	// project-UAT gate — spell out the shipped tally + the `m` accept move (plans-board FR2).
 	if derived == plans.StatusAwaitingProjectUAT {
 		b = append(b,
-			statusStyle(fmt.Sprintf("all %d work item(s) shipped — press D to accept the project-UAT (→ done)", len(p.Members))),
+			statusStyle(fmt.Sprintf("all %d work item(s) shipped - press m to accept the project-UAT (→ done)", len(p.Members))),
 			"",
 		)
 	}
@@ -1007,7 +1077,7 @@ func (m Model) viewPlanDetail() string {
 	if strings.TrimSpace(desc) == "" {
 		desc = dimStyle.Render("(no description — edit the plan file with e)")
 	}
-	b = append(b, desc, "", colTitleStyle.Render("TARGET SOURCES"))
+	b = append(b, desc, "", colTitleStyle.Render("WORK ITEMS"))
 
 	if len(p.Targets) == 0 {
 		b = append(b, dimStyle.Render("  (no target sources — press + to add one)"))
@@ -1033,7 +1103,7 @@ func (m Model) viewPlanDetail() string {
 	if m.status != "" {
 		b = append(b, "", statusStyle(m.status))
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · c create item · + add source · D accept project-UAT · e edit plan · esc back")
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · c create item · + add source · m move (ready→go→done) · e edit plan · esc back")
 	b = append(b, "", help)
 	return strings.Join(b, "\n")
 }

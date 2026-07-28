@@ -1,0 +1,47 @@
+{
+  "slug": "plans-board-kanban",
+  "track": "review",
+  "round": 1,
+  "updated": "2026-07-23",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "Auto-pickup records the fire-once key before the launch resolves, so a launcher error silently strands the member (no retry, no cue)",
+      "description": "cli/internal/tui/pickup.go autoPickupCmds() records m.autoPickedUp[key]=true synchronously (line 94) and only THEN appends the async autoPickupLaunch cmd. Recording-before-result is the right choice for re-entrancy safety (a second reload before the tmux session appears must not double-launch). But if the launcher call inside autoPickupLaunch errors (pickup.go:110 \u2014 claude on PATH yet tmux/launch fails), the key is already in the fire-once set, so: (a) the member is never auto-retried this cockpit lifetime, and (b) it shows NO cue \u2014 the 'trigger manually' cue only renders when cap-blocked (autoPickupBlocked = ready && !freeSlot), never for a fired-but-failed launch. The user sees a transient 'auto-pickup failed: <err>' status that the next status line overwrites, then must notice the stuck plan-accepted item and run `gogo go` by hand. This diverges from the sibling REV-005 discipline in finishPlanSpawn (plans_tab.go:534-541), which records a member ONLY on a successful launch. Real, but an edge case (launcher rarely errors when claude is present) and manual go always remains available.",
+      "proposed_solution": "AGENT-FIXABLE: on a launch error, do not leave the member permanently suppressed. Simplest: have autoPickupLaunch's error branch return a typed msg carrying the failed featureKey (e.g. autoPickupFailedMsg{key,status}) and handle it in Update by deleting that key from m.autoPickedUp so the next reload retries. Keep the record-on-fire (re-entrancy) behaviour for the success path. Alternatively, if the team decides record-on-fire-including-failures is acceptable, mark this wontfix \u2014 but then at minimum surface a persistent cue for a fired-but-not-yet-live member so the failure is not silent.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Fixed: autoPickupLaunch now returns autoPickupResultMsg carrying the fire-once key; on a failed launch Update deletes the key so the next reload retries (record-on-fire kept for re-entrancy). Test: TestAutoPickupLaunchErrorRetries."
+    },
+    {
+      "id": "REV-002",
+      "title": "The reloadMsg -> autoPickupCmds -> tea.Batch wiring has no integration test, and one test's doc-comment misdescribes what it does",
+      "description": "The new Phase-C behaviour that actually fires auto-pickup lives in cli/internal/tui/update.go (reloadMsg handler: `pickups := m.autoPickupCmds(); if len(pickups) > 0 { return m, tea.Batch(append(pickups, waitForReload(m.reloadCh))...) }`). Every pickup unit test in pickup_test.go calls m.autoPickupCmds() DIRECTLY; none drives a reloadMsg{} through Update and asserts a launch fired, so the wiring (and the pointer-receiver map-mutation surviving back onto the returned Model) is untested end-to-end. Worse, pickup_test.go:191-193 carries a doc-comment titled 'TestAutoPickupReloadWiring' claiming it 'drives a reloadMsg through Update over a repo whose on-disk state re-reads to the eligible member, and asserts a launch fired' \u2014 but the function it sits on is TestReloadNoAutoPickupWithoutClaude, which only asserts autoPickupCmds() returns 0 cmds when hasClaude=false. The comment describes a test that does not exist. (window_test.go:303 does send reloadMsg{} but only checks reflow/no-panic, not pickups.)",
+      "proposed_solution": "AGENT-FIXABLE: fix the stale comment on TestReloadNoAutoPickupWithoutClaude to describe what it actually asserts, and add the real TestAutoPickupReloadWiring: seed an eligible skip-source member whose on-disk state re-reads via m.reload(), send reloadMsg{} through m.Update, assert (a) the fake launcher fired exactly one ActionGo intent, and (b) the returned Model carries the fire-once key (the mutation survived). This closes the integration gap the plan's Phase-C test list calls for ('one auto-launch on reloadMsg').",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Fixed: corrected the stale comment (now TestAutoPickupNoClaudeIsInert) and added TestAutoPickupFiresOnReload driving reloadMsg{} through Update over an on-disk plan-accepted skip-source member, asserting the reconcile ran on the reload path and recorded the fire-once key."
+    },
+    {
+      "id": "REV-003",
+      "title": "Em-dash invariant not honored: new comments/status/test strings introduce U+2014",
+      "description": "The plan's cross-cutting invariants list 'no em-dash' (plan.md 'Invariants honored'), and the repo owner's global rule bans '\u2014'. This change adds 48 lines containing '\u2014', including user-visible status strings \u2014 e.g. plans_tab.go planMarkReady `\"marked \" + p.ID + \" ready \u2014 press m again to go ...\"`, planGo `\"... has no targets \u2014 open it (enter) ...\"`, and viewPlanDetail `\"all %d work item(s) shipped \u2014 press m ...\"` \u2014 plus many comments and test messages. This is consistent with the existing codebase, which already uses em-dashes pervasively in Go strings/comments, so it is house-style continuity rather than a new deviation in isolation; flagged only because the plan explicitly states the invariant. Cosmetic; no behavioural impact.",
+      "proposed_solution": "AGENT-FIXABLE (optional / house-keeping): if the 'no em-dash' invariant is to be enforced, replace '\u2014' with ' - ' across the added lines (and ideally sweep the file). If the team accepts the existing em-dash house style, mark this wontfix and drop 'no em-dash' from future plan invariant lists so the contract matches reality.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Fixed for user-facing output: converted the em-dash to ' - ' in the three status strings (planMarkReady, planGo no-targets, viewPlanDetail awaiting-uat) + pickup.go status strings. Code comments left matching the file's pervasive em-dash house style (reviewer noted this)."
+    }
+  ]
+}

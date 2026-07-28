@@ -1,0 +1,28 @@
+flowchart TD
+  subgraph TUI["plans kanban - cli/internal/tui/plans_tab.go"]
+    K["4 columns: drafts | ready | active | done<br/>(reuses work-board column chrome + card styles)"]
+    M{"m move (focused plan, by status)"}
+  end
+  K --> M
+  M -->|draft| MR["plans.MarkReady<br/>(~/.gogo write, NO spawn)"]
+  M -->|ready| GO["planGo - fan-out spawn"]
+  M -->|active| UAT["planAcceptUAT - project-UAT gate"]
+  M -->|done| BOUNCE["terminal - status bounce"]
+
+  GO --> LP["launch claude -p /gogo:plan &lt;brief&gt; --correlation plan-XXXX<br/>(per un-spawned target; + --skip-acceptance when source opted out)"]
+  LP --> SK["gogo:plan skill writes source .gogo/work/ + stamps state.md correlation"]
+  SK --> WB["work board: card appears in its plan phase"]
+  GO --> REC["record member + SetStatus active<br/>(ONLY on a successful launch)"]
+
+  UAT --> MSHIP{"every member work item shipped?"}
+  MSHIP -->|no| REFUSE["refuse - name unshipped members"]
+  MSHIP -->|yes| DONE["MarkDone: append Project UAT round + done<br/>+ deterministic project changelog under ~/.gogo (Phase B, D3=A)<br/>plan STAYS in store as done"]
+
+  WB -. "member at plan-accepted + source planAcceptanceSkip (Phase C, on reload)" .-> CAP{"source under ConcurrentWorkItems cap?"}
+  CAP -->|"under cap + no session + fire-once"| PICK["auto-pickup: launch claude -p /gogo:go &lt;slug&gt;<br/>ALWAYS a launch, NEVER a CLI state-flip"]
+  CAP -->|"at cap"| CUE["needs-manual-trigger cue on BOTH cards<br/>(transient - auto-fires when a slot frees)"]
+
+  classDef s2 fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef s3 fill:#e8ecff,stroke:#7c8bd9,color:#111
+  class DONE s2
+  class PICK,CUE s3

@@ -1,0 +1,10 @@
+{
+  "slug": "plans-board-kanban",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-is: plans tab is a grouped LIST (ACTIVE/READY/DRAFTS) with a flat cursor; r is OVERLOADED to mark-ready AND auto-spawn; done omitted from the view"
+    }
+  ]
+}

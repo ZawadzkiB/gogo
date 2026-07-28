@@ -1,0 +1,4 @@
+{ "schema": 2, "name": "plans-board-kanban", "release": "0.26.0", "date": "2026-07-23",
+  "members": [ { "slug": "plans-board-kanban", "title": "plans tab as a 4-column kanban with an all-manual lifecycle (spawn re-sequenced off ready onto go)", "version": "0.26.0" } ],
+  "diagrams": [ { "kind": "flow", "file": "plans-board-kanban-flow.mmd", "title": "plans-board-kanban: m move dispatches mark-ready / go-spawn / project-UAT; done-archive + reload auto-pickup (cap two-branch)" }, { "kind": "state", "file": "plans-board-kanban-plan-lifecycle.mmd", "title": "plans-board-kanban: plan lifecycle draft -m-> ready (mark only) -m-> active (SPAWN) -m-> done" } ],
+  "before": [ { "kind": "flow", "file": "before/plans-board-kanban-flow.mmd", "title": "plans-board-kanban: plans tab before - grouped list, spawn fired on ready" } ] }

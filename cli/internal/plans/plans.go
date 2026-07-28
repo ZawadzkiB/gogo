@@ -604,11 +604,15 @@ func DerivedStatus(p Plan, allShipped bool) string {
 	return p.Status
 }
 
-// MarkDone records the project-UAT acceptance on a CLI-owned plan (FR3, accept-only
-// v1): it appends a `## Project UAT` round to the plan body and flips the persisted
-// status to `done`. It does NOT itself re-check members-shipped — the caller
-// (`gogo plan done` / plans-tab `D`) guards with MembersShipped first. Writes ONLY the
-// plan file under ~/.gogo/ (never a source's .gogo/). A missing plan is an error.
+// MarkDone records the project-UAT acceptance on a CLI-owned plan (plans-board FR5): it
+// appends a `## Project UAT` round to the plan body, flips the persisted status to `done`,
+// AND writes a deterministic, LLM-free project-changelog entry (writeChangelogEntry). The
+// plan STAYS in the store as `done` (the kanban's 4th column reads it) — "archive" is the
+// ADDITIONAL durable record, never a move-out. It does NOT itself re-check members-shipped
+// — the caller (`gogo plan done` / the plans-tab `m` on an active plan) guards with
+// MembersShipped first. Writes ONLY under ~/.gogo/ (the plan file + the changelog entry),
+// never a source's .gogo/. A missing plan is an error; a changelog-write failure is
+// surfaced (the plan flip has already persisted).
 func MarkDone(project, id string) (Plan, error) {
 	p, ok := Get(project, id)
 	if !ok {
@@ -623,5 +627,69 @@ func MarkDone(project, id string) (Plan, error) {
 	}
 	p.Description = body + block
 	p.Status = StatusDone
-	return p, Save(project, p)
+	if err := Save(project, p); err != nil {
+		return Plan{}, err
+	}
+	// Additive project-changelog record (plans-board FR5, D3=A): a deterministic entry
+	// enriched with each member's real slug/status when the project's contract resolves it.
+	if err := writeChangelogEntry(project, p, stamp, loadProjectRepo(project)); err != nil {
+		return p, err
+	}
+	return p, nil
+}
+
+// ChangelogDir is a project's changelog directory
+// ~/.gogo/projects/<project>/.gogo/changelog (plans-board FR5). Mirrors Dir — a home-only
+// path; the CLI never writes a source's .gogo/.
+func ChangelogDir(project string) string {
+	return filepath.Join(projects.Dir(project), ".gogo", "changelog")
+}
+
+// loadProjectRepo best-effort reads the project's aggregate contract (its sources' work
+// items) so writeChangelogEntry can enrich each member with its REAL on-disk slug +
+// status. nil on any failure (an unknown project, an unreadable source) — the entry then
+// falls back to the advisory source:slug-hint. A pure READ; never a source write.
+func loadProjectRepo(project string) *contract.Repo {
+	proj, err := projects.Load(project)
+	if err != nil || proj == nil {
+		return nil
+	}
+	return contract.LoadProject(*proj)
+}
+
+// writeChangelogEntry writes the deterministic, LLM-free project-changelog record for a
+// done plan (plans-board FR5, D3=A): a fixed markdown file at
+// <ChangelogDir>/<date>-<id>/entry.md recording the date, plan id + title, and each member
+// work item — its source + REAL slug + status when resolvable from repo, else the advisory
+// `source : slug-hint` the plan stores. No launch, no synthesis. repo is best-effort (nil,
+// or an unresolved member, degrades to the advisory hint). Writes ONLY under ~/.gogo/.
+func writeChangelogEntry(project string, p Plan, date string, repo *contract.Repo) error {
+	dir := filepath.Join(ChangelogDir(project), date+"-"+p.ID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	var b strings.Builder
+	title := p.Title
+	if title == "" {
+		title = "(untitled)"
+	}
+	fmt.Fprintf(&b, "# %s\n\n", title)
+	fmt.Fprintf(&b, "- **plan:** %s\n", p.ID)
+	fmt.Fprintf(&b, "- **project:** %s\n", project)
+	fmt.Fprintf(&b, "- **completed:** %s\n", date)
+	fmt.Fprintf(&b, "\n## Work items (%d)\n\n", len(p.Members))
+	if len(p.Members) == 0 {
+		b.WriteString("(none)\n")
+	}
+	for _, mem := range p.Members {
+		line := mem.Source + " : " + mem.SlugHint
+		if f := memberFeature(repo, project, mem.Source, p.ID); f != nil {
+			line = mem.Source + " : " + f.Slug
+			if f.Status != "" {
+				line += " (" + f.Status + ")"
+			}
+		}
+		fmt.Fprintf(&b, "- %s\n", line)
+	}
+	return os.WriteFile(filepath.Join(dir, "entry.md"), []byte(b.String()), 0o644)
 }

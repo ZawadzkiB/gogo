@@ -144,12 +144,12 @@ func TestCmdPlanPromoteBadSource(t *testing.T) {
 	}
 }
 
-// TestCmdPlanReadyFansOut pins the 0.25.0 FR2 CLI mirror: `gogo plan ready <id>` on a
-// plan with targets fires the launch seam ONCE per un-spawned target (each carrying its
-// per-source brief + `--correlation`, and `--skip-acceptance` for a plan-acceptance-skip
-// source), records a member per target, and flips the plan active — the headless twin of
-// the plans-tab `r` auto-spawn.
-func TestCmdPlanReadyFansOut(t *testing.T) {
+// TestCmdPlanGoFansOut pins the re-sequenced CLI mirror (plans-board FR3): `gogo plan go
+// <id>` on a plan with targets fires the launch seam ONCE per un-spawned target (each
+// carrying its per-source brief + `--correlation`, and `--skip-acceptance` for a
+// plan-acceptance-skip source), records a member per target, and flips the plan active —
+// the headless twin of the plans-tab ready→go move.
+func TestCmdPlanGoFansOut(t *testing.T) {
 	seedDataHome(t)
 	if _, err := projects.Add(projects.Project{Name: "app", Sources: []projects.Source{
 		{Name: "web", Path: "/repos/web"},
@@ -178,8 +178,8 @@ Do the api side.`
 		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
 	})
 
-	if code := cmdPlanStore([]string{"ready", p.ID}); code != 0 {
-		t.Fatalf("plan ready: exit %d, want 0", code)
+	if code := cmdPlanStore([]string{"go", p.ID}); code != 0 {
+		t.Fatalf("plan go: exit %d, want 0", code)
 	}
 	if calls != 2 {
 		t.Fatalf("launcher fired %d times, want exactly 2 (one per target)", calls)
@@ -194,16 +194,18 @@ Do the api side.`
 		t.Errorf("web (no skip) spawn = %q, must not carry --skip-acceptance", cmds["/repos/web"])
 	}
 	if got, _ := plans.Get("app", p.ID); got.Status != plans.StatusActive || len(got.Members) != 2 {
-		t.Errorf("after ready plan = %+v, want active with 2 members", got)
+		t.Errorf("after go plan = %+v, want active with 2 members", got)
 	}
 }
 
-// TestCmdPlanReadyTargetlessMarksReady pins the additive fallback: `gogo plan ready` on a
-// TARGETLESS plan just advances draft → ready with ZERO launches.
-func TestCmdPlanReadyTargetlessMarksReady(t *testing.T) {
+// TestCmdPlanReadyMarksReadyNoSpawn pins the re-sequence (plans-board FR3): `gogo plan
+// ready` just advances draft → ready with ZERO launches — even for a TARGETED plan (the
+// fan-out moved to `gogo plan go`).
+func TestCmdPlanReadyMarksReadyNoSpawn(t *testing.T) {
 	seedDataHome(t)
 	seedPlanProject(t, "web", "/repos/web")
 	p, _ := plans.New("web", "Solo idea", "x")
+	plans.AddTarget("web", p.ID, "web") // even WITH a target, ready must not spawn
 
 	fired := false
 	stubPlanLauncher(t, func(string, launch.Intent) (launch.Result, error) {
@@ -211,19 +213,19 @@ func TestCmdPlanReadyTargetlessMarksReady(t *testing.T) {
 		return launch.Result{}, nil
 	})
 	if code := cmdPlanStore([]string{"ready", p.ID}); code != 0 {
-		t.Fatalf("plan ready (targetless): exit %d, want 0", code)
+		t.Fatalf("plan ready: exit %d, want 0", code)
 	}
 	if fired {
-		t.Error("targetless ready fired the launcher (want zero launches)")
+		t.Error("plan ready fired the launcher (want zero launches — mark-ready only)")
 	}
 	if got, _ := plans.Get("web", p.ID); got.Status != plans.StatusReady {
-		t.Errorf("targetless ready: status = %q, want ready", got.Status)
+		t.Errorf("plan ready: status = %q, want ready", got.Status)
 	}
 }
 
-// TestCmdPlanReadyIdempotent pins the idempotency: a re-run skips a target that already
+// TestCmdPlanGoIdempotent pins the idempotency: a re-run skips a target that already
 // has a member (never re-launching it).
-func TestCmdPlanReadyIdempotent(t *testing.T) {
+func TestCmdPlanGoIdempotent(t *testing.T) {
 	seedDataHome(t)
 	if _, err := projects.Add(projects.Project{Name: "app", Sources: []projects.Source{
 		{Name: "web", Path: "/repos/web"},
@@ -241,19 +243,19 @@ func TestCmdPlanReadyIdempotent(t *testing.T) {
 		roots = append(roots, root)
 		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
 	})
-	if code := cmdPlanStore([]string{"ready", p.ID}); code != 0 {
-		t.Fatalf("plan ready: exit %d, want 0", code)
+	if code := cmdPlanStore([]string{"go", p.ID}); code != 0 {
+		t.Fatalf("plan go: exit %d, want 0", code)
 	}
 	if len(roots) != 1 || roots[0] != "/repos/api" {
 		t.Fatalf("fired into %v, want exactly [/repos/api] (web skipped)", roots)
 	}
 }
 
-// TestCmdPlanReadyIdempotentOnBoardFeature pins REV-002: `gogo plan ready` also skips a
-// target already spawned OUT OF BAND — a work item in the source stamped with the plan's
+// TestCmdPlanGoIdempotentOnBoardFeature pins REV-002: `gogo plan go` also skips a target
+// already spawned OUT OF BAND — a work item in the source stamped with the plan's
 // correlation id but NEVER recorded as a member — matching the plans-tab member-OR-feature
 // guard, so a re-run never re-launches a duplicate into that source.
-func TestCmdPlanReadyIdempotentOnBoardFeature(t *testing.T) {
+func TestCmdPlanGoIdempotentOnBoardFeature(t *testing.T) {
 	seedDataHome(t)
 	webRoot := t.TempDir()
 	apiRoot := t.TempDir()
@@ -274,19 +276,19 @@ func TestCmdPlanReadyIdempotentOnBoardFeature(t *testing.T) {
 		roots = append(roots, root)
 		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
 	})
-	if code := cmdPlanStore([]string{"ready", p.ID}); code != 0 {
-		t.Fatalf("plan ready: exit %d, want 0", code)
+	if code := cmdPlanStore([]string{"go", p.ID}); code != 0 {
+		t.Fatalf("plan go: exit %d, want 0", code)
 	}
 	if len(roots) != 1 || roots[0] != apiRoot {
 		t.Fatalf("fired into %v, want exactly [%s] (web already spawned out of band, skipped)", roots, apiRoot)
 	}
 }
 
-// TestCmdPlanReadyInvalidTargetsReported pins REV-003: when spawned==0 is caused by an
-// unresolved target (a targets: entry that is not a source), `gogo plan ready` names it
-// on stderr and exits non-zero — it must NOT print the misleading "all targets already
+// TestCmdPlanGoInvalidTargetsReported pins REV-003: when spawned==0 is caused by an
+// unresolved target (a targets: entry that is not a source), `gogo plan go` names it on
+// stderr and exits non-zero — it must NOT print the misleading "all targets already
 // spawned - nothing to do" success (the old swallow), and it must not launch or mutate.
-func TestCmdPlanReadyInvalidTargetsReported(t *testing.T) {
+func TestCmdPlanGoInvalidTargetsReported(t *testing.T) {
 	seedDataHome(t)
 	if _, err := projects.Add(projects.Project{Name: "app", Sources: []projects.Source{
 		{Name: "web", Path: "/repos/web"},
@@ -303,9 +305,9 @@ func TestCmdPlanReadyInvalidTargetsReported(t *testing.T) {
 		fired = true
 		return launch.Result{}, nil
 	})
-	out, code := captureStderr(t, func() int { return cmdPlanStore([]string{"ready", p.ID}) })
+	out, code := captureStderr(t, func() int { return cmdPlanStore([]string{"go", p.ID}) })
 	if code == 0 {
-		t.Errorf("plan ready with an unresolved target: exit 0, want non-zero (must not misreport 'already spawned')")
+		t.Errorf("plan go with an unresolved target: exit 0, want non-zero (must not misreport 'already spawned')")
 	}
 	if fired {
 		t.Error("an invalid target fired the launcher (must not)")
@@ -318,13 +320,13 @@ func TestCmdPlanReadyInvalidTargetsReported(t *testing.T) {
 	}
 }
 
-// TestCmdPlanReadyLaunchFailuresReported pins TEST-001: when spawned==0 is caused by a
+// TestCmdPlanGoLaunchFailuresReported pins TEST-001: when spawned==0 is caused by a
 // genuine LAUNCH FAILURE (planLauncher returns err for every un-spawned target — no claude
-// on PATH, tmux down, etc.) rather than idempotency, `gogo plan ready` must exit non-zero
-// and name the failed target(s) on stderr — it must NOT print the misleading "all targets
+// on PATH, tmux down, etc.) rather than idempotency, `gogo plan go` must exit non-zero and
+// name the failed target(s) on stderr — it must NOT print the misleading "all targets
 // already spawned - nothing to do" success (which would tell a CI $? check zero work items
 // were actually created). The plan file stays unmutated (no phantom member; REV-005).
-func TestCmdPlanReadyLaunchFailuresReported(t *testing.T) {
+func TestCmdPlanGoLaunchFailuresReported(t *testing.T) {
 	seedDataHome(t)
 	if _, err := projects.Add(projects.Project{Name: "app", Sources: []projects.Source{
 		{Name: "web", Path: "/repos/web"},
@@ -341,9 +343,9 @@ func TestCmdPlanReadyLaunchFailuresReported(t *testing.T) {
 		calls++
 		return launch.Result{}, errors.New("claude CLI not found on PATH")
 	})
-	out, code := captureStderr(t, func() int { return cmdPlanStore([]string{"ready", p.ID}) })
+	out, code := captureStderr(t, func() int { return cmdPlanStore([]string{"go", p.ID}) })
 	if code == 0 {
-		t.Errorf("plan ready with only launch failures: exit 0, want non-zero (must not misreport 'already spawned')")
+		t.Errorf("plan go with only launch failures: exit 0, want non-zero (must not misreport 'already spawned')")
 	}
 	if calls != 2 {
 		t.Errorf("launcher fired %d times, want 2 (one attempt per un-spawned target)", calls)
@@ -360,11 +362,11 @@ func TestCmdPlanReadyLaunchFailuresReported(t *testing.T) {
 	}
 }
 
-// TestCmdPlanReadyMissingProjectSources pins REV-003 (the load path): a targeted plan in
-// a project with NO sources cannot resolve any target, so `gogo plan ready` surfaces a
-// clear error + non-zero rather than swallowing an empty source set into the false
-// "all already spawned" summary.
-func TestCmdPlanReadyMissingProjectSources(t *testing.T) {
+// TestCmdPlanGoMissingProjectSources pins REV-003 (the load path): a targeted plan in a
+// project with NO sources cannot resolve any target, so `gogo plan go` surfaces a clear
+// error + non-zero rather than swallowing an empty source set into the false "all already
+// spawned" summary.
+func TestCmdPlanGoMissingProjectSources(t *testing.T) {
 	seedDataHome(t)
 	if _, err := projects.Add(projects.Project{Name: "app"}); err != nil { // project, zero sources
 		t.Fatalf("seed project: %v", err)
@@ -377,9 +379,9 @@ func TestCmdPlanReadyMissingProjectSources(t *testing.T) {
 		fired = true
 		return launch.Result{}, nil
 	})
-	out, code := captureStderr(t, func() int { return cmdPlanStore([]string{"ready", p.ID}) })
+	out, code := captureStderr(t, func() int { return cmdPlanStore([]string{"go", p.ID}) })
 	if code == 0 {
-		t.Errorf("plan ready in a source-less project: exit 0, want non-zero")
+		t.Errorf("plan go in a source-less project: exit 0, want non-zero")
 	}
 	if fired {
 		t.Error("a source-less project fired the launcher (must not)")

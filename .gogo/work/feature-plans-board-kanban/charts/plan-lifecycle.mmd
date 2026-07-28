@@ -1,0 +1,17 @@
+stateDiagram-v2
+  [*] --> draft: n new / A plan-with-claude
+  draft --> ready: m move / gogo plan ready  (MARK READY only, no spawn)
+  ready --> active: m move / gogo plan go  (SPAWN a work item per un-spawned target)
+  active --> awaiting_project_uat: every member work item shipped (derived, display-only)
+  awaiting_project_uat --> done: m move / gogo plan done  (project-UAT accept)
+  active --> done: m move / gogo plan done  (all members shipped)
+  done --> [*]: archive + project changelog  (Phase B)
+  note right of ready
+    RE-SEQUENCED: ready no longer spawns
+    (0.25.0 fired the fan-out on r/ready;
+    it now fires on go / ready to active)
+  end note
+  note right of awaiting_project_uat
+    DerivedStatus over the board contract;
+    never persisted until MarkDone flips done
+  end note

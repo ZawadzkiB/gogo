@@ -330,6 +330,27 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   **never writes a source's `.gogo/work/`** (only skills do), single-repo fallback byte-for-byte,
   LLM-free millisecond read path, enum-sync + no-unsafe-rm guards green. Slash command set unchanged;
   version **0.21.0**. Roadmap remaining: **P5** opt-in worktrees.
+- **Cockpit fast-follows (0.22.0-0.25.1):** per-project/per-source **colors** (0.22.x), the
+  `gogo global` **unified board** across every project (0.23.0), **empty projects + project
+  `.knowledge/` + project-UAT + per-source gate-skip flags** `planAcceptanceSkip`/`uatAcceptanceSkip`
+  (0.24.0, the first skill change: the skills honor `--skip-acceptance`/`--skip-uat`), and the
+  **analyst-driven `A` plan-with-claude** that reads a project's sources and auto-selects targets
+  (0.25.x, skill `gogo-project-plan`). Verify against code; these are summarized, not exhaustive.
+- **Plans-board kanban + re-sequence + auto-pickup (0.26.0):** the **plans tab** became a
+  **4-column KANBAN** (drafts · ready · active · done) mirroring the work board (reusing its column
+  chrome + card styles; `cli/internal/tui/plans_tab.go` `viewPlansBoard`/`renderPlanCard`,
+  `model.go` `planCols`/`rebuildPlans`, `window.go` `reflowPlanColumns`). The lifecycle is
+  **all-manual** via a single **`m` move** (`planMove`): draft→ready **marks ready, no spawn**;
+  ready→active is the new **`go`** step that fans out the spawn; active→done accepts the project-UAT.
+  This **re-sequenced the 0.25.0 auto-spawn OFF `ready`**: `gogo plan ready` now marks-ready-only and
+  the fan-out moved to a new **`gogo plan go`** verb. `MarkDone` also writes a **deterministic project
+  changelog** at `~/.gogo/projects/<name>/.gogo/changelog/<date>-<id>/entry.md` (the plan stays
+  in-store as `done`). New **reload-driven auto-pickup** (`cli/internal/tui/pickup.go`): a plan member
+  spawned into a `planAcceptanceSkip` source auto-runs `claude -p /gogo:go` on the next board reload
+  when its source is **under its integer `concurrentWorkItems` cap** (counted per-source-root), else a
+  **"trigger manually"** cue on the card (transient — auto-fires when a slot frees); fire-once, retries
+  on launch failure, always a launched session (never a CLI state-flip). Additive; invariants held
+  (CLI writes only `~/.gogo/`); version **0.26.0**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

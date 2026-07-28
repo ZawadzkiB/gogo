@@ -1,0 +1,21 @@
+{
+  "slug": "plans-board-kanban",
+  "track": "test",
+  "round": 1,
+  "updated": "2026-07-23",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "cli/plan.go:429 still emits an em-dash in a new user-facing stderr line (planGo's unresolved-target message)",
+      "description": "The plan's cross-cutting invariants say 'no em-dash' and REV-003 (review round 1) fixed three user-facing status strings for exactly this. One new user-facing string was missed: cli/plan.go:429, inside the new `planGo` (FR3 re-sequence) - `fmt.Fprintf(os.Stderr, \"gogo plan go: target %q is not a source of %q \u2014 skipping\\n\", target, project)` uses U+2014. Confirmed live via the real binary: `gogo plan go <id>` on a plan with an unresolved target (a `targets:` entry that is not a project source) prints this line verbatim to stderr, em-dash and all. Cosmetic only - the command still exits non-zero and names the target correctly (TestCmdPlanGoInvalidTargetsReported passes because it only asserts substrings 'ghost' and 'unresolved', not the exact separator character).",
+      "proposed_solution": "AGENT-FIXABLE: replace the em-dash with ' - ' at cli/plan.go:429, matching the three strings REV-003 already fixed (planMarkReady, planGo's no-targets message, viewPlanDetail's awaiting-uat cue). One-line change; no test currently pins the character so none needs updating, though a follow-up could assert `!strings.ContainsRune(out, '\\u2014')` on this stderr line to prevent recurrence.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 1,
+      "fix_summary": "Swapped the em-dash for ' - ' in planGo's unresolved-target stderr line (plan.go). gofmt/vet/-race green."
+    }
+  ]
+}

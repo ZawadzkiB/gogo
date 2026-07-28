@@ -21,7 +21,8 @@ usage:
   gogo plan show <id> [--project <p>]                       print a plan + its targets/members
   gogo plan add <id> <source>[:<slug>] [--project <p>]      add a target source (or link an existing work item)
   gogo plan rm  <id> <source>[:<slug>] [--project <p>]      remove a target (or unlink a work item)
-  gogo plan ready <id> [--project <p>]                      ACCEPT: auto-spawn a work item into each target (targetless: just mark ready)
+  gogo plan ready <id> [--project <p>]                      mark a plan ready (draft -> ready; waits for implementation, NO spawn)
+  gogo plan go <id> [--project <p>]                         GO: spawn a work item into each un-spawned target (ready -> active); idempotent
   gogo plan promote <id> <source> [--project <p>]           SPAWN one work item: launch /gogo:plan --correlation plan-<hash> in the source
   gogo plan done <id> [--project <p>]                       accept the project-UAT (refuses unless every member work item is shipped)
   gogo plan delete <id> [--project <p>]                     delete a plan
@@ -45,7 +46,7 @@ var planLauncher func(root string, in launch.Intent) (launch.Result, error) = la
 // plan store (vs a bare `gogo plan <slug>` which launches a persistent session).
 func isPlanStoreVerb(v string) bool {
 	switch v {
-	case "new", "list", "ls", "show", "add", "rm", "remove", "delete", "del", "ready", "promote", "done":
+	case "new", "list", "ls", "show", "add", "rm", "remove", "delete", "del", "ready", "go", "promote", "done":
 		return true
 	case "-h", "--help", "help":
 		return true
@@ -76,6 +77,8 @@ func cmdPlanStore(args []string) int {
 		return planDelete(args[1:])
 	case "ready":
 		return planReady(args[1:])
+	case "go":
+		return planGo(args[1:])
 	case "promote":
 		return planPromote(args[1:])
 	case "done":
@@ -84,7 +87,7 @@ func cmdPlanStore(args []string) int {
 		fmt.Print(planStoreHelp)
 		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "gogo plan: unknown subcommand %q (new | list | show | add | rm | ready | promote | done | delete)\n", args[0])
+		fmt.Fprintf(os.Stderr, "gogo plan: unknown subcommand %q (new | list | show | add | rm | ready | go | promote | done | delete)\n", args[0])
 		return 2
 	}
 }
@@ -333,15 +336,11 @@ func planDelete(args []string) int {
 	return 0
 }
 
-// planReady is the headless ACCEPT step (0.25.0 FR2, the CLI mirror of the plans-tab
-// `r`). A TARGETLESS plan just advances draft → ready (today's behaviour, byte-for-byte).
-// A plan WITH targets fans out: it AUTO-SPAWNS a work item into each UN-spawned target
-// source — one `/gogo:plan <brief> --correlation plan-XXXX` per target (its per-source
-// brief as the goal, its `--skip-acceptance` when the source opted out), records a member
-// + flips the plan active on each SUCCESSFUL launch, and is idempotent (a target already
-// carrying a member is skipped, so a re-run never re-launches). The CLI writes nothing
-// under a source's .gogo/ — each launched skill does. `gogo plan promote` (single source)
-// stays the manual fallback.
+// planReady is the headless MARK-READY step (plans-board FR3, the CLI mirror of the
+// plans-tab draft→ready move): it advances a plan draft → ready and spawns NOTHING —
+// the plan WAITS for implementation. This RE-SEQUENCES the 0.25.0 behaviour, which fired
+// the auto-spawn fan-out here; the fan-out now lives on `gogo plan go` (ready → active).
+// Targeted and targetless plans alike just mark ready.
 func planReady(args []string) int {
 	pa, ok, code := parsePlanArgs("gogo plan ready", args)
 	if !ok {
@@ -356,31 +355,61 @@ func planReady(args []string) int {
 		return code
 	}
 	id := pa.pos[0]
-	p, found := plans.Get(project, id)
-	if !found {
+	if _, found := plans.Get(project, id); !found {
 		fmt.Fprintf(os.Stderr, "gogo plan ready: no plan %q in %q (see `gogo plan list`)\n", id, project)
 		return 1
 	}
-	// Targetless plan → today's plain draft → ready (no spawn).
-	if len(p.Targets) == 0 {
-		updated, err := plans.MarkReady(project, id)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "gogo plan ready: %v\n", err)
-			return 1
-		}
-		fmt.Printf("marked plan %s ready\n", updated.ID)
-		return 0
+	updated, err := plans.MarkReady(project, id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gogo plan ready: %v\n", err)
+		return 1
 	}
-	// Fan out to the un-spawned targets (mirrors the plans-tab `r` auto-spawn). Load the
-	// project ONCE, surfacing the error (REV-003) instead of swallowing it; a project with
-	// no sources cannot resolve any target, so say so up front rather than N stderr lines.
+	fmt.Printf("marked plan %s ready - spawn its work items with `gogo plan go %s`\n", updated.ID, updated.ID)
+	return 0
+}
+
+// planGo is the headless GO step (plans-board FR3, the CLI mirror of the plans-tab
+// ready→active move). It fans out: for each UN-spawned target source it AUTO-SPAWNS a
+// work item — one `/gogo:plan <brief> --correlation plan-XXXX` per target (its per-source
+// brief as the goal, its `--skip-acceptance` when the source opted out), records a member
+// + flips the plan active on each SUCCESSFUL launch, and is idempotent (a target already
+// carrying a member is skipped, so a re-run never re-launches). The CLI writes nothing
+// under a source's .gogo/ — each launched skill does. Lenient on status: a draft or a
+// ready plan both spawn (go implies ready). `gogo plan promote` (single source) stays the
+// manual fallback.
+func planGo(args []string) int {
+	pa, ok, code := parsePlanArgs("gogo plan go", args)
+	if !ok {
+		return code
+	}
+	if len(pa.pos) == 0 {
+		fmt.Fprintln(os.Stderr, "gogo plan go: needs an <id> (see `gogo plan list`)")
+		return 2
+	}
+	project, code := resolveProjectName("gogo plan go", pa.project)
+	if code != 0 {
+		return code
+	}
+	id := pa.pos[0]
+	p, found := plans.Get(project, id)
+	if !found {
+		fmt.Fprintf(os.Stderr, "gogo plan go: no plan %q in %q (see `gogo plan list`)\n", id, project)
+		return 1
+	}
+	if len(p.Targets) == 0 {
+		fmt.Fprintf(os.Stderr, "gogo plan go: plan %s has no targets - add one (`gogo plan add %s <source>`) before go\n", id, id)
+		return 1
+	}
+	// Load the project ONCE, surfacing the error (REV-003) instead of swallowing it; a
+	// project with no sources cannot resolve any target, so say so up front rather than N
+	// stderr lines.
 	proj, err := projects.Load(project)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "gogo plan ready: cannot load project %q: %v\n", project, err)
+		fmt.Fprintf(os.Stderr, "gogo plan go: cannot load project %q: %v\n", project, err)
 		return 1
 	}
 	if len(proj.Sources) == 0 {
-		fmt.Fprintf(os.Stderr, "gogo plan ready: project %q has no sources - add one (`gogo source add`) before accepting a targeted plan\n", project)
+		fmt.Fprintf(os.Stderr, "gogo plan go: project %q has no sources - add one (`gogo source add`) before go\n", project)
 		return 1
 	}
 	body := p.Description
@@ -397,12 +426,12 @@ func planReady(args []string) int {
 		src, sname, ok := sourceInProject(project, target)
 		if !ok {
 			invalid = append(invalid, target)
-			fmt.Fprintf(os.Stderr, "gogo plan ready: target %q is not a source of %q — skipping\n", target, project)
+			fmt.Fprintf(os.Stderr, "gogo plan go: target %q is not a source of %q - skipping\n", target, project)
 			continue
 		}
 		// REV-002: also skip a target spawned OUT OF BAND — a work item already in the
 		// source carrying this plan's correlation id but never recorded as a member (the
-		// same member-OR-feature guard the plans-tab `r` applies, so the two mirrors agree).
+		// same member-OR-feature guard the plans-tab move applies, so the two mirrors agree).
 		// A pure READ of the source's contract, never a source write.
 		if planFeatureSpawned(src.Path, p.ID) {
 			alreadySpawned++
@@ -416,7 +445,7 @@ func planReady(args []string) int {
 		intent.Command += launch.SkipParams(src.PlanAcceptanceSkip, false)
 		res, err := planLauncher(src.Path, intent)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "gogo plan ready: spawn into %s failed: %v\n", sname, err)
+			fmt.Fprintf(os.Stderr, "gogo plan go: spawn into %s failed: %v\n", sname, err)
 			failed = append(failed, sname)
 			continue // leave the target un-recorded (no phantom member)
 		}
@@ -446,7 +475,7 @@ func planReady(args []string) int {
 		// work items exist — report it on stderr with a non-zero exit so a scripted/CI
 		// caller checking $? is never told "nothing to do" (REV-003 + TEST-001).
 		if len(problems) > 0 {
-			fmt.Fprintf(os.Stderr, "gogo plan ready: plan %s: nothing to spawn - %d already spawned, %s\n",
+			fmt.Fprintf(os.Stderr, "gogo plan go: plan %s: nothing to spawn - %d already spawned, %s\n",
 				id, alreadySpawned, strings.Join(problems, "; "))
 			return 1
 		}
@@ -456,11 +485,11 @@ func planReady(args []string) int {
 	if len(problems) > 0 {
 		// Some spawned, but a target did not resolve or a launch failed — signal the partial
 		// failure (non-zero) and name the offending targets so the problem is visible.
-		fmt.Fprintf(os.Stderr, "gogo plan ready: accepted plan %s - spawned %d work item(s), but %s\n",
+		fmt.Fprintf(os.Stderr, "gogo plan go: plan %s - spawned %d work item(s), but %s\n",
 			id, spawned, strings.Join(problems, "; "))
 		return 1
 	}
-	fmt.Printf("accepted plan %s - spawned %d work item(s)\n", id, spawned)
+	fmt.Printf("plan %s - spawned %d work item(s) (now active)\n", id, spawned)
 	return 0
 }
 

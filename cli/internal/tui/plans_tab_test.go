@@ -15,16 +15,18 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-// TestPlansTabListRendersGrouped: the plans tab lists the project's plans grouped by
-// status (ACTIVE · READY · DRAFTS), each with its ⛓ plan-XXXX chip, and the header
-// counts.
-func TestPlansTabListRendersGrouped(t *testing.T) {
+// TestPlansTabKanbanColumns (plans-board FR1): the plans tab renders a 4-column KANBAN
+// (drafts · ready · active · done) with each plan as a card in the column matching its
+// status, its ⛓ plan-XXXX chip present. A done plan appears in the visible 4th column.
+func TestPlansTabKanbanColumns(t *testing.T) {
 	seedDataHome(t)
 	active, _ := plans.New("app", "Shipping epic", "")
 	plans.SetStatus("app", active.ID, plans.StatusActive)
 	ready, _ := plans.New("app", "Ready plan", "")
 	plans.MarkReady("app", ready.ID)
 	draft, _ := plans.New("app", "A draft idea", "")
+	done, _ := plans.New("app", "Old done plan", "")
+	plans.SetStatus("app", done.ID, plans.StatusDone)
 
 	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("svc", "/r/svc")))
 	m = tab(m) // → plans
@@ -33,14 +35,61 @@ func TestPlansTabListRendersGrouped(t *testing.T) {
 	}
 	out := m.View()
 	for _, want := range []string{
-		"ACTIVE", "READY", "DRAFTS",
-		"1 active · 1 ready · 1 drafts",
-		"Shipping epic", "Ready plan", "A draft idea",
+		"drafts", "ready", "active", "done", // the four kanban column headers
+		"Shipping epic", "Ready plan", "A draft idea", "Old done plan",
 		"⛓ " + active.ID, "⛓ " + draft.ID,
 	} {
 		if !strings.Contains(out, want) {
-			t.Errorf("plans list missing %q:\n%s", want, out)
+			t.Errorf("plans kanban missing %q:\n%s", want, out)
 		}
+	}
+	// The plans partition by status into the right columns.
+	if len(m.planCols[0]) != 1 || m.planCols[0][0].ID != draft.ID {
+		t.Errorf("drafts column = %+v, want the one draft", m.planCols[0])
+	}
+	if len(m.planCols[1]) != 1 || m.planCols[1][0].ID != ready.ID {
+		t.Errorf("ready column = %+v, want the one ready plan", m.planCols[1])
+	}
+	if len(m.planCols[2]) != 1 || m.planCols[2][0].ID != active.ID {
+		t.Errorf("active column = %+v, want the one active plan", m.planCols[2])
+	}
+	if len(m.planCols[3]) != 1 || m.planCols[3][0].ID != done.ID {
+		t.Errorf("done column = %+v, want the one done plan", m.planCols[3])
+	}
+}
+
+// TestPlansTabKanbanNavigation (plans-board FR1): →/↓ move column/card focus exactly as on
+// the work board — the focused plan follows the cursor.
+func TestPlansTabKanbanNavigation(t *testing.T) {
+	seedDataHome(t)
+	plans.New("app", "Draft one", "")
+	plans.New("app", "Draft two", "")
+	r1, _ := plans.New("app", "Ready one", "")
+	plans.MarkReady("app", r1.ID)
+
+	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("svc", "/r/svc")))
+	m = tab(m) // → plans, focus starts on drafts col 0
+	if m.planColIdx != 0 {
+		t.Fatalf("kanban did not start on the drafts column")
+	}
+	if len(m.planCols[0]) != 2 {
+		t.Fatalf("drafts column = %d cards, want 2", len(m.planCols[0]))
+	}
+	// ↓ moves the card cursor down to the OTHER draft (order-agnostic — same-second
+	// Created ties break by id, so just assert the focus changed within the column).
+	first := m.focusedPlan()
+	m = send(m, tea.KeyMsg{Type: tea.KeyDown})
+	second := m.focusedPlan()
+	if first == nil || second == nil || first.ID == second.ID {
+		t.Errorf("↓ did not move the card cursor (first=%v second=%v)", first, second)
+	}
+	// → moves to the ready column, focusing its one plan.
+	m = send(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.planColIdx != 1 {
+		t.Fatalf("→ did not move to the ready column (planColIdx=%d)", m.planColIdx)
+	}
+	if got := m.focusedPlan(); got == nil || got.ID != r1.ID {
+		t.Errorf("ready column focus = %v, want %s", got, r1.ID)
 	}
 }
 
@@ -59,7 +108,7 @@ func TestPlanDetailRendersTargetSources(t *testing.T) {
 		t.Fatalf("enter did not open the plan detail")
 	}
 	out := m.View()
-	for _, want := range []string{"plans / Wire up auth", "⛓ " + p.ID, "seed the auth flow", "TARGET SOURCES", "web", "create work item"} {
+	for _, want := range []string{"plans / Wire up auth", "⛓ " + p.ID, "seed the auth flow", "WORK ITEMS", "web", "create work item"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("plan detail missing %q:\n%s", want, out)
 		}
@@ -141,8 +190,8 @@ func TestPlanListNewAndDelete(t *testing.T) {
 		t.Fatalf("after n+complete: plans = %v, want one 'Fresh idea' draft", list)
 	}
 
-	// x → delete the focused plan.
-	m.planIdx = 0
+	// x → delete the focused plan (the new draft, in the drafts column).
+	m.planColIdx = 0
 	m = send(m, runes("x"))
 	if list, _ := plans.List("app"); len(list) != 0 {
 		t.Errorf("after x: %d plans, want 0 (deleted)", len(list))
@@ -172,7 +221,7 @@ func TestPlanNewCapturesDescription(t *testing.T) {
 		t.Fatalf("n did not persist the description: %+v", got)
 	}
 	// The plan detail renders the actual description (not the placeholder).
-	m.planIdx = 0
+	m.planColIdx = 0 // the new draft is in the drafts column
 	det := send(m, tea.KeyMsg{Type: tea.KeyEnter}).View()
 	if !strings.Contains(det, "Rework the auth flow across web and api.") {
 		t.Errorf("plan detail did not render the description:\n%s", det)
@@ -470,7 +519,8 @@ func TestPlanCardPerSourceDotStates(t *testing.T) {
 			Correlations: []string{p.ID}},
 	}}
 	m := sizedWorkspace(t, repo, proj("app", src("web", "/r/web"), src("api", "/r/api")))
-	m = tab(m) // → plans
+	m = tab(m)       // → plans
+	m.planColIdx = 2 // focus the active column (where this plan lives) so enter opens its detail
 
 	list := m.View()
 	if !strings.Contains(list, "1 of 2 work items") {
@@ -506,9 +556,10 @@ func TestPlansTabDerivedAwaitingProjectUAT(t *testing.T) {
 			Class: contract.ClassShipped, Status: "shipped", Correlations: []string{p.ID}},
 	}}
 	m := sizedWorkspace(t, shipped, proj("app", src("web", "/r/web")))
-	m = tab(m) // → plans
+	m = tab(m)       // → plans
+	m.planColIdx = 2 // the active plan lives in the active column
 	if out := m.View(); !strings.Contains(out, plans.StatusAwaitingProjectUAT) {
-		t.Errorf("plans list did not derive awaiting-project-uat for an all-shipped plan:\n%s", out)
+		t.Errorf("plans kanban did not derive awaiting-project-uat for an all-shipped plan:\n%s", out)
 	}
 	if det := send(m, tea.KeyMsg{Type: tea.KeyEnter}).View(); !strings.Contains(det, plans.StatusAwaitingProjectUAT) {
 		t.Errorf("plan detail did not derive awaiting-project-uat:\n%s", det)
@@ -521,16 +572,17 @@ func TestPlansTabDerivedAwaitingProjectUAT(t *testing.T) {
 	}}
 	m2 := sizedWorkspace(t, building, proj("app", src("web", "/r/web")))
 	m2 = tab(m2)
+	m2.planColIdx = 2
 	if det := send(m2, tea.KeyMsg{Type: tea.KeyEnter}).View(); strings.Contains(det, plans.StatusAwaitingProjectUAT) {
 		t.Errorf("plan detail derived the UAT gate with an unshipped member:\n%s", det)
 	}
 }
 
-// TestPlansTabAcceptProjectUAT (FR3, `D`): the TUI project-UAT accept mirrors `gogo plan
-// done`. It REFUSES (a status naming the unshipped member, no confirm, plan stays active)
-// while a member is unshipped, and — once every member ships — `D` opens the accept
-// confirm whose completion records the accept (MarkDone: a `## Project UAT` round + the
-// persisted `done`).
+// TestPlansTabAcceptProjectUAT (plans-board FR2, active→done via `m`): the TUI project-UAT
+// accept mirrors `gogo plan done`. Pressing `m` on an ACTIVE plan REFUSES (a status naming
+// the unshipped member, no confirm, plan stays active) while a member is unshipped, and —
+// once every member ships — `m` opens the accept confirm whose completion records the
+// accept (MarkDone: a `## Project UAT` round + the persisted `done` + a changelog entry).
 func TestPlansTabAcceptProjectUAT(t *testing.T) {
 	seedDataHome(t)
 	p, _ := plans.New("app", "Cross-repo migration", "")
@@ -543,10 +595,11 @@ func TestPlansTabAcceptProjectUAT(t *testing.T) {
 			Class: contract.ClassInProgress, Phase: "implement", Status: "implementing", Correlations: []string{p.ID}},
 	}}
 	m := sizedWorkspace(t, building, proj("app", src("web", "/r/web")))
-	m = tab(m) // → plans
-	m = send(m, runes("D"))
+	m = tab(m)       // → plans
+	m.planColIdx = 2 // focus the active column
+	m = send(m, runes("m"))
 	if m.pendingPlanDone != nil {
-		t.Fatalf("D opened a confirm despite an unshipped member (pending=%v)", m.pendingPlanDone)
+		t.Fatalf("m opened a confirm despite an unshipped member (pending=%v)", m.pendingPlanDone)
 	}
 	if !strings.Contains(m.status, "not shipped") {
 		t.Errorf("refuse status = %q, want a 'not shipped' message naming the member", m.status)
@@ -555,16 +608,17 @@ func TestPlansTabAcceptProjectUAT(t *testing.T) {
 		t.Errorf("plan flipped despite the members-shipped guard: %s", got.Status)
 	}
 
-	// Accept: the member ships → D opens the confirm → completing it records the accept.
+	// Accept: the member ships → m opens the confirm → completing it records the accept.
 	shipped := &contract.Repo{Features: []*contract.Feature{
 		{Slug: "cross-web", Title: "Web side", Source: "web", Root: "/r/web",
 			Class: contract.ClassShipped, Status: "shipped", Correlations: []string{p.ID}},
 	}}
 	m2 := sizedWorkspace(t, shipped, proj("app", src("web", "/r/web")))
 	m2 = tab(m2)
-	m2 = send(m2, runes("D"))
+	m2.planColIdx = 2
+	m2 = send(m2, runes("m"))
 	if m2.pendingPlanDone == nil || m2.mode != modeForm {
-		t.Fatalf("D did not open the project-UAT accept confirm (mode=%d pending=%v)", m2.mode, m2.pendingPlanDone)
+		t.Fatalf("m did not open the project-UAT accept confirm (mode=%d pending=%v)", m2.mode, m2.pendingPlanDone)
 	}
 	// Confirm through the heap-stable binding (TEST-001) and complete.
 	m2.binding.confirm = true
@@ -589,13 +643,14 @@ func TestPlanListSingleCursor(t *testing.T) {
 	plans.SetStatus("app", a.ID, plans.StatusActive)
 
 	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("web", "/r/web")))
-	m = tab(m) // → plans
+	m = tab(m)       // → plans
+	m.planColIdx = 2 // the active plan lives in the active column
 	out := m.View()
 	if strings.Contains(out, "▸ ▸") {
-		t.Errorf("plans list doubled the cursor (`▸ ▸`):\n%s", out)
+		t.Errorf("plans kanban doubled the cursor (`▸ ▸`):\n%s", out)
 	}
 	if !strings.Contains(out, "▸") {
-		t.Errorf("plans list lost its focus cursor entirely:\n%s", out)
+		t.Errorf("plans kanban lost its focus cursor entirely:\n%s", out)
 	}
 
 	det := send(m, tea.KeyMsg{Type: tea.KeyEnter}).View()
@@ -604,12 +659,12 @@ func TestPlanListSingleCursor(t *testing.T) {
 	}
 }
 
-// TestPlansTabAcceptSpawnsPerTarget pins the 0.25.0 FR2 auto-spawn (`r` accept): a plan
-// with 3 analyst-chosen targets opens a confirm listing them, and on accept fires the
-// launcher ONCE per target — each `/gogo:plan` carrying that target's per-source BRIEF as
-// the goal + the plan correlation id, the plan-acceptance-skip source getting
-// `--skip-acceptance` — records 3 members, and flips the plan `active`.
-func TestPlansTabAcceptSpawnsPerTarget(t *testing.T) {
+// TestPlansTabGoSpawnsPerTarget pins the re-sequenced fan-out (plans-board FR3): pressing
+// `m` on a READY plan with 3 analyst-chosen targets opens a confirm listing them, and on
+// accept fires the launcher ONCE per target — each `/gogo:plan` carrying that target's
+// per-source BRIEF as the goal + the plan correlation id, the plan-acceptance-skip source
+// getting `--skip-acceptance` — records 3 members, and flips the plan `active`.
+func TestPlansTabGoSpawnsPerTarget(t *testing.T) {
 	seedDataHome(t)
 	body := `## Goal
 Roll out the new token flow.
@@ -627,6 +682,7 @@ Rotate tokens on schedule.`
 	plans.AddTarget("app", p.ID, "web")
 	plans.AddTarget("app", p.ID, "api")
 	plans.AddTarget("app", p.ID, "worker")
+	plans.MarkReady("app", p.ID) // ready → `m` is the GO/spawn move (draft → mark-ready first)
 
 	project := projects.Project{Name: "app", Sources: []projects.Source{
 		{Name: "web", Path: "/r/web"},
@@ -636,6 +692,7 @@ Rotate tokens on schedule.`
 	m := NewWorkspace(&contract.Repo{}, project)
 	m.hasClaude = true
 	m.tab = tabPlans
+	m.planColIdx = 1 // focus the ready column (where the ready plan lives)
 
 	var calls int
 	cmds := map[string]string{}
@@ -645,11 +702,11 @@ Rotate tokens on schedule.`
 		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
 	}
 
-	// r opens the accept+spawn confirm listing the 3 un-spawned targets.
-	nm, _ := m.Update(runes("r"))
+	// m (ready→go) opens the accept+spawn confirm listing the 3 un-spawned targets.
+	nm, _ := m.Update(runes("m"))
 	m = nm.(Model)
 	if m.pendingPlanSpawn == nil || m.mode != modeForm {
-		t.Fatalf("r did not open the accept+spawn confirm (mode=%d pending=%v)", m.mode, m.pendingPlanSpawn)
+		t.Fatalf("m did not open the go/spawn confirm (mode=%d pending=%v)", m.mode, m.pendingPlanSpawn)
 	}
 	if len(m.pendingPlanSpawn.targets) != 3 {
 		t.Fatalf("confirm targets = %v, want the 3 un-spawned sources", m.pendingPlanSpawn.targets)
@@ -705,46 +762,49 @@ Rotate tokens on schedule.`
 	}
 }
 
-// TestPlansTabAcceptTargetlessJustMarksReady pins the additive fallback (FR3): a plan
-// with NO analyst-chosen targets keeps today's plain `r` → MarkReady with ZERO launches
-// (no confirm, no spawn).
-func TestPlansTabAcceptTargetlessJustMarksReady(t *testing.T) {
+// TestPlansTabDraftMoveMarksReadyNoSpawn pins the re-sequence (plans-board FR2/FR3):
+// pressing `m` on a DRAFT marks it ready and spawns NOTHING — no confirm, no launch — the
+// plan just waits for implementation. (The spawn is now a separate ready→go move.)
+func TestPlansTabDraftMoveMarksReadyNoSpawn(t *testing.T) {
 	seedDataHome(t)
+	// A draft WITH a target too — the point is that draft→ready never spawns regardless.
 	p, _ := plans.New("app", "Solo idea", "just an idea")
+	plans.AddTarget("app", p.ID, "web")
 
 	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/r/web")))
 	m.hasClaude = true
-	m.tab = tabPlans
+	m.tab = tabPlans // focus starts on the drafts column (0), where this draft lives
 	fired := false
 	m.launcher = func(string, launch.Intent) (launch.Result, error) { fired = true; return launch.Result{}, nil }
 
-	nm, _ := m.Update(runes("r"))
+	nm, _ := m.Update(runes("m"))
 	m = nm.(Model)
 	if m.pendingPlanSpawn != nil {
-		t.Fatalf("targetless r opened a spawn confirm (%v)", m.pendingPlanSpawn)
+		t.Fatalf("draft m opened a spawn confirm (%v) — draft→ready must not spawn", m.pendingPlanSpawn)
 	}
 	if fired {
-		t.Error("targetless r fired the launcher (want zero launches)")
+		t.Error("draft m fired the launcher (want zero launches — mark-ready only)")
 	}
 	if got, _ := plans.Get("app", p.ID); got.Status != plans.StatusReady {
-		t.Errorf("targetless r: status = %q, want ready (plain MarkReady)", got.Status)
+		t.Errorf("draft m: status = %q, want ready (plain MarkReady, no spawn)", got.Status)
 	}
 }
 
-// TestPlansTabAcceptSkipsAlreadySpawned pins the idempotency (D3=a): a re-`r` on a plan
-// whose `web` target was already spawned confirms + fans out ONLY the still-un-spawned
-// `api`, never re-launching web.
-func TestPlansTabAcceptSkipsAlreadySpawned(t *testing.T) {
+// TestPlansTabGoSkipsAlreadySpawned pins the idempotency (plans-board FR3): a `m` (go) on a
+// READY plan whose `web` target was already spawned confirms + fans out ONLY the still-un-
+// spawned `api`, never re-launching web.
+func TestPlansTabGoSkipsAlreadySpawned(t *testing.T) {
 	seedDataHome(t)
 	p, _ := plans.New("app", "Rollout", "body")
 	plans.AddTarget("app", p.ID, "web")
 	plans.AddTarget("app", p.ID, "api")
 	plans.AddMember("app", p.ID, plans.Member{Source: "web", SlugHint: "rollout"}) // web already spawned
-	plans.SetStatus("app", p.ID, plans.StatusActive)
+	plans.MarkReady("app", p.ID)                                                   // ready → `m` is the go/spawn move
 
 	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/r/web"), src("api", "/r/api")))
 	m.hasClaude = true
 	m.tab = tabPlans
+	m.planColIdx = 1 // focus the ready column
 
 	var calls int
 	var roots []string
@@ -754,10 +814,10 @@ func TestPlansTabAcceptSkipsAlreadySpawned(t *testing.T) {
 		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
 	}
 
-	nm, _ := m.Update(runes("r"))
+	nm, _ := m.Update(runes("m"))
 	m = nm.(Model)
 	if m.pendingPlanSpawn == nil {
-		t.Fatalf("r did not open a confirm for the remaining un-spawned target")
+		t.Fatalf("m did not open a confirm for the remaining un-spawned target")
 	}
 	if len(m.pendingPlanSpawn.targets) != 1 || m.pendingPlanSpawn.targets[0] != "api" {
 		t.Fatalf("confirm targets = %v, want only [api] (web already spawned)", m.pendingPlanSpawn.targets)
@@ -774,24 +834,26 @@ func TestPlansTabAcceptSkipsAlreadySpawned(t *testing.T) {
 	}
 }
 
-// TestPlansTabAcceptLaunchErrorRecordsNoMember pins REV-005: a spawn whose launch fails
+// TestPlansTabGoLaunchErrorRecordsNoMember pins REV-005: a go/spawn whose launch fails
 // records NO member (never a phantom active member the store would over-report).
-func TestPlansTabAcceptLaunchErrorRecordsNoMember(t *testing.T) {
+func TestPlansTabGoLaunchErrorRecordsNoMember(t *testing.T) {
 	seedDataHome(t)
 	p, _ := plans.New("app", "Rollout", "body")
 	plans.AddTarget("app", p.ID, "web")
+	plans.MarkReady("app", p.ID) // ready → `m` is the go/spawn move
 
 	m := NewWorkspace(&contract.Repo{}, proj("app", src("web", "/r/web")))
 	m.hasClaude = true
 	m.tab = tabPlans
+	m.planColIdx = 1 // focus the ready column
 	m.launcher = func(string, launch.Intent) (launch.Result, error) {
 		return launch.Result{}, errors.New("boom")
 	}
 
-	nm, _ := m.Update(runes("r"))
+	nm, _ := m.Update(runes("m"))
 	m = nm.(Model)
 	if m.pendingPlanSpawn == nil {
-		t.Fatal("r did not open the accept+spawn confirm")
+		t.Fatal("m did not open the go/spawn confirm")
 	}
 	m.binding.confirm = true
 	fm, cmd := m.finishPlanSpawn()
@@ -817,9 +879,11 @@ func TestPlansTabAcceptSpawnFormMessageDriven(t *testing.T) {
 		p, _ := plans.New(project, "Rollout", "roll it out")
 		plans.AddTarget(project, p.ID, "web")
 		plans.AddTarget(project, p.ID, "api")
+		plans.MarkReady(project, p.ID) // ready → `m` is the go/spawn move
 		m := NewWorkspace(&contract.Repo{}, proj(project, src("web", "/r/web"), src("api", "/r/api")))
 		m.hasClaude = true
 		m.tab = tabPlans
+		m.planColIdx = 1 // focus the ready column
 		calls := 0
 		m.launcher = func(string, launch.Intent) (launch.Result, error) {
 			calls++
@@ -830,9 +894,9 @@ func TestPlansTabAcceptSpawnFormMessageDriven(t *testing.T) {
 
 	// Confirm (y): huh's async completion message routes through updateForm to the fan-out.
 	m, id, calls := setup("confirmapp")
-	m = send(m, runes("r"))
+	m = send(m, runes("m"))
 	if m.pendingPlanSpawn == nil || m.mode != modeForm {
-		t.Fatalf("r did not open the accept+spawn confirm (mode=%d pending=%v)", m.mode, m.pendingPlanSpawn)
+		t.Fatalf("m did not open the go/spawn confirm (mode=%d pending=%v)", m.mode, m.pendingPlanSpawn)
 	}
 	m = keyPress(t, m, runes("y")) // affirmative → huh completes → finishPlanSpawn fan-out
 	if *calls != 2 {
@@ -851,9 +915,9 @@ func TestPlansTabAcceptSpawnFormMessageDriven(t *testing.T) {
 	// Cancel (n): the negative completion routes to finishPlanSpawn's cancel branch —
 	// zero launches, plan left un-spawned, back on the plans tab.
 	m2, id2, calls2 := setup("cancelapp")
-	m2 = send(m2, runes("r"))
+	m2 = send(m2, runes("m"))
 	if m2.pendingPlanSpawn == nil {
-		t.Fatalf("r did not open the confirm for the cancel case")
+		t.Fatalf("m did not open the confirm for the cancel case")
 	}
 	m2 = keyPress(t, m2, runes("n")) // negative → huh completes → cancel branch
 	if *calls2 != 0 {
