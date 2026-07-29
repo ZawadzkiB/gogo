@@ -8,6 +8,18 @@ import "github.com/charmbracelet/lipgloss"
 // rune-count math is unaffected.
 const waitingMarker = "⏸"
 
+// Status-line severity markers (FR3.2). Every cockpit outcome - a cap bounce, a
+// dangling plan target, a tmux failure and a plain success - used to render
+// through ONE faint-grey voice, so the user could not tell a blocked launch from
+// a failed one. Colour alone would not fix it (a no-colour terminal, and `go
+// test`'s TTY-less lipgloss, both flatten it), so each severity also carries a
+// leading glyph: the distinction survives anywhere and is assertable in View().
+// Success keeps NO marker, so today's success line is byte-for-byte unchanged.
+const (
+	statusErrMarker  = "✗ " // a failure - always carries the real error's words
+	statusWarnMarker = "⚠ " // blocked / a gate - always carries the unblock
+)
+
 // TONE palette — per-column accents ported from the xplan/web tones, as lipgloss
 // adaptive colors so light terminals stay readable (TEST-007). All styles here
 // are precomputed ONCE (package init), never rebuilt per frame.
@@ -53,6 +65,12 @@ var (
 
 	secondaryStyle = lipgloss.NewStyle().Foreground(secondaryText)
 	faintStyle     = lipgloss.NewStyle().Foreground(faintText)
+
+	// Status-line severity styles (FR3.2), over the palette the pills already use:
+	// red = failed, amber = blocked/gate. The dim success voice stays statusStyle
+	// (view.go) so every untouched call site is unchanged.
+	statusErrStyle  = lipgloss.NewStyle().Bold(true).Foreground(waitAccent)
+	statusWarnStyle = lipgloss.NewStyle().Bold(true).Foreground(columnAccent[1])
 
 	// correlationChipStyle tints a card's ⛓ plan-… correlation chip(s) (FR14) — a muted
 	// purple, distinct from the source tag's registry color, echoing the uat/gate

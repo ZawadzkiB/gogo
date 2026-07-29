@@ -54,7 +54,8 @@ The markdown-plugin side has no unit suite — verification = **dogfood**:
 install, then run `/gogo:build`, `/gogo:plan`, `/gogo:go` on a sample repo and
 inspect the produced `.gogo/` artifacts. The **CLI** (since 0.10.0) has a real
 Go suite: `cd cli && gofmt -l . && go vet ./... && go test -race ./...`
-(~120 test functions as of 0.11.0, across contract/tui/launch/pages/diagram/**trash**
+(**449** test functions as of 0.28.0 - verified by grep, was "~120 as of 0.11.0" - across
+13 packages: contract/tui/launch/pages/plans/projects/orchestrator/diagram/**trash**/config
 + a `gogo status` golden). UI/browser testing for *target* projects
 uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 `testing-tools.md` / `test-strategy.md`.
@@ -74,6 +75,29 @@ uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
   multi-select fallback. tmux is installed on this dev host (so the live-TUI test
   path in `test-strategy.md` applies), but it **stays a soft dep** — same
   detection, same fallback.
+
+## tmux platform constraints (measured on tmux 3.7b, 0.28.0)
+
+Two hard facts about tmux that anything building a launch argv must respect. Both were
+measured on this host, not inferred, and both caused real bugs:
+
+- **A tmux command line over ~16 KB is refused** with `command too long` on stderr and
+  exit status 1. Bisected: last accepted **16317** bytes, first refused 16318, and it is
+  the WHOLE command line (session name included) that is bounded. `launch` pins
+  `MaxTmuxCommandBytes = 16317` and preflights every `new-session`. Never inline a
+  multi-KB body into a launched command - point at the file that holds it.
+- **A plain `-t` target resolves exact -> prefix -> fnmatch**, so it can hit the wrong
+  session: `kill-session -t gogo-plan-foo` provably killed `gogo-plan-foobar-long`.
+  Always use the exact form, in the shape the target position accepts: **`=<name>`** for a
+  **session** target (`has-session`, `kill-session`, `attach-session`, `switch-client`)
+  and **`=<name>:`** for `capture-pane`, whose `-t` is a **pane** target and rejects the
+  bare `=<name>` outright (`can't find pane`). `new-session -s` takes a NAME, not a
+  target - the `=` would become part of the session name.
+
+Also verified: tmux does **not** run the launched command through a shell (argv arrives
+verbatim, so `$(...)`, backticks, `;`, `*` and newlines are safe as separate argv
+elements), and neither `-c <bad dir>` nor a missing binary nor `.`/`:` in a name fails on
+3.7b.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

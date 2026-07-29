@@ -459,6 +459,10 @@ cd cli && go build -o gogo .
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
   Since **0.26.0** the plans tab is a **4-column KANBAN** (drafts · ready · active · done) mirroring the
   work board, with an **all-manual** lifecycle: keys `←→` columns · `↑↓` cards · `enter` open the detail ·
+  `v` **view the plan** (since **0.28.0** - the same glamour terminal viewer the work board's `v` uses,
+  over the plan's markdown file; `esc` returns to the plans tab) · `w` **web page** (since **0.28.0** - the
+  self-contained interactive page, written under the PROJECT home at
+  `~/.gogo/projects/<name>/.gogo/resources/view/<plan-id>.html`, never a source repo) ·
   `n` new plan (title **+ optional description**) ·
   `A` **plan-with-claude** (since 0.25.0 an **analyst-grade** session; since **0.25.1** it FIRST prompts
   for the plan **goal** - so the plan is minted with that goal as its description, never a blank
@@ -476,7 +480,7 @@ cd cli && go build -o gogo .
   **detail** the **WORK ITEMS** list shows each member + its live status; press `c` **create work item**
   on a source row - the CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the
   analyst derives the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+`
-  adds a target, `m` moves the plan, `e` edits the plan file. `gogo plan new/list/show/add/rm/ready/go/
+  adds a target, `v`/`w` view the plan, `m` moves the plan, `e` edits the plan file. `gogo plan new/list/show/add/rm/ready/go/
   promote/done/delete` is the scriptable surface (`gogo plan ready` marks ready; `gogo plan go` fans out
   the spawn). **Auto-pickup:** a work item spawned into a source with `planAcceptanceSkip` auto-runs
   `/gogo:go` on the next board reload when its source is **under its `concurrentWorkItems` cap**; when the
@@ -494,8 +498,27 @@ cd cli && go build -o gogo .
   into two labelled groups. The
   per-source **concurrency cap** refuses a `gogo go` (or board `m`→go) that would start work on an
   **(N+1)th** live in-progress feature in that source (so two build sessions can't clobber one shared
-  working tree); `--force` overrides. Default cap `1`; `0` = unlimited; an uncapped source is inert.
+  working tree); `--force` overrides, and since **0.28.0** so does the board's **`M`** (the same confirm,
+  naming the cap and the slugs already building - no need to leave the cockpit). Default cap `1`; `0` =
+  unlimited; an uncapped source is inert. The cap's **scope** is spelled out where it is read (since
+  0.28.0): it is **per source**, counts only **in-progress work items with a live session**, and
+  **never counts plans** - a plan spawn is not cap-gated at all.
   All config writes land under `~/.gogo/` only - never a source's `.gogo/`.
+- **Self-reporting launches (since 0.28.0)** - a cockpit launch that fails now says why. tmux's own
+  stderr is captured into a typed error (`tmux new-session failed: exit status 1: command too long`
+  instead of a bare `exit status 1`); an oversized command is caught **before** tmux sees it (tmux
+  refuses a command line past a measured **16 317 bytes**), and a plan brief too big to inline is
+  **folded to an on-disk pointer** at the plan file that already holds it - under budget the launched
+  command is byte-for-byte unchanged, and the same fold applies to `gogo plan go` / `gogo plan promote`,
+  so the scriptable surface is not left behind. Every tmux target
+  (`has-session` / `kill-session` / `capture-pane` / `attach-session` / `switch-client`) uses tmux's
+  **exact-match** form, because a prefix target provably killed, peeked and attached the *wrong* session;
+  a session started by an **older** gogo keeps its board attribution across the upgrade. A failed **attach** is reported instead of always claiming "detached". And the status
+  line has **severity**: `✗` red = failed (carrying the real error's words) · `⚠` amber = blocked/gate
+  (carrying the unblock) · dim = ok. A plan whose `targets:` names something that is **not a source of
+  its project** is now refused **by name, up front** ("plan targets `gogo`, which is not a source of
+  project `dotai` - add it in the config tab, or retarget the plan") instead of opening a confirm and
+  silently spawning nothing.
 - **Scriptable** - `gogo status` (classifier table), `gogo view <slug>[:plan|:report] [--web] [--open]`,
   `gogo events <slug>`, `gogo go [<slug>] [--attach] [--takeover]`,
   `gogo sweep [--dry-run] [<slug>...]`, `gogo trash [restore <entry>]`,
@@ -511,9 +534,11 @@ cd cli && go build -o gogo .
 **Soft deps** (detected at use, graceful fallback): `tmux` (else backgrounded
 `claude -p` + log), `claude` (needed only to launch), `glow` (the built-in
 glamour view is the fallback). Keymap: `←→`/`h` columns · `↑↓`/`jk` cards ·
-`space` select · `enter` drill-in · `v` view · `w` web · `m` move · `d` ship ·
-`a` attach · `l` peek · `x` delete→trash · `tab`/`shift+tab` board·plans·config ·
+`space` select · `enter` drill-in · `v` view · `w` web · `m` move · `M` force past the
+source cap · `d` ship · `a` attach · `l` peek · `x` delete→trash ·
+`tab`/`shift+tab` board·plans·config ·
 `p` project chip / project switcher · `/` filter (incl. `@name`, `#plan-<id>`) · `G` glow · `q` quit.
+On the **plans** tab the same `v` / `w` open the focused plan (terminal viewer / web page).
 
 **CLI companion reference** - an installed Claude also carries an on-demand
 `gogo-cli` skill (`skills/gogo-cli/SKILL.md`) documenting the full command

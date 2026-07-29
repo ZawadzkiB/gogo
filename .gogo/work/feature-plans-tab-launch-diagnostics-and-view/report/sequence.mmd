@@ -1,0 +1,40 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant P as tui/plans_tab.go<br/>updatePlanList / updatePlanDetail
+  participant V as tui/update.go<br/>updateViewer
+  participant PL as internal/plans
+  participant PR as internal/projects
+  participant D as tui/drill.go<br/>openArtifact
+  participant PG as internal/pages
+  participant BR as browser
+
+  Note over U,BR: v - terminal view of the plan markdown (as built)
+  U->>P: press v on a kanban card OR in an open plan detail
+  P->>P: currentPlan - the open detail, else the focused kanban card
+  P->>PL: plans.Path(project, plan.ID)
+  PL-->>P: ~/.gogo/projects/&lt;name&gt;/.gogo/plans/&lt;id&gt;.md
+  alt file missing
+    P-->>U: statusBlocked no plan file at path - amber, no viewer
+  else file present
+    P->>P: m.planViewing = true, BEFORE openArtifact - the return-mode flag
+    P->>D: openArtifact(Artifact{Kind: KindMarkdown, Path: ...})
+    D->>D: renderArtifactCmd -> glamour, article mdstyle, width-keyed cache
+    D-->>U: modeViewer - paging, g/G, spinner, no drill involved
+  end
+  U->>V: press esc
+  V->>V: not peeking, but planViewing IS set
+  V->>P: closePlanView - planViewing false, mode modeBoard, tab tabPlans
+  Note right of V: it must NOT fall through to modeDrill -<br/>viewDrill dereferences m.drill, which is nil here.<br/>Verified: removing this branch panics the cockpit.
+
+  Note over U,BR: w - self-contained interactive web page
+  U->>P: press w on the plans tab, or from the open plan view
+  P->>PL: plans.Path(project, plan.ID)
+  P->>PR: projects.Dir(project)
+  PR-->>P: ~/.gogo/projects/&lt;name&gt;/
+  P->>PG: pages.WritePage(projectDir, planBundleFor(project, plan))<br/>MarkdownPath = planPath, DiagramDir / BeforeDir / ManifestPath EMPTY
+  PG->>PG: renderSummary via goldmark, buildFigures yields nothing,<br/>ReadManifest of an empty path is nil-safe, readLayouts yields an empty map
+  PG-->>P: ~/.gogo/projects/&lt;name&gt;/.gogo/resources/view/&lt;id&gt;.html
+  P->>BR: openBrowser(page)
+  BR-->>U: offline article page
+  Note over P,PG: measured live - the page and the vendored renderer land ONLY<br/>under ~/.gogo/projects/&lt;name&gt;/ and the source repo is untouched

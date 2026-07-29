@@ -53,6 +53,24 @@ Generated-by: /gogo:build
   `make sync-assets` (the `assets/` copy is the source of truth). Exactly these
   two copies; never a third.
 
+## Diagnosability (since 0.28.0 - the "why did nothing happen" bar)
+A failure the user can see but not explain is a bug, even when the code is correct.
+The 0.28.0 incident: a launch failed with `exit status 1` for weeks because tmux's
+`command too long` was written to a stderr the code never captured.
+- **Never discard a child process's stderr on a user-visible path.** Capture it into a
+  bounded buffer (so a huge stderr cannot grow unbounded, and a capture failure can never
+  break a call that would otherwise have worked) and carry it in a **typed** error that
+  names the subcommand and wraps the original (`Unwrap()` must still reach the
+  `*exec.ExitError`). A wrapped exit code alone is not a diagnosis.
+- **A limit must name its number.** "Too big" is not actionable; "the command line is
+  20128 bytes, the limit is 16317" is. Prefer refusing **before** invoking the tool, so
+  the message is the real reason rather than the tool's generic failure.
+- **Distinguish blocked from failed from done.** A refusal must carry the *unblock*; a
+  failure must carry the tool's own words. And the distinction must survive a
+  **colourless** terminal - colour alone is flattened by a no-colour TTY and by
+  TTY-less `go test`, so pair it with a glyph or a word, which is also what makes it
+  **assertable in `View()`**.
+
 ## Performance (since 0.10.0 — the CLI bar)
 - **The read path is deterministic and LLM-free.** Managing/viewing existing work
   (board, status, view, events) must start in **milliseconds** — the `gogo` CLI

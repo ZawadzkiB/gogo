@@ -1,0 +1,26 @@
+stateDiagram-v2
+  direction TB
+  [*] --> KeyPressed
+
+  KeyPressed --> CapBounce: board m/d, source at cap
+  KeyPressed --> DanglingTarget: plans m, target not a source of this project
+  KeyPressed --> TmuxFailure: launch.Launch returns an error
+  KeyPressed --> NoClaude: claude not on PATH
+  KeyPressed --> Success: launcher returned a session
+
+  CapBounce: m.status = "cap 1 reached - already building X"
+  DanglingTarget: m.status = "no spawnable targets for plan-XXXX"
+  TmuxFailure: m.status = "spawn failed: tmux new-session failed: exit status 1"
+  NoClaude: m.status = "claude CLI not on PATH"
+  Success: m.status = "spawning work item in svc -> /gogo:plan ..."
+
+  CapBounce --> FaintGrey
+  DanglingTarget --> FaintGrey
+  TmuxFailure --> FaintGrey
+  NoClaude --> FaintGrey
+  Success --> FaintGrey
+
+  FaintGrey: statusStyle() renders EVERY outcome identically<br/>lipgloss.NewStyle().Faint(true) - no severity, no color
+  FaintGrey --> Indistinguishable
+  Indistinguishable: user cannot tell blocked from broken from done
+  Indistinguishable --> [*]

@@ -3,12 +3,12 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
 	"github.com/ZawadzkiB/gogo/cli/internal/launch"
+	"github.com/ZawadzkiB/gogo/cli/internal/pages"
 	"github.com/ZawadzkiB/gogo/cli/internal/plans"
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,16 +35,20 @@ var (
 	planColumnStatus = [4]string{plans.StatusDraft, plans.StatusReady, plans.StatusActive, plans.StatusDone}
 )
 
-var planSlugUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
-
 // planSlugHint derives the advisory kebab feature slug a spawn pins as the member
 // hint (the analyst derives the real slug; the correlation id is the exact link).
+//
+// It runs the SAME transform the launch package uses for a session name
+// (launch.SlugFromLabel == sanitizeLabel), because the two used to disagree and
+// that is how a plan-spawned work item lost its attribution (FR1.7): the old
+// `[^a-z0-9]+` regex collapsed an existing `-`, so a title's `" - "` became `-`
+// here but `---` in the session name, and SessionMatchesSlug then returned false.
+// One transform, no drift.
 func planSlugHint(title string) string {
-	s := planSlugUnsafe.ReplaceAllString(strings.ToLower(title), "-")
-	if s = strings.Trim(s, "-"); s == "" {
-		s = "plan"
+	if strings.TrimSpace(title) == "" {
+		return "plan"
 	}
-	return s
+	return launch.SlugFromLabel(title)
 }
 
 // focusedPlan returns the plan under the kanban cursor (planColIdx, planCardIdx), or nil
@@ -75,6 +79,41 @@ func (m *Model) sourceByName(name string) *projects.Source {
 		}
 	}
 	return nil
+}
+
+// resolveTargets partitions a plan's targets into those that resolve to a SOURCE
+// of the focused project (spawnable) and those that do not (unknown) - FR3.1.
+// A `targets:` entry naming a source of a DIFFERENT project (the user's live
+// `dotai/plan-1948afcd`, which targets `gogo`) used to sail past every guard, open
+// a confirm promising a spawn, and then be silently `continue`d over inside
+// finishPlanSpawn - zero launches, plan untouched, and a status that never said
+// why. Partitioning UP FRONT is what lets the confirm promise only what it can
+// honour and lets an unknown target be named.
+func (m Model) resolveTargets(p plans.Plan) (spawnable, unknown []string) {
+	for _, t := range p.Targets {
+		if m.sourceByName(t) != nil {
+			spawnable = append(spawnable, t)
+			continue
+		}
+		unknown = append(unknown, t)
+	}
+	return spawnable, unknown
+}
+
+// unknownTargetHint is the FR3.1 refusal: it NAMES the unresolvable target(s) and
+// the project they are missing from, plus the two ways out. A status the user can
+// act on, instead of "no spawnable targets for plan-XXXX".
+func (m Model) unknownTargetHint(unknown []string) string {
+	project := "this project"
+	if m.project != nil {
+		project = m.project.Name
+	}
+	noun := "which is not a source of"
+	if len(unknown) > 1 {
+		noun = "which are not sources of"
+	}
+	return "plan targets " + strings.Join(unknown, ", ") + ", " + noun + " project " + project +
+		" - add it in the config tab, or retarget the plan"
 }
 
 // spawnedFeature returns the work item spawned for (source, plan) — a feature tagged
@@ -115,9 +154,12 @@ func (m Model) updatePlans(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // updatePlanList handles the plans KANBAN keys (plans-board FR1/FR2): ←→/h l move
-// columns · ↑↓/j k move cards · enter open detail · n new · A plan-with-claude · m move
-// (draft→ready→go→done) · x delete. The persistent keys (q / tab / ?) are handled one
-// level up in updateActive.
+// columns · ↑↓/j k move cards · enter open detail · v terminal view · w web page ·
+// n new · A plan-with-claude · m move (draft→ready→go→done) · x delete. The
+// persistent keys (q / tab / ?) are handled one level up in updateActive.
+//
+// TestPlansTabKeyHelpInSync derives this switch's keys and fails if any is missing
+// from the help line below - so a new key can never ship undocumented.
 func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "left", "h":
@@ -135,6 +177,10 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.planSourceIdx = 0
 			m.status = ""
 		}
+	case "v":
+		return m.planView()
+	case "w":
+		return m, m.planPageCmd()
 	case "n":
 		if m.project != nil {
 			m.startPlanForm()
@@ -148,7 +194,7 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if p := m.focusedPlan(); p != nil && m.project != nil {
 			id := p.ID
 			if _, err := plans.Delete(m.project.Name, id); err != nil {
-				m.status = "delete failed: " + err.Error()
+				m.statusFailed("delete failed: " + err.Error())
 			} else {
 				m.loadPlans()
 				m.status = "deleted " + id
@@ -160,7 +206,9 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // updatePlanDetail handles the plan-detail keys: ↑↓ work-item nav · c create work item
-// · + add source · m move (advance the plan's lifecycle) · e edit plan · esc/q/← back.
+// · + add source · v terminal view · w web page · m move (advance the plan's lifecycle)
+// · e edit plan · esc/q/← back. TestPlansTabKeyHelpInSync guards these against the
+// detail's help line.
 func (m Model) updatePlanDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.planDetail
 	switch msg.String() {
@@ -175,12 +223,119 @@ func (m Model) updatePlanDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.planCreateWorkItem()
 	case "+":
 		return m.planAddTarget()
+	case "v":
+		return m.planView()
+	case "w":
+		return m, m.planPageCmd()
 	case "m":
 		return m.planMove(p)
 	case "e":
 		m.status = "edit the plan by hand at " + plans.Path(m.project.Name, p.ID) + " (or `gogo plan show " + p.ID + "`)"
 	}
 	return m, nil
+}
+
+// --- plan viewers: v (terminal) / w (web) - FR2 -------------------------------
+//
+// The work board's cards have had both for releases; plan cards had neither, so a
+// plan could only be read in the cramped inline detail pane. Both reuse the seams
+// that already exist - openArtifact (the same glamour article renderer, width-keyed
+// cache, spinner and paging keys) and pages.Bundle (which degrades cleanly with no
+// diagram set, verified against a real plan) - so neither needs a new renderer.
+
+// planPath is the focused project's on-disk path for a plan id
+// (~/.gogo/projects/<name>/.gogo/plans/<id>.md) - the file `v` renders, `w` builds
+// from, and an over-budget launch folds to a pointer at. "" with no project.
+func (m Model) planPath(id string) string {
+	if m.project == nil {
+		return ""
+	}
+	return plans.Path(m.project.Name, id)
+}
+
+// currentPlan is the plan the plans tab is acting on: the open detail when there is
+// one, else the plan under the kanban cursor. nil when the focused column is empty.
+func (m Model) currentPlan() *plans.Plan {
+	if m.planDetail != nil {
+		return m.planDetail
+	}
+	return m.focusedPlan()
+}
+
+// planView (v) opens the focused plan's markdown in the TERMINAL viewer (FR2.1) -
+// the same article renderer the board's `v` uses, over the one markdown file a plan
+// is. It sets planViewing FIRST: that flag is what makes the viewer's esc return
+// here instead of to modeDrill, which would nil-deref m.drill (FR2.2/D3).
+func (m Model) planView() (tea.Model, tea.Cmd) {
+	p := m.currentPlan()
+	if p == nil || m.project == nil {
+		m.statusBlocked("no plan focused - nothing to view")
+		return m, nil
+	}
+	path := plans.Path(m.project.Name, p.ID)
+	if !fileExists(path) {
+		m.statusBlocked("no plan file at " + path)
+		return m, nil
+	}
+	m.planViewing = true
+	return m, m.openArtifact(contract.Artifact{Label: p.ID + ".md", Path: path, Kind: contract.KindMarkdown})
+}
+
+// closePlanView returns from a plan view to the plans tab (FR2.2). It mirrors
+// closePeek exactly - the established precedent for "this viewer was not opened
+// from a drill". It must NEVER leave mode == modeDrill: a plan has no drilled
+// card, and viewDrill dereferences m.drill.
+func (m Model) closePlanView() Model {
+	m.planViewing = false
+	m.mode = modeBoard // renders the active tab
+	m.tab = tabPlans
+	return m
+}
+
+// planPageCmd (w) builds the focused plan's self-contained interactive page and
+// opens it (FR2.3). The page is written under the PROJECT HOME
+// (~/.gogo/projects/<name>/.gogo/resources/view/<plan-id>.html - D2=A): a plan has
+// no repo of its own, and the CLI never writes a source repo's .gogo/ (FR2.4).
+func (m Model) planPageCmd() tea.Cmd {
+	p := m.currentPlan()
+	if p == nil || m.project == nil {
+		return func() tea.Msg {
+			return launchDoneMsg{status: "no plan focused - nothing to build", level: statusLevelWarn}
+		}
+	}
+	project := m.project.Name
+	root := projects.Dir(project)
+	bundle := planBundleFor(project, *p)
+	if !fileExists(bundle.MarkdownPath) {
+		return func() tea.Msg {
+			return launchDoneMsg{status: "no plan file at " + bundle.MarkdownPath, level: statusLevelWarn}
+		}
+	}
+	return func() tea.Msg {
+		page, err := pages.WritePage(root, bundle)
+		if err != nil {
+			return launchDoneMsg{status: "page build failed: " + err.Error(), level: statusLevelErr}
+		}
+		openBrowser(page)
+		return launchDoneMsg{status: "page: " + page}
+	}
+}
+
+// planBundleFor is the plan's page bundle (FR2.3): the plan markdown and NOTHING
+// else. A project plan is one file with no charts/ - and pages.BuildHTML degrades
+// cleanly on empty DiagramDir/BeforeDir/ManifestPath (contract.ReadManifest("")
+// returns (nil, nil) and Manifest.TitleFor is nil-safe), so the page renders the
+// summary with an empty diagram slot rather than erroring.
+func planBundleFor(project string, p plans.Plan) pages.Bundle {
+	title := p.Title
+	if strings.TrimSpace(title) == "" {
+		title = p.ID
+	}
+	return pages.Bundle{
+		Name:         p.ID,
+		Title:        "gogo - " + title,
+		MarkdownPath: plans.Path(project, p.ID),
+	}
 }
 
 // planMove is the plans-tab `m` move (plans-board FR2): it advances the given plan one
@@ -200,7 +355,7 @@ func (m Model) planMove(p *plans.Plan) (tea.Model, tea.Cmd) {
 	case plans.StatusActive:
 		return m.planAcceptUAT(p)
 	case plans.StatusDone:
-		m.status = "plan " + p.ID + " is already done"
+		m.statusBlocked("plan " + p.ID + " is already done")
 		return m, nil
 	}
 	return m, nil
@@ -215,7 +370,7 @@ func (m Model) planMarkReady(p *plans.Plan) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if _, err := plans.MarkReady(m.project.Name, p.ID); err != nil {
-		m.status = "mark-ready failed: " + err.Error()
+		m.statusFailed("mark-ready failed: " + err.Error())
 		return m, nil
 	}
 	m.loadPlans()
@@ -236,16 +391,18 @@ func (m Model) planAcceptUAT(p *plans.Plan) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if p.Status == plans.StatusDone {
-		m.status = "plan " + p.ID + " is already done (project-UAT accepted)"
+		m.statusBlocked("plan " + p.ID + " is already done (project-UAT accepted)")
 		return m, nil
 	}
 	allShipped, unshipped := plans.MembersShippedIn(m.project.Name, *p, m.repo)
 	if !allShipped {
 		if len(p.Members) == 0 {
-			m.status = "refusing — plan " + p.ID + " has no work items yet; spawn + ship members first (c)"
+			m.statusBlocked("refusing — plan " + p.ID + " has no work items yet; spawn + ship members first (c)")
 		} else {
-			m.status = fmt.Sprintf("refusing — %d of %d member(s) not shipped: %s",
-				len(unshipped), len(p.Members), strings.Join(unshipped, ", "))
+			// FR3.2: the SAME project-UAT refusal as the arm above, so it must read the
+			// same way - it rendered dim while its sibling rendered amber (REV-006).
+			m.statusBlocked(fmt.Sprintf("refusing — %d of %d member(s) not shipped: %s",
+				len(unshipped), len(p.Members), strings.Join(unshipped, ", ")))
 		}
 		return m, nil
 	}
@@ -260,7 +417,14 @@ func (m Model) planAcceptUAT(p *plans.Plan) (tea.Model, tea.Cmd) {
 // passed, so accepting flips a genuinely-ready plan.
 func (m *Model) startPlanDoneForm(p *plans.Plan) {
 	m.pendingPlanDone = &planDoneEdit{project: m.project.Name, id: p.ID, title: p.Title}
-	b := &formBinding{}
+	// CONFIRM-DEFAULT CONVENTION (TEST-001) - see startFormOverriding in move.go for the
+	// canonical statement. A FORWARD pipeline move (`m`: launch / spawn / accept) seeds
+	// `confirm: true`, so the affirmative starts highlighted and a bare Enter submits it -
+	// the board's `m` has always behaved that way, and an unseeded binding here made the
+	// SAME keystroke silently cancel on the plans tab. A DESTRUCTIVE action (delete, kill)
+	// seeds `confirm: false` on purpose so Enter is safe and the user must arrow over.
+	// Do not "align" the two: the asymmetry IS the safety rule.
+	b := &formBinding{confirm: true}
 	m.binding = b
 	m.form = huh.NewForm(huh.NewGroup(
 		huh.NewConfirm().
@@ -294,15 +458,15 @@ func (m Model) finishPlanDone() (tea.Model, tea.Cmd) {
 	}
 	p, ok := plans.Get(edit.project, edit.id)
 	if !ok {
-		m.status = "no plan " + edit.id + " in " + edit.project
+		m.statusFailed("no plan " + edit.id + " in " + edit.project)
 		return m, nil
 	}
 	if allShipped, unshipped := plans.MembersShippedIn(edit.project, p, m.repo); !allShipped {
-		m.status = fmt.Sprintf("refusing — %d member(s) not shipped: %s", len(unshipped), strings.Join(unshipped, ", "))
+		m.statusBlocked(fmt.Sprintf("refusing — %d member(s) not shipped: %s", len(unshipped), strings.Join(unshipped, ", ")))
 		return m, nil
 	}
 	if _, err := plans.MarkDone(edit.project, edit.id); err != nil {
-		m.status = "accept failed: " + err.Error()
+		m.statusFailed("accept failed: " + err.Error())
 		return m, nil
 	}
 	m.loadPlans()
@@ -340,25 +504,31 @@ func (m Model) planCreateWorkItem() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.planSourceIdx < 0 || m.planSourceIdx >= len(p.Targets) {
-		m.status = "no target source selected — add one with +"
+		m.statusBlocked("no target source selected — add one with +")
 		return m, nil
 	}
 	sourceName := p.Targets[m.planSourceIdx]
 	src := m.sourceByName(sourceName)
 	if src == nil {
-		m.status = "source " + sourceName + " is not in this project"
+		// FR3.1: name the source AND the project it is missing from, plus the way out.
+		m.statusBlocked(m.unknownTargetHint([]string{sourceName}))
 		return m, nil
 	}
 	if !m.hasClaude {
-		m.status = "claude CLI not on PATH — cannot spawn a work item"
+		m.statusBlocked("claude CLI not on PATH — cannot spawn a work item")
 		return m, nil
 	}
 	body := p.Description
 	if strings.TrimSpace(body) == "" {
 		body = p.Title
 	}
-	intent := launch.PlanIntent(p.Title, body, p.ID)
 	root := src.Path
+	intent := launch.PlanIntent(p.Title, body, p.ID)
+	intent.Root = root
+	// FR1.3 (D1=A): a multi-KB brief inlined into the tmux command line is what tmux
+	// refuses with `command too long`. Over budget, swap the inlined body for a
+	// pointer at the file that already holds it. A no-op under budget.
+	intent = launch.FoldToPointer(intent, m.planPath(p.ID), sourceName)
 	launcher := m.launcher
 	planID := p.ID
 	member := plans.Member{Source: sourceName, SlugHint: planSlugHint(p.Title)}
@@ -370,8 +540,9 @@ func (m Model) planCreateWorkItem() (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg {
 		res, err := launcher(root, intent)
 		if err != nil {
-			// Launch failed → leave the plan UNTOUCHED (no phantom active member).
-			return launchDoneMsg{status: "spawn failed: " + err.Error()}
+			// Launch failed → leave the plan UNTOUCHED (no phantom active member). The
+			// error now carries tmux's own words (FR1.1) and renders red (FR3.2).
+			return launchDoneMsg{status: "spawn failed: " + err.Error(), level: statusLevelErr}
 		}
 		// Record the spawn ONLY on success (advisory member + ready→active) — store
 		// writes to ~/.gogo/ only, never the source's .gogo/. The launchDoneMsg handler
@@ -401,7 +572,7 @@ func (m Model) planGo(p *plans.Plan) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if len(p.Targets) == 0 {
-		m.status = "plan " + p.ID + " has no targets - open it (enter) and press + to add one before go"
+		m.statusBlocked("plan " + p.ID + " has no targets - open it (enter) and press + to add one before go")
 		return m, nil
 	}
 	todo := m.unspawnedTargets(*p)
@@ -409,11 +580,19 @@ func (m Model) planGo(p *plans.Plan) (tea.Model, tea.Cmd) {
 		m.status = fmt.Sprintf("all %d target(s) already spawned for %s", len(p.Targets), p.ID)
 		return m, nil
 	}
-	if !m.hasClaude {
-		m.status = "claude CLI not on PATH — cannot spawn work items (use `gogo plan promote`, or `c` per source)"
+	// FR3.1: partition BEFORE the confirm. A target that resolves to no source of this
+	// project cannot be spawned into, so the confirm must never promise it - and a plan
+	// with NO resolvable target must not open a confirm it cannot honour at all.
+	spawnable, unknown := m.resolveTargets(plans.Plan{Targets: todo})
+	if len(spawnable) == 0 {
+		m.statusBlocked(m.unknownTargetHint(unknown))
 		return m, nil
 	}
-	m.startPlanSpawnForm(p, todo)
+	if !m.hasClaude {
+		m.statusBlocked("claude CLI not on PATH — cannot spawn work items (use `gogo plan promote`, or `c` per source)")
+		return m, nil
+	}
+	m.startPlanSpawnForm(p, spawnable, unknown)
 	return m, m.form.Init()
 }
 
@@ -448,15 +627,27 @@ func (m Model) targetSpawned(p plans.Plan, t string) bool {
 // startPlanSpawnForm opens the huh accept+spawn confirm under modeForm (0.25.0 FR2, `r`).
 // It marks pendingPlanSpawn (so updateForm routes completion to finishPlanSpawn and a
 // cancel returns to the plans tab) and binds the confirm through a heap-stable
-// *formBinding (TEST-001). Reached only with ≥1 un-spawned target + claude on PATH.
-func (m *Model) startPlanSpawnForm(p *plans.Plan, targets []string) {
+// *formBinding (TEST-001). Reached only with ≥1 SPAWNABLE un-spawned target + claude
+// on PATH: targets carries only what can actually be launched, and unknown (FR3.1)
+// carries the unresolvable names so the confirm SAYS what it is skipping instead of
+// dropping them silently after the user says yes.
+func (m *Model) startPlanSpawnForm(p *plans.Plan, targets, unknown []string) {
 	m.pendingPlanSpawn = &planSpawnEdit{project: m.project.Name, id: p.ID, title: p.Title, targets: targets}
-	b := &formBinding{}
+	// CONFIRM-DEFAULT CONVENTION (TEST-001) - see startFormOverriding in move.go for the
+	// canonical statement. This is a FORWARD pipeline move (`m` on a ready plan), so it
+	// seeds `confirm: true` and a bare Enter spawns - matching the board's `m`, whose
+	// muscle memory a user brings to this tab. Destructive confirms (delete, kill) seed
+	// `confirm: false` on purpose; do not align the two.
+	b := &formBinding{confirm: true}
 	m.binding = b
+	desc := "into: " + strings.Join(targets, ", ") + " — launches /gogo:plan per source, records members, flips the plan active"
+	if len(unknown) > 0 {
+		desc += "\nskipping " + strings.Join(unknown, ", ") + " - not a source of project " + m.project.Name
+	}
 	m.form = huh.NewForm(huh.NewGroup(
 		huh.NewConfirm().
 			Title(fmt.Sprintf("Accept %s and spawn %d work item(s)?", p.ID, len(targets))).
-			Description("into: " + strings.Join(targets, ", ") + " — launches /gogo:plan per source, records members, flips the plan active").
+			Description(desc).
 			Affirmative("Spawn").
 			Negative("Cancel").
 			Value(&b.confirm),
@@ -488,7 +679,7 @@ func (m Model) finishPlanSpawn() (tea.Model, tea.Cmd) {
 	}
 	p, ok := plans.Get(edit.project, edit.id)
 	if !ok {
-		m.status = "no plan " + edit.id + " in " + edit.project
+		m.statusFailed("no plan " + edit.id + " in " + edit.project)
 		return m, nil
 	}
 	body := p.Description
@@ -503,25 +694,35 @@ func (m Model) finishPlanSpawn() (tea.Model, tea.Cmd) {
 		intent launch.Intent
 	}
 	var spawns []spawn
+	var unresolved []string
 	for _, target := range edit.targets {
 		src := m.sourceByName(target)
 		if src == nil {
-			continue // source vanished from the project — skip (never a phantom member)
+			// The confirm only ever lists spawnable targets (FR3.1), so reaching here
+			// means the source vanished between the confirm and the submit. Never a
+			// phantom member - but no longer a SILENT drop either: name it below.
+			unresolved = append(unresolved, target)
+			continue
 		}
 		goal := plans.BriefFor(p, target)
 		if strings.TrimSpace(goal) == "" {
 			goal = body
 		}
 		intent := launch.PlanIntent(p.Title, goal, p.ID)
+		intent.Root = src.Path
 		// Ride the skip flag of the source ALREADY in hand (m.sourceByName scopes to the
 		// FOCUSED project), not a first-path-match across EVERY project's sources (REV-001):
 		// a repo linked to two projects with opposite PlanAcceptanceSkip must carry the
 		// focused project's flag, never whichever identically-pathed source sorts first.
 		intent.Command += launch.SkipParams(src.PlanAcceptanceSkip, false)
+		// FR1.3: fold an over-budget brief to a pointer at the plan file, naming this
+		// source's `### <name>` subsection. The skip params were appended first and are
+		// preserved by the fold. A no-op under budget.
+		intent = launch.FoldToPointer(intent, plans.Path(edit.project, edit.id), target)
 		spawns = append(spawns, spawn{source: target, root: src.Path, intent: intent})
 	}
 	if len(spawns) == 0 {
-		m.status = "no spawnable targets for " + edit.id
+		m.statusBlocked(m.unknownTargetHint(unresolved))
 		return m, nil
 	}
 	launcher := m.launcher
@@ -531,9 +732,13 @@ func (m Model) finishPlanSpawn() (tea.Model, tea.Cmd) {
 
 	return m, func() tea.Msg {
 		launched, failed := 0, 0
+		firstErr := ""
 		for _, s := range spawns {
 			if _, err := launcher(s.root, s.intent); err != nil {
 				failed++
+				if firstErr == "" {
+					firstErr = err.Error()
+				}
 				continue // leave this target un-recorded (no phantom member, REV-005)
 			}
 			plans.AddMember(project, planID, plans.Member{Source: s.source, SlugHint: slugHint})
@@ -541,10 +746,20 @@ func (m Model) finishPlanSpawn() (tea.Model, tea.Cmd) {
 			launched++
 		}
 		status := fmt.Sprintf("accepted %s — spawned %d work item(s)", planID, launched)
+		level := statusLevelOK
 		if failed > 0 {
-			status += fmt.Sprintf(" (%d failed)", failed)
+			// FR1.1/FR3.2: carry the first real error's words (tmux's own, now that
+			// stderr is captured) rather than an opaque count, and render it as a failure.
+			status += fmt.Sprintf(" (%d failed: %s)", failed, firstErr)
+			level = statusLevelErr
 		}
-		return launchDoneMsg{status: status}
+		if len(unresolved) > 0 {
+			status += " · skipped " + strings.Join(unresolved, ", ") + " (no such source)"
+			if level == statusLevelOK {
+				level = statusLevelWarn
+			}
+		}
+		return launchDoneMsg{status: status, level: level}
 	}
 }
 
@@ -565,7 +780,7 @@ func (m Model) planAddTarget() (tea.Model, tea.Cmd) {
 			continue
 		}
 		if _, err := plans.AddTarget(m.project.Name, p.ID, label); err != nil {
-			m.status = "add source failed: " + err.Error()
+			m.statusFailed("add source failed: " + err.Error())
 			return m, nil
 		}
 		m.loadPlans()
@@ -575,7 +790,7 @@ func (m Model) planAddTarget() (tea.Model, tea.Cmd) {
 		m.status = "added source " + label
 		return m, nil
 	}
-	m.status = "every source is already a target"
+	m.statusBlocked("every source is already a target")
 	return m, nil
 }
 
@@ -619,12 +834,12 @@ func (m Model) finishPlanForm() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.project == nil {
-		m.status = "no project — cannot create a plan"
+		m.statusBlocked("no project — cannot create a plan")
 		return m, nil
 	}
 	p, err := plans.New(m.project.Name, title, desc)
 	if err != nil {
-		m.status = "create failed: " + err.Error()
+		m.statusFailed("create failed: " + err.Error())
 		return m, nil
 	}
 	m.loadPlans()
@@ -658,11 +873,11 @@ type planAuthorLaunchedMsg struct {
 // the quick inline draft.
 func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 	if m.project == nil {
-		m.status = "no project — cannot author a plan"
+		m.statusBlocked("no project — cannot author a plan")
 		return m, nil
 	}
 	if !m.hasClaude {
-		m.status = "claude CLI not on PATH — cannot start a plan-with-claude session (use `n` for a quick draft)"
+		m.statusBlocked("claude CLI not on PATH — cannot start a plan-with-claude session (use `n` for a quick draft)")
 		return m, nil
 	}
 	m.startPlanWithClaudeForm()
@@ -714,7 +929,7 @@ func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
 	m.form = nil
 	m.mode = modeBoard // renders the active tab (tabPlans)
 	if m.project == nil {
-		m.status = "no project — cannot author a plan"
+		m.statusBlocked("no project — cannot author a plan")
 		return m, nil
 	}
 	if goal == "" {
@@ -728,7 +943,7 @@ func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
 	// the detail view have real content to show.
 	p, err := plans.New(m.project.Name, title, goal)
 	if err != nil {
-		m.status = "create failed: " + err.Error()
+		m.statusFailed("create failed: " + err.Error())
 		return m, nil
 	}
 	m.loadPlans()
@@ -754,12 +969,18 @@ func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
 		root = projects.Dir(m.project.Name)
 		homeNote = "no source to anchor at — the session runs in the project home; approve it if Claude prompts"
 	}
+	intent.Root = root
+	// FR1.3: a pasted multi-KB goal blows tmux's command budget exactly like a plan
+	// body does. It is ALREADY the plan file's body (plans.New wrote it above), so
+	// fold to a whole-file pointer - no section, the goal IS the body. No-op under
+	// budget, so a normal goal launches byte-for-byte as before.
+	intent = launch.FoldToPointer(intent, planPath, "")
 	launcher := m.launcher
 
 	return m, func() tea.Msg {
 		res, err := launcher(root, intent)
 		if err != nil {
-			return launchDoneMsg{status: "plan-with-claude failed: " + err.Error()}
+			return launchDoneMsg{status: "plan-with-claude failed: " + err.Error(), level: statusLevelErr}
 		}
 		// Hand the created session name to Update so it can ATTACH the user in (tmux) or
 		// surface the headless status (no tmux → res.Session == "") — naming the log path
@@ -850,9 +1071,11 @@ func (m Model) viewPlansBoard() string {
 	body := lipgloss.JoinHorizontal(lipgloss.Top, interleaveSeparators(rendered)...)
 	parts := []string{body}
 	if m.status != "" {
-		parts = append(parts, statusStyle(m.status))
+		parts = append(parts, m.renderStatus(m.status))
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("←→ cols · ↑↓ cards · enter open · n new · A plan-with-claude · m move (ready→go→done) · x delete · tab board/config · q quit")
+	// FR2.5: every key updatePlanList handles appears here - TestPlansTabKeyHelpInSync
+	// derives the switch's cases and fails if one is missing.
+	help := lipgloss.NewStyle().Faint(true).Render("←→ cols · ↑↓ cards · enter open · v view · w web · n new · A plan-with-claude · m move (ready→go→done) · x delete · tab board/config · q quit")
 	parts = append(parts, help)
 	return strings.Join(parts, "\n")
 }
@@ -1101,9 +1324,10 @@ func (m Model) viewPlanDetail() string {
 	}
 
 	if m.status != "" {
-		b = append(b, "", statusStyle(m.status))
+		b = append(b, "", m.renderStatus(m.status))
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · c create item · + add source · m move (ready→go→done) · e edit plan · esc back")
+	// FR2.5: guarded against updatePlanDetail's switch by TestPlansTabKeyHelpInSync.
+	help := lipgloss.NewStyle().Faint(true).Render("↑↓ · c create item · + add source · v view · w web · m move (ready→go→done) · e edit plan · esc back")
 	b = append(b, "", help)
 	return strings.Join(b, "\n")
 }

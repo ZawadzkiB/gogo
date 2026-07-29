@@ -123,15 +123,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// fire-once key so the next reload retries it (REV-001) — a launcher error must not
 		// strand the member permanently marked fired-but-never-launched; on success the key
 		// stays recorded (fire-once holds).
-		m.status = msg.status
-		if !msg.ok {
+		if msg.ok {
+			m.setStatus(statusLevelOK, msg.status)
+		} else {
+			m.statusFailed(msg.status) // FR3.2: a failed auto-pickup reads as a failure
 			delete(m.autoPickedUp, msg.key)
 		}
 		m.sessions = launch.ListSessions()
 		return m, nil
 
 	case launchDoneMsg:
-		m.status = msg.status
+		// The launch outcome carries its OWN severity (FR3.2) - the zero value is OK,
+		// so every unclassified site keeps the dim voice byte-for-byte.
+		m.setStatus(msg.level, msg.status)
 		m.sessions = launch.ListSessions()
 		// A plan spawn records its member + active flip only on a SUCCESSFUL launch
 		// (REV-005), inside the fired cmd — so re-read the project's plans here to catch
@@ -158,13 +162,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				status += " — log: " + msg.logPath
 			}
 			status += "; the plan updates when it finishes; `tmux` recommended for the interactive session"
-			m.status = status
+			// FR3.2 (REV-006): a DEGRADED fallback the user should notice - the analyst
+			// they asked to steer is running unattended. Amber, not the success voice.
+			m.statusBlocked(status)
 			m.loadPlans()
 			return m, nil
 		}
 		return m.attachSession(msg.session)
 
 	case tea.KeyMsg:
+		// A new keypress starts from the dim voice; the handler escalates it if this
+		// outcome is a block or a failure (FR3.2). Resetting HERE - the one choke point
+		// every key flows through - is what makes a stale severity impossible: a later
+		// bare `m.status = "cancelled"` can never inherit the previous error's red.
+		m.statusLevel = statusLevelOK
 		switch m.mode {
 		case modeForm:
 			return m.updateForm(msg)
@@ -263,6 +274,11 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.buildPageCmd()
 	case "m":
 		return m.launchAction(false)
+	case "M":
+		// FR3.3: force past the source's concurrency cap without leaving the cockpit
+		// (the bounce used to end at `gogo go <slug> --force`). Capital M - `m` stays
+		// the guarded move, exactly as `K` sits beside `k`.
+		return m.launchForce()
 	case "d":
 		return m.launchAction(true)
 	case "a":
@@ -367,6 +383,12 @@ func (m Model) updateViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.peeking {
 			return m.closePeek(), nil // peek launched from the board → back to board
 		}
+		// FR2.2 (D3=A): a plans-tab `v` has NO drilled card, so falling through to
+		// modeDrill below would render viewDrill over a nil m.drill. Mirror the peeking
+		// precedent and return to the plans tab instead.
+		if m.planViewing {
+			return m.closePlanView(), nil
+		}
 		m.mode = modeDrill
 		return m, nil
 	case "r":
@@ -381,6 +403,11 @@ func (m Model) updateViewer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.attachFromPeek()
 		}
 	case "w":
+		// FR2.3: `w` from an open PLAN view builds the plan's page, not a feature's
+		// (there is no drilled/focused card behind a plan view to build one from).
+		if m.planViewing {
+			return m, m.planPageCmd()
+		}
 		return m, m.buildPageCmd()
 	case "g":
 		m.viewport.GotoTop()
@@ -570,13 +597,13 @@ func (m Model) attachFeature(f *contract.Feature) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if !m.hasTmux {
-		m.status = "tmux not installed — nothing to attach"
+		m.statusBlocked("tmux not installed — nothing to attach")
 		return m, nil
 	}
 	sessions := liveSessionsFor(f.Slug, m.sessions)
 	switch len(sessions) {
 	case 0:
-		m.status = "no running session for " + f.Slug
+		m.statusBlocked("no running session for " + f.Slug)
 		return m, nil
 	case 1:
 		return m.attachSession(sessions[0])
@@ -592,11 +619,25 @@ func (m Model) attachFeature(f *contract.Feature) (tea.Model, tea.Cmd) {
 // seam, so the status line is the observable (the same "status line is the
 // observable" pattern viewDrill already relies on).
 func (m Model) attachSession(session string) (tea.Model, tea.Cmd) {
-	m.status = "attaching " + session
+	m.setStatus(statusLevelOK, "attaching "+session)
 	c := exec.Command("tmux", launch.AttachArgs(session)...)
-	return m, tea.ExecProcess(c, func(err error) tea.Msg {
-		return launchDoneMsg{status: "detached from " + session}
-	})
+	return m, tea.ExecProcess(c, func(err error) tea.Msg { return attachOutcome(session, err) })
+}
+
+// attachOutcome maps a finished tea.ExecProcess attach into its status message
+// (FR1.6). It is a PACKAGE-LEVEL function, not an inline closure, for one reason:
+// both attach sites (attachSession here and attachFromPeek in peek.go) must make
+// the identical decision, and a test must be able to drive the REAL decision
+// rather than a copy of it (REV-003 - the previous test asserted a test-local
+// re-implementation, so deleting this error branch left the suite green).
+//
+// The err used to be DISCARDED, so a failed attach reported "detached from X",
+// indistinguishable from a clean detach.
+func attachOutcome(session string, err error) launchDoneMsg {
+	if err != nil {
+		return launchDoneMsg{status: "attach to " + session + " failed: " + err.Error(), level: statusLevelErr}
+	}
+	return launchDoneMsg{status: "detached from " + session}
 }
 
 // startAttachPicker opens the FR-2 attach picker (≥2 live sessions): one option
@@ -656,13 +697,13 @@ func (m Model) killDrill() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if !m.hasTmux {
-		m.status = "tmux not installed — no session to kill"
+		m.statusBlocked("tmux not installed — no session to kill")
 		return m, nil
 	}
 	sessions := liveSessionsFor(f.Slug, m.sessions)
 	switch len(sessions) {
 	case 0:
-		m.status = "no live session to kill for " + f.Slug
+		m.statusBlocked("no live session to kill for " + f.Slug)
 		return m, nil
 	case 1:
 		// Exactly one session → keep the existing single-confirm UX (D2).
@@ -676,6 +717,11 @@ func (m Model) killDrill() (tea.Model, tea.Cmd) {
 
 // startKillForm opens the kill confirm. Defaults to Cancel (confirm=false) so
 // Enter is safe — the user must deliberately pick Kill.
+//
+// This is the DESTRUCTIVE half of the confirm-default convention (canonical
+// statement in move.go's startFormOverriding, TEST-001) - forward pipeline moves
+// seed `true` and submit on Enter; this one must NOT. Do not flip it for
+// consistency with them.
 func (m *Model) startKillForm(f *contract.Feature, sessions []string) {
 	m.pendingKill = sessions
 	m.binding = &formBinding{confirm: false}
@@ -764,9 +810,13 @@ func (m Model) finishKill() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	killed, failed := 0, 0
+	firstErr := ""
 	for _, s := range targets {
 		if err := m.killer(s); err != nil {
 			failed++
+			if firstErr == "" {
+				firstErr = err.Error()
+			}
 		} else {
 			killed++
 		}
@@ -775,10 +825,15 @@ func (m Model) finishKill() (tea.Model, tea.Cmd) {
 	if m.drill != nil {
 		m.loadDrillCard(m.drill) // refresh live/stale rows after the kill
 	}
-	m.status = fmt.Sprintf("killed %d %s", killed, plural(killed, "session"))
+	status := fmt.Sprintf("killed %d %s", killed, plural(killed, "session"))
 	if failed > 0 {
-		m.status += fmt.Sprintf(", %d failed", failed)
+		// FR1.1/FR3.2 (REV-006): KillSession now returns a *launch.TmuxError carrying
+		// tmux's own words, so name the real reason instead of a bare count - and render
+		// a partial kill failure as a FAILURE, not as the dim success voice.
+		m.statusFailed(fmt.Sprintf("%s, %d failed: %s", status, failed, firstErr))
+		return m, nil
 	}
+	m.setStatus(statusLevelOK, status)
 	return m, nil
 }
 

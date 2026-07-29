@@ -54,6 +54,33 @@ var tabTitles = [3]string{"board", "plans", "config"}
 
 const tabCount = 3
 
+// statusLevel is the severity of a status-line message (FR3.2). Today every
+// outcome - a cap bounce, a dangling plan target, a tmux failure and a plain
+// success - rendered through the same faint grey, so the user could not tell
+// "blocked" from "failed". The zero value is OK, which keeps every unclassified
+// call site byte-for-byte on the old dim voice.
+type statusLevel int
+
+const (
+	statusLevelOK   statusLevel = iota // dim - it worked (the existing voice)
+	statusLevelWarn                    // amber - blocked / a gate: name the unblock
+	statusLevelErr                     // red - it failed: carry the real error's words
+)
+
+// setStatus records a message AND its severity. The three shorthands below are
+// what the launch sites use, so classifying an outcome is a one-word change.
+func (m *Model) setStatus(level statusLevel, s string) {
+	m.status, m.statusLevel = s, level
+}
+
+// statusFailed marks a failure (red): a launch that errored, a page build that
+// blew up - always carrying the underlying error's own words.
+func (m *Model) statusFailed(s string) { m.setStatus(statusLevelErr, s) }
+
+// statusBlocked marks a refusal/gate (amber): a cap bounce, a dangling plan
+// target, a missing claude - always carrying how to unblock it.
+func (m *Model) statusBlocked(s string) { m.setStatus(statusLevelWarn, s) }
+
 // formBinding holds the huh field targets behind a pointer so the bindings stay
 // valid as the value-type Model is copied between Update calls. Binding huh's
 // .Value() directly to a field of the Model (a value receiver copies the struct
@@ -179,13 +206,18 @@ type Model struct {
 	// drills into a plan; planSourceIdx is its target-source cursor. Reads/writes ONLY
 	// ~/.gogo/… via the plans store; spawning a work item is a claude -p launch (never a
 	// source's .gogo/ write).
-	plans                 []plans.Plan
-	planCols              [4][]plans.Plan
-	planColIdx            int
-	planCardIdx           [4]int
-	planColOffset         [4]int
-	planDetail            *plans.Plan
-	planSourceIdx         int
+	plans         []plans.Plan
+	planCols      [4][]plans.Plan
+	planColIdx    int
+	planCardIdx   [4]int
+	planColOffset [4]int
+	planDetail    *plans.Plan
+	planSourceIdx int
+	// planViewing marks the open viewer as a PLAN view (FR2.2), mirroring the
+	// existing `peeking` flag. It is load-bearing: updateViewer's esc otherwise sets
+	// mode = modeDrill, and a plan `v` has no drilled card - the return path must land
+	// back on the plans tab instead.
+	planViewing           bool
 	pendingPlan           bool
 	pendingPlanWithClaude bool           // in-flight `A` goal form (0.25.1) — mint+launch+attach on submit
 	pendingPlanDone       *planDoneEdit  // in-flight project-UAT accept confirm (plans-board `m` on active)
@@ -222,6 +254,11 @@ type Model struct {
 	filter    string
 	filtering bool
 	status    string
+	// statusLevel is the SEVERITY of the current status line (FR3.2). The zero value
+	// is statusLevelOK, so any site that just assigns m.status keeps today's dim
+	// voice; Update resets it on every keypress, so a stale severity can never
+	// re-colour an unrelated message.
+	statusLevel statusLevel
 
 	showAllKeys bool // FR-10: ? toggles the full key list under the contextual footer
 

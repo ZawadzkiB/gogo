@@ -103,9 +103,11 @@ func (m Model) viewBoard() string {
 	}
 	body := lipgloss.JoinHorizontal(lipgloss.Top, interleaveSeparators(rendered)...)
 
-	status := m.status
-	if status == "" {
-		status = m.boardStatusLine()
+	// The status line carries its recorded severity (FR3.2); the idle fallback (the
+	// session summary) is never an outcome, so it always reads dim.
+	statusLine := m.renderStatus(m.status)
+	if m.status == "" {
+		statusLine = statusStyle(m.boardStatusLine())
 	}
 
 	// Header · columns · status · contextual footer. The needs-you strip is gone —
@@ -122,7 +124,7 @@ func (m Model) viewBoard() string {
 	} else {
 		parts = append(parts, header)
 	}
-	parts = append(parts, body, statusStyle(status), m.contextualFooter())
+	parts = append(parts, body, statusLine, m.contextualFooter())
 	return strings.Join(parts, "\n")
 }
 
@@ -768,7 +770,7 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 // keys`. `?` (FR-10) swaps it for the full pre-redesign key list.
 func (m Model) contextualFooter() string {
 	if m.showAllKeys {
-		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · d ship · a attach · l peek · x del · p source · tab plans/config · / filter · ? keys · q quit"
+		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · M force (past the source cap) · d ship · a attach · l peek · x del · p source · tab plans/config · / filter · ? keys · q quit"
 		return helpStyle.Render(full)
 	}
 	right := keyChipStyle.Render("[?] all keys")
@@ -838,6 +840,17 @@ func (m Model) sessionsLine() string {
 // (registry ⨯ live-tmux), a compact recent-events tail, then the openable files.
 func (m Model) viewDrill() string {
 	f := m.drill
+	if f == nil {
+		// Defence in depth (D3): modeDrill with no drilled card must never nil-deref.
+		// The plans-tab viewer's esc no longer lands here (closePlanView returns to the
+		// plans tab), but a future caller might, and a panic is a worse answer than a
+		// dead-end panel with a way out.
+		return strings.Join([]string{
+			colTitleStyle.Render("card"), "",
+			dimStyle.Render("(no card selected)"), "",
+			lipgloss.NewStyle().Faint(true).Render("esc back"),
+		}, "\n")
+	}
 	var b []string
 	b = append(b, colTitleStyle.Render("card — "+f.Slug), "")
 
@@ -899,7 +912,7 @@ func (m Model) viewDrill() string {
 	// confirmations set m.status, but viewDrill — unlike viewBoard — never rendered
 	// it, so those actions looked like silent no-ops in the live TUI.
 	if m.status != "" {
-		b = append(b, "", statusStyle(m.status))
+		b = append(b, "", m.renderStatus(m.status))
 	}
 	help := lipgloss.NewStyle().Faint(true).Render("↑↓ files · enter open · a attach · K kill · G glow · w web · esc back")
 	b = append(b, "", help)
@@ -951,8 +964,45 @@ func (m Model) viewViewer() string {
 	return strings.Join([]string{title, m.viewport.View(), help}, "\n")
 }
 
+// statusStyle is the DIM default voice - every untouched call site keeps it, so
+// nothing outside the classified launch sites changes.
 func statusStyle(s string) string {
 	return lipgloss.NewStyle().Faint(true).Render(s)
+}
+
+// statusOK / statusWarn / statusErr are the three severity voices of the status
+// line (FR3.2). statusOK IS the dim default (named so the trio reads as one set);
+// warn and err add a colour AND a leading marker, so "blocked" never looks like
+// "failed" and neither looks like "done".
+func statusOK(s string) string { return statusStyle(s) }
+
+func statusWarn(s string) string {
+	if s == "" {
+		return ""
+	}
+	return statusWarnStyle.Render(statusWarnMarker + s)
+}
+
+func statusErr(s string) string {
+	if s == "" {
+		return ""
+	}
+	return statusErrStyle.Render(statusErrMarker + s)
+}
+
+// renderStatus styles m.status by the severity the handler recorded (FR3.2). An
+// empty status, or the OK level, renders exactly as before.
+func (m Model) renderStatus(s string) string {
+	switch {
+	case s == "":
+		return statusOK(s)
+	case m.statusLevel == statusLevelErr:
+		return statusErr(s)
+	case m.statusLevel == statusLevelWarn:
+		return statusWarn(s)
+	default:
+		return statusOK(s)
+	}
 }
 
 func truncate(s string, max int) string {

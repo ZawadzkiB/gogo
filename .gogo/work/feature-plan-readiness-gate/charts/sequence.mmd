@@ -1,0 +1,20 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as gogo board (TUI)
+  participant C as claude /gogo:go &lt;slug&gt;
+  participant D as gogo-implement
+  participant S as state.md
+  participant K as cap (ActiveWorkSlugs)
+
+  U->>B: m on a plan-accepted card
+  B->>C: launch tmux gogo-go-&lt;slug&gt;
+  C->>D: phase 2 implement
+  D->>D: validate-in (plan-accepted AND plan.md exists)
+  D->>S: NEW 1b entry write: phase=implement status=implementing + phase-started
+  Note over S,K: TODAY this write happens only at step 4,<br/>after ALL the work - so for the whole build<br/>state.md still says plan-accepted
+  D->>D: edit files, run tests (minutes)
+  B->>K: reload: is this repo busy?
+  K-->>B: NEW counts a live gogo-go session (Class filter dropped)
+  B-->>U: card reads implementing, in-progress column, cap enforced
+  D->>S: step 4 exit write: iterations bump + phase-done

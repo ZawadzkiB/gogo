@@ -1,0 +1,34 @@
+stateDiagram-v2
+  [*] --> authoring: gogo-plan creates .gogo/work/feature-slug/
+  authoring --> authoring: analyst writes state.md / decisions.md / charts/
+  authoring --> authoring: analyst dies mid-write  (STAYS here - derived, crash-safe)
+  authoring --> awaiting_acceptance: plan.md lands (written + substantive)
+  awaiting_acceptance --> plan_accepted: user accepts (in-chat, or m -> /gogo:accept)
+  plan_accepted --> implementing: gogo-implement 1b ENTRY write (NEW timing)
+  implementing --> reviewing: gogo-review entry write
+  reviewing --> testing: gogo-test entry write
+  testing --> awaiting_uat: report 5
+  implementing --> stalled: session killed, no live gogo-go
+  stalled --> implementing: gogo go slug resumes
+
+  note right of authoring
+    DERIVED, display-only:
+    status on disk is still
+    awaiting-plan-acceptance; plan.md's
+    absence is what makes it read as
+    authoring. NO new status enum value.
+    m refuses. /gogo:accept refuses.
+    Not counted in the header gate count.
+  end note
+
+  note right of plan_accepted
+    TODAY the build runs entirely INSIDE
+    this state: gogo-implement writes
+    implementing only at its step 4, after
+    the work. So the card sits in the plan
+    column, in-progress reads 0, and the
+    cap does not count it.
+    FR11 moves the write to phase ENTRY;
+    FR12 makes the cap count a live
+    gogo-go session regardless of class.
+  end note

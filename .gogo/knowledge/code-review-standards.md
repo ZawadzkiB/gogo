@@ -45,6 +45,29 @@ Generated-by: /gogo:build
    Flag a whole-board sweep invoked from a ship/skill path, or a reaper that trusts
    `TerminalStatus` alone to decide a session is dead (REV-002, `immediate-kill-at-ship`).
 
+10. **External-tool failures must be diagnosable (0.28.0).** Flag any `exec.Command(...)`
+    on a user-visible path that leaves `cmd.Stderr` nil, or that returns a bare
+    `fmt.Errorf("%w")` around an exit code: the tool's own words are the diagnosis, and
+    discarding them shipped `exit status 1` as the only symptom of a 16 KB tmux limit.
+    Also flag a **non-exact tmux `-t` target** (`=<name>` for a session target,
+    `=<name>:` for `capture-pane`'s pane target) - a prefix target provably killed,
+    peeked and attached the *wrong* session - and a size/quota check that does not name
+    the measured number and the limit.
+11. **A test must assert the PRODUCTION decision, and for the RIGHT reason (0.28.0).**
+    Three variants of the same defect shipped in one release, all with green suites:
+    (a) the test asserted a **test-local copy** of the callback, so deleting the
+    production branch changed nothing (fix: make the decision a package-level function
+    both call sites use, and add a test that fails if either site re-inlines it);
+    (b) a **wiring** was named in the plan, shipped, and had no test that bites - the
+    launch-package function was tested, the TUI call site was not;
+    (c) the test passed for a **weaker reason than it claimed** - a fixture reused its
+    data home so the "other arm" block re-tested the first arm, and two refusal tests
+    refused because the member was *not found* rather than *not shipped*.
+    So: flag a test whose comment claims coverage its assertions do not provide, and
+    require the assertion to name the **exact** reason (the tally, the specific string),
+    not just the outcome. The check is a mutation, compile-checked first - see
+    `test-strategy.md`.
+
 ## Severity guide
 - **Blocker** — breaks a hard invariant (writes outside `.gogo/`, implements
   without acceptance, hard-codes a path, adds a required dep, drops a gate).

@@ -1,0 +1,42 @@
+flowchart TD
+  subgraph tui["cli/internal/tui"]
+    K1["plans_tab: A -> finishPlanWithClaude"]
+    K2["plans_tab: m -> planGo -> finishPlanSpawn"]
+    K3["plans_tab: c -> planCreateWorkItem"]
+    ST["m.status = 'spawn failed: ...'"]
+    SS["statusStyle(): lipgloss Faint(true)"]
+  end
+
+  subgraph launch["cli/internal/launch"]
+    PI["PlanIntent(title, goal, planID)<br/>Command = '/gogo:plan ' + goal<br/>goal = BriefFor() or the WHOLE plan body"]
+    AI["AuthorPlanIntent(title, goal, planPath, ...)<br/>one prose blob: goal + planPath + every source path"]
+    SN["sessionName() -> sanitizeLabel()<br/>regexp [^a-z0-9-]+ &middot; NO length cap"]
+    US["uniqueSession(base)"]
+    HS["HasSession: tmux has-session -t name<br/>tmux resolves exact -> PREFIX -> fnmatch"]
+    TA["TmuxNewSessionArgs(root, intent)"]
+    RUN["exec.Command('tmux', args...).Run()<br/>cmd.Stderr is nil -> stderr DISCARDED"]
+    ERR["fmt.Errorf('tmux new-session failed: %w', err)"]
+  end
+
+  TMUX["tmux 3.7b server"]
+
+  K1 --> AI
+  K2 --> PI
+  K3 --> PI
+  PI --> SN
+  AI --> SN
+  SN --> US
+  US --> HS
+  HS -.->|"phantom hit on a LONGER session"| US
+  US --> TA
+  TA --> RUN
+  RUN --> TMUX
+  TMUX -->|"stderr: 'command too long' (cmd line &gt; ~16317 B)"| RUN
+  TMUX -->|"stderr: 'duplicate session: name'"| RUN
+  RUN --> ERR
+  ERR --> ST
+  ST --> SS
+  SS --> LOST["user sees only 'exit status 1', in the same faint grey<br/>as a success and as a cap bounce"]
+
+  classDef gap fill:#ffe0e0,stroke:#c04040,color:#111
+  class RUN,ERR,SS,LOST,HS gap

@@ -305,10 +305,15 @@ func TestClaudePrintArgs(t *testing.T) {
 	}
 }
 
-// TestCapturePaneArgs pins the read-only peek snapshot argv (FR7).
+// TestCapturePaneArgs pins the read-only peek snapshot argv (FR7), now with the
+// EXACT-match PANE target form (0.28.0 FR1.5): a plain `-t <name>` resolves exact →
+// prefix → fnmatch, so a peek could snapshot a DIFFERENT session's pane whenever
+// one gogo session name prefixed another. The trailing `:` is required - a bare
+// `=<name>` is a SESSION target and capture-pane rejects it outright (measured on
+// tmux 3.7b: `can't find pane: =gogo-go-x`), which would break every peek.
 func TestCapturePaneArgs(t *testing.T) {
 	got := CapturePaneArgs("gogo-go-x", 300)
-	want := []string{"capture-pane", "-t", "gogo-go-x", "-p", "-S", "-300"}
+	want := []string{"capture-pane", "-t", "=gogo-go-x:", "-p", "-S", "-300"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("CapturePaneArgs = %v, want %v", got, want)
 	}
@@ -336,13 +341,26 @@ func TestBackgroundLogFor(t *testing.T) {
 	}
 }
 
+// TestAttachArgs pins the attach argv, now on the EXACT-match target form
+// (0.28.0 FR1.5/REV-008). Both subcommands take a target-SESSION, so both get the
+// bare `=<name>` (never the pane form's trailing `:`). Verified live on tmux 3.7b
+// before the change: `=<exact>` attaches/switches, `=<prefix>` is refused, and a
+// BARE prefix resolves to a different session - the hazard this closes.
 func TestAttachArgs(t *testing.T) {
 	t.Setenv("TMUX", "")
-	if got := AttachArgs("gogo-go-x"); !reflect.DeepEqual(got, []string{"attach-session", "-t", "gogo-go-x"}) {
+	if got := AttachArgs("gogo-go-x"); !reflect.DeepEqual(got, []string{"attach-session", "-t", "=gogo-go-x"}) {
 		t.Errorf("outside tmux: %v", got)
 	}
 	t.Setenv("TMUX", "/tmp/tmux-501/default,1234,0")
-	if got := AttachArgs("gogo-go-x"); !reflect.DeepEqual(got, []string{"switch-client", "-t", "gogo-go-x"}) {
+	if got := AttachArgs("gogo-go-x"); !reflect.DeepEqual(got, []string{"switch-client", "-t", "=gogo-go-x"}) {
 		t.Errorf("inside tmux: %v", got)
+	}
+	// A target-session takes the bare `=` form - the trailing `:` is the PANE form
+	// (capture-pane) and must not leak here.
+	for _, env := range []string{"", "/tmp/tmux-501/default,1234,0"} {
+		t.Setenv("TMUX", env)
+		if got := AttachArgs("gogo-go-x"); strings.HasSuffix(got[2], ":") {
+			t.Errorf("attach target %q carries the pane form's trailing colon", got[2])
+		}
 	}
 }

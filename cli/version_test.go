@@ -9,10 +9,10 @@ import (
 
 // TestVersionMirrorsPlugin pins the CLI --version to the plugin version (the stability
 // statement: `cli/main.go Version` mirrors `.claude-plugin/plugin.json`), and to the
-// current release train (0.27.0 - diagrams rendered by very-nice-mermaid).
+// current release train (0.28.0 - plans-tab launch diagnostics + plan v/w viewers).
 // A version bump updates both, so this fails loudly if the two ever drift.
 func TestVersionMirrorsPlugin(t *testing.T) {
-	const want = "0.27.0"
+	const want = "0.28.0"
 	if Version != want {
 		t.Errorf("cli Version = %q, want %q", Version, want)
 	}

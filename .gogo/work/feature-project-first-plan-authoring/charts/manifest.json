@@ -1,0 +1,22 @@
+{
+  "slug": "project-first-plan-authoring",
+  "updated": "2026-07-29",
+  "note": "Intended design. flow = the plans-tab authoring path with the project switcher, the project-select field, multi-line entry and attachment validation; sequence = the runtime call sequence for 'p' (switch) and 'A' (plan-with-claude) once the project is chosen explicitly; class = the structures the change adds (plans.Plan.Attachments, the new formBinding fields, gogoKeyMap/newForm, and the launch.WithAttachments decorator).",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": ".gogo/work/feature-project-first-plan-authoring/charts/flow.mmd",
+      "title": "Plans-tab authoring: switch project, choose project at mint, multi-line body, validated attachments"
+    },
+    {
+      "kind": "sequence",
+      "file": ".gogo/work/feature-project-first-plan-authoring/charts/sequence.mmd",
+      "title": "Runtime sequence for 'p' (switch project) and 'A' (plan-with-claude) with an explicit project choice"
+    },
+    {
+      "kind": "class",
+      "file": ".gogo/work/feature-project-first-plan-authoring/charts/class.mmd",
+      "title": "Structures added: Plan.Attachments, formBinding fields, gogoKeyMap/newForm, launch.WithAttachments"
+    }
+  ]
+}

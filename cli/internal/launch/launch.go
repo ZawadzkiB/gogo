@@ -45,6 +45,13 @@ type Intent struct {
 	// re-resolves the root by a (possibly colliding) slug on the unified board (REV-001);
 	// "" when the caller roots the launch itself (e.g. the CLI inside a repo).
 	Root string
+	// Body is the free-text brief/goal this command INLINES verbatim (the analyst's plan
+	// body, the `A` goal). It is metadata only - never rendered into an argv - and exists
+	// so FoldToPointer can excise EXACTLY the inlined text when the command line blows
+	// tmux's byte budget, leaving every other part of the prompt (the skill instruction,
+	// the --correlation / --skip-* params) intact. "" = the command inlines nothing, so
+	// there is nothing to fold.
+	Body string
 }
 
 // Result records what was actually launched so the TUI can surface it.
@@ -57,6 +64,201 @@ type Result struct {
 }
 
 var sessionUnsafe = regexp.MustCompile(`[^a-z0-9-]+`)
+
+// --- tmux command budget + typed failures (0.28.0, FR1.1/FR1.2) ---------------
+//
+// tmux refuses a command line past a hard byte limit with `command too long` on
+// STDERR and exit status 1. Bisected on this host (tmux 3.7b): the last accepted
+// command line was 16 317 bytes, the first refusal 16 318. A plans-tab spawn that
+// inlines a whole plan brief blows it easily (a real 20 KB plan body built a
+// 20 128-byte command), and `.Run()` threw tmux's own words away - the user saw
+// only `exit status 1`. These make the failure self-reporting and catch the
+// oversize BEFORE tmux sees it.
+
+// MaxTmuxCommandBytes is the largest command line tmux accepts, measured by
+// bisection on tmux 3.7b (last OK 16317, first failure 16318 → `command too long`).
+//
+// Re-verified at implementation time by bisecting a real `tmux new-session -d -s
+// <name> -c /tmp true <payload>` on this host: the boundary under THIS accounting
+// (TmuxCommandBytes = every argv element plus one separator between them) sits at
+// 16363 accepted / 16364 refused, and it is the WHOLE command line - a session
+// name one byte longer moves the payload boundary one byte down, confirmed by
+// bisecting a 2-char and a 30-char name (delta exactly 28). 16317 is therefore
+// ~46 bytes CONSERVATIVE, which is the right side to err on: over-budget means
+// fold to a pointer (FoldToPointer), never a lost brief, so refusing a hair early
+// costs nothing and leaves headroom for tmux builds with a tighter buffer.
+const MaxTmuxCommandBytes = 16317
+
+// MaxSessionLabel bounds the sanitized label component of a session name (FR1.4).
+// Names far longer than this DO launch (2 010 chars was fine on 3.7b), but every
+// byte of the name eats the shared command budget above and an 83-char session
+// name reads terribly in `tmux ls`. 48 keeps names readable and still unique.
+const MaxSessionLabel = 48
+
+// tmuxStderrLimit bounds how much of tmux's stderr a TmuxError carries - tmux's
+// diagnostics are one short line, so this is a safety valve, not a window.
+const tmuxStderrLimit = 2048
+
+// TmuxCommandBytes is the byte size of a tmux command line: every argv element
+// plus one separator byte between them. This is the quantity MaxTmuxCommandBytes
+// bounds - pure, so the preflight is unit-testable without tmux.
+func TmuxCommandBytes(argv []string) int {
+	n := 0
+	for _, a := range argv {
+		n += len(a)
+	}
+	if len(argv) > 1 {
+		n += len(argv) - 1
+	}
+	return n
+}
+
+// TmuxError is a failed tmux invocation carrying tmux's OWN words (FR1.1): the
+// subcommand, the exact argv, the captured stderr and the underlying exit error.
+// Error() reads `tmux new-session failed: exit status 1: command too long`, so a
+// status line built from it always names the real cause.
+type TmuxError struct {
+	Sub    string   // the tmux subcommand ("new-session", "kill-session", …)
+	Args   []string // the full argv handed to tmux
+	Stderr string   // tmux's own stderr text (bounded)
+	Err    error    // the underlying error (usually *exec.ExitError)
+}
+
+func (e *TmuxError) Error() string {
+	msg := "tmux " + e.Sub + " failed"
+	if e.Err != nil {
+		msg += ": " + e.Err.Error()
+	}
+	if s := strings.TrimSpace(e.Stderr); s != "" {
+		msg += ": " + s
+	}
+	return msg
+}
+
+// Unwrap exposes the underlying *exec.ExitError so errors.Is/As still reach it.
+func (e *TmuxError) Unwrap() error { return e.Err }
+
+// CommandTooLongError is the PREFLIGHT refusal (FR1.2): the command line would be
+// rejected by tmux, so it is never sent. It names the measured byte count and the
+// limit, because "shorten the brief" is only actionable when the user knows by how
+// much. It is the backstop behind FoldToPointer (D1=A) - reached only when even the
+// folded, pointer-carrying command does not fit.
+type CommandTooLongError struct {
+	Sub   string // the tmux subcommand the command line was built for
+	Bytes int    // the measured command-line size
+	Limit int    // MaxTmuxCommandBytes
+}
+
+func (e *CommandTooLongError) Error() string {
+	return fmt.Sprintf("tmux %s refused before launch: the command line is %d bytes, tmux accepts at most %d - shorten the brief (it lives on disk; the launch already points at it)",
+		e.Sub, e.Bytes, e.Limit)
+}
+
+// boundedBuffer is an io.Writer that keeps at most limit bytes and silently drops
+// the rest - it never fails the child's write, so capturing stderr can never break
+// a tmux invocation that would otherwise have succeeded.
+type boundedBuffer struct {
+	limit int
+	buf   []byte
+}
+
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	if room := b.limit - len(b.buf); room > 0 {
+		if room > len(p) {
+			room = len(p)
+		}
+		b.buf = append(b.buf, p[:room]...)
+	}
+	return len(p), nil
+}
+
+func (b *boundedBuffer) String() string { return string(b.buf) }
+
+// runTmux runs `tmux <args>` capturing stderr into a bounded buffer and, on
+// failure, returns a *TmuxError carrying tmux's own words (FR1.1). Every
+// state-changing tmux call goes through it; HasSession stays a bare predicate by
+// design (it asks a question, it does not act).
+func runTmux(sub string, args []string) error {
+	cmd := exec.Command("tmux", args...)
+	errBuf := &boundedBuffer{limit: tmuxStderrLimit}
+	cmd.Stderr = errBuf
+	if err := cmd.Run(); err != nil {
+		return &TmuxError{Sub: sub, Args: args, Stderr: errBuf.String(), Err: err}
+	}
+	return nil
+}
+
+// exactTarget builds tmux's EXACT-match SESSION target (`=<name>`) for a `-t` flag.
+// tmux resolves a plain `-t` target exact → prefix → fnmatch, which is a
+// wrong-session hazard: `kill-session -t gogo-plan-foo` provably killed
+// `gogo-plan-foobar-long`. The `=` prefix disables the fallbacks (FR1.5).
+//
+// It must NEVER be applied to `new-session -s <name>`: `-s` takes a NAME, not a
+// target, so the `=` becomes part of it (verified - a session literally called
+// `=gogo-eqtest` was created).
+func exactTarget(name string) string { return "=" + name }
+
+// exactPaneTarget is the exact-match form for a PANE target (`=<name>:`).
+//
+// This is NOT the same as exactTarget, and the difference is load-bearing:
+// `capture-pane -t` takes a PANE target, whose parser does not accept a bare
+// `=<name>` - measured on tmux 3.7b, `capture-pane -t "=gogo-x"` fails outright
+// with `can't find pane: =gogo-x`, which would have broken every log peek. The
+// trailing `:` makes it a pane target whose SESSION component is exact-matched;
+// the window/pane components then default to the session's current ones. Verified
+// live: `-t "=gogo-x:"` refuses to match `gogo-x-long` (the prefix hazard - a
+// plain `-t gogo-x` read `gogo-x-long`'s pane) and still reads its own.
+func exactPaneTarget(name string) string { return "=" + name + ":" }
+
+// pointerText is the on-disk POINTER a folded command carries instead of the
+// inlined brief (FR1.3/D1=A): the brief is ALREADY a file under ~/.gogo/, so
+// nothing is lost - the session reads it. Section names the per-source
+// `## Source briefs` subsection when the fold is a spawn; empty for a whole-file
+// pointer (an authoring goal, which IS the plan body).
+func pointerText(planPath, section string) string {
+	s := "read your brief at " + planPath
+	if sec := strings.TrimSpace(section); sec != "" {
+		s += ", section `## Source briefs` -> `### " + sec + "`"
+	}
+	return s
+}
+
+// FoldToPointer keeps an over-budget launch launchable (FR1.3, D1=A). When the
+// intent's command line already fits, it is returned UNCHANGED - byte-for-byte,
+// so nothing on the happy path moves. Over budget it drops the inlined body
+// (Intent.Body) and substitutes an absolute pointer to the file that already
+// holds it, preserving every other part of the command (the skill instruction,
+// `--correlation`, the `--skip-*` params). An intent with no recorded body, or no
+// plan path to point at, is returned unchanged - the caller's preflight then
+// surfaces a CommandTooLongError instead of silently truncating a brief.
+func FoldToPointer(in Intent, planPath, section string) Intent {
+	if strings.TrimSpace(planPath) == "" || in.Body == "" {
+		return in
+	}
+	if intentFits(in) {
+		return in
+	}
+	folded := in
+	folded.Command = strings.Replace(in.Command, in.Body, pointerText(planPath, section), 1)
+	folded.Body = ""
+	return folded
+}
+
+// intentFits reports whether the tmux new-session command line for in stays within
+// MaxTmuxCommandBytes, measured at the intent's own Root (the session name and the
+// anchor path are part of the same budget).
+func intentFits(in Intent) bool {
+	return TmuxCommandBytes(TmuxNewSessionArgs(in.Root, in)) <= MaxTmuxCommandBytes
+}
+
+// preflight refuses a command line tmux would reject, BEFORE tmux sees it (FR1.2),
+// so the caller reports the real reason instead of a bare `exit status 1`.
+func preflight(sub string, args []string) error {
+	if n := TmuxCommandBytes(args); n > MaxTmuxCommandBytes {
+		return &CommandTooLongError{Sub: sub, Bytes: n, Limit: MaxTmuxCommandBytes}
+	}
+	return nil
+}
 
 // --- launched-session permission mode (FR8) ---------------------------------
 //
@@ -233,8 +435,12 @@ const PeekLines = 300
 
 // CapturePaneArgs is the argv for `tmux capture-pane`: a read-only snapshot of a
 // session's active pane — the last `lines` lines (`-S -<lines>`), printed (`-p`).
+// The target is the EXACT PANE form (`-t =<session>:`, FR1.5): tmux's default
+// prefix/fnmatch fallback made a peek read a DIFFERENT session's pane whenever one
+// name prefixed another (measured). Note the trailing `:` - a bare `=<session>` is
+// a SESSION target and capture-pane rejects it (see exactPaneTarget).
 func CapturePaneArgs(session string, lines int) []string {
-	return []string{"capture-pane", "-t", session, "-p", "-S", "-" + strconv.Itoa(lines)}
+	return []string{"capture-pane", "-t", exactPaneTarget(session), "-p", "-S", "-" + strconv.Itoa(lines)}
 }
 
 // CapturePane returns a read-only snapshot of a live session's pane (best-effort;
@@ -366,6 +572,10 @@ func PlanIntent(label, body, correlation string) Intent {
 		Action:  ActionPlan,
 		Command: cmd,
 		Session: sessionName("plan", label),
+		// The goal is the INLINED brief - record it so an over-budget command can be
+		// folded to an on-disk pointer without disturbing the --correlation param
+		// (FR1.3). Metadata only; it never reaches an argv.
+		Body: goal,
 	}
 }
 
@@ -451,6 +661,11 @@ func AuthorPlanIntent(label, goal, planPath, correlation, knowledgePath string, 
 		Action:  ActionAuthor,
 		Command: b.String(),
 		Session: sessionName("author", label),
+		// The GOAL is the only unbounded part of this prompt (a pasted multi-KB spec
+		// blew the tmux budget), and it is ALREADY the plan file's body - so record it
+		// as the fold target (FR1.3). Folding swaps it for a pointer at planPath and
+		// leaves the skill instruction + the source list intact.
+		Body: strings.TrimSpace(goal),
 	}
 }
 
@@ -461,8 +676,41 @@ func sessionName(action string, label string) string {
 }
 
 // sanitizeLabel lowercases a slug/label and reduces it to tmux-safe [a-z0-9-]
-// (the exact transform sessionName applies). Empty → "run".
+// (the exact transform sessionName applies), then BOUNDS it to MaxSessionLabel
+// (FR1.4), cutting on a `-` boundary so a capped name still reads as words and
+// never ends in a dash. Empty → "run". Idempotent: re-sanitizing a sanitized
+// label is a no-op, which is what keeps SessionMatchesSlug - which runs the same
+// transform on the slug side - matching a capped session name.
 func sanitizeLabel(label string) string {
+	s := unboundedLabel(label)
+	if len(s) > MaxSessionLabel {
+		s = s[:MaxSessionLabel]
+		// Cut on a word boundary rather than mid-word - but ONLY when the boundary
+		// leaves a label still worth having (REV-001). Without the floor, a title like
+		// "Refactor NotificationDeliveryOrchestrationPipelineForRealtimeEvents" has its
+		// only dash at index 8 and collapses to "refactor": two plans sharing a first
+		// word then mint the SAME session base, which is exactly the attribution
+		// ambiguity TEST-005 exists to prevent - arriving through a lossy transform
+		// instead of a substring match. Below the floor, keep the hard cut: a
+		// mid-word 48-char label is ugly but still unique, which is the property that
+		// matters here.
+		if i := strings.LastIndex(s, "-"); i > MaxSessionLabel/2 {
+			s = s[:i]
+		}
+		s = strings.TrimRight(s, "-")
+	}
+	if s == "" {
+		s = "run"
+	}
+	return s
+}
+
+// unboundedLabel is the [a-z0-9-] reduction WITHOUT the MaxSessionLabel bound -
+// exactly the transform every gogo release up to 0.27.0 minted session names with.
+// sanitizeLabel is this plus the cap; SessionMatchesSlug keeps it as a second
+// candidate base so a session minted by an OLDER gogo still attributes after an
+// upgrade (REV-009). Never used to mint a name.
+func unboundedLabel(label string) string {
 	s := sessionUnsafe.ReplaceAllString(strings.ToLower(label), "-")
 	s = strings.Trim(s, "-")
 	if s == "" {
@@ -471,6 +719,14 @@ func sanitizeLabel(label string) string {
 	return s
 }
 
+// SlugFromLabel is the exported form of the session-label transform: the SAME
+// [a-z0-9-] reduction (and MaxSessionLabel bound) that sessionName embeds and
+// SessionMatchesSlug parses. Callers that derive an advisory slug from a human
+// title (the plans tab's member hint) use it so the two transforms can never
+// drift apart (FR1.7) - a hint that no longer matches its session is exactly how
+// a plan-spawned work item lost its ● dot.
+func SlugFromLabel(label string) string { return sanitizeLabel(label) }
+
 // SessionMatchesSlug reports whether a running tmux session name was created for
 // slug, following the "gogo-<action>-<sanitized-slug>" convention (sessionName)
 // plus uniqueSession's collision suffix ("-<n>"). This is an EXACT boundary
@@ -478,17 +734,43 @@ func sanitizeLabel(label string) string {
 // feature's session is never misattributed to another whose sanitized name is a
 // textual substring of it (e.g. session "gogo-done-awaiting-card" must not match
 // slug "waiting-card"; TEST-005).
+//
+// The action list must cover EVERY action sessionName can mint (FR1.7): author
+// and resume sessions were missing, so a `gogo-author-<slug>` / `gogo-resume-<slug>`
+// session was invisible to the board (no ● dot, `a` said "no running session",
+// `l` fell back to the log, and the cap under-counted it).
+//
+// It matches against BOTH label transforms (REV-009): the bounded one 0.28.0 mints
+// with AND the pre-0.28.0 unbounded one. FR1.4's cap changed the SLUG side of this
+// comparison too, so without the widening every session an OLDER gogo started with
+// a >48-char label silently lost its attribution the moment the user upgraded -
+// measured on a real 83-char session running live during this work. The cap is what
+// makes that dangerous rather than cosmetic: ActiveWorkSlugs would UNDER-count the
+// running build, so the per-source cap would let a second build start in the same
+// repo and clobber the working tree, which is the exact safety property Leg 3
+// exists to protect.
+//
+// This is a READ-side compatibility widening, not a relaxation of FR1.4: minting
+// (sessionName) stays bounded, so no new long name is ever created. It cannot
+// reintroduce REV-001's ambiguity either, because each candidate is still compared
+// as a WHOLE base (exact, or base + a purely-numeric suffix) - adding a second
+// candidate can never turn a prefix into a match.
 func SessionMatchesSlug(session, slug string) bool {
-	sanitized := sanitizeLabel(slug)
-	for _, action := range []Action{ActionGo, ActionPlan, ActionDone, ActionAccept} {
-		base := "gogo-" + string(action) + "-" + sanitized
-		if session == base {
-			return true
-		}
-		// uniqueSession appends "-<n>" (n≥2) on a name collision — accept the
-		// base name followed by a purely-numeric suffix, nothing else.
-		if rest, ok := strings.CutPrefix(session, base+"-"); ok && allDigits(rest) {
-			return true
+	bases := []string{sanitizeLabel(slug)}
+	if unbounded := unboundedLabel(slug); unbounded != bases[0] {
+		bases = append(bases, unbounded) // only differs for a label past the cap
+	}
+	for _, action := range []Action{ActionGo, ActionPlan, ActionDone, ActionAccept, ActionAuthor, ActionResume} {
+		for _, label := range bases {
+			base := "gogo-" + string(action) + "-" + label
+			if session == base {
+				return true
+			}
+			// uniqueSession appends "-<n>" (n≥2) on a name collision — accept the
+			// base name followed by a purely-numeric suffix, nothing else.
+			if rest, ok := strings.CutPrefix(session, base+"-"); ok && allDigits(rest) {
+				return true
+			}
 		}
 	}
 	return false
@@ -569,12 +851,21 @@ func CurrentSession() string {
 	return strings.TrimSpace(string(out))
 }
 
-// HasSession reports whether a tmux session with this exact name exists.
+// HasSessionArgs is the argv for the exact-name session probe (FR1.5): tmux's
+// `=` target form, which disables the prefix/fnmatch fallbacks that made
+// `has-session -t gogo-test-al` answer true for `gogo-test-alpha-beta-gamma`.
+func HasSessionArgs(name string) []string {
+	return []string{"has-session", "-t", exactTarget(name)}
+}
+
+// HasSession reports whether a tmux session with this exact name exists. It stays
+// a bare predicate by design (no TmuxError): "no such session" is the answer, not
+// a failure, so there is nothing to report.
 func HasSession(name string) bool {
 	if !HasTmux() {
 		return false
 	}
-	return exec.Command("tmux", "has-session", "-t", name).Run() == nil
+	return exec.Command("tmux", HasSessionArgs(name)...).Run() == nil
 }
 
 // uniqueSession appends -2, -3, … until the name is free (best-effort).
@@ -593,11 +884,26 @@ func uniqueSession(base string) string {
 
 // AttachArgs returns argv for attaching to a session, honoring whether we are
 // already inside tmux (switch-client) or outside (attach-session).
+//
+// Both take a TARGET-SESSION, so both get the exact-match form (FR1.5/REV-008) -
+// the same `=<name>` the probes use, NOT the pane form. The window is narrow (every
+// caller passes a name from ListSessions or a fresh Result.Session, so an exact
+// match normally exists and wins) but the failure mode is the worst in this class:
+// if that session exits between the listing and the attach, a prefix fallback drops
+// the user INTO A DIFFERENT feature's live session.
+//
+// Verified live on tmux 3.7b before changing (the A2 discipline), both branches:
+//
+//	attach-session -t "=<exact>"   -> attaches
+//	attach-session -t "=<prefix>"  -> can't find session   (refused)
+//	switch-client  -t "=<exact>"   -> rc=0, client moves to the exact session
+//	switch-client  -t "=<prefix>"  -> can't find session   (refused)
+//	switch-client  -t "<prefix>"   -> RESOLVED to another session (the hazard, reproduced)
 func AttachArgs(session string) []string {
 	if os.Getenv("TMUX") != "" {
-		return []string{"switch-client", "-t", session}
+		return []string{"switch-client", "-t", exactTarget(session)}
 	}
-	return []string{"attach-session", "-t", session}
+	return []string{"attach-session", "-t", exactTarget(session)}
 }
 
 // Launch spawns the intent. With tmux → a detached, attachable session running
@@ -617,8 +923,15 @@ func Launch(root string, in Intent) (Result, error) {
 		session := uniqueSession(in.Session)
 		in.Session = session
 		args := TmuxNewSessionArgs(root, in)
-		if err := exec.Command("tmux", args...).Run(); err != nil {
-			return Result{}, fmt.Errorf("tmux new-session failed: %w", err)
+		// Preflight (FR1.2): an over-budget command line is refused HERE, naming the
+		// byte count and the limit, instead of reaching tmux and coming back as a bare
+		// `exit status 1`. Callers fold an oversized brief to an on-disk pointer first
+		// (FoldToPointer, D1=A); this is the backstop when even that does not fit.
+		if err := preflight("new-session", args); err != nil {
+			return Result{}, err
+		}
+		if err := runTmux("new-session", args); err != nil {
+			return Result{}, err
 		}
 		return Result{Mode: "tmux", Session: session, Command: in.Command}, nil
 	}
@@ -653,6 +966,9 @@ func Launch(root string, in Intent) (Result, error) {
 // session so panes never pile up — the remain-on-exit leak the incident hit
 // (7 orphaned sessions) is what this repairs (FR8). No tmux, no such session, or
 // an empty name → a returned error; never a panic.
+// The target is EXACT (`-t =<name>`, FR1.5). This is not cosmetic: a prefix
+// `kill-session -t gogo-plan-foo` provably killed `gogo-plan-foobar-long` on this
+// host - the reaper could reap a session it was never asked about.
 func KillSession(name string) error {
 	if name == "" {
 		return fmt.Errorf("empty tmux session name")
@@ -660,7 +976,13 @@ func KillSession(name string) error {
 	if !HasTmux() {
 		return fmt.Errorf("tmux not installed")
 	}
-	return exec.Command("tmux", "kill-session", "-t", name).Run()
+	return runTmux("kill-session", KillSessionArgs(name))
+}
+
+// KillSessionArgs is the argv for the exact-name kill (FR1.5) - exported so the
+// exact-target contract is assertable without tmux.
+func KillSessionArgs(name string) []string {
+	return []string{"kill-session", "-t", exactTarget(name)}
 }
 
 // PidAlive reports whether a process is alive via signal 0 (no signal is
@@ -713,8 +1035,14 @@ func LaunchPersistent(root string, in Intent, opts PhaseOpts) (Result, error) {
 	}
 	session := uniqueSession(in.Session)
 	in.Session = session
-	if err := exec.Command("tmux", TmuxPersistentArgs(root, in, opts)...).Run(); err != nil {
-		return Result{}, fmt.Errorf("tmux new-session failed: %w", err)
+	args := TmuxPersistentArgs(root, in, opts)
+	// Same preflight + stderr capture as Launch (FR1.1/FR1.2) - this path spawns the
+	// same kind of oversized, brief-carrying command line.
+	if err := preflight("new-session", args); err != nil {
+		return Result{}, err
+	}
+	if err := runTmux("new-session", args); err != nil {
+		return Result{}, err
 	}
 	return Result{Mode: "tmux", Session: session, Command: in.Command}, nil
 }

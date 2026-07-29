@@ -86,8 +86,11 @@ on you (plan-acceptance / decision / UAT). Since **0.23.0** `gogo global` opens 
 `●project ●source`. On a **lone repo** with no home project there are no tabs / chips -
 just the single-repo board (byte-for-byte).
 
-**Plans tab keys:** `↑↓` plans · `enter` open the detail · `n` new plan (title **+ an
-optional description**) · `A` **plan-with-claude** (since 0.25.0 an analyst-grade session;
+**Plans tab keys:** `↑↓` plans · `enter` open the detail · `v` **view the plan** (since
+0.28.0 - the glamour terminal viewer over the plan's markdown; `esc` returns to the plans
+tab) · `w` **web page** (since 0.28.0 - written under the PROJECT home at
+`~/.gogo/projects/<name>/.gogo/resources/view/<plan-id>.html`, never a source repo) ·
+`n` new plan (title **+ an optional description**) · `A` **plan-with-claude** (since 0.25.0 an analyst-grade session;
 since **0.25.1** it FIRST prompts for the plan **goal** - what to build/change across the
 sources - so the plan is minted with that goal as its description, never a blank "Untitled
 plan"; then it launches AND **attaches** you into the live `claude` session anchored at a
@@ -105,8 +108,20 @@ gate as `gogo plan done`: refuses unless every member is shipped, else a confirm
 the plan to `done`) · `x` delete. A plan whose members are all shipped renders the derived
 **`awaiting-project-uat`** status (distinct from `active`). In a plan's detail: `↑↓`
 target sources · `c` **create work item** (launches `/gogo:plan <body> --correlation
-plan-<hash>` in that source) · `+` add a target source · `D` accept project-UAT · `e`
-edit the plan file · `esc` back.
+plan-<hash>` in that source) · `+` add a target source · `v` view · `w` web · `D` accept
+project-UAT · `e` edit the plan file · `esc` back.
+
+**Launch diagnostics (since 0.28.0).** A cockpit launch that fails names the real cause:
+tmux's stderr is captured (`tmux new-session failed: exit status 1: command too long`,
+not a bare `exit status 1`), an over-budget command line is refused **before** tmux sees
+it (tmux's measured limit is **16 317 bytes**), and a plan brief too big to inline is
+**folded to a pointer** at the plan file that already holds it - under budget the command
+is byte-for-byte unchanged. Session probes use tmux's exact-match `-t "=<name>"` form (a
+prefix target killed/peeked the wrong session). The status line carries severity: `✗` red
+= failed · `⚠` amber = blocked/gate · dim = ok. On the board **`M`** forces a launch past
+the source's concurrency cap through the same confirm (which names the cap and the slugs
+already building) - the cap is **per source**, counts only in-progress work items with a
+live session, and **never counts plans**.
 
 **Config tab + per-source concurrency cap (since 0.21.0):** the config tab manages
 the focused project's **sources** (`a` add · `x` remove · `e` edit a source's

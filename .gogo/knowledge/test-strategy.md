@@ -139,6 +139,30 @@ potentially, the session driving the very pipeline doing the testing.
   the Go unit tests with injected `List`/`Kill` (no real tmux). Baseline the host
   session list before/after every experiment (`immediate-kill-at-ship`, 0.17.0).
 
+### Mutation is the coverage check - and the harness needs two rules (since 0.28.0)
+"Green suite" says nothing about whether a change is *guarded*. In 0.28.0 review found
+**three shipped wirings whose reverts left the entire suite green** (a slug-transform
+alignment and two of the three fold call sites), plus a test asserting a **test-local
+copy** of the production callback, plus three of four status classifications unguarded.
+The check that found them is a revert-mutation sweep - with two rules, both learned the
+hard way in that same round:
+- **`go build ./...` FIRST, for every mutation.** A mutation that does not compile is
+  `BUILD-FAIL`, not a result: the reviewer's own first pass mis-scored one because it was
+  a syntax error in the mutation, not a fact about the code. **A mutation count produced
+  without compile-checking is not trustworthy in either direction.**
+- **A mutation can compile, be semantically valid, and still never reach the assertion,
+  because something else compensates.** A fixture that reuses its data home puts the
+  cursor back on the previous case; a fixture missing a `Correlations` link makes a test
+  refuse because the member was *not found* rather than *not shipped*, so the property
+  the test is named for is never exercised. The remedy is not more mutations: make the
+  assertion name the **exact reason** (the `1 of 2` tally, the verbatim refusal string,
+  the specific style/marker), so a fixture that quietly stops resolving **fails loudly**.
+- **Prefer a guard that cannot be escaped.** Where two call sites must agree, assert it
+  structurally (read both sources and fail if either re-inlines the decision) rather than
+  asserting the behaviour twice - a future copy-paste then cannot re-open the hole.
+- **Report the sweep, with counts.** e.g. "24 mutations, compile-checked first, all fail,
+  each in the expected test" is a claim a reader can audit; "tests added" is not.
+
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
      reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any

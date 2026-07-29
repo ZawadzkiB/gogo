@@ -1,0 +1,16 @@
+{"ts":"2026-07-29T14:31:03Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T15:42:47Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T16:16:37Z","event":"phase-started","phase":"implement","status":"implementing","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T16:16:37Z","event":"phase-done","phase":"implement","status":"implementing","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T16:52:46Z","event":"fix-round","phase":"implement","status":"implementing","round":1,"slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T16:52:46Z","event":"phase-done","phase":"implement","status":"implementing","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T17:18:07Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T17:18:07Z","event":"phase-done","phase":"implement","status":"implementing","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T17:54:15Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T17:54:15Z","event":"issues-found","phase":"test","status":"testing","round":1,"note":"1 minor","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T21:42:19Z","event":"fix-round","phase":"implement","status":"implementing","round":3,"slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T21:42:19Z","event":"phase-done","phase":"implement","status":"implementing","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T22:06:32Z","event":"phase-started","phase":"report","status":"implementing","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T22:23:34Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T22:52:16Z","event":"uat-passed","phase":"done","status":"shipped","slug":"plans-tab-launch-diagnostics-and-view"}
+{"ts":"2026-07-29T22:52:16Z","event":"shipped","phase":"done","status":"shipped","slug":"plans-tab-launch-diagnostics-and-view","release":"0.28.0"}

@@ -1,0 +1,22 @@
+{
+  "slug": "plans-tab-launch-diagnostics-and-view",
+  "updated": "2026-07-29",
+  "note": "AS-BUILT (0.28.0). flow = the shipped launch path: Intent.Body as the fold target, the preflight + typed CommandTooLongError inside Launch/LaunchPersistent, runTmux's bounded stderr capture into TmuxError, and the exact-match probe forms - note capture-pane needs the PANE form '=name:', not '=name' (the plan's FR1.5 said otherwise; a bare '=name' is rejected on tmux 3.7b, see the A2 correction). sequence = the plans-tab v/w viewers over the existing openArtifact + pages seams, including the esc return path that must not land on modeDrill. activity = the shipped status-line taxonomy (statusLevel recorded beside m.status, reset per keypress, rendered red/amber/dim plus a marker glyph so the distinction survives a colourless terminal). before/ holds the plan-time as-is baseline for the report phase to diff against.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/charts/flow.mmd",
+      "title": "As-built launch path: fold-to-pointer, byte preflight, exact session probes, captured tmux stderr"
+    },
+    {
+      "kind": "sequence",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/charts/sequence.mmd",
+      "title": "As-built plans-tab v (terminal view) and w (offline web page), incl. the non-drill esc return"
+    },
+    {
+      "kind": "activity",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/charts/activity.mmd",
+      "title": "As-built launch-outcome taxonomy: blocked (amber) vs failed (red) vs launched (dim)"
+    }
+  ]
+}

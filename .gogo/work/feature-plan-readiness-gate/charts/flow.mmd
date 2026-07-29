@@ -1,0 +1,37 @@
+flowchart TD
+  subgraph disk["feature folder on disk"]
+    st["state.md<br/>status: awaiting-plan-acceptance"]
+    pm["plan.md<br/>(present? substantive?)"]
+  end
+
+  st --> parse["contract.parseStateFile()<br/>+ NEW stripPlaceholder()"]
+  pm --> pw["NEW contract.planWritten(dir)<br/>exists AND &gt;= 2 '## ' headings"]
+
+  parse --> feat["contract.Feature"]
+  pw --> flag["NEW Feature.PlanUnwritten<br/>(defect-positive; zero value = today)"]
+  flag --> feat
+
+  feat --> auth["NEW Feature.Authoring()<br/>PlanUnwritten AND status in {apa, ''}"]
+
+  auth --> wfi["Feature.WaitingForInput()<br/>authoring EXCLUDED"]
+  auth --> pill["tui.pillLabel / pillStyleFor<br/>dim '✎ authoring'"]
+  auth --> mv["tui.attemptAction (m)<br/>BOUNCE, never ActionAccept"]
+
+  wfi --> hdr["header '⏸ K need you'<br/>+ gogo status WAIT column"]
+
+  mv -.->|blocked| acc["/gogo:accept &lt;slug&gt;"]
+  acc --> g2["gogo-accept step 2<br/>NEW hard gate: plan.md written?"]
+  g2 -->|no| stop["STOP with reason<br/>+ 'gogo plan &lt;slug&gt;'"]
+  g2 -->|yes| rec["record acceptance<br/>(unchanged single owner)"]
+
+  sess["launch.ListSessions()<br/>gogo-&lt;action&gt;-&lt;slug&gt;"] --> sa["NEW launch.SessionAction()<br/>returns go | plan | done | accept"]
+  sa --> capf["orchestrator.ActiveWorkSlugs<br/>NEW: live GO session, drop Class filter"]
+  sa --> cue["tui: '● building' chip<br/>+ activeAgent from the session"]
+  feat --> capf
+
+  feat --> go["cli/go.go cmdGo<br/>NEW: refuse plan-accepted + unwritten plan"]
+
+  classDef new fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef reuse fill:#e8ecff,stroke:#7c8bd9,color:#111
+  class pw,flag,auth,g2,stop,sa,capf,cue new
+  class parse,feat,wfi,pill,mv,hdr,acc,rec,go,sess reuse

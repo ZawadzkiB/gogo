@@ -1,0 +1,100 @@
+classDiagram
+  direction LR
+
+  namespace cli_internal_launch {
+    class Intent {
+      +Action Action
+      +Slugs []string
+      +Command string
+      +Session string
+      +Root string
+      +Body string  «NEW - the inlined brief, metadata only»
+    }
+    class TmuxError {
+      +Sub string
+      +Args []string
+      +Stderr string  «tmux's own words, bounded»
+      +Err error
+      +Error() string
+      +Unwrap() error
+    }
+    class CommandTooLongError {
+      +Sub string
+      +Bytes int
+      +Limit int
+      +Error() string
+    }
+    class boundedBuffer {
+      -limit int
+      -buf []byte
+      +Write(p) (int, error)
+      +String() string
+    }
+    class launch_funcs {
+      +MaxTmuxCommandBytes = 16317
+      +MaxSessionLabel = 48
+      -tmuxStderrLimit = 2048
+      +TmuxCommandBytes(argv) int
+      +FoldToPointer(in, planPath, section) Intent
+      +SlugFromLabel(label) string
+      +SessionMatchesSlug(session, slug) bool
+      -intentFits(in) bool
+      -preflight(sub, argv) error
+      -runTmux(sub, argv) error
+      -sanitizeLabel(label) string
+      -unboundedLabel(label) string
+      -exactTarget(name) string
+      -exactPaneTarget(name) string
+    }
+  }
+
+  namespace cli_internal_tui {
+    class statusLevel {
+      «enumeration»
+      statusLevelOK
+      statusLevelWarn
+      statusLevelErr
+    }
+    class Model {
+      +status string
+      +statusLevel statusLevel  «NEW»
+      +planViewing bool  «NEW»
+      +setStatus(level, s)
+      +statusBlocked(s)
+      +statusFailed(s)
+      +renderStatus(s) string
+      +planView() (Model, Cmd)
+      +closePlanView() Model
+      +planPageCmd() Cmd
+      +currentPlan() *Plan
+      +attemptActionForce(ship, force)
+      +launchForce() (Model, Cmd)
+    }
+    class launchDoneMsg {
+      +status string
+      +level statusLevel  «NEW»
+    }
+    class formBinding {
+      +confirm bool  «CONFIRM-DEFAULT CONVENTION»
+    }
+  }
+
+  class cli_plan_go {
+    «cli/plan.go - the headless doors»
+    +planGo(args) int
+    +planPromote(args) int
+    +planKebab(title) string
+  }
+
+  boundedBuffer --* TmuxError : captured stderr becomes
+  launch_funcs ..> Intent : folds / measures
+  launch_funcs ..> TmuxError : runTmux returns
+  launch_funcs ..> CommandTooLongError : preflight returns
+  Model ..> launch_funcs : FoldToPointer before every launch
+  cli_plan_go ..> launch_funcs : same fold at gogo plan go / promote
+  Model --> launchDoneMsg : severity travels with the outcome
+  launchDoneMsg --> statusLevel
+  Model --> statusLevel
+  Model --* formBinding : forward move seeds true, destructive seeds false
+  TmuxError ..> statusLevel : rendered red
+  CommandTooLongError ..> statusLevel : rendered red

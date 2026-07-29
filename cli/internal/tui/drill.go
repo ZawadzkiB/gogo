@@ -379,7 +379,7 @@ func bundleFor(root string, f *contract.Feature) (pages.Bundle, error) {
 // (soft dep). No glow → a status hint.
 func (m Model) openInGlow() (tea.Model, tea.Cmd) {
 	if !m.hasGlow {
-		m.status = "glow not installed — showing the built-in glamour view"
+		m.statusBlocked("glow not installed — showing the built-in glamour view")
 		return m, nil
 	}
 	if m.artIdx >= len(m.artifacts) {

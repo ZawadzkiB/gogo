@@ -1,0 +1,34 @@
+flowchart TD
+  subgraph disk["feature folder mid-authoring (observed live)"]
+    st["state.md (from template)<br/>feature: &lt;one-line title&gt;<br/>status: awaiting-plan-acceptance<br/>created: &lt;YYYY-MM-DD&gt;"]
+    dec["decisions.md"]
+    ch["charts/"]
+    missing["plan.md<br/>DOES NOT EXIST"]
+  end
+
+  st --> parse["contract.parseStateFile()<br/>Title = '&lt;one-line title&gt;' verbatim"]
+  parse --> feat["contract.Feature"]
+  feat --> cls["contract.classify()<br/>NO plan.md check anywhere"]
+  cls --> col["ClassUnfinished -&gt; ColPlan"]
+
+  feat --> sort["sortFeaturesNewestFirst<br/>'&lt;YYYY-MM-DD&gt;' &gt; any real date<br/>-&gt; broken card sorts FIRST"]
+
+  feat --> badge["tui.badge() -&gt; 'awaiting-plan-acceptance'"]
+  badge --> pill["tui.pillLabel() -&gt; red '⏸ accept plan'"]
+  feat --> title["tui.renderCard: title = f.Title<br/>placeholder rendered as card text"]
+  feat --> wfi["Feature.WaitingForInput() = TRUE"]
+  wfi --> hdr["header '⏸ K need you' INFLATED"]
+
+  col --> mv["tui.attemptAction (m)<br/>status == awaiting-plan-acceptance"]
+  mv --> acc["launch.ActionAccept<br/>claude '/gogo:accept &lt;slug&gt;'"]
+  acc --> s2["gogo-accept step 2<br/>gates on STATUS ONLY -&gt; PASSES"]
+  s2 --> s3["step 3 'present plan.md'<br/>no file to read"]
+  s3 --> s5["step 5 records acceptance<br/>state.md -&gt; plan-accepted<br/>+ plan-accepted event"]
+
+  missing -.->|"nothing reads this absence"| cls
+  missing -.->|"nothing reads this absence"| s2
+
+  classDef bug fill:#ffe0e0,stroke:#cc5555,color:#111
+  classDef reuse fill:#e8ecff,stroke:#7c8bd9,color:#111
+  class cls,pill,title,wfi,hdr,s2,s3,s5,sort,missing bug
+  class parse,feat,col,badge,mv,acc reuse

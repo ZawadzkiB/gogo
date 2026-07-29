@@ -111,7 +111,10 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		huh.NewInput().Title("Name").Description("display name (defaults to the folder name)").Value(&b.srcName),
 		huh.NewInput().Title("Main branch").Description("the source's default branch").Value(&b.srcBranch),
 		huh.NewInput().Title("Label color").Description("origin-dot hex or a swatch name (e.g. teal, #58a6ff) — blank auto-assigns").Value(&b.srcColor),
-		huh.NewInput().Title("Concurrent work items").Description("0 = unlimited; N caps live in-progress features").Value(&b.srcCap),
+		// FR3.4: state the cap's REAL scope where it is set. It is per SOURCE, counts
+		// only in-progress work items that have a live session, and never counts plans -
+		// a cap of 1 does NOT stop other sources, other plans, or a plan spawn.
+		huh.NewInput().Title("Concurrent work items").Description("0 = unlimited; N caps THIS source's in-progress work items that have a live session - other sources are unaffected, and plans are never counted").Value(&b.srcCap),
 		// Per-source gate-skip flags (FR4): opt this source OUT of the plan-acceptance /
 		// UAT gate. When on, `gogo go` appends --skip-acceptance / --skip-uat to the
 		// launched /gogo:go and the gogo skills auto-advance that gate. Default off →
@@ -281,7 +284,7 @@ func (m Model) viewConfig() string {
 
 	parts := []string{colTitleStyle.Render("config — sources & knowledge"), "", body}
 	if m.status != "" {
-		parts = append(parts, "", statusStyle(m.status))
+		parts = append(parts, "", m.renderStatus(m.status))
 	}
 	help := lipgloss.NewStyle().Faint(true).Render("↑↓/jk source · p switch project · c project color · a add · e edit · x remove · tab board/plans · q quit")
 	parts = append(parts, "", help)
@@ -417,7 +420,7 @@ func (m Model) viewConfigRight() string {
 		dimStyle.Render("path         ")+s.Path,
 		dimStyle.Render("branch       ")+branch,
 		dimStyle.Render("label color  ")+m.sourceDot(name)+" "+colorLabel,
-		dimStyle.Render("cap          ")+capText(s.ConcurrentWorkItems),
+		dimStyle.Render("cap          ")+capText(s.ConcurrentWorkItems)+"  "+dimStyle.Render(capScopeNote(s.ConcurrentWorkItems)),
 		// Per-source gate-skip flags (FR4): a source with both off reads today's detail
 		// byte-for-byte; when on, the gate auto-advances (--skip-acceptance / --skip-uat).
 		dimStyle.Render("plan-accept skip  ")+yesNo(s.PlanAcceptanceSkip),
@@ -465,6 +468,17 @@ func capText(n int) string {
 		return fmt.Sprintf("cap %d", n)
 	}
 	return "cap ∞"
+}
+
+// capScopeNote spells out what the cap actually counts, next to the number (FR3.4).
+// The scope was invisible, so a cap of 1 read as a global "gogo will only run one
+// thing" - it is per SOURCE, counts only in-progress work items with a LIVE
+// session, and never counts plans (they are not work items at all).
+func capScopeNote(n int) string {
+	if n > 0 {
+		return "(this source only · counts in-progress work items with a live session · plans never count)"
+	}
+	return "(unlimited)"
 }
 
 // knEntry is one knowledge file (name + byte size) in the config-tab explorer.

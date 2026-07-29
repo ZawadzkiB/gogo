@@ -1,0 +1,22 @@
+{
+  "slug": "plan-readiness-gate",
+  "updated": "2026-07-29",
+  "note": "Intended design for one root cause with two sightings. Slice A derives plan readiness at read time (contract.planWritten -> Feature.PlanUnwritten -> Feature.Authoring()); Slice B moves each phase's status write from exit to ENTRY and makes the concurrency cap key on a live gogo-go session rather than the file-derived class. Neither adds a status enum value, so the frozen contract's status enum, the four work-index classes and the class->column mapping are unchanged.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Intended control flow: the plan.md check feeds the pill, the gate count, the m action and the /gogo:accept gate; the new session-action parser feeds the cap and the building cue"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "Intended timing of a build: gogo-implement writes phase=implement/status=implementing at ENTRY (step 1b) instead of at exit, and the cap counts the live gogo-go session"
+    },
+    {
+      "kind": "activity",
+      "file": "state.mmd",
+      "title": "Work-item lifecycle with the derived authoring state before acceptance and the corrected entry-write transitions after it"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{ "schema": 2, "name": "plans-tab-launch-diagnostics-and-view", "release": "0.28.0", "date": "2026-07-29",
+  "members": [ { "slug": "plans-tab-launch-diagnostics-and-view", "title": "diagnosable cockpit launches (tmux's ~16 KB command limit, fold-to-pointer), plans-tab v/w viewers, and a legible per-source cap", "version": "0.28.0" } ],
+  "diagrams": [
+    { "kind": "flow", "file": "plans-tab-launch-diagnostics-and-view-flow.mmd", "title": "As-built launch path: byte preflight, fold-to-pointer, typed TmuxError, exact session probes" },
+    { "kind": "sequence", "file": "plans-tab-launch-diagnostics-and-view-sequence.mmd", "title": "As-built plans-tab v (terminal view) and w (offline web page), incl. the viewer-return guard" },
+    { "kind": "activity", "file": "plans-tab-launch-diagnostics-and-view-activity.mmd", "title": "As-built launch-outcome taxonomy: blocked (amber) vs failed (red) vs launched (dim)" },
+    { "kind": "class", "file": "plans-tab-launch-diagnostics-and-view-class.mmd", "title": "As-built types: TmuxError / CommandTooLongError / boundedBuffer / statusLevel / Intent.Body" }
+  ],
+  "before": [
+    { "kind": "flow", "file": "before/plans-tab-launch-diagnostics-and-view-flow.mmd", "title": "Before: the brief inlined into the tmux command line, stderr discarded" },
+    { "kind": "sequence", "file": "before/plans-tab-launch-diagnostics-and-view-sequence.mmd", "title": "Before: the plans tab had no v/w - a plan was readable only in the inline detail pane" },
+    { "kind": "activity", "file": "before/plans-tab-launch-diagnostics-and-view-activity.mmd", "title": "Before: every outcome rendered Faint - a cap bounce looked identical to a crash" }
+  ] }

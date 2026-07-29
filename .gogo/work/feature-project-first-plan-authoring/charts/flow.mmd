@@ -1,0 +1,31 @@
+flowchart TD
+  plans["plans tab -- updatePlanList"] --> header["project header row: dot + name + '(p to switch)'"]
+  plans --> keyP["'p' -> m.switchProject(projIdx+1)"]
+  keyP --> focusProject["focusProject -> m.project, sourceColors, projectChip, loadPlans"]
+  focusProject --> reload["plans.List(newProject) -> rebuildPlans"]
+  reload --> header
+
+  plans --> keyN["'n' startPlanForm"]
+  plans --> keyA["'A' planWithClaude"]
+
+  keyN --> form["newForm(group) -- huh.Form + gogoKeyMap()"]
+  keyA --> form
+  form --> f1["Select(project) -- only when len(allProjects) > 1, pre-seeded to m.project"]
+  form --> f2["Text(goal / description) -- enter INSERTS a newline, tab advances"]
+  form --> f3["Text(attachments) -- one path or URL per line, Validate() at submit"]
+
+  f3 --> validate["validateAttachments: expand ~, filepath.Abs, reject a comma, http(s) shape-check only"]
+  validate -->|"bad line"| stay["huh renders the error, field refuses to advance"]
+  validate -->|"ok"| finish["finishPlanForm / finishPlanWithClaude"]
+
+  finish --> switchTo["switchProject(selected) BEFORE minting"]
+  switchTo --> new["plans.New(selected, title, body) + plans.SetAttachments"]
+  new --> file["~/.gogo/projects/<selected>/.gogo/plans/plan-XXXX.md"]
+  file --> fm["front matter gains 'attachments:' -- parsePlan + render round-trip"]
+
+  finish --> intent["launch.PlanIntent / AuthorPlanIntent"]
+  intent --> deco["launch.WithAttachments(intent, atts) -- bounded trailing clause"]
+  deco --> launcher["m.launcher(root, intent) -- fire exactly once"]
+  launcher --> claude["claude session reads the paths / URLs; CLI writes no source .gogo/work/"]
+
+  new --> status["status line names the project the plan landed in"]

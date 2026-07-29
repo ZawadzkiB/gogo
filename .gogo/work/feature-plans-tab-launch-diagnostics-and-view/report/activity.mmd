@@ -1,0 +1,39 @@
+stateDiagram-v2
+  direction TB
+  [*] --> KeyPressed
+
+  KeyPressed: Update sees a tea.KeyMsg<br/>m.statusLevel reset to OK first - no stale severity
+
+  KeyPressed --> Blocked: a guard refused
+  KeyPressed --> Failed: the launch returned an error
+  KeyPressed --> Launched: the launcher returned a session
+
+  state Blocked {
+    direction TB
+    Cap: cap N reached in &lt;source&gt; - already building X<br/>counts in-progress work items with a live session, per source<br/>plans never count - press M to force, ship one, or force from the CLI
+    Dangling: plan targets &lt;name&gt;, which is not a source of<br/>project &lt;p&gt; - add it in the config tab, or retarget the plan<br/>refused BEFORE the confirm - no promise it cannot honour
+    NoClaude: claude CLI not on PATH
+    NoSession: no running session, no live session to kill, nothing to peek
+  }
+
+  state Failed {
+    direction TB
+    TooLong: tmux new-session refused before launch -<br/>the command line is N bytes, tmux accepts at most 16317<br/>only after FoldToPointer could not shrink it
+    TmuxSaid: tmux &lt;sub&gt; failed - &lt;exit status&gt; - &lt;real tmux stderr&gt;<br/>e.g. command too long, duplicate session &lt;name&gt;
+    AttachFail: attach to &lt;session&gt; failed - &lt;err&gt;<br/>was always detached from &lt;session&gt;
+    SpawnFail: spawn failed, plan-with-claude failed, page build failed
+  }
+
+  Blocked --> Amber
+  Failed --> Red
+  Launched --> Dim
+
+  Amber: statusLevelWarn to statusWarn<br/>amber plus a leading warning glyph
+  Red: statusLevelErr to statusErr<br/>red plus a leading cross, always carrying the real error words
+  Dim: statusLevelOK to statusOK, which IS statusStyle<br/>the existing dim success voice, byte-for-byte
+
+  Amber --> Actionable
+  Red --> Actionable
+  Dim --> Actionable
+  Actionable: every outcome names WHAT happened and WHAT to do next<br/>and stays distinguishable on a COLOURLESS terminal via the glyph,<br/>which is what makes it render-assertable in the test suite
+  Actionable --> [*]

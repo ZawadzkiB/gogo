@@ -1,0 +1,55 @@
+flowchart TD
+  subgraph tui["cli/internal/tui"]
+    K1["plans_tab: A -> finishPlanWithClaude"]
+    K2["plans_tab: m -> planGo -> finishPlanSpawn"]
+    K3["plans_tab: c -> planCreateWorkItem"]
+    RT["resolveTargets(plan): split into<br/>spawnable vs UNKNOWN source names"]
+    FOLD["launch.FoldToPointer(intent, planPath, section)<br/>called at the 3 brief-inlining sites<br/>(the TUI is what knows the plan path)"]
+    STA["m.statusFailed / statusBlocked / setStatus(OK)<br/>records m.statusLevel beside m.status"]
+    REN["m.renderStatus(): statusErr / statusWarn / statusOK<br/>red + '&#10007;' &middot; amber + '&#9888;' &middot; dim"]
+  end
+
+  subgraph launch["cli/internal/launch"]
+    PI["PlanIntent / AuthorPlanIntent<br/>now also record Intent.Body<br/>(the inlined brief = the fold target)"]
+    FIT{"intentFits(in):<br/>TmuxCommandBytes(TmuxNewSessionArgs(Root, in))<br/>&lt;= MaxTmuxCommandBytes (16317) ?"}
+    PTR["fold: Command = replace(Body -&gt; pointer), Body = ''<br/>'read your brief at planPath, section ## Source briefs -&gt; ### source'<br/>params (--correlation / --skip-*) survive"]
+    SN["sanitizeLabel(): [^a-z0-9-]+ then MaxSessionLabel (48) cap<br/>cut on a '-' boundary, no trailing dash<br/>exported as SlugFromLabel (one transform, no drift)"]
+    US["uniqueSession(base)"]
+    HS["HasSessionArgs: has-session -t '=' + name<br/>KillSessionArgs: kill-session -t '=' + name<br/>CapturePaneArgs: capture-pane -t '=' + name + ':'<br/>(a PANE target needs the ':' - a bare '=name' is rejected)"]
+    TA["TmuxNewSessionArgs(root, intent)<br/>-s gets the BARE name (never '=')"]
+    PRE{"preflight(sub, argv):<br/>still over budget ?"}
+    CTL["*CommandTooLongError{Sub, Bytes, Limit}<br/>refused BEFORE tmux sees it, naming both numbers"]
+    RUN["runTmux(sub, argv): cmd.Stderr = boundedBuffer(2048)"]
+    TE["*TmuxError{Sub, Args, Stderr, Err}<br/>Error() = 'tmux new-session failed: exit status 1: command too long'<br/>Unwrap() -&gt; *exec.ExitError"]
+  end
+
+  TMUX["tmux server"]
+
+  K1 --> FOLD
+  K2 --> RT
+  K3 --> RT
+  RT -->|"unknown target"| STA
+  RT -->|"spawnable"| FOLD
+  FOLD --> PI
+  PI --> FIT
+  FIT -->|no| PTR
+  PTR --> SN
+  FIT -->|yes| SN
+  SN --> US
+  US --> HS
+  HS --> TA
+  TA --> PRE
+  PRE -->|yes| CTL
+  PRE -->|no| RUN
+  RUN --> TMUX
+  TMUX -->|"stderr text"| RUN
+  RUN -->|error| TE
+  RUN -->|ok| OK["Result{Mode: tmux, Session}"]
+  CTL --> STA
+  TE --> STA
+  OK --> STA
+  STA --> REN
+  REN --> SEEN["user always sees WHY:<br/>red = failed &middot; amber = blocked/gate &middot; dim = ok"]
+
+  classDef new fill:#e0f0e0,stroke:#40a040,color:#111
+  class RT,FOLD,FIT,PTR,PRE,CTL,RUN,TE,STA,REN,SEEN,HS new

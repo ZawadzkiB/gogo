@@ -1,0 +1,28 @@
+sequenceDiagram
+  actor U as User
+  participant M as tui.Model
+  participant F as huh.Form with gogoKeyMap
+  participant S as plans store
+  participant L as launch
+  participant T as claude / tmux
+
+  U->>M: 'p' on the plans tab
+  M->>M: switchProject, the same mover the config tab uses
+  M->>S: plans.List for the newly focused project
+  S-->>M: that project's plans, then rebuildPlans
+  M-->>U: header row and kanban now read the new project
+
+  U->>M: 'A'
+  M->>F: startPlanWithClaudeForm -- Select project, Text goal, Input title, Text attachments
+  Note over M,F: binding.planProject is pre-seeded to m.project.Name so Options pre-selects it
+  U->>F: picks the project, types a multi-line goal with enter, lists attachments
+  F->>F: Validate -- expand tilde, make absolute, reject commas, shape-check http and https
+  U->>F: tab off the last field
+  F-->>M: StateCompleted
+  M->>M: finishPlanWithClaude calls switchProject on the CHOSEN project first
+  M->>S: plans.New in the chosen project, then SetAttachments
+  S-->>M: plan-XXXX with attachments in front matter
+  M->>L: AuthorPlanIntent using the chosen project's KnowledgeDir and sourceRefs
+  M->>L: WithAttachments decorates the intent with a bounded attachments clause
+  L->>T: one argv element, anchored at the CHOSEN project's first source
+  T-->>U: attach, and the session reads the attached images and links

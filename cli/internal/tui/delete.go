@@ -13,11 +13,11 @@ import (
 func (m Model) deleteFocused() (tea.Model, tea.Cmd) {
 	f := m.focusedCard()
 	if f == nil {
-		m.status = "no card to delete"
+		m.statusBlocked("no card to delete")
 		return m, nil
 	}
 	if f.Column() == contract.ColChangelog {
-		m.status = "changelog is append-only — cannot delete " + f.Slug
+		m.statusBlocked("changelog is append-only — cannot delete " + f.Slug)
 		return m, nil
 	}
 	m.startDeleteForm(f)
@@ -26,6 +26,11 @@ func (m Model) deleteFocused() (tea.Model, tea.Cmd) {
 
 // startDeleteForm opens the destructive-action confirm. It defaults to Cancel
 // (confirm=false) so Enter is safe: the user must deliberately pick Delete.
+//
+// This is the DESTRUCTIVE half of the confirm-default convention (canonical
+// statement in move.go's startFormOverriding, TEST-001) - forward pipeline moves
+// seed `true` and submit on Enter; this one must NOT. Do not flip it for
+// consistency with them.
 func (m *Model) startDeleteForm(f *contract.Feature) {
 	m.pendingDelete = f
 	m.binding = &formBinding{confirm: false}
@@ -57,7 +62,7 @@ func (m Model) finishDelete() (tea.Model, tea.Cmd) {
 	}
 	entry, err := trash.MoveToTrash(m.rootFor(f), f.Dir)
 	if err != nil {
-		m.status = "delete failed: " + err.Error()
+		m.statusFailed("delete failed: " + err.Error())
 		return m, nil
 	}
 	m.status = "moved " + f.Slug + " → .gogo/trash/" + entry.Base + "  (gogo trash restore " + entry.Base + ")"

@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as gogo board (TUI)
+  participant C as claude /gogo:go &lt;slug&gt;
+  participant D as gogo-implement
+  participant S as state.md
+  participant K as cap (ActiveWorkSlugs)
+
+  U->>B: m on a plan-accepted card
+  B->>C: launch tmux gogo-go-&lt;slug&gt;
+  C->>D: phase 2 implement
+  D->>D: 1 validate-in
+  D->>D: 2 edit files, run tests (MINUTES) - no state write at all
+  B->>K: reload: is this repo busy?
+  K-->>B: cap.go:37 skips it (Class != ClassInProgress) -> repo looks FREE
+  B-->>U: card in the PLAN column, pill plan-accepted,<br/>header 'in progress 0', agent chip reads '● analyst'
+  U->>B: m on ANOTHER slug in the same repo
+  B->>C: SECOND build launches - two sessions, one working tree
+  D->>D: 3 validate-out
+  D->>S: 4 ONLY NOW: phase=implement status=implementing<br/>+ phase-started AND phase-done in one burst
+  B-->>U: card finally moves - after the work is already over

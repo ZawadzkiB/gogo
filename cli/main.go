@@ -19,7 +19,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.27.0"
+const Version = "0.28.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -189,15 +189,21 @@ view flags:
 
 board keys:
   ←→/h columns · ↑↓/jk cards · space select (ready) · enter drill-in · v quick-view
-  w web page · m move/launch (accepts a plan-pending card) · d ship · a attach session
+  w web page · m move/launch (accepts a plan-pending card) · M force past the source cap · d ship · a attach session
   l peek log · x delete→trash · p project chip (unified board) · tab board/plans/config · @name / #plan-<id> filter · / filter · G glow · q quit
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
+  status line severity: ✗ red = failed (carries tmux's own words) · ⚠ amber = blocked/gate (carries the unblock) · dim = ok
 
 plans tab keys (a 4-column KANBAN: drafts · ready · active · done):
-  ←→ columns · ↑↓ cards · enter open · n new (title + description) · A plan-with-claude (prompts for the goal, then attaches the analyst session)
+  ←→ columns · ↑↓ cards · enter open · v view the plan (terminal) · w web page · n new (title + description) · A plan-with-claude (prompts for the goal, then attaches the analyst session)
   m move (draft→ready: mark ready, no spawn · ready→active: go, spawns a work item per target · active→done: accept project-UAT + write a project changelog) · x delete
-  in a plan: ↑↓ work items · c create work item (spawn /gogo:plan --correlation) · + add source · m move · e edit · esc back
+  in a plan: ↑↓ work items · c create work item (spawn /gogo:plan --correlation) · + add source · v view · w web · m move · e edit · esc back
   auto-pickup: a work item spawned into a source with planAcceptanceSkip auto-runs /gogo:go on reload when its source is under cap; at cap it shows "trigger manually"
+
+concurrency cap (concurrentWorkItems, per SOURCE - config tab):
+  0 = unlimited; N caps THAT source's in-progress work items that have a live session.
+  Other sources are unaffected, and PLANS are never counted (a plan spawn is never cap-gated).
+  Over cap: press M on the board to force past it, or run gogo go <slug> --force.
 
 drill-in keys (enter on a card - shows description / folder / status / sessions / events):
   ↑↓/jk files · enter open file · a attach session (picker if ≥2) · K kill session (confirm; one/all picker if ≥2)

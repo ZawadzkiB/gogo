@@ -1,0 +1,22 @@
+{
+  "slug": "plans-tab-launch-diagnostics-and-view",
+  "updated": "2026-07-30",
+  "note": "The plan-time as-is baseline, copied verbatim from charts/before/ into the report bundle so the archive is self-contained (only each `file` path was re-pointed at this folder). Captured before any code change and scoped to what this feature touches. flow = the 0.27.0 launch path (stderr discarded, no size preflight, prefix-matching session probe); sequence = the work board's v/w viewers vs the plans tab having neither; activity = the single-voice status line where every outcome renders identically faint.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/report/before/flow.mmd",
+      "title": "As-is: launch.Launch discards tmux stderr and never preflights command size"
+    },
+    {
+      "kind": "sequence",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/report/before/sequence.mmd",
+      "title": "As-is: board cards have v/w, plan cards have neither"
+    },
+    {
+      "kind": "activity",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/report/before/activity.mmd",
+      "title": "As-is: every launch outcome collapses into one faint-grey status line"
+    }
+  ]
+}

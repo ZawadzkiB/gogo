@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
@@ -443,6 +442,13 @@ func planGo(args []string) int {
 		}
 		intent := launch.PlanIntent(p.Title, goal, p.ID)
 		intent.Command += launch.SkipParams(src.PlanAcceptanceSkip, false)
+		// FR1.3 (REV-002): this door builds the IDENTICAL over-budget command the plans
+		// tab does - a real ~20 KB per-source brief measured 20 951 bytes against tmux's
+		// 16 317 limit - so it needs the same fold. Without it `gogo plan go` stayed
+		// unusable on realistic briefs while the cockpit worked, which is D1's rejected
+		// option B by accident. A no-op under budget, byte-for-byte.
+		intent.Root = src.Path
+		intent = launch.FoldToPointer(intent, plans.Path(project, p.ID), target)
 		res, err := planLauncher(src.Path, intent)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "gogo plan go: spawn into %s failed: %v\n", sname, err)
@@ -557,6 +563,10 @@ func planPromote(args []string) int {
 		body = p.Title
 	}
 	intent := launch.PlanIntent(p.Title, body, p.ID)
+	// FR1.3 (REV-002): same fold as the fan-out above and the plans tab - promote seeds
+	// the whole plan body as the goal, so it blows the same budget. No-op under budget.
+	intent.Root = src.Path
+	intent = launch.FoldToPointer(intent, plans.Path(project, p.ID), sname)
 	res, err := planLauncher(src.Path, intent)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gogo plan promote: %v\n", err)
@@ -654,15 +664,18 @@ func splitSourceSlug(spec string) (source, slug string) {
 	return strings.TrimSpace(spec[:i]), strings.TrimSpace(spec[i+1:])
 }
 
-var planKebabUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
-
 // planKebab derives the advisory kebab feature slug a spawn pins as the member hint.
+//
+// It delegates to launch.SlugFromLabel - the SAME transform the session name and the
+// plans tab's planSlugHint use (REV-004/FR1.7). Both doors write the same field of the
+// same store (plans.Member.SlugHint), so two hand-kept regexes here and in the TUI were
+// guaranteed to drift: they already disagreed on `" - "` (`-` vs `---`) and on any
+// 48+ char title. One transform, no sync burden.
 func planKebab(title string) string {
-	s := planKebabUnsafe.ReplaceAllString(strings.ToLower(title), "-")
-	if s = strings.Trim(s, "-"); s == "" {
-		s = "plan"
+	if strings.TrimSpace(title) == "" {
+		return "plan"
 	}
-	return s
+	return launch.SlugFromLabel(title)
 }
 
 // FormatPlans renders a project's plans as a deterministic plain-text table

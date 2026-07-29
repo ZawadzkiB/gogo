@@ -1,0 +1,29 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant B as tui/update.go<br/>updateBoard
+  participant P as tui/plans_tab.go<br/>updatePlanList
+  participant D as tui/drill.go
+  participant PG as internal/pages
+  participant V as viewport (glamour)
+
+  Note over U,V: work board - a focused CARD has both viewers
+  U->>B: press v
+  B->>D: quickView(f)
+  D->>D: openDrill(f) then defaultArtifact(f)
+  D->>V: openArtifact(plan.md / report.md)
+  V-->>U: rendered markdown in the viewport
+  U->>B: press w
+  B->>D: buildPageCmd()
+  D->>D: bundleFor(root, f) - charts/ + charts/before/
+  D->>PG: pages.WritePage(root, bundle)
+  PG-->>U: file:// page opened in the browser
+
+  Note over U,V: plans tab - a focused PLAN has NEITHER
+  U->>P: press v
+  P--xU: unhandled key, no effect
+  U->>P: press w
+  P--xU: unhandled key, no effect
+  U->>P: press enter
+  P->>P: m.planDetail = plan
+  P-->>U: viewPlanDetail(): title, status, description,<br/>work-item rows - a cramped inline pane, no diagrams,<br/>no paging, no glamour article styling

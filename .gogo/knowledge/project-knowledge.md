@@ -372,6 +372,43 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   rejects identically (**zero regressions**). `very-nice-mermaid` stays an **optional** dep (exit 3 ->
   flowcharts still render). Version **0.27.0**.
 
+- **Diagnosable cockpit launches + plan `v`/`w` + a legible cap (0.28.0):** a plans-tab launch could
+  fail with nothing but `exit status 1`. Root cause: **tmux refuses a command line over ~16 KB**
+  (bisected on tmux 3.7b: last OK **16317** bytes, first failure 16318, stderr `command too long`),
+  the plans tab **inlined the whole plan brief into it** (a real spawn measured **20128** bytes), and
+  `launch.Launch` ran `exec.Command(...).Run()` with `cmd.Stderr` nil, so tmux's own words were
+  **discarded**. NOT the cause, all measured false: session-name length (names to **2010** chars
+  launch fine), an existing TUI key enum-sync test (none existed - `TestCLICommandEnumerationInSync`
+  guards CLI *verbs*; 0.28.0 **adds** `TestPlansTabKeyHelpInSync`), and tmux shelling out (argv is
+  preserved verbatim). As built: `runTmux` captures stderr into a bounded buffer and returns a typed
+  **`launch.TmuxError{Sub, Args, Stderr, Err}`** (`Unwrap()` reaches the `*exec.ExitError`); a
+  **preflight** refuses an over-budget line before tmux sees it with
+  **`CommandTooLongError{Sub, Bytes, Limit}`**; **`FoldToPointer`** (D1=A) drops the inlined
+  `Intent.Body` for an absolute pointer at the plan file that already holds it - **a no-op under
+  budget, byte-for-byte** (re-derived twice against a side-by-side 0.27.0 build: 51/51 then 24/24
+  launched commands identical). The fold is wired at **both** the TUI's three sites **and** the
+  headless `gogo plan go` / `gogo plan promote` doors (`cli/plan.go`), which build the identical
+  intent and measured 20951 bytes without it. Every tmux **`-t` target is exact-matched** (a prefix
+  target provably killed, peeked and attached the *wrong* session) - see `tech-stack.md`'s "tmux
+  platform constraints" for the two forms and which position takes which. Session labels are bounded
+  (`MaxSessionLabel` 48, dash-boundary cut only past the half-way floor - an unfloored cut collapsed
+  a title to its first word and re-opened the TEST-005 attribution ambiguity), and
+  `SessionMatchesSlug` covers `author`/`resume` and matches **both** the bounded and the pre-0.28.0
+  **unbounded** label, so a session an older gogo started keeps its dot, its attach and its place in
+  the cap across the upgrade (a **read-side** widening; minting stays bounded). Plans tab gains
+  **`v`** (glamour terminal view via the existing `openArtifact`) and **`w`** (a page under
+  `~/.gogo/projects/<name>/.gogo/resources/view/<plan-id>.html` - D2=A, never a source repo); `esc`
+  returns via a `planViewing` flag because `viewDrill` nil-derefs otherwise. The **cap is unchanged**
+  (already per-source, already counts only in-progress work items with a live session, already cannot
+  count plans) but now **says so** in the config form, the source detail, the bounce and `--help`,
+  with **`M`** to force past it in-cockpit; a plan `targets:` entry naming a non-source is refused
+  **up front by name** instead of silently spawning nothing; and the status line gained **severity**
+  (red = failed, carrying the tool's own words · amber = blocked, carrying the unblock · dim = ok),
+  each with a **glyph** so it survives a colourless terminal and stays assertable in `View()`. Also
+  **named the CONFIRM-DEFAULT CONVENTION** (`move.go` `startFormOverriding`): a forward pipeline move
+  seeds `confirm: true` so **Enter submits**; a destructive action (delete, kill) seeds `false` so
+  **Enter is safe**. The asymmetry IS the rule - never align the two families. Version **0.28.0**.
+
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
      reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any

@@ -1,0 +1,27 @@
+{
+  "slug": "plans-tab-launch-diagnostics-and-view",
+  "updated": "2026-07-30",
+  "note": "AS-BUILT (0.28.0), four kinds chosen by what the diff introduced. flow = the shipped launch path (Intent.Body as the fold target, the byte preflight + typed CommandTooLongError inside Launch/LaunchPersistent, runTmux's bounded stderr capture into TmuxError, and the exact-match probe forms - note capture-pane needs the PANE form '=name:', not '=name'; the plan's FR1.5 said otherwise and was corrected, see A2). sequence = the plans-tab v/w viewers over the existing openArtifact + pages seams, including the esc return path that must not land on modeDrill. activity = the shipped status-line taxonomy (statusLevel recorded beside m.status, reset per keypress, rendered red/amber/dim plus a marker glyph so the distinction survives a colourless terminal). class = the new/changed types the diff added across launch + tui + cli/plan.go. No use-case diagram: the new capabilities (v, w, M) are already shown as real call paths in the sequence and flow, so an actor-oval graph would restate them without adding signal. before/ holds the plan-time as-is baseline (three kinds) copied in so this bundle is self-contained.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/report/flow.mmd",
+      "title": "As-built launch path: fold-to-pointer, byte preflight, exact session probes, captured tmux stderr"
+    },
+    {
+      "kind": "sequence",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/report/sequence.mmd",
+      "title": "As-built plans-tab v (terminal view) and w (offline web page), incl. the non-drill esc return"
+    },
+    {
+      "kind": "activity",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/report/activity.mmd",
+      "title": "As-built launch-outcome taxonomy: blocked (amber) vs failed (red) vs launched (dim)"
+    },
+    {
+      "kind": "class",
+      "file": ".gogo/work/feature-plans-tab-launch-diagnostics-and-view/report/class.mmd",
+      "title": "As-built types: TmuxError / CommandTooLongError / boundedBuffer, Intent.Body, and the tui statusLevel plumbing"
+    }
+  ]
+}

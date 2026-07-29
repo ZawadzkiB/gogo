@@ -24,7 +24,7 @@ type peekContentMsg struct {
 func (m Model) peekFocused() (tea.Model, tea.Cmd) {
 	f := m.focusedCard()
 	if f == nil {
-		m.status = "no card to peek"
+		m.statusBlocked("no card to peek")
 		return m, nil
 	}
 	if session := liveSessionFor(f.Slug, m.sessions); session != "" {
@@ -33,7 +33,7 @@ func (m Model) peekFocused() (tea.Model, tea.Cmd) {
 	if logPath := launch.BackgroundLogFor(m.rootFor(f), f.Slug); logPath != "" {
 		return m.startPeek(f.Slug, "", logPath, "peek — "+filepath.Base(logPath))
 	}
-	m.status = "no running session or log for " + f.Slug + " — launch it (m / d) first"
+	m.statusBlocked("no running session or log for " + f.Slug + " — launch it (m / d) first")
 	return m, nil
 }
 
@@ -102,15 +102,15 @@ func (m Model) closePeek() Model {
 // peek is over a live tmux session).
 func (m Model) attachFromPeek() (tea.Model, tea.Cmd) {
 	if m.peekSession == "" {
-		m.status = "background log peek — no live tmux session to attach"
+		m.statusBlocked("background log peek — no live tmux session to attach")
 		return m, nil
 	}
 	session := m.peekSession
 	m = m.closePeek()
 	c := exec.Command("tmux", launch.AttachArgs(session)...)
-	return m, tea.ExecProcess(c, func(err error) tea.Msg {
-		return launchDoneMsg{status: "detached from " + session}
-	})
+	// FR1.6: the SAME shared decision the board's attach uses (attachOutcome in
+	// update.go) - one function, so the two sites cannot drift and one test guards both.
+	return m, tea.ExecProcess(c, func(err error) tea.Msg { return attachOutcome(session, err) })
 }
 
 // tailLines returns the last n lines of s — the background-log analogue of tmux

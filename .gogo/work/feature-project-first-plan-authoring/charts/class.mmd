@@ -1,0 +1,59 @@
+classDiagram
+  class Plan {
+    +string ID
+    +string Title
+    +string Description
+    +string Status
+    +[]string Targets
+    +[]Member Members
+    +string Created
+    +[]string Attachments
+  }
+  note for Plan "Attachments is NEW. The front-matter key set is CLOSED -- parsePlan and render must both learn it or the key is dropped on the next CLI write."
+
+  class plansStore {
+    +parsePlan(id, raw) Plan
+    +render() []byte
+    +SetAttachments(project, id, atts) Plan
+    +AddAttachment(project, id, att) Plan
+  }
+  plansStore ..> Plan
+
+  class formBinding {
+    +string planTitle
+    +string planDesc
+    +string planGoal
+    +string planProject
+    +string planAttach
+  }
+  note for formBinding "planProject and planAttach are NEW, heap-stable like every other field (TEST-001)."
+
+  class tuiForms {
+    +gogoKeyMap() *huh.KeyMap
+    +newForm(groups) *huh.Form
+    +projectSelectField(b) huh.Field
+    +validateAttachments(raw) error
+    +parseAttachments(raw) []string
+  }
+  tuiForms ..> formBinding
+
+  class Model {
+    +switchProject(idx)
+    +startPlanForm()
+    +startPlanWithClaudeForm()
+    +finishPlanForm()
+    +finishPlanWithClaude()
+    +updatePlanList(msg)
+    +viewPlansBoard()
+    +viewPlanDetail()
+  }
+  Model ..> tuiForms
+  Model ..> plansStore
+
+  class launchPkg {
+    +PlanIntent(label, body, correlation) Intent
+    +AuthorPlanIntent(...) Intent
+    +WithAttachments(in, atts) Intent
+  }
+  note for launchPkg "WithAttachments is a DECORATOR -- same shape as the sibling item's FoldToPointer, so the two compose without either touching the intent builders."
+  Model ..> launchPkg

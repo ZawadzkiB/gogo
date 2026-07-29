@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,8 +15,13 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-// launchDoneMsg carries the outcome of a launch back to the model.
-type launchDoneMsg struct{ status string }
+// launchDoneMsg carries the outcome of a launch back to the model, with its
+// SEVERITY (FR3.2). The zero level is statusLevelOK, so every site that only sets
+// `status` keeps today's dim voice byte-for-byte.
+type launchDoneMsg struct {
+	status string
+	level  statusLevel
+}
 
 // attemptAction resolves the requested action into a launch intent or a bounce
 // reason (the status-line hint). Pure — the unit-tested move-guard core.
@@ -23,6 +29,16 @@ type launchDoneMsg struct{ status string }
 //	ship=false (m): plan-pending → accept · other unfinished (plan-accepted) → go · in-progress → go(resume) · ready → done · shipped → bounce
 //	ship=true  (d): ready(+selection) → done · everything else → bounce
 func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
+	return m.attemptActionForce(ship, false)
+}
+
+// attemptActionForce is attemptAction with the FR3.3 cap override: force=true
+// skips the per-source concurrency-cap bounce (and only that guard - every other
+// legality rule still applies) so `M` can start a second build in a busy source
+// from inside the cockpit, instead of sending the user out to
+// `gogo go <slug> --force`. The confirm still names the cap and the blocking
+// slugs, so forcing stays a deliberate act.
+func (m *Model) attemptActionForce(ship, force bool) (launch.Intent, bool, string) {
 	sel := m.selectedFeatures()
 	if len(sel) > 0 {
 		// A ready selection ships as one (merged if >1) entry — but ONLY within a
@@ -67,12 +83,12 @@ func (m *Model) attemptAction(ship bool) (launch.Intent, bool, string) {
 		if f.Status == "awaiting-plan-acceptance" {
 			return m.intentFor(launch.ActionAccept, f), false, ""
 		}
-		if bounce := m.capBounce(f); bounce != "" {
+		if bounce := m.capBounce(f); bounce != "" && !force {
 			return launch.Intent{}, false, bounce
 		}
 		return m.intentFor(launch.ActionGo, f), false, ""
 	case contract.ClassInProgress:
-		if bounce := m.capBounce(f); bounce != "" {
+		if bounce := m.capBounce(f); bounce != "" && !force {
 			return launch.Intent{}, false, bounce
 		}
 		return m.intentFor(launch.ActionGo, f), false, ""
@@ -154,35 +170,87 @@ func (m *Model) capBounce(f *contract.Feature) string {
 	if !orchestrator.CapExceeded(cap, len(active)) {
 		return ""
 	}
-	return fmt.Sprintf("cap %d reached — already building %s; ship one or run `gogo go %s --force`",
-		cap, strings.Join(active, ", "), f.Slug)
+	// FR3.4: say plainly what the cap counts - the scope was invisible, so a bounce
+	// read as "gogo won't let me work" rather than "this ONE repo is busy".
+	return fmt.Sprintf("cap %d reached in %s - already building %s (the cap counts in-progress work items with a live session, per source; plans are never counted); press M to force, ship one, or run `gogo go %s --force`",
+		cap, filepath.Base(root), strings.Join(active, ", "), f.Slug)
 }
 
 // launchAction runs the guard, then either bounces or opens the huh
 // confirmation. NEVER launches without the confirmation.
 func (m Model) launchAction(ship bool) (tea.Model, tea.Cmd) {
-	intent, isShip, bounce := m.attemptAction(ship)
+	return m.launchActionForce(ship, false)
+}
+
+// launchForce is the FR3.3 in-TUI cap override (`M`): the same guarded launch as
+// `m`, minus the per-source cap bounce, still behind the huh confirmation - which
+// now names the cap it is overriding and the slugs already building.
+func (m Model) launchForce() (tea.Model, tea.Cmd) {
+	return m.launchActionForce(false, true)
+}
+
+// launchActionForce is the shared body of `m` / `M`.
+func (m Model) launchActionForce(ship, force bool) (tea.Model, tea.Cmd) {
+	intent, isShip, bounce := m.attemptActionForce(ship, force)
 	if bounce != "" {
-		m.status = bounce
+		m.statusBlocked(bounce) // FR3.2: a refused move is BLOCKED, not failed
 		return m, nil
 	}
 	if !m.hasClaude {
-		m.status = "claude CLI not on PATH — cannot launch " + intent.Command
+		m.statusBlocked("claude CLI not on PATH — cannot launch " + intent.Command)
 		return m, nil
 	}
-	m.startForm(intent, isShip)
+	// Only claim to be forcing when a cap is ACTUALLY being overridden (REV-007/REV-010).
+	// Ask the GUARD what the force overrode rather than enumerating the arms that do
+	// not consult the cap: attemptActionForce answers the selection branch (a merged
+	// /gogo:done) and the plan-acceptance branch (an uncapped /gogo:accept) before any
+	// capBounce is reached, so an arm list is a thing to keep in sync and was already
+	// wrong twice. Re-running the guard UNFORCED yields exactly the bounce the force
+	// suppressed - "" for every arm that never consulted the cap - which is correct by
+	// construction for all of them. It is a pure read, so the extra call costs nothing.
+	// A confirm is the safety surface for a state-changing launch, so wrong text there
+	// is worse than cosmetic.
+	override := ""
+	if force {
+		if _, _, unforced := m.attemptActionForce(ship, false); unforced != "" {
+			override = unforced
+		}
+	}
+	m.startFormOverriding(intent, isShip, override)
 	return m, m.form.Init()
 }
 
 // startForm builds the huh confirmation (a release-name input first, for a
 // merged ship of ≥2) and switches to form mode.
 func (m *Model) startForm(intent launch.Intent, isShip bool) {
+	m.startFormOverriding(intent, isShip, "")
+}
+
+// startFormOverriding is startForm plus the FR3.3 override note: when `M` is
+// skipping a cap bounce, the confirm carries that bounce verbatim (it already
+// names the cap and the blocking slugs) so the user sees exactly what they are
+// overriding. An empty note renders today's confirm byte-for-byte.
+func (m *Model) startFormOverriding(intent launch.Intent, isShip bool, override string) {
 	m.pending = intent
 	m.pendingShip = isShip
 	// A fresh, heap-stable binding for this form's fields (see formBinding).
-	// Defaults to the affirmative so the confirmation the user deliberately
-	// opened is submittable with Enter/Tab; Esc/Ctrl+C or toggling to Cancel (n)
-	// aborts it.
+	//
+	// CONFIRM-DEFAULT CONVENTION (the canonical statement; TEST-001). Every gogo
+	// confirm seeds binding.confirm EXPLICITLY, and which value it seeds is a
+	// deliberate safety rule, not a style choice:
+	//
+	//   - a FORWARD pipeline move (launch / spawn / accept - the `m` family, here and
+	//     startPlanSpawnForm / startPlanDoneForm on the plans tab) seeds `true`, so the
+	//     affirmative starts highlighted and a bare **Enter submits** the confirmation
+	//     the user deliberately opened. Esc/Ctrl+C, or toggling to Cancel (n), aborts.
+	//   - a DESTRUCTIVE or irreversible action (startDeleteForm in delete.go,
+	//     startKillForm in update.go) seeds `false`, so **Enter is safe** and the user
+	//     must arrow over to pick Delete/Kill on purpose.
+	//
+	// The asymmetry IS the rule. Never "align" the two families for consistency: an
+	// unseeded binding on a plans-tab spawn made the same keystroke that launches on the
+	// board silently cancel there (TEST-001), and seeding `true` on a delete would make
+	// a stray Enter destructive.
 	m.binding = &formBinding{confirm: true}
 
 	var fields []huh.Field
@@ -194,11 +262,15 @@ func (m *Model) startForm(intent launch.Intent, isShip bool) {
 			Description(strings.Join(intent.Slugs, " + ")).
 			Value(&m.binding.release))
 	}
-	fields = append(fields, huh.NewConfirm().
+	confirm := huh.NewConfirm().
 		Title(m.confirmSummary(intent)).
 		Affirmative("Launch").
 		Negative("Cancel").
-		Value(&m.binding.confirm))
+		Value(&m.binding.confirm)
+	if override != "" {
+		confirm = confirm.Description("FORCING past the source cap - " + override)
+	}
+	fields = append(fields, confirm)
 
 	m.form = huh.NewForm(huh.NewGroup(fields...))
 	m.mode = modeForm
@@ -243,14 +315,17 @@ func (m Model) doLaunch() tea.Cmd {
 		// bare intent). Never launch relative to the process cwd — bounce, launching
 		// nothing (REV-004).
 		return func() tea.Msg {
-			return launchDoneMsg{status: "feature no longer present, nothing launched"}
+			return launchDoneMsg{status: "feature no longer present, nothing launched", level: statusLevelWarn}
 		}
 	}
 	launcher := m.launcher
 	return func() tea.Msg {
 		res, err := launcher(root, intent)
 		if err != nil {
-			return launchDoneMsg{status: "launch failed: " + err.Error()}
+			// FR1.1/FR3.2: err is now a *launch.TmuxError (or a *CommandTooLongError),
+			// so this line carries tmux's OWN words - `command too long`, a duplicate
+			// session name - instead of a bare `exit status 1`, and it renders RED.
+			return launchDoneMsg{status: "launch failed: " + err.Error(), level: statusLevelErr}
 		}
 		if res.Mode == "tmux" {
 			return launchDoneMsg{status: "launched " + res.Command + " → tmux " + res.Session + " (press a to attach)"}
