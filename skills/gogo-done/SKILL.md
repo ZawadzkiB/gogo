@@ -59,7 +59,7 @@ mutates gogo state (D5). Pure `Read` / `Write` / `Bash` (+ `Skill` to reuse the
 | in (optional, per member) | `report/before/*.mmd` + `report/before/manifest.json` | the plan-time "before" set (FR8) → viewer compare mode |
 | in (board mode) | the shared **work-index** (gogo-status Step A classifier, in-memory) | the four-class record shape the board consumes; the orchestrator also uses each card's `class` to route a `view` intent |
 | in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/kanban/board.py` | vendored terminal-TUI cockpit (copied on demand; soft dep) |
-| in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/{mermaid/mermaid.min.js, viewer/*}` | vendored viewer runtime (copied on demand) |
+| in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/vnm/{vnm-browser.js, viewer.js, viewer.css, viewer.template.html}` | vendored very-nice-mermaid renderer + viewer (copied on demand) |
 | in (board mode) | `.gogo/resources/kanban/board-intent.json` — the board's schema-v2 **intent** `{schema:2, action, items}` (legacy `{"ship":[...]}` accepted as `action:ship`) | what the orchestrator reads + routes each loop iteration |
 | out | `.gogo/changelog/<YYYY-MM-DD>-<name>/` — **synthesized** `report.md` + slug-prefixed `*.mmd` + `manifest.json` (with a `members[]` array) + `before/` | append-only archive; **no `diagrams.html` copy** |
 | out | `.gogo/resources/view/<date>-<name>.html` (interactive viewer page, best-effort) | self-contained offline page |
@@ -314,10 +314,15 @@ approval.
    ```bash
    set -euo pipefail
    mkdir -p .gogo/resources/viewer .gogo/resources/view
-   [ -f .gogo/resources/mermaid.min.js ] || \
-     cp "${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js" .gogo/resources/mermaid.min.js
-   cp "${CLAUDE_PLUGIN_ROOT}"/assets/viewer/*.js       .gogo/resources/viewer/ 2>/dev/null || true
-   cp "${CLAUDE_PLUGIN_ROOT}/assets/viewer/viewer.css" .gogo/resources/viewer/viewer.css 2>/dev/null || true
+   [ -f .gogo/resources/vnm-browser.js ] || \
+     cp "${CLAUDE_PLUGIN_ROOT}/assets/vnm/vnm-browser.js" .gogo/resources/vnm-browser.js
+   cp "${CLAUDE_PLUGIN_ROOT}/assets/vnm/viewer.js"  .gogo/resources/viewer/viewer.js  2>/dev/null || true
+   cp "${CLAUDE_PLUGIN_ROOT}/assets/vnm/viewer.css" .gogo/resources/viewer/viewer.css 2>/dev/null || true
+   ```
+   Build the entry's prebuilt models too, so every kind stays interactive:
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/assets/vnm/layout.mjs" \
+     .gogo/changelog/<date>-<name>/layouts.json .gogo/changelog/<date>-<name>/*.mmd || true
    ```
    Then assemble the page from the entry exactly as gogo-view Step 3 does (template
    tokens; the synthesized `report.md` → HTML summary; one `figure.diagram` per prefixed

@@ -9,12 +9,14 @@ description: >-
   the user asks for a diagram inside a gogo feature folder.
 ---
 
-# gogo-mermaid — portable diagrams, no CLI required
+# gogo-mermaid - portable diagrams, rendered by very-nice-mermaid
 
-This skill produces Mermaid diagrams that render **anywhere**, with **no global
-`mmdc`, no Chromium, no network**. Mermaid is vendored inside this plugin
-(`${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js`, a UMD build that works
-over `file://`).
+This skill produces Mermaid diagrams that render **anywhere**, with **no
+Chromium and no network**. Rendering is done by
+[`very-nice-mermaid`](https://www.npmjs.com/package/very-nice-mermaid), whose
+browser build is vendored inside this plugin
+(`${CLAUDE_PLUGIN_ROOT}/assets/vnm/vnm-browser.js`, a classic script that loads
+over `file://`). `mmdc` is **no longer used anywhere in gogo**.
 
 ## What "a diagram" means in gogo — three artifacts
 
@@ -24,51 +26,54 @@ For each diagram, produce all three so it renders in every context:
    This renders natively in GitHub, VS Code, and JetBrains previews — zero deps.
 2. **A standalone `.mmd` file** in the feature's `charts/` folder
    (`.gogo/work/feature-<slug>/charts/<name>.mmd`) holding the same source.
-3. **The offline viewer** `.gogo/work/feature-<slug>/charts/diagrams.html` — a
-   self-contained page that renders every `.mmd` in the folder. Open it in any
-   browser; it needs only the vendored `mermaid.min.js`.
+3. **A prebuilt `charts/layouts.json`** - the parsed + positioned model for every
+   `.mmd` in the folder, which is what lets the offline viewer render **every**
+   kind interactively. Best-effort: see below.
 
-## Generating / refreshing `charts/diagrams.html`
+> **Keep `&lt;` / `&gt;` escaped in the `.mmd` source.** The same DSL ships as a
+> ` ```mermaid ` fence, where GitHub draws labels as HTML - so `A["/gogo:done
+> &lt;slug&gt;"]` is correct at rest. The viewer decodes the entities before
+> rendering, so both surfaces show `<slug>`. Do not "fix" the source.
 
-1. **Ensure the shared runtime exists** (one copy per project, not per feature):
-   if `.gogo/resources/mermaid.min.js` is missing, copy it from
-   `${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js`.
-   ```bash
-   mkdir -p .gogo/resources
-   [ -f .gogo/resources/mermaid.min.js ] || cp "${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js" .gogo/resources/mermaid.min.js
-   ```
-2. **Start from the template** `${CLAUDE_PLUGIN_ROOT}/assets/mermaid/viewer.template.html`
-   and replace the three tokens:
-   - `GOGO_FEATURE_SLUG` → the feature slug.
-   - `GOGO_MERMAID_SRC` → the **relative** path from `charts/` to the shared
-     runtime. Charts live at `.gogo/work/feature-<slug>/charts/`, three levels
-     under `.gogo/`, so this is `../../../resources/mermaid.min.js`.
-   - `<!-- GOGO:DIAGRAMS -->` → one block per `.mmd`, in this exact shape (inline
-     the source — do **not** `fetch()` it; `file://` forbids it):
-     ```html
-     <h2>Plan flow</h2>
-     <div class="diagram"><pre class="mermaid">
-     flowchart TD
-       A[user goal] --> B[plan]
-     </pre></div>
-     ```
-3. Write the result to `.gogo/work/feature-<slug>/charts/diagrams.html`.
+## Generating / refreshing `charts/layouts.json`
 
-> Why a shared `.gogo/resources/` copy: it keeps the runtime out of every feature
-> folder (one ~3 MB file per project) and high enough that other skills (e.g. the
-> viewer) can share it, the path is relative (so the repo stays portable if moved
-> or shared), and it works fully offline.
+Run the vendored layout tool over the folder's `.mmd` set:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/assets/vnm/layout.mjs" charts/layouts.json charts/*.mmd
+```
+
+Exit codes: **0** = layouts written (per-file parse failures are reported on
+stderr and skipped, never fatal); **3** = `very-nice-mermaid` is not installed.
+
+**On exit 3, skip silently and carry on** - the `.mmd` source and the fenced
+block are the durable artifacts, and the viewer still renders flowcharts by
+parsing the inline DSL in-browser. Note the skip in the report rather than
+erroring. To enable the full set, the user installs it once:
+
+```bash
+npm i -g very-nice-mermaid   # optional; Node >= 20
+```
+
+> **Why the layout is prebuilt rather than parsed in the browser.** Routing a
+> `sequence` / `class` / `state` diagram from raw DSL needs mermaid's
+> `detectType`, i.e. a dynamic `import("mermaid")`. A gogo page opens over
+> `file://`, where every module fetch is blocked - so in-browser routing
+> silently degrades those kinds to a garbage flowchart parse. Doing the parse
+> here, in Node, keeps the viewer dependency-free and correct for all five kinds.
+> Flowcharts (the majority) need no prebuild: vnm's own parser handles them
+> in-browser with zero dependencies.
 
 ## Optional SVG/PNG export (graceful, never required)
 
-Only if a renderer is already present — never install one:
+Only if `very-nice-mermaid` is installed - never install it mid-run:
 ```bash
-if command -v mmdc >/dev/null 2>&1; then
-  mmdc -i charts/plan.mmd -o charts/plan.svg -t default -b transparent || true
+if command -v vnm >/dev/null 2>&1; then
+  vnm render charts/flow.mmd -o charts/flow.svg --theme arch-light || true
 fi
 ```
-If `mmdc` is absent, **skip silently** — the `.mmd` source + the offline viewer
-are the durable artifacts. Note the skip in the report rather than erroring.
+`vnm` renders **every** gogo kind to a static SVG (PNG too, via `-o x.png`).
+If it is absent, **skip silently** - as above.
 
 ## What the diagram is about — read this first
 
@@ -151,9 +156,10 @@ change is pure process, draw nothing and note it.
   use-case}` (the `charts-manifest.schema.json` enum). Only draw what carries
   signal — skip trivial diagrams.
   - **The report ⑤ bundle lives in `report/`, not `charts/`.** Write the as-built
-    `.mmd` set as `report/<kind>.mmd` and the viewer as `report/diagrams.html`.
-    `report/` sits at the same depth as `charts/` (three levels under `.gogo/`), so
-    the `GOGO_MERMAID_SRC` path math is **identical**: `../../../resources/mermaid.min.js`.
+    `.mmd` set as `report/<kind>.mmd` and its prebuilt models as
+    `report/layouts.json` (same `layout.mjs` call, pointed at `report/*.mmd`).
+    There is no path math to get right any more: `layouts.json` sits **beside**
+    its `.mmd` set, and `/gogo:view` inlines it into the page it builds.
 
 ## The "before" (as-is) baseline set — `charts/before/` (FR7)
 
@@ -168,11 +174,10 @@ Plan ① captures the UML of the **existing** flow the change will touch — the
   `charts-manifest.schema.json`, `slug` = the feature slug) listing the before set.
   The before-set reuses the schema **unchanged** via this **separate** manifest
   (decision D5) — there is no `role`/`before` field added to the manifest.
-- **`charts/before/diagrams.html`** (optional offline viewer) — built exactly like
-  the main one, **except** `charts/before/` sits **one level deeper** than `charts/`,
-  so `GOGO_MERMAID_SRC` is **`../../../../resources/mermaid.min.js`** — **four** `../`,
-  not three. Get the depth right or the vendored runtime won't resolve from
-  `charts/before/`.
+- **`charts/before/layouts.json`** (best-effort) - built exactly like the main
+  one, just pointed at this folder:
+  `node "${CLAUDE_PLUGIN_ROOT}/assets/vnm/layout.mjs" charts/before/layouts.json charts/before/*.mmd`.
+  It sits beside its own `.mmd` set, so nesting depth is irrelevant.
 
 Report ⑤ later draws the **after** set into `report/`, **copies this before set**
 into the report bundle (`report/before/`) so the archive is self-contained, and adds
@@ -182,6 +187,10 @@ has nothing structural to show (a brand-new area, or a pure-process change), ski
 
 ## Portability contract
 
-- Never depend on a globally-installed mermaid skill or CLI.
-- The fenced block is the minimum viable output; the `.mmd` + viewer are
-  enhancements. If anything optional fails, the markdown still renders.
+- The **renderer is vendored**, never fetched: the viewer loads
+  `assets/vnm/vnm-browser.js` from disk, over `file://`, with no network.
+- `very-nice-mermaid` on `PATH` (for `layouts.json` and SVG/PNG export) is
+  **optional** - detect at use, degrade silently, never install it mid-run.
+- The fenced block is the minimum viable output; the `.mmd`, `layouts.json` and
+  any `.svg` are enhancements. If every optional step fails, the markdown still
+  renders and flowcharts still work in the viewer.

@@ -141,16 +141,17 @@ gogo/
 │   │                         #   Claude-launching moves. `cd cli && go build -o gogo .`
 │   ├── main.go + status/view/events   #   root board + non-interactive subcommands
 │   ├── internal/contract/    #   parse state.md/manifests/issues/events + the classifier
-│   ├── internal/pages/       #   goldmark `w` page builder (+ go:embed of assets/viewer +
-│   │                         #   mermaid.min.js; re-sync via `make sync-assets`)
+│   ├── internal/pages/       #   goldmark `w` page builder (+ go:embed of assets/vnm/*;
+│   │                         #   re-sync via `make sync-assets`)
 │   ├── internal/tui/         #   bubbletea board · drill-in · glamour/huh
 │   ├── internal/{launch,diagram,textfmt}/  # tmux/claude spawn · mmd→ASCII · shared formatters
 │   └── go.mod / go.sum       #   pinned deps (binary is gitignored, built from source)
 ├── assets/
-│   ├── mermaid/              #   vendored mermaid.min.js + viewer.template.html
-│   ├── viewer/               #   the interactive viewer (modular, vanilla, no build):
-│   │   │                     #   geometry.js · viewport.js · mermaid-parse.js ·
-│   │   │                     #   render.js · interactive.js · viewer.css · viewer.template.html
+│   ├── vnm/                  #   diagrams, powered by very-nice-mermaid (no build):
+│   │   │                     #   vnm-browser.js (GENERATED vendored renderer) ·
+│   │   │                     #   build-bundle.mjs (regenerates it) · layout.mjs
+│   │   │                     #   (.mmd → layouts.json) · viewer.js · viewer.css ·
+│   │   │                     #   viewer.template.html
 │   │   │                     #   (also go:embed-copied into cli/internal/pages/assets/)
 │   └── kanban/              #   board.py — vendored python3 curses TUI for the /gogo:done work board (soft dep; --selftest headless)
 ├── .mcp.json                 # Playwright MCP (optional; UI testing)
@@ -168,7 +169,7 @@ your-project/
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
-│   ├── resources/            # vendored mermaid.min.js (shared by all features) + viewer/ module set + view/ built pages + kanban/ (work board scratch: board.py, work-index.json, board-intent.json, board-exit.code)  [gogo-mermaid, /gogo:view, /gogo:done write]
+│   ├── resources/            # vendored vnm-browser.js (shared by all features) + viewer/ (viewer.js+css) + view/ built pages + kanban/ (work board scratch: board.py, work-index.json, board-intent.json, board-exit.code)  [gogo-mermaid, /gogo:view, /gogo:done write]
 │   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<name>/ (SYNTHESIZED report.md + slug-prefixed .mmd + manifest.json{members[]} + before/; single or merged; no diagrams.html)  [/gogo:done writes]
 │   └── work/
 │       └── feature-<slug>/   # one folder per piece of work:

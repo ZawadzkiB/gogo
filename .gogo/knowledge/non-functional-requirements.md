@@ -12,9 +12,9 @@ Generated-by: /gogo:build
 
 ## Portability
 - The **core plan→implement→review→test loop needs zero external dependencies.**
-- **Mermaid is vendored** and renders offline over `file://` (no `mmdc`, no
-  Chromium, no network).
-- Anything else (Playwright MCP, `mmdc`, `jq`, ntfy, and — since 0.7.0 — `python3`
+- **The renderer is vendored** - `very-nice-mermaid`'s browser build renders
+  offline over `file://` (no `mmdc`, no Chromium, no network).
+- Anything else (Playwright MCP, `very-nice-mermaid`, `jq`, ntfy, and - since 0.7.0 - `python3`
   + `tmux` for the `/gogo:done` work board) is **optional** and must be detected at
   use; absence → graceful fallback, never a failure. The interactive terminal TUI
   (`board.py`) degrades to the status table + `AskUserQuestion` multi-select.
@@ -34,10 +34,10 @@ Generated-by: /gogo:build
   propagated. (Drives the pipeline-contracts work.)
 
 ## Footprint
-- One vendored mermaid runtime per project at `.gogo/resources/mermaid.min.js`
-  (shared by all features), not per feature.
+- One vendored renderer per project at `.gogo/resources/vnm-browser.js`
+  (~450 KB, shared by all features), not per feature.
 - Keep the published plugin lean; no build artifacts committed except the
-  intentional vendored `mermaid.min.js` (and authored source like `board.py`).
+  intentional vendored `vnm-browser.js` (and authored source like `board.py`).
 - **Vendored Python must never ship compiled bytecode** — `__pycache__/` and
   `*.pyc` are gitignored so a vendored tool (e.g. `assets/kanban/board.py`) never
   drags platform-specific bytecode into the bundle.
@@ -46,12 +46,12 @@ Generated-by: /gogo:build
   `manifest.json` (+ `before/`) — never a full-report copy and never a
   `diagrams.html` duplicate. The full audit trail stays in `.gogo/work/` (linked);
   the interactive page is built from source by `/gogo:view`.
-- **Second sanctioned vendored mermaid copy (since 0.10.0, REV-012 accepted):**
-  `cli/internal/pages/assets/mermaid.min.js` duplicates
-  `assets/mermaid/mermaid.min.js` (~3.3 MB) because `go:embed` requires the file
-  inside the module — the price of a standalone `go install`-able binary. Kept
-  byte-identical via `make sync-assets` (the `assets/` copy is the source of
-  truth). Exactly these two copies; never a third.
+- **Second sanctioned vendored renderer copy (since 0.10.0, REV-012 accepted):**
+  `cli/internal/pages/assets/vnm-browser.js` duplicates `assets/vnm/vnm-browser.js`
+  (~450 KB) because `go:embed` requires the file inside the module - the price of
+  a standalone `go install`-able binary. Kept byte-identical via
+  `make sync-assets` (the `assets/` copy is the source of truth). Exactly these
+  two copies; never a third.
 
 ## Performance (since 0.10.0 — the CLI bar)
 - **The read path is deterministic and LLM-free.** Managing/viewing existing work

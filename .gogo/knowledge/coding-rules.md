@@ -32,14 +32,14 @@ Generated-by: /gogo:build
   surface a suggestion to the user instead.
 - **Never implement an unaccepted plan.** Acceptance is the gate before code.
 - **Portability contract.** The core plan→implement→review→test loop must work
-  with **no external dependencies**. Anything optional (`mmdc`, Playwright, `jq`,
+  with **no external dependencies**. Anything optional (`very-nice-mermaid`, Playwright, `jq`,
   ntfy) must degrade gracefully and never hard-fail.
 - **`${CLAUDE_PLUGIN_ROOT}`** for all in-plugin asset/template paths — never
   hard-code absolute paths.
 
 ## Vendored executable assets (since 0.7.0)
 - An **authored** vendored executable (e.g. `assets/kanban/board.py`, distinct from
-  the third-party `mermaid.min.js` snapshot) must be **pure standard library** (no
+  the third-party `vnm-browser.js` snapshot) must be **pure standard library** (no
   pip/network), **pure ASCII**, ship a **`--selftest`**, and expose a **documented
   exit-code contract** the calling skill branches on. It stays a **soft dep**
   (detected at use; graceful fallback) and **never commits compiled bytecode**

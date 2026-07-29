@@ -103,9 +103,9 @@ emits neither.
    Update the plan's diagrams where they still hold; add the as-built ones. Name
    files per kind under `report/` (`flow.mmd` / `sequence.mmd` / `activity.mmd` /
    `class.mmd` / `use-case.mmd`); the manifest `kind` must be one of
-   `{flow, sequence, class, activity, use-case}`. The `report/diagrams.html` viewer
-   loads the shared runtime at `../../../resources/mermaid.min.js` (`report/` is the
-   same depth as `charts/`). **Write `report/manifest.json`** so its `diagrams[]`
+   `{flow, sequence, class, activity, use-case}`. Also refresh the bundle's prebuilt
+   models - `node "${CLAUDE_PLUGIN_ROOT}/assets/vnm/layout.mjs" report/layouts.json report/*.mmd`
+   (exit 3 = `very-nice-mermaid` absent → skip, see gogo-mermaid). **Write `report/manifest.json`** so its `diagrams[]`
    (kind/file/title) match the `.mmd` set on disk (empty `diagrams` + a `note` if you
    drew nothing).
 

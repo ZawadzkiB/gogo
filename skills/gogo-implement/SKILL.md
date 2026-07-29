@@ -119,8 +119,8 @@ back to the orchestrator → review.
 ## Degradation
 
 If `git` is unavailable, track touched files via the plan's Changes checklist so
-the review phase still has a scope to work from. If `mmdc` is absent, the `.mmd`
-sources + the offline viewer are still the durable charts (never install a
-renderer). Contract validation degrades per `gogo-contracts` — when no
+the review phase still has a scope to work from. If `very-nice-mermaid` is
+absent, the `.mmd` sources + the offline viewer are still the durable charts
+(never install a renderer mid-run). Contract validation degrades per `gogo-contracts` - when no
 `jq`/schema validator is present, the agent checks the document against the schema
 directly (the semantic checks always run).

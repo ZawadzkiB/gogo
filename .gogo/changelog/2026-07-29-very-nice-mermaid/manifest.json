@@ -1,0 +1,4 @@
+{ "schema": 2, "name": "very-nice-mermaid", "release": "0.27.0", "date": "2026-07-29",
+  "members": [ { "slug": "very-nice-mermaid", "title": "diagrams rendered by very-nice-mermaid: mmdc and the 3.3 MB vendored mermaid runtime dropped, every kind interactive offline", "version": "0.27.0" } ],
+  "diagrams": [ { "kind": "flow", "file": "very-nice-mermaid-flow.mmd", "title": "very-nice-mermaid: layout prebuilt in Node, mounted in-browser; three-tier fallback + real parse errors" } ],
+  "before": [ { "kind": "flow", "file": "before/very-nice-mermaid-flow.mmd", "title": "very-nice-mermaid: before - mmdc export plus a hand-rolled renderer re-parsing mermaid's SVG" } ] }

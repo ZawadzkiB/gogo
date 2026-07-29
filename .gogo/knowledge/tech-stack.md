@@ -14,9 +14,12 @@ Generated-by: /gogo:build
   (`agents/*.md`), templates (`templates/**`). This is where ~all the logic lives.
 - **Bash** — hooks (`hooks/*.sh`): `config-check.sh`, `notify.sh`. POSIX-ish,
   `set -euo pipefail`, best-effort (never hard-fail the session).
-- **JavaScript (vendored, not authored)** — `assets/mermaid/mermaid.min.js` (UMD
-  build, works over `file://`). Do not edit; it's a dependency snapshot. The
-  `/gogo:view` renderer modules (`assets/viewer/*.js`) ARE authored.
+- **JavaScript (vendored, not authored)** - `assets/vnm/vnm-browser.js`, the
+  [very-nice-mermaid](https://www.npmjs.com/package/very-nice-mermaid) browser
+  build (classic script, works over `file://`). **Generated - do not edit**;
+  regenerate with `node assets/vnm/build-bundle.mjs`. The gogo orchestrator
+  (`assets/vnm/viewer.js`) and the layout tool (`assets/vnm/layout.mjs`) ARE
+  authored.
 - **Python (vendored, authored) — since 0.7.0** — `assets/kanban/board.py`, the
   `/gogo:done` work-board curses TUI. **Pure stdlib** (no pip), pure ASCII, ships a
   `--selftest`; a soft dep (see below).
@@ -27,7 +30,7 @@ Generated-by: /gogo:build
   parses the `.gogo/` contract files (spec: `docs/cli-contract.md`) — no LLM in
   the read path. Pinned deps: the Charm stack (**bubbletea**, **bubbles**,
   **lipgloss**, **glamour**, **huh**) + **goldmark** (md→HTML) + **fsnotify**
-  (live refresh). Viewer assets + `mermaid.min.js` are `go:embed`ded
+  (live refresh). Viewer assets + `vnm-browser.js` are `go:embed`ded
   (`cli/internal/pages/assets/`, synced from `assets/` via `make sync-assets`).
 
 ## "Build"
@@ -57,7 +60,11 @@ uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 `testing-tools.md` / `test-strategy.md`.
 
 ## Optional tooling (graceful — never required)
-- `mmdc` (mermaid CLI) — only used for SVG/PNG export if already present.
+- `very-nice-mermaid` (`vnm`, Node >= 20) - prebuilds `layouts.json` so the
+  viewer can render sequence/class/state interactively, and exports SVG/PNG.
+  Absent → flowcharts still render (parsed in-browser); other kinds show an
+  inline error. Install with `npm i -g very-nice-mermaid`. **`mmdc` is no longer
+  used anywhere in gogo.**
 - `jq` — handy for validating/reading JSON artifacts when present.
 - Node.js — only for the Playwright MCP.
 - `python3` + `tmux` (since 0.7.0) — soft deps for the `/gogo:done` interactive

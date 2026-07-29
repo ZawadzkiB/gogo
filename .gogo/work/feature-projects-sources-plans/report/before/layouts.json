@@ -1,0 +1,1 @@
+{"class":{"_error":"Parse error on line 25:\n...+Member[] members  \"{repo, slugHint}\"  \n-----------------------^\nExpecting 'STRUCT_STOP', 'MEMBER', got 'OPEN_IN_STRUCT'"}}

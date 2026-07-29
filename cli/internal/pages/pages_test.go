@@ -33,9 +33,9 @@ func TestBuildHTMLStructure(t *testing.T) {
 	// No unreplaced template placeholders. (window.GOGO_LAYOUT is a legit JS
 	// variable in the template, not a placeholder — so we check the exact set.)
 	for _, tok := range []string{
-		"GOGO_VIEW_TITLE", "GOGO_VIEW_SUMMARY", "GOGO_VIEW_DIAGRAMS", "GOGO_VIEW_LAYOUT",
-		"GOGO_MERMAID_SRC", "GOGO_GEOMETRY_SRC", "GOGO_VIEWPORT_SRC",
-		"GOGO_MERMAID_PARSE_SRC", "GOGO_RENDER_SRC", "GOGO_VIEWER_SRC", "GOGO_VIEWER_CSS",
+		"GOGO_VIEW_TITLE", "GOGO_VIEW_SUMMARY", "GOGO_VIEW_DIAGRAMS",
+		"GOGO_VIEW_LAYOUTS", "GOGO_VIEW_LAYOUT",
+		"GOGO_VNM_SRC", "GOGO_VIEWER_SRC", "GOGO_VIEWER_CSS",
 	} {
 		if strings.Contains(html, tok) {
 			t.Errorf("unreplaced placeholder: %q", tok)
@@ -140,8 +140,8 @@ func TestWritePageAndResources(t *testing.T) {
 	}
 	// Resources materialised for offline file:// use.
 	for _, rel := range []string{
-		filepath.Join(".gogo", "resources", "mermaid.min.js"),
-		filepath.Join(".gogo", "resources", "viewer", "interactive.js"),
+		filepath.Join(".gogo", "resources", "vnm-browser.js"),
+		filepath.Join(".gogo", "resources", "viewer", "viewer.js"),
 		filepath.Join(".gogo", "resources", "viewer", "viewer.css"),
 	} {
 		if !fileExistsTest(filepath.Join(root, rel)) {

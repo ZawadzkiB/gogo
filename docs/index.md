@@ -105,7 +105,8 @@ phase mechanics: [Flow](flow.md).
 ## Portability
 
 The core **plan -> implement -> review -> test** loop needs **no external
-dependencies**. Mermaid is vendored for the offline diagram viewer; the
-Playwright MCP (UI testing), `mmdc`, and `jq` are all optional and degrade
+dependencies**. The very-nice-mermaid renderer is vendored for the offline
+diagram viewer; the Playwright MCP (UI testing), `very-nice-mermaid` (prebuilt
+layouts + SVG/PNG export), and `jq` are all optional and degrade
 gracefully. See the [README](https://github.com/ZawadzkiB/gogo) for the full
 prerequisites list.

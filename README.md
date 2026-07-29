@@ -552,9 +552,9 @@ classifies as **standalone** (a reusable, self-contained capability) instead lan
 in **`.claude/skills/<slug>/`** so Claude Code auto-discovers it - written only
 when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
-**`.gogo/resources/`** - one vendored mermaid runtime per project
-(`mermaid.min.js`, shared by every feature) plus the interactive viewer module set
-(`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`), and
+**`.gogo/resources/`** - one vendored renderer per project
+(`vnm-browser.js`, the very-nice-mermaid browser build, shared by every feature)
+plus the viewer (`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`), and
 `kanban/` (the `/gogo:done` work-board scratch - the vendored `board.py`, the
 work-index, and the board-intent). Offline, no network, no build.
 
@@ -602,7 +602,10 @@ gogo is built to run anywhere it's installed:
   dependencies**.
 - **Mermaid** diagrams render natively in GitHub / VS Code / JetBrains from
   fenced ` ```mermaid ` blocks; the bundled offline viewer needs only a browser
-  (mermaid is vendored - no network, no CLI).
+  ([very-nice-mermaid](https://www.npmjs.com/package/very-nice-mermaid) is
+  vendored - no network, no CLI). Installing `very-nice-mermaid` (`npm i -g
+  very-nice-mermaid`) is optional: it prebuilds the layouts that make
+  sequence/class/state diagrams interactive too, and exports SVG/PNG.
 - **Browser / UI testing** uses the bundled **Playwright MCP**, which boots via
   `npx` on first use (needs **Node.js**). Without it, the test phase falls back to
   API/CLI tests plus written manual steps.

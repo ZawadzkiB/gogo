@@ -1,0 +1,20 @@
+flowchart TD
+  mmd["charts/*.mmd"] --> fence["```mermaid fence<br/>(GitHub renders)"]
+  mmd --> tool{"very-nice-mermaid installed?"}
+  tool -- yes --> layoutjs["assets/vnm/layout.mjs<br/>parse + dagre layout in Node"]
+  tool -- no --> skip["exit 3: skip, carry on"]
+  layoutjs --> layouts["layouts.json<br/>serializeModel per diagram"]
+  layoutjs -. on parse failure .-> err["{_error: parse msg + caret}"]
+
+  mmd --> page["gogo-view / cli pages builds page"]
+  layouts --> page
+  err --> page
+  page --> vnm["vnm-browser.js (447 KB, vendored)"]
+  vnm --> mount{"viewer.js: pick a tier"}
+  mount -- "layout present" --> interactive["mount(): drag · zoom · minimap<br/>SVG-PNG export - ALL five kinds"]
+  mount -- "flowchart DSL only" --> inline["parse inline DSL in-browser<br/>(zero deps)"]
+  mount -- "static svg" --> svg["inline SVG as-is"]
+  mount -- "_error" --> shown["inline .err: the real parse error"]
+
+  classDef new fill:#e6f5e6,stroke:#86b886,color:#111
+  class layoutjs,layouts,vnm,interactive new

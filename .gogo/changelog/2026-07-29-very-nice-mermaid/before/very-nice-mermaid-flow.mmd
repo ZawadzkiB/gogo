@@ -1,0 +1,16 @@
+flowchart TD
+  mmd["charts/*.mmd"] --> fence["```mermaid fence<br/>(GitHub renders)"]
+  mmd --> mmdc{"mmdc on PATH?"}
+  mmdc -- yes --> svg["*.svg export"]
+  mmdc -- no --> skip["skip silently"]
+
+  mmd --> page["gogo-view builds page"]
+  page --> vendored["mermaid.min.js (3.3 MB)"]
+  vendored --> layout["mermaid lays out to SVG"]
+  layout --> parse["mermaid-parse.js<br/>re-parses that SVG into {nodes,edges}"]
+  parse --> rich{"flowchart family?"}
+  rich -- yes --> cards["render.js: draggable cards<br/>+ owned edge layer + minimap"]
+  rich -- no --> pan["viewport.js: plain pan/zoom canvas<br/>(sequence / class / state)"]
+
+  classDef gone fill:#ffe0e6,stroke:#d98aa0,color:#111
+  class vendored,parse,pan,mmdc gone

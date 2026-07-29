@@ -7,6 +7,7 @@ package pages
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -46,16 +47,51 @@ func BuildHTML(b Bundle) (string, error) {
 		"GOGO_VIEW_TITLE", escapeText(b.Title),
 		"GOGO_VIEW_SUMMARY", summary,
 		"GOGO_VIEW_DIAGRAMS", diagrams,
+		"GOGO_VIEW_LAYOUTS", readLayouts(b.DiagramDir, b.BeforeDir),
 		"GOGO_VIEW_LAYOUT", "{}",
-		"GOGO_MERMAID_SRC", "../mermaid.min.js",
-		"GOGO_GEOMETRY_SRC", "../viewer/geometry.js",
-		"GOGO_VIEWPORT_SRC", "../viewer/viewport.js",
-		"GOGO_MERMAID_PARSE_SRC", "../viewer/mermaid-parse.js",
-		"GOGO_RENDER_SRC", "../viewer/render.js",
-		"GOGO_VIEWER_SRC", "../viewer/interactive.js",
+		"GOGO_VNM_SRC", "../vnm-browser.js",
+		"GOGO_VIEWER_SRC", "../viewer/viewer.js",
 		"GOGO_VIEWER_CSS", "../viewer/viewer.css",
 	)
 	return r.Replace(string(tmpl)), nil
+}
+
+// readLayouts inlines the bundle's prebuilt layouts.json - the parsed+positioned
+// models gogo-mermaid writes beside the .mmd set. They are what let the viewer
+// render sequence/class/state at all: routing those from raw DSL needs mermaid's
+// detectType (a dynamic import file:// blocks), so without a layout they would
+// degrade to a garbage flowchart parse. Flowcharts need no entry - the viewer
+// parses their DSL in-browser. A before/ set is merged under `before-<stem>`
+// keys to match the compare-mode data-diagram attributes. Missing or unreadable
+// layouts are not an error: "{}" simply means "no prebuilt models".
+func readLayouts(afterDir, beforeDir string) string {
+	merged := map[string]json.RawMessage{}
+	load := func(dir, prefix string) {
+		if dir == "" {
+			return
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, "layouts.json"))
+		if err != nil {
+			return
+		}
+		var m map[string]json.RawMessage
+		if json.Unmarshal(raw, &m) != nil {
+			return
+		}
+		for k, v := range m {
+			merged[prefix+k] = v
+		}
+	}
+	load(afterDir, "")
+	load(beforeDir, "before-")
+	if len(merged) == 0 {
+		return "{}"
+	}
+	out, err := json.Marshal(merged)
+	if err != nil {
+		return "{}"
+	}
+	return string(out)
 }
 
 // WritePage ensures the shared resources exist under <root>/.gogo/resources/
@@ -80,9 +116,9 @@ func WritePage(root string, b Bundle) (string, error) {
 	return filepath.Abs(page)
 }
 
-// ensureResources writes the vendored viewer JS/CSS every run (small, so
-// updates propagate) and mermaid.min.js only if missing (large). Same policy
-// as the skill.
+// ensureResources writes the gogo viewer JS/CSS every run (small, so updates
+// propagate) and the vendored very-nice-mermaid bundle only if missing (~450
+// KB). Same policy as the skill.
 func ensureResources(root string) error {
 	res := filepath.Join(root, ".gogo", "resources")
 	viewer := filepath.Join(res, "viewer")
@@ -100,8 +136,8 @@ func ensureResources(root string) error {
 			return err
 		}
 		switch {
-		case name == "mermaid.min.js":
-			dst := filepath.Join(res, "mermaid.min.js")
+		case name == "vnm-browser.js":
+			dst := filepath.Join(res, "vnm-browser.js")
 			if _, err := os.Stat(dst); os.IsNotExist(err) {
 				if err := os.WriteFile(dst, data, 0o644); err != nil {
 					return err

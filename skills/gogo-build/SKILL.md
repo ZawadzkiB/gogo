@@ -42,10 +42,13 @@ runtime moved up one level to `.gogo/resources/` (so other skills can share it).
 2. **Vendored runtime.** If a legacy `.gogo/plans/.assets/` (or, after step 1,
    `.gogo/work/.assets/`) exists and `.gogo/resources/` does not, move it to
    `.gogo/resources/`.
-3. **Viewer paths.** In every moved `charts/diagrams.html`, rewrite the
-   `<script src>` from the old `../../.assets/mermaid.min.js` to the new
+3. **Viewer paths (legacy only).** In every moved `charts/diagrams.html`, rewrite
+   the `<script src>` from the old `../../.assets/mermaid.min.js` to
    `../../../resources/mermaid.min.js` — charts now sit one level deeper
-   (`.gogo/work/feature-<slug>/charts/`, three levels under `.gogo/`).
+   (`.gogo/work/feature-<slug>/charts/`, three levels under `.gogo/`). This only
+   repairs **pre-existing** pages from the mermaid era; gogo no longer generates
+   `diagrams.html` or ships `mermaid.min.js` - `/gogo:view` builds the current
+   viewer from `assets/vnm/`.
 4. **Log** exactly what moved — both in the Step 7 report and in `_discovered.md`.
 
 ```bash

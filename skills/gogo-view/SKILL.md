@@ -4,29 +4,29 @@ user-invocable: false
 description: >-
   Build and open a self-contained, offline interactive webpage for a gogo plan or
   report — the plan.md / report.md summary pre-rendered to readable HTML plus its
-  mermaid diagrams made interactive: flowchart-family kinds get an xplan-style rich
-  renderer (draggable, token-styled node cards with a live-re-routing edge layer +
-  minimap), other kinds fall back to a pan / zoom / drag canvas (vendored runtime,
-  no network, no build). A bundle that carries a before/ set renders before | after
-  side by side (compare mode). Use when the user runs /gogo:view or asks to view /
-  browse a plan, a changelog entry, or a feature's report. Enumerates both plans and
-  reports grouped Work (each feature's plan + report) / Changelog (shipped reports),
-  lets the user pick, builds the page under .gogo/resources/view/, and opens it.
+  mermaid diagrams made interactive by the vendored very-nice-mermaid renderer:
+  every kind (flow, use-case, sequence, class, activity) gets draggable nodes,
+  live-re-routing edges, a minimap, fit / zoom / reset and SVG-PNG export, plus a
+  ⛶ expand-to-modal control (vendored runtime, no network, no build). A bundle
+  that carries a before/ set renders before | after side by side (compare mode).
+  Use when the user runs /gogo:view or asks to view / browse a plan, a changelog
+  entry, or a feature's report. Enumerates both plans and reports grouped Work
+  (each feature's plan + report) / Changelog (shipped reports), lets the user
+  pick, builds the page under .gogo/resources/view/, and opens it.
 ---
 
 # gogo-view — interactive viewer for gogo plans & reports (FR8 / FR9 / FR10)
 
 Turns a plan or report bundle (`plan.md` / `report.md` + its `.mmd` diagrams) into
-one self-contained HTML page: the summary rendered as a clean centered article, and each diagram made
-interactive. **Flowchart-family** diagrams (`flow` + `use-case`) get an
-**xplan-style rich renderer** — mermaid lays them out, the viewer parses that SVG
-into a `{nodes,edges}` model and owns interaction: token-styled node **cards you
-can drag**, an **owned edge layer** that re-routes live, a **minimap**, and
-per-diagram fit / zoom / reset-layout controls (dragged positions auto-persist to
-`localStorage`, plus an **export** control that downloads the portable
-`<name>.layout.json` sidecar; D7=A). **Other kinds** (`sequence` / `class` /
-`stateDiagram`) fall back to the **pan / zoom / drag canvas**. Renders mermaid
-client-side from the **vendored** `.gogo/resources/mermaid.min.js` — opens over
+one self-contained HTML page: the summary rendered as a clean centered article,
+and each diagram made interactive by the vendored
+[**very-nice-mermaid**](https://www.npmjs.com/package/very-nice-mermaid) renderer
+(`.gogo/resources/vnm-browser.js`). **Every** gogo kind - `flow`, `use-case`,
+`sequence`, `class`, `activity` - gets the same first-class treatment: node
+**cards you can drag**, an edge layer that **re-routes live**, a **minimap**,
+per-diagram fit / zoom / reset, **SVG / PNG export**, and gogo's **⛶
+expand-to-modal**. Dragged positions auto-persist to `localStorage` per diagram
+(D7=A) and can be exported as a portable `<name>.layout.json` sidecar. Opens over
 `file://` with **no network, no build, no runtime deps**. Pure
 Glob / Grep / Read / Write / Bash; only ever writes under `.gogo/`.
 
@@ -43,10 +43,11 @@ path every phase reads). Reports still live in `report/`.
 | in (one required) | a chosen `report.md` (+ its sibling `*.mmd`) | the report bundle |
 | in (one required) | a feature's `plan.md` (+ its `charts/*.mmd`) | the plan bundle (D1=A, in place) |
 | in (optional) | a `before/` set beside the report (`report/before/*.mmd`, FR8) or a plan's `charts/before/*.mmd` | triggers compare mode (FR9) |
-| in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/viewer/{viewer.template.html,viewer.css}` + all `assets/viewer/*.js` | vendored renderer (modular) |
-| in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js` | vendored mermaid |
+| in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/vnm/{viewer.template.html,viewer.js,viewer.css}` | the gogo page + orchestrator |
+| in (assets) | `${CLAUDE_PLUGIN_ROOT}/assets/vnm/vnm-browser.js` | vendored very-nice-mermaid renderer |
+| in (optional) | the bundle's `layouts.json` (`charts/` for a plan, `report/` for a report) | prebuilt models - required for sequence/class/state |
 | in (optional) | `.gogo/resources/view/<name>.layout.json` | saved node positions (sidecar, D6) |
-| out | `.gogo/resources/{mermaid.min.js, viewer/*.js, viewer/viewer.css}` | shared, idempotent copies |
+| out | `.gogo/resources/{vnm-browser.js, viewer/viewer.js, viewer/viewer.css}` | shared, idempotent copies |
 | out | `.gogo/resources/view/<date-or-slug>.html` (report) or `<slug>-plan.html` (plan) | the self-contained page |
 
 ## ① validate-in (gate)
@@ -108,23 +109,22 @@ for a report.
 
 ### 2. Ensure shared resources (idempotent)
 
-Copy the vendored runtime + renderer into `.gogo/resources/` only if missing
-(re-runs are no-ops). The viewer is now **modular** — copy every
-`assets/viewer/*.js` (they load as ordered plain `<script>` tags, no bundler).
+Copy the vendored renderer into `.gogo/resources/` (re-runs are no-ops).
 Use `${CLAUDE_PLUGIN_ROOT}` — never hard-code plugin paths:
 ```bash
 set -euo pipefail
 mkdir -p .gogo/resources/viewer .gogo/resources/view
-[ -f .gogo/resources/mermaid.min.js ] || \
-  cp "${CLAUDE_PLUGIN_ROOT}/assets/mermaid/mermaid.min.js" .gogo/resources/mermaid.min.js
-cp "${CLAUDE_PLUGIN_ROOT}"/assets/viewer/*.js  .gogo/resources/viewer/
-cp "${CLAUDE_PLUGIN_ROOT}/assets/viewer/viewer.css" .gogo/resources/viewer/viewer.css
+[ -f .gogo/resources/vnm-browser.js ] || \
+  cp "${CLAUDE_PLUGIN_ROOT}/assets/vnm/vnm-browser.js" .gogo/resources/vnm-browser.js
+cp "${CLAUDE_PLUGIN_ROOT}/assets/vnm/viewer.js"  .gogo/resources/viewer/viewer.js
+cp "${CLAUDE_PLUGIN_ROOT}/assets/vnm/viewer.css" .gogo/resources/viewer/viewer.css
 ```
-(The viewer JS/CSS are small — copy them every run so updates propagate; mermaid is
-large, so copy it once.) The modules are: `geometry.js` (pure edge/anchor math),
-`viewport.js` (pan/zoom/fit/drag controller), `mermaid-parse.js` (rendered SVG →
-`{nodes,edges}` model), `render.js` (rich node-card + owned-edge renderer +
-minimap), and `interactive.js` (the orchestrator + fallback).
+(The viewer JS/CSS are small - copy them every run so updates propagate;
+`vnm-browser.js` is ~450 KB, so copy it once.) Two files, not six:
+`vnm-browser.js` is the vendored **very-nice-mermaid** build (parser, dagre
+layout, and interactive renderer for every diagram kind), and `viewer.js` is the
+thin gogo orchestrator that mounts each figure and owns the expand-to-modal
+control. gogo no longer ships a renderer of its own.
 
 ### 3. Build the page (D7 — pre-render, no JS markdown lib)
 
@@ -136,11 +136,11 @@ minimap), and `interactive.js` (the orchestrator + fallback).
 | report | the chosen `report.md` | the `*.mmd` beside it (or legacy `charts/*.mmd`) | `<date-or-slug>.html` |
 | plan (D1=A, in place) | the feature's `plan.md` (at the feature root — **never moved**) | the feature's `charts/*.mmd` (+ `charts/before/*.mmd`) | `<slug>-plan.html` |
 
-A plan bundle reuses the **exact same renderer** as a report (rich flowchart-family
-cards + pan/zoom fallback, compare mode, layout sidecar) — it is only a different
-markdown + diagram source rendered into the same template.
+A plan bundle reuses the **exact same renderer** as a report (interactive cards
+for every kind, compare mode, layout sidecar) - it is only a different markdown +
+diagram source rendered into the same template.
 
-Start from `${CLAUDE_PLUGIN_ROOT}/assets/viewer/viewer.template.html` and replace
+Start from `${CLAUDE_PLUGIN_ROOT}/assets/vnm/viewer.template.html` and replace
 its tokens:
 
 | Token | Value |
@@ -148,29 +148,49 @@ its tokens:
 | `GOGO_VIEW_TITLE` | a clean plain-text tab title — `gogo — <name>` for a report, `gogo — <slug> (plan)` for a plan; strip markdown (no backticks/`#`/`**`), don't duplicate "report" |
 | `GOGO_VIEW_SUMMARY` | the source markdown **converted to HTML by you** — `report.md` for a report, the feature's `plan.md` for a plan (see below) |
 | `GOGO_VIEW_DIAGRAMS` | one `<figure>` per diagram (see below) |
+| `GOGO_VIEW_LAYOUTS` | the bundle's prebuilt `layouts.json` inlined verbatim (see below); use `{}` when there is none |
 | `GOGO_VIEW_LAYOUT` | saved node positions as an inline JSON object (see "Layout sidecar" below); use `{}` when there is none |
-| `GOGO_MERMAID_SRC` | `../mermaid.min.js` |
-| `GOGO_GEOMETRY_SRC` | `../viewer/geometry.js` |
-| `GOGO_VIEWPORT_SRC` | `../viewer/viewport.js` |
-| `GOGO_MERMAID_PARSE_SRC` | `../viewer/mermaid-parse.js` |
-| `GOGO_RENDER_SRC` | `../viewer/render.js` |
-| `GOGO_VIEWER_SRC` | `../viewer/interactive.js` |
+| `GOGO_VNM_SRC` | `../vnm-browser.js` |
+| `GOGO_VIEWER_SRC` | `../viewer/viewer.js` |
 | `GOGO_VIEWER_CSS` | `../viewer/viewer.css` |
 
-The six script tags load in this order — **mermaid, geometry, viewport,
-mermaid-parse, render, interactive** — as plain `<script src>` (never
-`type=module`): `file://` blocks ES-module loading and `fetch()`, so each module
-attaches to the shared `window.gogoViewer` namespace instead of importing.
+The two script tags load in this order - **vnm-browser, viewer** - as plain
+`<script src>` at the **end of `<body>`** (never `type=module`): `file://` blocks
+ES-module loading and `fetch()`, so the bundle attaches to `window.vnm` instead
+of exporting.
 
-**Rich vs fallback rendering (what the viewer does at runtime).** For each
-diagram the orchestrator lets mermaid lay it out to SVG, then `mermaid-parse.js`
-tries to read a `{nodes,edges}` model from it. **Flowchart-family** diagrams
-(`flowchart` / `graph` — gogo `flow` + `use-case`) parse successfully and get the
-**rich renderer**: token-styled node cards you can drag, an owned edge layer that
-re-routes live, a minimap, and fit/zoom/reset-layout. **Other kinds**
-(`sequence` / `class` / `stateDiagram`) return `null` and **fall back** to the
-0.5.0 pan/zoom/drag canvas — no regression, never a blank page. A missing mermaid
-runtime still degrades to an inline error per diagram with the summary readable.
+**`GOGO_VIEW_LAYOUTS` - the prebuilt models.** Read the bundle's `layouts.json`
+(written by gogo-mermaid beside the `.mmd` set: `charts/layouts.json` for a plan,
+`report/layouts.json` for a report) and inline it verbatim. If it is missing,
+first try to build it:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/assets/vnm/layout.mjs" <bundle>/layouts.json <bundle>/*.mmd
+```
+
+Exit **3** means `very-nice-mermaid` isn't installed - use `{}` and carry on (see
+degradation). In **compare mode** merge the before set under `before-<stem>` keys
+so they match the `data-diagram` attributes:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/assets/vnm/layout.mjs" /tmp/before.json <bundle>/before/*.mmd
+```
+then re-key each entry `<stem>` → `before-<stem>` and merge into the same object.
+
+**How the viewer renders each figure**, in order, falling through on failure:
+1. **Prebuilt layout** - `window.GOGO_LAYOUTS[<data-diagram>]` exists → mount it.
+   This is the only tier that can render **sequence / class / state**, because
+   routing raw DSL for those needs mermaid's `detectType` (a dynamic import
+   `file://` blocks) - without a layout they would silently render as a garbage
+   flowchart.
+2. **Inline DSL** - a `flowchart` / `graph` source parses in-browser with vnm's
+   own dependency-free parser. Covers the majority with zero authoring deps.
+3. **Static SVG** - an `<svg>` inlined in the figure is shown as-is.
+
+Anything left renders an inline `.err` box naming the diagram, with the summary
+still readable - a figure never silently blanks. Every interactive figure gets
+drag / zoom / fit / reset / minimap / SVG-PNG export from vnm itself, plus gogo's
+**⛶ expand-to-modal** control for reading a cramped compare-row diagram big.
 
 **Summary → HTML (you pre-render it; no runtime markdown dependency).** Convert the
 chosen source markdown — `report.md` for a report, `plan.md` for a plan — to clean,
@@ -241,10 +261,11 @@ Then:
 - **Unmatched stems.** A stem present on only one side is a single full-width figure
   inside its own `.compare` row with `class="diagram compare-solo"`, captioned
   "Added — <title>" (after only) or "Removed — <title>" (before only).
-- **Still fully interactive.** `interactive.js` renders **every** `figure.diagram`
-  on the page (rich for flowchart-family, pan/zoom fallback otherwise), so compare
-  mode is **pure markup** — two figures per row, no renderer change. The `.compare`
-  CSS is two columns that fall back to stacked on narrow widths (`viewer.css`).
+- **Still fully interactive.** `viewer.js` mounts **every** `figure.diagram` on
+  the page, so compare mode is **pure markup** - two figures per row, no renderer
+  change. Give the before set its own `before-<stem>` keys in `GOGO_VIEW_LAYOUTS`
+  so both sides get prebuilt models. The `.compare` CSS is two columns that fall
+  back to stacked on narrow widths (`viewer.css`).
 
 This is **side-by-side + labeled pairs only** (decision D4=A) — do **not** compute a
 structural node-diff. A bundle with **no** `before/` set builds the normal
@@ -269,12 +290,12 @@ renderer persists dragged positions per diagram, keyed by `data-diagram`. A
   if it exists (the map above) and inline it into the `GOGO_VIEW_LAYOUT` token; if
   it doesn't, use `{}` (optionally write an empty `{}` sidecar so the path is
   obvious). The renderer's seed order is: injected `window.GOGO_LAYOUT[<data-diagram>]`
-  (this committed sidecar) → then `localStorage` → then mermaid's parsed positions.
+  (this committed sidecar) → then `localStorage` → then the prebuilt positions.
   So a committed sidecar wins first-open; thereafter local drags persist. **No label
   editing** (decision D2=A) — modify == reposition + restyle + persist only.
 
 **Write** the finished page to `.gogo/resources/view/<name>.html`. Writing it
-there fixes the relative paths: `../mermaid.min.js` and `../viewer/...` resolve on
+there fixes the relative paths: `../vnm-browser.js` and `../viewer/...` resolve on
 disk, so the page is self-contained and offline. The page must contain **no**
 `http(s)://` CDN/network references.
 
@@ -300,8 +321,12 @@ One line: which plan or report was viewed, the generated page path, and the
 ## Degradation
 
 - No `open`/`xdg-open` → print the path (above).
-- mermaid runtime missing at view time → the page shows an inline error per
-  diagram (handled by `interactive.js`) and the summary still reads; re-running
-  the skill restores `.gogo/resources/mermaid.min.js`.
+- Renderer missing at view time → the page shows an inline error per diagram
+  (handled by `viewer.js`) and the summary still reads; re-running the skill
+  restores `.gogo/resources/vnm-browser.js`.
+- `very-nice-mermaid` not installed → no `layouts.json`: **flowcharts still
+  render** (parsed in-browser), while sequence / class / state show an inline
+  `.err` naming the diagram and the fix (`npm i -g very-nice-mermaid`). Never a
+  silent blank, never a garbage flowchart.
 - A bundle with no diagrams → a summary-only page (valid).
 - Only ever writes under `.gogo/`; offline throughout (no network, no build).
