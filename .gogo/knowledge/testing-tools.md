@@ -23,7 +23,11 @@ artifacts it produces.
 - **`jq`** (if present) — validate JSON artifacts (e.g. an issues list) and assert
   required fields/shape.
 - **Bash** — run hooks directly: `bash hooks/notify.sh <<<'{"message":"x"}'`,
-  `bash hooks/config-check.sh`.
+  `bash hooks/config-check.sh`. Since 0.31.0 `notify.sh` also ships a built-in
+  suite — `bash hooks/notify.sh --selftest` (44 decision-table cases, sends
+  nothing, exit 0/1; run under BOTH `/bin/bash` 3.2 and bash 5.x) — and
+  `GOGO_NOTIFY_DEBUG=1` / `GOGO_NOTIFY_DRYRUN=1` for tracing single invocations
+  without deliveries.
 - **Bundled Playwright MCP** (`.mcp.json`) — for UI/e2e testing of *target*
   projects (the `gogo-tester` agent uses it). Boots via `npx`; needs Node. Absent
   → fall back to CLI/API checks + written manual steps.

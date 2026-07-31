@@ -1,0 +1,31 @@
+flowchart TD
+  cc["Claude Code 2.1.220<br/>Notification event"] --> pay["stdin JSON:<br/>message · title · notification_type"]
+  pay --> hook["hooks/notify.sh"]
+  st(["bash notify.sh --selftest"]):::alt -.->|"payload × fixture table,<br/>sends nothing"| dec
+
+  hook --> dec["gogo_notify_decide()<br/>(side-effect-free)"]
+  dec --> lvl{"GOGO_NOTIFY_LEVEL"}
+  lvl -- "off" --> quiet["silent · exit 0"]
+  lvl -- "all (legacy)" --> send["gogo_notify_send():<br/>ntfy + banner + bell"]
+  lvl -- "gates (default)" --> cls["gogo_notify_classify()"]
+
+  cls -- "agent_needs_input<br/>worker_permission_prompt<br/>idle_prompt · *permission*" --> vmsg["message = Claude's own text"] --> send
+  cls -- "elicitation_* · auth_success<br/>computer_use_* · push_notification" --> quiet
+  cls -- "agent_completed · unknown/absent" --> gates["gogo_notify_gates()"]
+
+  gates --> scan["scan CLAUDE_PROJECT_DIR/.gogo/work/feature-*/state.md<br/>first status token outside HTML comments"]
+  scan --> pred{"GOGO_GATE_STATUSES?<br/>awaiting-plan-acceptance (plan.md written)<br/>waiting-for-user · awaiting-uat"}
+  pred -- "open gates" --> latch{"edge-latch (D4):<br/>NEW vs .gogo/resources/notify/gates?"}
+  latch -- "newly opened" --> named["message = 'feature-x · awaiting-uat'<br/>(+N more when several new)"] --> send
+  latch -- "already notified" --> quiet
+  latch -.-> mem["remember pruned set -><br/>.gogo/resources/notify/gates"]
+  pred -- "no gate" --> quiet
+
+  send --> dbg["GOGO_NOTIFY_DEBUG=1 -> one stderr line:<br/>type · level · class · verdict · gates · channels"]
+  quiet --> dbg
+
+  classDef ok fill:#e7f6e7,stroke:#4f9d4f,color:#111
+  classDef no fill:#fdeaea,stroke:#c96a6a,color:#111
+  classDef alt fill:#eef2ff,stroke:#7c8bd9,color:#111
+  class send,named,vmsg ok
+  class quiet no

@@ -1,0 +1,17 @@
+{
+  "slug": "notify-only-at-user-gates",
+  "updated": "2026-07-31",
+  "note": "AS-BUILT report set (phase 5). flow.mmd is the decision pipeline hooks/notify.sh ships in 0.31.0: gogo_notify_decide() (level knob -> type classifier -> gate scan -> D4 edge-latch read), the --selftest entry that drives the same function, and gogo_notify_main's one side effect (re-remember the pruned gate set at .gogo/resources/notify/gates). sequence.mmd shows the acceptance behaviour across one /gogo:go run: agent_completed silenced at every phase hand-off, exactly one ping when phase 5 writes awaiting-uat, then latch silence. report/before/ carries the plan-time as-is baseline for side-by-side compare. No class diagram (no new types - bash functions in one script + two Go guard tests); no use-case diagram (the capability existed, it became truthful). layouts.json/diagrams.html not prebuilt: very-nice-mermaid unresolvable from the layout tool here (exit 3) - /gogo:view builds the interactive page from these .mmd sources on demand.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-built: Notification payload -> gogo_notify_decide() -> level switch -> type classifier -> state.md gate scan -> D4 edge-latch vs .gogo/resources/notify/gates -> send or stay silent, with the --selftest entry and a GOGO_NOTIFY_DEBUG trace on every path"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "As-built: one /gogo:go run - agent_completed from the reviewer and tester is silenced because state.md reads reviewing/testing, the same event pings once when phase 5 writes awaiting-uat, and the D4 latch then keeps the parked gate silent"
+    }
+  ]
+}

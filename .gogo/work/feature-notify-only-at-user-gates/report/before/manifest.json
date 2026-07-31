@@ -1,0 +1,17 @@
+{
+  "slug": "notify-only-at-user-gates",
+  "updated": "2026-07-31",
+  "note": "As-is baseline captured before any code change, scoped to hooks/notify.sh and its Notification wiring in hooks/hooks.json. flow.mmd shows the defect structurally: the script reads .message and sends, while notification_type (10 distinct values in Claude Code 2.1.220) and .gogo/work/*/state.md are both on disk and both unread. sequence.mmd shows the consequence the user reported: agent_completed fires once per Task subagent return, so a single /gogo:go run emits 4+ identical 'gogo needs your input' pings, and the one real gate is indistinguishable from them.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-is: hooks/notify.sh reads only .message, defaults it to 'gogo needs your input' and always sends - notification_type and every state.md are ignored"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "As-is timing: every gogo-analyst / gogo-reviewer / gogo-tester Task return raises agent_completed, so one run produces 4+ identical pings and none of them marks a real gate"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "notify-only-at-user-gates",
+  "updated": "2026-08-01",
+  "note": "Changelog entry for 0.31.0 - the Notification hook now pings only when a work item newly arrives at a user gate. Synthesized from the member's report bundle; before/ carries the plan-time as-is baseline for viewer compare mode.",
+  "members": ["notify-only-at-user-gates"],
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "notify-only-at-user-gates-flow.mmd",
+      "title": "notify-only-at-user-gates: Notification payload -> gogo_notify_decide() -> level switch -> type classifier -> state.md gate scan -> D4 edge-latch vs .gogo/resources/notify/gates -> send or stay silent, with the --selftest entry and a GOGO_NOTIFY_DEBUG trace on every path"
+    },
+    {
+      "kind": "sequence",
+      "file": "notify-only-at-user-gates-sequence.mmd",
+      "title": "notify-only-at-user-gates: one /gogo:go run - agent_completed silenced at each phase hand-off, exactly one ping when phase 5 writes awaiting-uat, and the D4 latch then keeps the parked gate silent"
+    }
+  ]
+}

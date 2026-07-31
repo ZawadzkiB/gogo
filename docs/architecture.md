@@ -134,7 +134,8 @@ gogo/
 │   ├── skill.template.md     #   scaffold for an extracted skill
 │   ├── skills-index.template.md  # scaffold for .gogo/skills/index.md
 │   ├── state.template.md  decisions.template.md  report.template.md
-├── hooks/                    # config-check.sh, notify.sh, hooks.json (best-effort)
+├── hooks/                    # config-check.sh, notify.sh (user-gate-filtered ping,
+│   │                         #   --selftest; see README "notifications"), hooks.json
 ├── cli/                      # the `gogo` CLI — a Go/Bubble Tea cockpit (NOT a slash
 │   │                         #   command; a separate binary): deterministic reader of
 │   │                         #   the cli-contract, kanban board, terminal viewers,

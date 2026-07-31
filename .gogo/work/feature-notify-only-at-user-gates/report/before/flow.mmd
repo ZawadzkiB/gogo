@@ -1,0 +1,20 @@
+flowchart TD
+  cc["Claude Code 2.1.220<br/>Notification event"] --> types["notification_type (10 values):<br/>agent_completed · agent_needs_input<br/>worker_permission_prompt · idle_prompt<br/>elicitation_response · elicitation_complete<br/>auth_success · push_notification<br/>computer_use_enter · computer_use_exit"]
+  types --> pay["stdin JSON:<br/>message · title · notification_type"]
+  pay --> hook["hooks/notify.sh<br/>(unchanged since commit e08659d)"]
+
+  hook --> read["payload=$(cat)<br/>msg=$(jq -r '.message')"]
+  read --> dflt["msg empty -> 'gogo needs your input'<br/>title = 'gogo • ${PWD##*/}'"]
+  dflt --> send["ALWAYS send"]
+
+  send --> ntfy["curl ntfy.sh/$GOGO_NTFY_TOPIC"]
+  send --> osa["osascript display notification"]
+  send --> bell["printf a > /dev/tty"]
+
+  ignored["notification_type<br/>NEVER READ"] -.-> hook
+  state[".gogo/work/*/state.md<br/>NEVER READ"] -.-> hook
+
+  classDef bad fill:#fdeaea,stroke:#c96a6a,color:#111
+  classDef dead fill:#eeeeee,stroke:#999999,color:#555,stroke-dasharray: 4 3
+  class send,dflt bad
+  class ignored,state dead

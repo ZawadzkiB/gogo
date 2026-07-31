@@ -402,7 +402,8 @@ When you do stop:
    `state.md` is `knowledge` (the fifth phase's skill name), map it to **`report`**
    in the event's `phase` field (the events enum has `report`, not `knowledge`).
 3. End your turn and ask (use `AskUserQuestion` for clear forks; prose for
-   open-ended). The Notification hook pings the user.
+   open-ended). The Notification hook pings the user (a decision gate writes
+   `waiting-for-user`, so its gate scan fires; see docs/flow.md).
 4. On the answer: append a `RESOLVED` block to `decisions.md`, clear
    `open-decision`, and resume at `state.md`'s `resume` phase. **Append the
    transition event** (best-effort, same `knowledge`→`report` phase mapping as in

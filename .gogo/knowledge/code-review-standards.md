@@ -93,6 +93,15 @@ Generated-by: /gogo:build
     regression comes back. Also flag any **safety** rule that depends on either write: a guard
     that prevents *damage* must key on a deterministic signal (a live session, a file on disk),
     and a writer that can skip must be **detectable** rather than silent.
+14. **A test seam must never gate the side effect it exists to pin (REV-010, 0.31.0).**
+    `notify.sh`'s dry-run flag was added so the selftest could drive the whole script
+    without sending — and the same flag also skipped the latch WRITE, so every
+    whole-script test ran with the production write path disabled: deleting the write
+    call kept the suite green while resurrecting the shipped bug. When reviewing a
+    dry-run/no-op/test-mode seam, ask which statements it disables and whether any of
+    them is a wiring the suite claims to cover; prove it with a call-site mutation
+    (no-op the call — at least one test must fail). A seam may suppress **deliveries**
+    (network, UI, notifications), never the **state transitions** under test.
 
 ## Severity guide
 - **Blocker** — breaks a hard invariant (writes outside `.gogo/`, implements

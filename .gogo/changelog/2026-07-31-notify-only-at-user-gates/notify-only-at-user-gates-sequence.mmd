@@ -1,0 +1,28 @@
+sequenceDiagram
+  autonumber
+  participant U as User (away)
+  participant O as gogo orchestrator
+  participant R as gogo-reviewer (Task)
+  participant T as gogo-tester (Task)
+  participant S as state.md
+  participant H as hooks/notify.sh
+
+  O->>S: status: implementing
+  O->>R: delegate phase 3
+  R-->>O: issues.json
+  Note over R,H: Claude Code: agent_completed
+  H->>S: gate scan -> reviewing
+  H-->>U: SILENT
+
+  O->>S: status: testing
+  O->>T: delegate phase 4
+  T-->>O: test issues.json
+  Note over T,H: Claude Code: agent_completed
+  H->>S: gate scan -> testing
+  H-->>U: SILENT
+
+  O->>S: status: awaiting-uat
+  Note over O,H: Claude Code: agent_completed
+  H->>S: gate scan -> awaiting-uat (newly opened)
+  H-->>U: PING "feature-x · awaiting-uat"
+  Note over H: remembers the gate in .gogo/resources/notify/gates<br/>(D4 edge-latch: no re-ping while it stays parked)

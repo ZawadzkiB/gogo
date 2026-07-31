@@ -41,7 +41,11 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
 - **`agents/*.md`** — specialist subagents the orchestrator delegates to:
   `gogo` (orchestrator, hands-off), `gogo-developer` ②, `gogo-reviewer` ③, `gogo-tester` ④.
 - **`hooks/`** — `config-check.sh` (SessionStart reminder), `notify.sh`
-  (Notification → ntfy/macOS/bell). **`assets/vnm/`** - vendored very-nice-mermaid
+  (Notification → ntfy/macOS/bell, **since 0.31.0 gate-filtered**: blocking prompts
+  always ping, lifecycle noise never, `agent_completed`/unknown types only when a
+  `.gogo/work` item NEWLY reaches a user gate — edge-latch state in
+  `.gogo/resources/notify/gates`; knobs `GOGO_NOTIFY_LEVEL`/`GOGO_NOTIFY_DEBUG`;
+  `--selftest` self-verifies). **`assets/vnm/`** - vendored very-nice-mermaid
   browser build + the viewer (template/js/css) + `layout.mjs`/`build-bundle.mjs`.
   **`.mcp.json`** - bundled Playwright MCP.
 

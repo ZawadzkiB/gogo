@@ -1,0 +1,17 @@
+{
+  "slug": "notify-only-at-user-gates",
+  "updated": "2026-07-31",
+  "note": "AS-BUILT (implement phase, incl. D4 edge-latch). flow.mmd is the decision pipeline hooks/notify.sh now runs: the gogo_notify_decide() core (also driven by --selftest, which sends nothing), the GOGO_NOTIFY_LEVEL switch, the gogo_notify_classify() type classifier (always-notify / always-silent / gate-conditional), the gogo_notify_gates() scan of .gogo/work/feature-*/state.md that mirrors contract.WaitingForInput() via the GOGO_GATE_STATUSES constant (pinned by cli/notify_hook_test.go), and the D4 edge-latch: the open-gate set is diffed against .gogo/resources/notify/gates so only NEWLY-opened gates ping, the pruned set is re-remembered by main after every gate-class event, and a missing/unreadable seen-file degrades to fire-on-open-gate, never to silence. sequence.mmd shows one /gogo:go run - the SAME agent_completed event suppressed at each phase hand-off and delivered once at the UAT gate, naming the feature and its gate, after which the latch keeps the parked gate silent. No class diagram: the change adds no types, only bash functions inside one existing script plus two Go guard tests. No use-case diagram: the user-facing capability (get pinged when gogo needs you) already exists - this change makes it truthful, not new.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-built: Notification payload -> gogo_notify_decide() -> level switch -> type classifier -> state.md gate scan -> D4 edge-latch vs .gogo/resources/notify/gates -> send or stay silent, with the --selftest entry and a GOGO_NOTIFY_DEBUG trace on every path"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "As-built: one /gogo:go run - agent_completed from the reviewer and tester is silenced because state.md reads reviewing/testing, the same event pings once when phase 5 writes awaiting-uat, and the D4 latch then keeps the parked gate silent"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "slug": "notify-only-at-user-gates",
+  "phase": "test",
+  "status": "waiting-for-user",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-notify-only-at-user-gates/plan.md",
+    ".gogo/work/feature-notify-only-at-user-gates/review/issues.json",
+    ".gogo/work/feature-notify-only-at-user-gates/charts/manifest.json",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-notify-only-at-user-gates/test/issues.json",
+    ".gogo/work/feature-notify-only-at-user-gates/test-01.md",
+    ".gogo/work/feature-notify-only-at-user-gates/decisions.md",
+    ".gogo/work/feature-notify-only-at-user-gates/state.md",
+    ".gogo/work/feature-notify-only-at-user-gates/events.jsonl"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 3,
+  "summary": "All existing suites green (bash --selftest 43/43 under bash 3.2 and 5.3; cli gofmt/vet/go test -race full suite; both notify Go guards) and the full E2E dogfood acceptance signal replayed byte-for-byte against the real hook, plus every edge case and a live regression probe against this repo's own two real open gates. Not green: TEST-001 (minor, fixable) a spurious trailing space in notification message text, and TEST-002/TEST-003 (minor, needs-user-decision) two plan.md empirical assumptions about live Claude Code Notification behaviour that this headless test session cannot observe -- gated at decisions.md D5, state.md set to waiting-for-user."
+}

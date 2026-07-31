@@ -1,0 +1,45 @@
+{
+  "slug": "notify-only-at-user-gates",
+  "track": "test",
+  "round": 1,
+  "updated": "2026-07-31",
+  "issues": [
+    {
+      "id": "TEST-001",
+      "title": "Notification message extraction appends a spurious trailing space to every non-empty Claude-authored message",
+      "description": "gogo_notify_decide() (hooks/notify.sh, the `msg=\"$(gogo_json_field \"$payload\" message | tr '\\n\\t' '  ')\"` line) builds the message this way for both the `notify` class and `level=all`. jq -r (and the no-jq sed fallback in gogo_json_field_fallback) both print the extracted value with a trailing newline; piping that through `tr '\\n\\t' '  '` transliterates the TRAILING newline into a trailing SPACE instead of removing it (tr is 1:1, so no newline is left for the outer $(...) to strip). Reproduced directly against the shipped functions (sourced hooks/notify.sh with its trailing --selftest/main dispatch stripped) on BOTH the jq path and a PATH-narrowed no-jq path: payload message \"pick an option\" (14 chars, verified via wc -c) round-trips through gogo_notify_decide() as \"pick an option \" (15 chars) in both cases; same for \"gogo-tester needs permission for Bash\" (37 -> 38 chars). This hits every FR2 `notify`-class path (agent_needs_input / worker_permission_prompt / idle_prompt / *permission*) and the legacy `level=all` path -- i.e. exactly the paths the plan's FR2 and the BDD 'permission prompt' scenario call the message 'verbatim'. It is invisible in the shipped --selftest because expect()'s message assertion is a substring match (`case \"$msg\" in *\"$6\"*)`), which a trailing space can never fail, so 43/43 still passes with the bug present.",
+      "proposed_solution": "Strip the extracted value's own trailing newline before the internal-whitespace normalization runs, e.g. capture `raw=\"$(gogo_json_field \"$payload\" message)\"` first (command substitution already strips ALL trailing newlines from raw) and only then `msg=\"$(printf '%s' \"$raw\" | tr '\\n\\t' '  ')\"` -- or avoid the second subshell with `msg=\"${raw//$'\\n'/ }\"`. Add a --selftest case asserting an EXACT string (`[ \"$msg\" = \"pick an option\" ]`), not the current substring match, so this class of defect (an appended/consumed trailing char) cannot regress silently again.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "fixed",
+      "origin": "test",
+      "found_in_round": 1,
+      "fixed_in_round": 5,
+      "fix_summary": "decide now strips the trailing whitespace the newline-flattening tr left behind (sed s/[[:space:]]*$//); pinned by a new byte-exact msg-exact selftest case (44/44, would fail without the strip on both jq and no-jq paths)."
+    },
+    {
+      "id": "TEST-002",
+      "title": "Blocked hands-on check: which notification_type values Claude Code 2.1.220 actually emits LIVE could not be observed in this test session",
+      "description": "plan.md's acceptance work included resolving, empirically, which notification_type values Claude Code really sends (the plan's ten values came from a static `strings` scan of the installed binary, never an observed live session). This test session runs headless inside an agent shell: there is no interactive terminal to produce a real agent_needs_input / idle_prompt / worker_permission_prompt event, so every classifier path in this round was proven against SYNTHETIC stdin payloads only -- exhaustively (bash hooks/notify.sh --selftest: 43/43 under both bash 3.2 and freshly-installed bash 5.3.15; a full /gogo:go notification-sequence dogfood replay against a scratch .gogo/ tree with GOGO_NOTIFY_DEBUG=1, matching the plan's acceptance signal byte-for-byte: agent_completed silent x3 through implementing/reviewing/testing, one notify at awaiting-uat naming the feature+gate, silent again via the D4 latch; every FR2-FR5 edge case; and a live probe against this repo's own two real open gates, feature-interactive-plan-review and feature-session-binding-ops, confirming the D4 edge-latch notifies once for both then goes silent -- the exact REV-001 scenario, now fixed). Re-running the plan's own static verification (strings -a against the SAME installed binary, /Users/bartlomiej.zawadzki/.local/share/claude/versions/2.1.220, claude --version still 2.1.220) reproduces the identical ten notificationType:\"...\" literals the plan enumerated, with no evidence of an added/removed type in this build -- but a binary string scan proves only what the product CAN send, not what a live session actually sends, in what proportion, or in what order.",
+      "proposed_solution": "NEEDS-USER-DECISION (blocked hands-on check; see decisions.md D5 for options A/B/C). Unblock by running one real Claude Code session (ideally /gogo:go) with GOGO_NOTIFY_DEBUG=1 exported and 0.31.0 installed; capture the stderr trace's `type=` field across a normal run and report the observed values back. Resume at phase (4) to fold the finding in -- close this issue if the trace confirms the expected types classify as designed, or open a new fixable finding if a genuinely 'user needed' type is found classifying as silent.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "wontfix",
+      "origin": "test",
+      "found_in_round": 1,
+      "fix_summary": "D5 resolved B (user, 2026-07-31): accepted-and-skipped. Live observation is only possible in an interactive Claude Code session; the user UAT of 0.31.0 with GOGO_NOTIFY_DEBUG=1 doubles as it. FR2 *permission* hedge + D1 gate-conditional bound the risk."
+    },
+    {
+      "id": "TEST-003",
+      "title": "Blocked hands-on check: whether an ordinary MAIN-session permission prompt carries a notification_type at all could not be observed in this test session",
+      "description": "plan.md's own 'Risks and unknowns' section flagged this exact question and named FR6's debug trace as the way to resolve it empirically 'during implement, before the classifier is frozen' -- it was not resolved during implement, and this test session cannot resolve it either: triggering a genuine main-session (as opposed to worker) Claude Code permission prompt requires an interactive terminal hitting a real tool-permission gate, which this headless agent shell has no way to produce. Static corroboration only: strings -a on the installed 2.1.220 binary finds no literal \"needs your permission to use\" string associated with notification metadata (only the notificationType literal worker_permission_prompt appears), consistent with the plan's assumption that this may be a worker-only signal in this build -- but an absent literal string in a strings dump is not proof of runtime behaviour. Consequence if the assumption is wrong: a main-session prompt whose notification_type literal does not contain the substring \"permission\" would fall through FR2's *permission* hedge and be classified gate-conditional instead of always-notify -- silent unless a gogo gate happens to be open at that moment, which is the exact failure mode D1 accepted as the lower-cost risk, but is worth confirming deliberately given this is the highest-cost case to get wrong.",
+      "proposed_solution": "NEEDS-USER-DECISION (blocked hands-on check; see decisions.md D5 for options A/B/C). Unblock: the user triggers a real main-session permission prompt (e.g. run an interactive session against a tool needing approval) with GOGO_NOTIFY_DEBUG=1 exported, and reports the trace's type= field for that event (or its literal absence, i.e. type=(none)). If absent, note that FR2's *permission* hedge cannot even apply (there is no notification_type to match against) and the event falls through to gate-conditional classification by design (D1) -- confirm that is the accepted behaviour rather than an oversight.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "wontfix",
+      "origin": "test",
+      "found_in_round": 1,
+      "fix_summary": "D5 resolved B (user, 2026-07-31): accepted-and-skipped. Live observation is only possible in an interactive Claude Code session; the user UAT of 0.31.0 with GOGO_NOTIFY_DEBUG=1 doubles as it. FR2 *permission* hedge + D1 gate-conditional bound the risk."
+    }
+  ]
+}

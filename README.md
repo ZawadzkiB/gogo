@@ -665,7 +665,20 @@ gogo is built to run anywhere it's installed:
 
 Optional: set `GOGO_NTFY_TOPIC` in your shell to get a phone push (via
 [ntfy.sh](https://ntfy.sh)) when gogo pauses for your input. Without it you still
-get a local desktop notification + a terminal bell.
+get a local desktop notification + a terminal bell. Since 0.31.0 the hook pings
+**only when you are actually needed**: blocking prompts (`agent_needs_input`,
+`worker_permission_prompt`, `idle_prompt`, anything `*permission*`) always
+notify; lifecycle noise never does; and everything else — notably
+`agent_completed`, which fires once per subagent hand-off — notifies only when
+a `.gogo/work` item **newly arrives** at a user gate (`awaiting-plan-acceptance`
+with a written plan · `waiting-for-user` · `awaiting-uat`), with the ping naming
+the feature and its gate. The last-notified gate set is remembered in
+`.gogo/resources/notify/gates` (an already-gitignored, regenerable path), so an
+already-pinged parked gate stays silent instead of re-pinging on every event. Tune it with `GOGO_NOTIFY_LEVEL` (`gates` default · `all`
+= legacy fire-on-everything · `off` = kill switch) and inspect any decision with
+`GOGO_NOTIFY_DEBUG=1` (one stderr line per event: type, verdict, gate count,
+channels). `bash hooks/notify.sh --selftest` verifies the whole decision table
+without sending anything.
 
 ## License
 

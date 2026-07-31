@@ -1,5 +1,5 @@
 {
-  "description": "gogo — config reminder on session start; pause-for-user ping on notifications.",
+  "description": "gogo — config reminder on session start; user-gate ping on notifications (blocking prompts always; agent_completed and unknown types only when a .gogo work item newly arrives at a gate).",
   "hooks": {
     "SessionStart": [
       {

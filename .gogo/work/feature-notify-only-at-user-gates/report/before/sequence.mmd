@@ -1,0 +1,30 @@
+sequenceDiagram
+  autonumber
+  participant U as User (away)
+  participant O as gogo orchestrator
+  participant A as gogo-analyst (Task)
+  participant R as gogo-reviewer (Task)
+  participant T as gogo-tester (Task)
+  participant H as hooks/notify.sh
+
+  O->>A: delegate phase 1
+  A-->>O: plan.md
+  Note over A,H: Claude Code: agent_completed
+  H-->>U: PING "gogo needs your input"
+
+  O->>R: delegate phase 3
+  R-->>O: issues.json
+  Note over R,H: Claude Code: agent_completed
+  H-->>U: PING "gogo needs your input"
+
+  O->>R: re-review after fixes
+  R-->>O: issues.json (round 2)
+  Note over R,H: Claude Code: agent_completed
+  H-->>U: PING "gogo needs your input"
+
+  O->>T: delegate phase 4
+  T-->>O: test issues.json
+  Note over T,H: Claude Code: agent_completed
+  H-->>U: PING "gogo needs your input"
+
+  Note over U,H: 4+ identical pings per run;<br/>none of them is a real gate,<br/>and the real UAT gate looks the same

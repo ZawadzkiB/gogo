@@ -1,0 +1,32 @@
+{
+  "slug": "notify-only-at-user-gates",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-notify-only-at-user-gates/plan.md",
+    ".gogo/work/feature-notify-only-at-user-gates/state.md",
+    ".gogo/work/feature-notify-only-at-user-gates/decisions.md",
+    ".gogo/work/feature-notify-only-at-user-gates/review/issues.json",
+    ".gogo/work/feature-notify-only-at-user-gates/test/issues.json",
+    ".gogo/work/feature-notify-only-at-user-gates/charts/manifest.json",
+    ".gogo/work/feature-notify-only-at-user-gates/charts/before/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-notify-only-at-user-gates/report/report.md",
+    ".gogo/work/feature-notify-only-at-user-gates/report/flow.mmd",
+    ".gogo/work/feature-notify-only-at-user-gates/report/sequence.mmd",
+    ".gogo/work/feature-notify-only-at-user-gates/report/manifest.json",
+    ".gogo/work/feature-notify-only-at-user-gates/report/before/flow.mmd",
+    ".gogo/work/feature-notify-only-at-user-gates/report/before/sequence.mmd",
+    ".gogo/work/feature-notify-only-at-user-gates/report/before/manifest.json",
+    ".gogo/work/feature-notify-only-at-user-gates/plan.md",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/code-review-standards.md",
+    "docs/architecture.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Clean green run reported: all phases completed (implement x5, review x3 APPROVE, test green after D5), report bundle written with before/after set; knowledge reconciled (hooks description, --selftest invocation, 544 test count, seam-gates-side-effect review lesson). layouts.json/diagrams.html not prebuilt (very-nice-mermaid unresolvable, exit 3) - /gogo:view renders from .mmd on demand. Feature parked at awaiting-uat."
+}

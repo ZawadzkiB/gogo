@@ -205,7 +205,13 @@ everything else, decide, note it, and keep moving. When stopping:
 2. Set `state.md` -> `status: waiting-for-user`, `resume: <phase>`,
    `open-decision: D<n>`.
 3. End the turn and ask (`AskUserQuestion` for clear forks; prose otherwise). The
-   Notification hook pings the user.
+   Notification hook pings the user — it always notifies on blocking prompts
+   (`agent_needs_input`, `worker_permission_prompt`, `idle_prompt`), and on other
+   events (e.g. `agent_completed`) only when a work item NEWLY arrives at a user
+   gate (`awaiting-plan-acceptance` with a written plan · `waiting-for-user` ·
+   `awaiting-uat`; the last-notified set is remembered in
+   `.gogo/resources/notify/gates`) — so routine phase hand-offs and
+   already-pinged parked gates stay silent.
 4. On the answer: append a `RESOLVED` block, clear `open-decision`, and resume at
    `state.md`'s `resume` phase.
 
