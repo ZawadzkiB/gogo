@@ -54,7 +54,7 @@ The markdown-plugin side has no unit suite — verification = **dogfood**:
 install, then run `/gogo:build`, `/gogo:plan`, `/gogo:go` on a sample repo and
 inspect the produced `.gogo/` artifacts. The **CLI** (since 0.10.0) has a real
 Go suite: `cd cli && gofmt -l . && go vet ./... && go test -race ./...`
-(**449** test functions as of 0.28.0 - verified by grep, was "~120 as of 0.11.0" - across
+(**542** test functions as of 0.30.0 - verified by grep, was 449 as of 0.28.0 - across
 13 packages: contract/tui/launch/pages/plans/projects/orchestrator/diagram/**trash**/config
 + a `gogo status` golden). UI/browser testing for *target* projects
 uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See

@@ -1,6 +1,7 @@
 package launch
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -362,5 +363,74 @@ func TestAttachArgs(t *testing.T) {
 		if got := AttachArgs("gogo-go-x"); strings.HasSuffix(got[2], ":") {
 			t.Errorf("attach target %q carries the pane form's trailing colon", got[2])
 		}
+	}
+}
+
+// TestWithAttachmentsEmptyUnchanged (project-first-plan-authoring FR5.1): an
+// empty/all-blank attachment list returns the intent UNCHANGED, byte-for-byte —
+// every attachment-less launch is exactly today's.
+func TestWithAttachmentsEmptyUnchanged(t *testing.T) {
+	in := PlanIntent("My plan", "the body", "plan-abc12345")
+	for _, atts := range [][]string{nil, {}, {"", "   "}} {
+		out := WithAttachments(in, atts)
+		if !reflect.DeepEqual(out, in) {
+			t.Errorf("WithAttachments(%v) changed the intent:\n got %+v\nwant %+v", atts, out, in)
+		}
+	}
+}
+
+// TestWithAttachmentsNamesEach: with entries the decorator appends ONE clause
+// naming each attachment inside the same single trailing command string — the
+// rest of the intent (session, action, body) is untouched, so it composes with
+// FoldToPointer without either editing the intent builders.
+func TestWithAttachmentsNamesEach(t *testing.T) {
+	in := PlanIntent("My plan", "the body", "plan-abc12345")
+	atts := []string{"/abs/mockup.png", "https://example.com/spec"}
+	out := WithAttachments(in, atts)
+	for _, a := range atts {
+		if !strings.Contains(out.Command, a) {
+			t.Errorf("decorated command does not name %q:\n%s", a, out.Command)
+		}
+	}
+	if !strings.HasPrefix(out.Command, in.Command) {
+		t.Errorf("decorator must APPEND, not rewrite: %q", out.Command)
+	}
+	if out.Session != in.Session || out.Body != in.Body || out.Action != in.Action {
+		t.Errorf("decorator touched more than Command: %+v", out)
+	}
+	// The fold still works on a decorated intent: the body substring is intact.
+	if !strings.Contains(out.Command, in.Body) {
+		t.Errorf("body substring lost — FoldToPointer could no longer excise it")
+	}
+}
+
+// TestWithAttachmentsBounded (FR5.4): the clause is bounded by entry count AND
+// total bytes — an over-long list is truncated with a named "+N more" pointer at
+// the plan file, never unbounded (attachments must never be what overflows the
+// tmux command budget).
+func TestWithAttachmentsBounded(t *testing.T) {
+	in := PlanIntent("My plan", "the body", "plan-abc12345")
+
+	// Entry-count bound: MaxAttachmentEntries+5 entries → exactly the cap named.
+	var many []string
+	for i := 0; i < MaxAttachmentEntries+5; i++ {
+		many = append(many, fmt.Sprintf("/files/shot-%02d.png", i))
+	}
+	out := WithAttachments(in, many)
+	if !strings.Contains(out.Command, "+5 more") {
+		t.Errorf("truncation not named: %q", out.Command)
+	}
+	if strings.Contains(out.Command, many[MaxAttachmentEntries]) {
+		t.Errorf("entry past the cap was inlined: %q", out.Command)
+	}
+
+	// Byte bound: a few huge paths can never grow the clause past the cap.
+	huge := []string{"/" + strings.Repeat("a", 3000), "/" + strings.Repeat("b", 3000)}
+	out = WithAttachments(in, huge)
+	if grew := len(out.Command) - len(in.Command); grew > MaxAttachmentClauseBytes {
+		t.Errorf("clause grew %d bytes, cap is %d", grew, MaxAttachmentClauseBytes)
+	}
+	if !strings.Contains(out.Command, "attachment") {
+		t.Errorf("over-budget attachments silently dropped: %q", out.Command)
 	}
 }

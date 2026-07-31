@@ -336,3 +336,71 @@ Nothing here.`
 		t.Errorf("BriefFor on a brief-less plan = %q, want empty", got)
 	}
 }
+
+// TestAttachmentsRoundTrip (project-first-plan-authoring FR4): attachments survive a
+// New → SetAttachments → List/Get round-trip — the closed front-matter set now
+// includes them (parsePlan + render both know the key).
+func TestAttachmentsRoundTrip(t *testing.T) {
+	seedDataHome(t)
+	p, err := New("proj", "With attachments", "body")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	atts := []string{"/abs/mockup.png", "https://example.com/spec"}
+	if _, err := SetAttachments("proj", p.ID, atts); err != nil {
+		t.Fatalf("SetAttachments: %v", err)
+	}
+	got, ok := Get("proj", p.ID)
+	if !ok {
+		t.Fatal("Get did not find the plan")
+	}
+	if len(got.Attachments) != 2 || got.Attachments[0] != atts[0] || got.Attachments[1] != atts[1] {
+		t.Errorf("Attachments = %v, want %v", got.Attachments, atts)
+	}
+	list, _ := List("proj")
+	if len(list) != 1 || len(list[0].Attachments) != 2 {
+		t.Errorf("List round-trip lost the attachments: %+v", list)
+	}
+	// SetAttachments trims and drops blanks (belt-and-braces behind the form validate).
+	if updated, _ := SetAttachments("proj", p.ID, []string{" /a ", "", "  "}); len(updated.Attachments) != 1 || updated.Attachments[0] != "/a" {
+		t.Errorf("SetAttachments did not trim/drop blanks: %v", updated.Attachments)
+	}
+}
+
+// TestAttachmentsSurviveResave: a plan file whose front matter carries
+// `attachments:` parses, and a later CLI write (Save via SetStatus) does NOT drop
+// the key — the exact failure mode the closed front-matter set produces for any
+// unknown key.
+func TestAttachmentsSurviveResave(t *testing.T) {
+	seedDataHome(t)
+	p, err := New("proj", "Hand-carried", "body")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if _, err := SetAttachments("proj", p.ID, []string{"/x/shot.png"}); err != nil {
+		t.Fatalf("SetAttachments: %v", err)
+	}
+	if _, err := SetStatus("proj", p.ID, StatusReady); err != nil {
+		t.Fatalf("SetStatus: %v", err)
+	}
+	got, _ := Get("proj", p.ID)
+	if len(got.Attachments) != 1 || got.Attachments[0] != "/x/shot.png" {
+		t.Errorf("re-save dropped the attachments: %v", got.Attachments)
+	}
+	if got.Status != StatusReady {
+		t.Errorf("status = %q, want ready", got.Status)
+	}
+}
+
+// TestNoAttachmentsNoLine: an empty attachment set writes NO `attachments:` line —
+// byte-for-byte front-matter parity for every existing plan file.
+func TestNoAttachmentsNoLine(t *testing.T) {
+	p := Plan{ID: "plan-abc12345", Title: "t", Status: StatusDraft}
+	if raw := string(p.render()); strings.Contains(raw, "attachments:") {
+		t.Errorf("empty attachment set rendered an attachments: line:\n%s", raw)
+	}
+	with := Plan{ID: "plan-abc12345", Title: "t", Status: StatusDraft, Attachments: []string{"/a", "https://b"}}
+	if raw := string(with.render()); !strings.Contains(raw, "attachments: /a, https://b") {
+		t.Errorf("attachments not rendered:\n%s", raw)
+	}
+}

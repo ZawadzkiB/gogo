@@ -39,10 +39,13 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
    that id and STRIP the `--correlation plan-XXXX` token from the goal text before
    deriving the slug/plan (the rest of the goal is the real brief). No `--correlation`
    → today's behaviour, byte-for-byte. Never treat any other text as a flag.
-   The AUTHORITATIVE id is the LAST (trailing) `--correlation plan-XXXX` token: the
-   cockpit CLI always appends it as the FINAL token of the invocation. If the goal
-   BODY itself contains an earlier `--correlation plan-YYYY` lookalike substring, that
-   one is ordinary prose (never a flag) - honor only the trailing token.
+   The AUTHORITATIVE id is the LAST `--correlation plan-XXXX` token ANYWHERE in the
+   invocation: the cockpit CLI appends it after the goal — since 0.30.0 it MAY be
+   followed by a trailing attachments clause ("The user ATTACHED these to the plan
+   ..."), which is ordinary prose to read as part of the brief (open each listed
+   local path / URL), never a flag. If the goal BODY itself contains an earlier
+   `--correlation plan-YYYY` lookalike substring, that one is ordinary prose (never
+   a flag) - honor only the last token.
 
    Also parse an optional **`--skip-acceptance`** flag - a fixed literal token with NO
    value, set when this work item's SOURCE has opted OUT of the plan-acceptance gate via
@@ -52,7 +55,8 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
    gogo-plan branch is the coverage for a **direct** `/gogo:plan <goal> --skip-acceptance`
    invocation (intentional belt-and-suspenders, one honored auto-accept path either way,
    never two). CAPTURE whether it is present and STRIP the token from the goal text (exactly
-   like `--correlation`); it is a trailing literal, so a body that merely mentions the words
+   like `--correlation`); it is a literal token appended after the goal (possibly followed
+   by the 0.30.0 attachments clause), so a body that merely mentions the words
    is ordinary prose (never a flag). **Absent → the plan-acceptance gate is today's hard
    gate, byte-for-byte.** Present → see Step 6, where it turns the acceptance stop into a
    pre-declared auto-accept.

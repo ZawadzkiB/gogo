@@ -25,10 +25,12 @@
 -->
 
 - **feature:** Project-first plan authoring — pick the project, switch it on the plans tab, multi-line goals, attachments
-- **phase:** plan            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** awaiting-plan-acceptance   <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
+- **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
+- **status:** shipped        <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
 - **created:** 2026-07-29
+- **accepted:** 2026-07-31 (user, via /gogo:accept)
+- **completed:** 2026-07-31
 - **branch:** main
-- **iterations:** plan=0 · implement=0 · review=0 · test=0
-- **resume:** none           <!-- <phase to re-enter> — <next action> | none -->
+- **iterations:** plan=0 · implement=3 · review=2 · test=1
+- **resume:** none — shipped to .gogo/changelog/2026-07-31-project-first-plan-authoring/
 - **open-decision:** none    <!-- <decisions.md anchor> | none -->

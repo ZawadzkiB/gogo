@@ -1,7 +1,7 @@
 {
   "slug": "project-first-plan-authoring",
-  "updated": "2026-07-29",
-  "note": "Intended design. flow = the plans-tab authoring path with the project switcher, the project-select field, multi-line entry and attachment validation; sequence = the runtime call sequence for 'p' (switch) and 'A' (plan-with-claude) once the project is chosen explicitly; class = the structures the change adds (plans.Plan.Attachments, the new formBinding fields, gogoKeyMap/newForm, and the launch.WithAttachments decorator).",
+  "updated": "2026-07-31",
+  "note": "As-built (phase 2). flow = the plans-tab authoring path with the project switcher, the project-select field, multi-line entry and attachment validation (WithAttachments decorates BEFORE FoldToPointer measures); sequence = the runtime call sequence for 'p' (switch) and 'A' (plan-with-claude) once the project is chosen explicitly; class = the structures the change added (plans.Plan.Attachments + SetAttachments, the new formBinding fields, gogoKeyMap/newForm at all 12 form sites, the attachment helpers + focusChosenProject, and the bounded launch.WithAttachments decorator).",
   "diagrams": [
     {
       "kind": "flow",

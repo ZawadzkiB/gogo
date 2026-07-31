@@ -1,0 +1,40 @@
+{
+  "phase": "implement",
+  "status": "ok",
+  "slug": "project-first-plan-authoring",
+  "round": 2,
+  "updated": "2026-07-31",
+  "validated_in": true,
+  "validated_out": true,
+  "inputs": [
+    ".gogo/work/feature-project-first-plan-authoring/plan.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/work/feature-project-first-plan-authoring/review/issues.json"
+  ],
+  "outputs": [
+    "cli/internal/plans/plans.go",
+    "cli/internal/launch/launch.go",
+    "cli/internal/tui/model.go",
+    "cli/internal/tui/plans_tab.go",
+    "cli/internal/tui/update.go",
+    "cli/internal/tui/delete.go",
+    "cli/internal/tui/move.go",
+    "cli/internal/tui/config_tab.go",
+    "cli/plan.go",
+    "cli/main.go",
+    "cli/version_test.go",
+    "cli/internal/plans/plans_test.go",
+    "cli/internal/launch/launch_test.go",
+    "cli/internal/tui/plans_tab_test.go",
+    "README.md",
+    "skills/gogo-cli/SKILL.md",
+    "docs/cli-contract.md",
+    ".claude-plugin/plugin.json",
+    ".gogo/work/feature-project-first-plan-authoring/charts/manifest.json",
+    "skills/gogo-project-plan/SKILL.md",
+    "skills/gogo-plan/SKILL.md",
+    "cli/internal/tui/window.go"
+  ],
+  "summary": "Round 2 (--issues review/issues.json): fixed all 7 review findings — REV-001 gogo-project-plan output contract preserves attachments:, REV-002 TestNewFormIsTheOnlyFormConstructionSite pins the newForm() wiring, REV-003 gogo-plan Step 0 param wording matches the decorated command shape, REV-004 comma re-checked on the normalized path, REV-005 planColAvail() gives the kanban its own height budget (+ fits-terminal test), REV-006 AddAttachment dropped (no caller), REV-007 directory attachments refused. Round 1 built the feature per the plan. Gates: gofmt clean, go vet clean, go test -race ./... green (12 packages)."
+}

@@ -36,7 +36,7 @@ func (m *Model) startDeleteForm(f *contract.Feature) {
 	m.binding = &formBinding{confirm: false}
 	title := "Move " + f.Slug + " (" + f.Class + ") to .gogo/trash/?"
 	desc := "recoverable — restore with:  gogo trash restore <entry>"
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewConfirm().
 			Title(title).
 			Description(desc).

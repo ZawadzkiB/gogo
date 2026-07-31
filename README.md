@@ -491,7 +491,17 @@ cd cli && go build -o gogo .
   work item into each un-spawned target (one `/gogo:plan <brief> --correlation plan-<hash>` per source,
   honoring that source's `--skip-acceptance`, recording a member + flipping the plan active; idempotent),
   **active→done** accepts the project-UAT (refuses until every member ships) and writes a deterministic
-  project changelog under `~/.gogo/projects/<name>/.gogo/changelog/` · `x` delete. In a plan's
+  project changelog under `~/.gogo/projects/<name>/.gogo/changelog/` · `p` **switch project** (since
+  **0.30.0** - the config tab's switcher on the plans tab itself, plus an always-on header row naming
+  the on-screen project). Since **0.30.0** plan authoring is **project-first and body-first**: both
+  mint forms (`n` / `A`) open with a **destination-project select** whenever several projects are
+  registered (pre-selected to the focused one - the interactive mirror of the CLI's refuse-to-guess
+  `--project` rule, closing the silent projs[0] misfile), `enter` **inserts a newline** in every
+  multi-line field (`tab` advances, `ctrl+e` opens `$EDITOR`), and an optional **attachments** field
+  takes one local file path or http(s) URL per line - validated at submit, stored in the plan's
+  front-matter `attachments:` list, rendered in the plan detail (a vanished local path is marked
+  `· missing`), printed by `gogo plan show`, and **named to the launched analyst/spawn sessions** ·
+  `x` delete. In a plan's
   **detail** the **WORK ITEMS** list shows each member + its live status; press `c` **create work item**
   on a source row - the CLI **launches** `/gogo:plan <body> --correlation plan-<hash>` in that source (the
   analyst derives the slug and writes `.gogo/work/`; the CLI never writes a source's `.gogo/work/`), `+`

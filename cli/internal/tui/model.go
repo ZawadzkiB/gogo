@@ -17,6 +17,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
 	"github.com/ZawadzkiB/gogo/cli/internal/plans"
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -111,9 +112,42 @@ type formBinding struct {
 	// goal (what to build/change across the project's sources) captured before minting.
 	planDesc string
 	planGoal string
+	// Project-first minting (project-first-plan-authoring FR1): planProject is the
+	// destination project the mint-form Select writes (pre-seeded to the focused
+	// project); planAttach is the attachments Text value — one path/URL per line
+	// (FR4). Both heap-stable like every other field (TEST-001).
+	planProject string
+	planAttach  string
 	// Config-tab project label-color form field (cockpit-colors FR4): the project's
 	// origin color (hex or a swatch name) as a STRING bound heap-stably (TEST-001).
 	projColor string
+}
+
+// gogoKeyMap is huh's default keymap with ONLY the Text group rebound
+// (project-first-plan-authoring FR3): `enter` INSERTS a newline instead of
+// advancing (measured against the vendored huh v1.0.0, whose Text.Next is
+// {"tab","enter"} — typing a newline was impossible; paste already worked),
+// `tab` advances, `shift+tab` goes back, `ctrl+d` submits. `shift+enter` is
+// included KNOWINGLY INERT (FR3.3): no bubbletea v1.3.10 key renders as
+// "shift+enter" on common terminals — it is future-proofing, nothing more.
+// Every other field group is untouched, so Input/Select/Confirm keep `enter`
+// exactly as today.
+func gogoKeyMap() *huh.KeyMap {
+	km := huh.NewDefaultKeyMap()
+	km.Text.NewLine = key.NewBinding(key.WithKeys("enter", "shift+enter", "alt+enter", "ctrl+j"), key.WithHelp("enter", "new line"))
+	km.Text.Next = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next"))
+	km.Text.Prev = key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "back"))
+	km.Text.Submit = key.NewBinding(key.WithKeys("ctrl+d"), key.WithHelp("ctrl+d", "submit"))
+	return km
+}
+
+// newForm is the ONE construction site for every gogo huh form — huh.NewForm plus
+// gogoKeyMap. All 12 form sites use it (FR3.2): ten contain no Text field, so
+// their behaviour is provably unchanged — the blanket swap is what stops the next
+// Text field somebody adds from silently regressing to "enter submits"
+// (enumeration-drift, this repo's recorded top trap).
+func newForm(groups ...*huh.Group) *huh.Form {
+	return huh.NewForm(groups...).WithKeyMap(gogoKeyMap())
 }
 
 // sourceEdit marks an in-flight config-tab per-source form (the analog of

@@ -229,6 +229,9 @@ func planShow(args []string) int {
 	if len(p.Targets) > 0 {
 		fmt.Printf("  targets: %s\n", strings.Join(p.Targets, ", "))
 	}
+	if len(p.Attachments) > 0 {
+		fmt.Printf("  attachments: %s\n", strings.Join(p.Attachments, ", "))
+	}
 	if len(p.Members) == 0 {
 		fmt.Println("  (no work items - spawn one with `gogo plan promote " + p.ID + " <source>`)")
 		return 0

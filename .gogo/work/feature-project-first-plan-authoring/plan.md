@@ -1,6 +1,13 @@
 # Plan — project-first plan authoring
 
-Status: awaiting acceptance
+Status: **accepted** (user, 2026-07-31) · **as-built 2026-07-31** (shipped as 0.30.0 — see `report/report.md`)
+
+> **As-built deltas** (all recorded in review): `plans.AddAttachment` dropped (REV-006 —
+> no caller; `SetAttachments` is the one write path) · `planColAvail()` added (REV-005 —
+> the header row needed its own height budget) · `skills/gogo-project-plan/SKILL.md` +
+> `skills/gogo-plan/SKILL.md` contract wording updated (REV-001/REV-003 — preserve
+> `attachments:`, param-token wording) · version = **0.30.0** (0.28.0/0.29.0 were taken).
+> Everything else shipped exactly as written below.
 
 **In one paragraph.** The gogo cockpit's plans tab mints a plan into whichever project
 happens to sort first alphabetically, never asks which project you meant, never shows you
@@ -448,52 +455,52 @@ classDiagram
 Build order: store first (pure), then launch (pure), then the TUI, then docs.
 
 **1. `cli/internal/plans/plans.go`**
-- [ ] Add `Attachments []string` to `Plan`.
-- [ ] `parsePlan`: `case "attachments": p.Attachments = parseList(val)`.
-- [ ] `render`: emit `attachments: …` when non-empty (after `targets:`, before `members:`).
-- [ ] Add `SetAttachments(project, id string, atts []string) (Plan, error)` beside `AddTarget`
+- [x] Add `Attachments []string` to `Plan`.
+- [x] `parsePlan`: `case "attachments": p.Attachments = parseList(val)`.
+- [x] `render`: emit `attachments: …` when non-empty (after `targets:`, before `members:`).
+- [x] Add `SetAttachments(project, id string, atts []string) (Plan, error)` beside `AddTarget`
       (same defensive load → mutate → `Save` shape).
 
 **2. `cli/internal/launch/launch.go`**
-- [ ] Add `WithAttachments(in Intent, atts []string) Intent` — appends one bounded clause to
+- [x] Add `WithAttachments(in Intent, atts []string) Intent` — appends one bounded clause to
       `in.Command`; empty/all-blank list returns `in` unchanged.
-- [ ] Bound it: cap the entry count and total bytes; document the cap in a comment.
+- [x] Bound it: cap the entry count and total bytes; document the cap in a comment.
 
 **3. `cli/internal/tui/model.go`**
-- [ ] `formBinding`: add `planProject string` and `planAttach string`.
-- [ ] Add `gogoKeyMap() *huh.KeyMap` (Text group only) + `newForm(groups ...*huh.Group)`.
+- [x] `formBinding`: add `planProject string` and `planAttach string`.
+- [x] Add `gogoKeyMap() *huh.KeyMap` (Text group only) + `newForm(groups ...*huh.Group)`.
 
 **4. `cli/internal/tui/plans_tab.go`**
-- [ ] `startPlanForm` / `startPlanWithClaudeForm`: build `[]huh.Field` conditionally — project
+- [x] `startPlanForm` / `startPlanWithClaudeForm`: build `[]huh.Field` conditionally — project
       `Select` first when `len(m.allProjects) > 1`, then the existing fields, then the
       attachments `Text`; construct via `newForm`. Pre-seed `binding.planProject`.
-- [ ] Name the destination project in both forms' descriptions.
-- [ ] Add `projectSelectField(b *formBinding) huh.Field`, `parseAttachments(raw string) []string`
+- [x] Name the destination project in both forms' descriptions.
+- [x] Add `projectSelectField(b *formBinding) huh.Field`, `parseAttachments(raw string) []string`
       and `validateAttachments(raw string) error` helpers.
-- [ ] `finishPlanForm` / `finishPlanWithClaude`: resolve the chosen project → `switchProject`
+- [x] `finishPlanForm` / `finishPlanWithClaude`: resolve the chosen project → `switchProject`
       **before** minting → mint → `SetAttachments` → status line names the project.
-- [ ] `finishPlanWithClaude` / `planCreateWorkItem` / `finishPlanSpawn`: wrap the intent in
+- [x] `finishPlanWithClaude` / `planCreateWorkItem` / `finishPlanSpawn`: wrap the intent in
       `launch.WithAttachments`.
-- [ ] `updatePlanList`: `case "p": m.switchProject(m.projIdx + 1)`.
-- [ ] `viewPlansBoard`: project header row; help line gains `p switch project`.
-- [ ] `viewPlanDetail`: ATTACHMENTS block; help line unchanged apart from that.
+- [x] `updatePlanList`: `case "p": m.switchProject(m.projIdx + 1)`.
+- [x] `viewPlansBoard`: project header row; help line gains `p switch project`.
+- [x] `viewPlanDetail`: ATTACHMENTS block; help line unchanged apart from that.
 
 **5. `cli/internal/tui/` — the remaining form sites**
-- [ ] Swap `huh.NewForm(` → `newForm(` in `delete.go`, `config_tab.go` (×3), `move.go`,
+- [x] Swap `huh.NewForm(` → `newForm(` in `delete.go`, `config_tab.go` (×3), `move.go`,
       `update.go` (×3), and the two remaining `plans_tab.go` confirms.
 
 **6. `cli/plan.go`**
-- [ ] `planShow`: print `attachments: …` when non-empty.
+- [x] `planShow`: print `attachments: …` when non-empty.
 
 **7. Docs + enumerations (FR6)**
-- [ ] `cli/main.go` `printHelp` — plans-tab key block gains `p`.
-- [ ] `README.md` — the *Plans tab + spawn* bullet: `p` switcher, project-first mint,
+- [x] `cli/main.go` `printHelp` — plans-tab key block gains `p`.
+- [x] `README.md` — the *Plans tab + spawn* bullet: `p` switcher, project-first mint,
       multi-line entry, attachments.
-- [ ] `skills/gogo-cli/SKILL.md` — same key list.
-- [ ] `docs/cli-contract.md` — additive note (FR6.2).
+- [x] `skills/gogo-cli/SKILL.md` — same key list.
+- [x] `docs/cli-contract.md` — additive note (FR6.2).
 
 **8. Version**
-- [ ] `.claude-plugin/plugin.json` + `cli/main.go` — next unclaimed minor (see *Coordination*).
+- [x] `.claude-plugin/plugin.json` + `cli/main.go` — next unclaimed minor (see *Coordination*).
 
 ---
 

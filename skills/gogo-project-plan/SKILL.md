@@ -65,6 +65,7 @@ id: plan-XXXX
 title: <a concise plan title>
 status: draft
 targets: web, api
+attachments: /abs/mockup.png, https://example.com/spec
 ---
 
 ## Goal
@@ -86,7 +87,14 @@ Rules the cockpit relies on:
   per target**, named to match a `targets:` entry. The text under a `### <name>`
   heading is that source's work-item brief; if a target has no brief, the spawn falls
   back to the plan goal.
-- **Keep the front-matter correlation id.** Do not remove or change the `id:` line.
+- **PRESERVE every front-matter key you did not author.** You own only `title:`,
+  `status:` and `targets:`; any other key the cockpit wrote (`id:`, `created:`,
+  `attachments:`, `members:`) must survive your edit byte-for-byte — above all the
+  correlation `id:` line, and `attachments:` (written at mint when the user attached
+  files/links; the path is the ONLY record, so dropping the line loses them).
+- **`attachments:`** (optional, cockpit-written) lists what the user attached to the
+  plan — READ each entry to ground your analysis: a local path is a file on this
+  machine (open it), an http(s) URL is a link (gogo itself never fetches it).
 - Write the body like a readable brief (short, scannable, decisions in bold), but the
   two structural pieces above (`targets:` + `### <name>` subsections) must stay exact.
 

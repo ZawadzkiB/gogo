@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -155,8 +156,9 @@ func (m Model) updatePlans(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updatePlanList handles the plans KANBAN keys (plans-board FR1/FR2): ←→/h l move
 // columns · ↑↓/j k move cards · enter open detail · v terminal view · w web page ·
-// n new · A plan-with-claude · m move (draft→ready→go→done) · x delete. The
-// persistent keys (q / tab / ?) are handled one level up in updateActive.
+// n new · A plan-with-claude · m move (draft→ready→go→done) · p switch project ·
+// x delete. The persistent keys (q / tab / ?) are handled one level up in
+// updateActive.
 //
 // TestPlansTabKeyHelpInSync derives this switch's keys and fails if any is missing
 // from the help line below - so a new key can never ship undocumented.
@@ -166,6 +168,11 @@ func (m Model) updatePlanList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.planColIdx = clamp(m.planColIdx-1, 0, 3)
 	case "right", "l":
 		m.planColIdx = clamp(m.planColIdx+1, 0, 3)
+	case "p":
+		// FR2.1: switch the plans tab's project IN PLACE — the exact call the config
+		// tab's `p` already makes (one shared mover, zero new state). Kanban only:
+		// a plan detail belongs to one plan of one project (FR2.3).
+		m.switchProject(m.projIdx + 1)
 	case "up", "k":
 		m.planCardIdx[m.planColIdx] = clamp(m.planCardIdx[m.planColIdx]-1, 0, len(m.planCols[m.planColIdx])-1)
 	case "down", "j":
@@ -426,7 +433,7 @@ func (m *Model) startPlanDoneForm(p *plans.Plan) {
 	// Do not "align" the two: the asymmetry IS the safety rule.
 	b := &formBinding{confirm: true}
 	m.binding = b
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewConfirm().
 			Title("Accept project-UAT for " + p.ID + "?").
 			Description("all members shipped — flips this plan to done + records a project-UAT round (~/.gogo/ only)").
@@ -525,6 +532,9 @@ func (m Model) planCreateWorkItem() (tea.Model, tea.Cmd) {
 	root := src.Path
 	intent := launch.PlanIntent(p.Title, body, p.ID)
 	intent.Root = root
+	// FR5.2: name the plan's attachments to the launched session (bounded decorator,
+	// before the fold so the budget check measures the real command).
+	intent = launch.WithAttachments(intent, p.Attachments)
 	// FR1.3 (D1=A): a multi-KB brief inlined into the tmux command line is what tmux
 	// refuses with `command too long`. Over budget, swap the inlined body for a
 	// pointer at the file that already holds it. A no-op under budget.
@@ -644,7 +654,7 @@ func (m *Model) startPlanSpawnForm(p *plans.Plan, targets, unknown []string) {
 	if len(unknown) > 0 {
 		desc += "\nskipping " + strings.Join(unknown, ", ") + " - not a source of project " + m.project.Name
 	}
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewConfirm().
 			Title(fmt.Sprintf("Accept %s and spawn %d work item(s)?", p.ID, len(targets))).
 			Description(desc).
@@ -715,6 +725,9 @@ func (m Model) finishPlanSpawn() (tea.Model, tea.Cmd) {
 		// a repo linked to two projects with opposite PlanAcceptanceSkip must carry the
 		// focused project's flag, never whichever identically-pathed source sorts first.
 		intent.Command += launch.SkipParams(src.PlanAcceptanceSkip, false)
+		// FR5.2: name the plan's attachments to each spawned session (bounded decorator,
+		// before the fold so the budget check measures the real command).
+		intent = launch.WithAttachments(intent, p.Attachments)
 		// FR1.3: fold an over-budget brief to a pointer at the plan file, naming this
 		// source's `### <name>` subsection. The skip params were appended first and are
 		// preserved by the fold. A no-op under budget.
@@ -794,36 +807,182 @@ func (m Model) planAddTarget() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// startPlanForm opens the huh new-plan form (FR10 `n`): a title input plus an optional
-// DESCRIPTION textarea (0.25.1 — so a quick draft can carry a real brief, not only a bare
-// title) under modeForm. It marks pendingPlan (so updateForm routes completion to
-// finishPlanForm and a cancel returns to the plans tab) and binds both fields through a
-// heap-stable *formBinding (TEST-001).
+// projectSelectField is the FR1.1 destination-project Select — the FIRST field of
+// both mint forms whenever more than one project is registered (FR1.2 mirrors
+// resolveProjectName's established rule: one project = no ambiguity = no prompt).
+// The caller pre-seeds binding.planProject to the focused project BEFORE this
+// builds the field, so huh's selectValue puts the cursor on it and the common case
+// stays one keystroke (FR1.3).
+func (m *Model) projectSelectField(b *formBinding) huh.Field {
+	opts := make([]huh.Option[string], 0, len(m.allProjects))
+	for _, p := range m.allProjects {
+		opts = append(opts, huh.NewOption(p.Name, p.Name))
+	}
+	return huh.NewSelect[string]().
+		Title("Project").
+		Description("the project this plan is created in").
+		Options(opts...).
+		Value(&b.planProject)
+}
+
+// attachmentsField is the optional FR4 attachments Text — ONE local file path or
+// http(s) URL PER LINE, refused at submit with a named error when a line is
+// neither (validateAttachments). A Text, not an Input, on purpose: FR3 just made
+// multi-line entry work, paths contain spaces, and huh.NewInput silently flattens
+// a pasted newline (measured).
+func attachmentsField(b *formBinding) huh.Field {
+	return huh.NewText().
+		Title("Attachments (optional)").
+		Description("one local file path or http(s):// URL per line — recorded on the plan + named to the launched session").
+		Lines(3).
+		Validate(validateAttachments).
+		Value(&b.planAttach)
+}
+
+// attachmentLines splits the attachments Text value into trimmed, non-empty lines.
+func attachmentLines(raw string) []string {
+	var out []string
+	for _, ln := range strings.Split(raw, "\n") {
+		if ln = strings.TrimSpace(ln); ln != "" {
+			out = append(out, ln)
+		}
+	}
+	return out
+}
+
+// normalizeAttachment validates ONE attachment line and returns its stored form:
+// an http(s) URL verbatim (SHAPE-checked only, never fetched — the core loop's
+// no-external-deps bar), or a `~`-expanded, ABSOLUTE local path that must exist
+// (so the record is cwd-independent). A comma is refused outright — the store's
+// list format splits on `,` (D4), so it would be silently corrupted, never stored.
+func normalizeAttachment(line string) (string, error) {
+	if strings.Contains(line, ",") {
+		return "", fmt.Errorf("%q: a comma cannot be stored (the attachments: list splits on it)", line)
+	}
+	if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
+		if strings.TrimPrefix(strings.TrimPrefix(line, "https://"), "http://") == "" {
+			return "", fmt.Errorf("%q: not a usable URL", line)
+		}
+		return line, nil
+	}
+	p := line
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			p = filepath.Join(home, strings.TrimPrefix(strings.TrimPrefix(p, "~"), "/"))
+		}
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return "", fmt.Errorf("%q: %v", line, err)
+	}
+	// REV-004: the STORED value is the normalized one — a comma re-entering via cwd
+	// or $HOME would be silently split into two bogus entries by parseList, so the
+	// D4 refusal must also run on what is actually stored.
+	if strings.Contains(abs, ",") {
+		return "", fmt.Errorf("the resolved path %q contains a comma, which the attachments: list cannot store - move the file or pass a comma-free path", abs)
+	}
+	st, err := os.Stat(abs)
+	if err != nil {
+		return "", fmt.Errorf("%q: not an existing local file (nor an http(s):// URL)", line)
+	}
+	// REV-007: the launched session is told "a local path is a file" — keep the
+	// promise true and refuse a directory here rather than in the session.
+	if !st.Mode().IsRegular() {
+		return "", fmt.Errorf("%q: is a directory (or not a regular file) - attach a file", line)
+	}
+	return abs, nil
+}
+
+// validateAttachments is the huh Validate hook for the attachments field (FR4.3):
+// it refuses to advance, naming the offending line, when any line is neither an
+// existing local file nor an http(s) URL (or carries a comma — FR4.4).
+func validateAttachments(raw string) error {
+	for _, ln := range attachmentLines(raw) {
+		if _, err := normalizeAttachment(ln); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// parseAttachments returns the normalized attachment set for a validated
+// attachments Text value (absolute local paths, verbatim URLs). Lines that fail
+// to normalize are skipped — validateAttachments already refused them at submit,
+// so this is belt-and-braces, never a second error path.
+func parseAttachments(raw string) []string {
+	var out []string
+	for _, ln := range attachmentLines(raw) {
+		if a, err := normalizeAttachment(ln); err == nil {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// focusChosenProject moves the shared focus to the mint form's chosen project
+// (FR1.5) BEFORE anything mints or launches, so plans.New, projects.KnowledgeDir,
+// sourceRefs and firstSourcePath all resolve against the SAME project — without
+// this the plan file would land in project B while the analyst session anchored
+// at project A's first source. A blank choice, an unknown name, or the
+// already-focused project is a no-op, so the single-project form (no Select)
+// stays byte-for-byte today's path.
+func (m *Model) focusChosenProject(chosen string) {
+	if chosen == "" || m.project == nil || chosen == m.project.Name {
+		return
+	}
+	for i := range m.allProjects {
+		if m.allProjects[i].Name == chosen {
+			m.switchProject(i)
+			return
+		}
+	}
+}
+
+// startPlanForm opens the huh new-plan form (FR10 `n`): a destination-project
+// Select FIRST when several projects exist (FR1.1, pre-seeded to the focused one),
+// then the title input, the optional DESCRIPTION textarea (0.25.1) and the optional
+// attachments Text (FR4), under modeForm. It marks pendingPlan (so updateForm
+// routes completion to finishPlanForm and a cancel returns to the plans tab) and
+// binds every field through a heap-stable *formBinding (TEST-001).
 func (m *Model) startPlanForm() {
 	m.pendingPlan = true
-	m.binding = &formBinding{}
-	m.form = huh.NewForm(huh.NewGroup(
+	b := &formBinding{}
+	m.binding = b
+	var fields []huh.Field
+	titleDesc := "creates a draft plan in " + m.project.Name + " — target sources + spawn from its detail"
+	if len(m.allProjects) > 1 {
+		b.planProject = m.project.Name // pre-seed BEFORE the field is built (FR1.3)
+		fields = append(fields, m.projectSelectField(b))
+		titleDesc = "creates a draft plan in the project selected above — target sources + spawn from its detail"
+	}
+	fields = append(fields,
 		huh.NewInput().
 			Title("New plan title").
-			Description("creates a draft plan in "+m.project.Name+" — target sources + spawn from its detail").
-			Value(&m.binding.planTitle),
+			Description(titleDesc).
+			Value(&b.planTitle),
 		huh.NewText().
 			Title("Description (optional)").
-			Description("the plan's goal / brief — shown in the plan detail; edit later with e").
+			Description("the plan's goal / brief — enter = new line · tab = next · ctrl+e = $EDITOR").
 			Lines(4).
-			Value(&m.binding.planDesc),
-	))
+			Value(&b.planDesc),
+		attachmentsField(b),
+	)
+	m.form = newForm(huh.NewGroup(fields...))
 	m.mode = modeForm
 }
 
 // finishPlanForm applies a completed new-plan form: a non-blank title creates a
-// draft plan in the focused project (a write to ~/.gogo/ only) carrying the optional
-// description, reloads the list, and lands back on the plans tab.
+// draft plan in the CHOSEN project (FR1.5 — the shared focus switches there first;
+// a write to ~/.gogo/ only) carrying the optional description + attachments,
+// reloads the list, and lands back on the plans tab with a status NAMING the
+// destination project (FR1.4).
 func (m Model) finishPlanForm() (tea.Model, tea.Cmd) {
-	title, desc := "", ""
+	title, desc, chosen, attach := "", "", "", ""
 	if m.binding != nil {
 		title = strings.TrimSpace(m.binding.planTitle)
 		desc = strings.TrimSpace(m.binding.planDesc)
+		chosen = strings.TrimSpace(m.binding.planProject)
+		attach = m.binding.planAttach
 	}
 	m.pendingPlan = false
 	m.binding = nil
@@ -837,15 +996,22 @@ func (m Model) finishPlanForm() (tea.Model, tea.Cmd) {
 		m.statusBlocked("no project — cannot create a plan")
 		return m, nil
 	}
+	m.focusChosenProject(chosen) // FR1.5: switch BEFORE minting
 	p, err := plans.New(m.project.Name, title, desc)
 	if err != nil {
 		m.statusFailed("create failed: " + err.Error())
 		return m, nil
 	}
+	if atts := parseAttachments(attach); len(atts) > 0 {
+		if _, err := plans.SetAttachments(m.project.Name, p.ID, atts); err != nil {
+			m.statusFailed("attachments failed: " + err.Error())
+			return m, nil
+		}
+	}
 	m.loadPlans()
 	m.planColIdx = 0 // a new plan is a draft — focus the drafts column
 	m.planCardIdx[0] = 0
-	m.status = "created draft " + p.ID
+	m.status = "created draft " + p.ID + " in " + m.project.Name
 	return m, nil
 }
 
@@ -884,25 +1050,38 @@ func (m Model) planWithClaude() (tea.Model, tea.Cmd) {
 	return m, m.form.Init()
 }
 
-// startPlanWithClaudeForm opens the huh `A` goal form (0.25.1) under modeForm: a required
-// GOAL textarea (what to build/change across the project's sources) plus an optional short
-// title (derived from the goal when blank). It marks pendingPlanWithClaude (so updateForm
-// routes completion to finishPlanWithClaude and a cancel mints NOTHING) and binds both
-// fields through a heap-stable *formBinding (TEST-001).
+// startPlanWithClaudeForm opens the huh `A` goal form (0.25.1) under modeForm: a
+// destination-project Select FIRST when several projects exist (FR1.1, pre-seeded
+// to the focused one — this form used to be the silent wrong-project mint), then
+// the required GOAL textarea (multi-line for real since FR3), the optional short
+// title (derived from the goal when blank) and the optional attachments Text
+// (FR4). It marks pendingPlanWithClaude (so updateForm routes completion to
+// finishPlanWithClaude and a cancel mints NOTHING) and binds every field through a
+// heap-stable *formBinding (TEST-001).
 func (m *Model) startPlanWithClaudeForm() {
 	m.pendingPlanWithClaude = true
-	m.binding = &formBinding{}
-	m.form = huh.NewForm(huh.NewGroup(
+	b := &formBinding{}
+	m.binding = b
+	var fields []huh.Field
+	goalDesc := "the analyst reads " + m.project.Name + "'s sources and writes the plan for this goal"
+	if len(m.allProjects) > 1 {
+		b.planProject = m.project.Name // pre-seed BEFORE the field is built (FR1.3)
+		fields = append(fields, m.projectSelectField(b))
+		goalDesc = "the analyst reads the selected project's sources and writes the plan for this goal"
+	}
+	fields = append(fields,
 		huh.NewText().
 			Title("What should gogo plan for this project? (the goal — what to build or change across its sources)").
-			Description("the analyst reads the project's sources and writes the plan for this goal").
+			Description(goalDesc+" — enter = new line · tab = next · ctrl+e = $EDITOR").
 			Lines(5).
-			Value(&m.binding.planGoal),
+			Value(&b.planGoal),
 		huh.NewInput().
 			Title("Plan title (optional)").
 			Description("defaults to a short title derived from the goal").
-			Value(&m.binding.planTitle),
-	))
+			Value(&b.planTitle),
+		attachmentsField(b),
+	)
+	m.form = newForm(huh.NewGroup(fields...))
 	m.mode = modeForm
 }
 
@@ -919,10 +1098,12 @@ func (m *Model) startPlanWithClaudeForm() {
 // anchoring at a source is safe. With no sources (rare) it falls back to the project home.
 // The launch returns a planAuthorLaunchedMsg so Update can ATTACH the user in.
 func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
-	goal, title := "", ""
+	goal, title, chosen, attach := "", "", "", ""
 	if m.binding != nil {
 		goal = strings.TrimSpace(m.binding.planGoal)
 		title = strings.TrimSpace(m.binding.planTitle)
+		chosen = strings.TrimSpace(m.binding.planProject)
+		attach = m.binding.planAttach
 	}
 	m.pendingPlanWithClaude = false
 	m.binding = nil
@@ -939,6 +1120,10 @@ func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
 	if title == "" {
 		title = deriveTitle(goal)
 	}
+	// FR1.5: switch the shared focus to the CHOSEN project BEFORE minting, so the plan
+	// file, the knowledge dir, the source refs and the session anchor below all resolve
+	// against the SAME project.
+	m.focusChosenProject(chosen)
 	// The DESCRIPTION is the goal, so the plan is never blank/"Untitled" and BriefFor /
 	// the detail view have real content to show.
 	p, err := plans.New(m.project.Name, title, goal)
@@ -946,9 +1131,17 @@ func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
 		m.statusFailed("create failed: " + err.Error())
 		return m, nil
 	}
+	atts := parseAttachments(attach)
+	if len(atts) > 0 {
+		if _, err := plans.SetAttachments(m.project.Name, p.ID, atts); err != nil {
+			m.statusFailed("attachments failed: " + err.Error())
+			return m, nil
+		}
+	}
 	m.loadPlans()
 	m.planColIdx = 0 // a fresh authored plan is a draft — focus the drafts column
 	m.planCardIdx[0] = 0
+	m.status = "created draft " + p.ID + " in " + m.project.Name + " — launching the analyst" // FR1.4
 
 	// Seed a plain authoring session to flesh out the brief IN the plan's own file, NAMING
 	// the goal so the analyst plans FOR IT. The whole prompt reaches claude as ONE trailing
@@ -970,6 +1163,10 @@ func (m Model) finishPlanWithClaude() (tea.Model, tea.Cmd) {
 		homeNote = "no source to anchor at — the session runs in the project home; approve it if Claude prompts"
 	}
 	intent.Root = root
+	// FR5.2: name the plan's attachments to the launched session — a bounded
+	// decorator, applied BEFORE the fold so the budget check measures the real
+	// command. An empty set returns the intent unchanged, byte-for-byte.
+	intent = launch.WithAttachments(intent, atts)
 	// FR1.3: a pasted multi-KB goal blows tmux's command budget exactly like a plan
 	// body does. It is ALREADY the plan file's body (plans.New wrote it above), so
 	// fold to a whole-file pointer - no section, the goal IS the body. No-op under
@@ -1069,13 +1266,20 @@ func (m Model) viewPlansBoard() string {
 		rendered[i] = m.renderPlanColumn(i, colWidth)
 	}
 	body := lipgloss.JoinHorizontal(lipgloss.Top, interleaveSeparators(rendered)...)
-	parts := []string{body}
+	var parts []string
+	// FR2.2: the tab can never again be silent about which project it shows — a
+	// project header row (color dot + name + the switch key), mirroring
+	// viewConfigLeft's `project  (p to switch)` line.
+	if m.project != nil {
+		parts = append(parts, m.projectDot(m.project.Name)+" "+colTitleStyle.Render(m.project.Name)+dimStyle.Render("  (p to switch)"), "")
+	}
+	parts = append(parts, body)
 	if m.status != "" {
 		parts = append(parts, m.renderStatus(m.status))
 	}
 	// FR2.5: every key updatePlanList handles appears here - TestPlansTabKeyHelpInSync
 	// derives the switch's cases and fails if one is missing.
-	help := lipgloss.NewStyle().Faint(true).Render("←→ cols · ↑↓ cards · enter open · v view · w web · n new · A plan-with-claude · m move (ready→go→done) · x delete · tab board/config · q quit")
+	help := lipgloss.NewStyle().Faint(true).Render("←→ cols · ↑↓ cards · enter open · v view · w web · n new · A plan-with-claude · m move (ready→go→done) · p switch project · x delete · tab board/config · q quit")
 	parts = append(parts, help)
 	return strings.Join(parts, "\n")
 }
@@ -1102,7 +1306,7 @@ func (m Model) renderPlanColumn(i, colWidth int) string {
 	}
 	start, end := 0, len(col)
 	if m.height > 0 {
-		avail := m.colAvail()
+		avail := m.planColAvail() // the kanban's own budget — the header row is chrome (REV-005)
 		if avail < 1 {
 			avail = 1
 		}
@@ -1300,7 +1504,21 @@ func (m Model) viewPlanDetail() string {
 	if strings.TrimSpace(desc) == "" {
 		desc = dimStyle.Render("(no description — edit the plan file with e)")
 	}
-	b = append(b, desc, "", colTitleStyle.Render("WORK ITEMS"))
+	b = append(b, desc, "")
+	// FR4.5: the plan's attachments, one row per entry — a local path that no longer
+	// exists is marked `· missing` (attachments are referenced, never copied — D3).
+	if len(p.Attachments) > 0 {
+		b = append(b, colTitleStyle.Render("ATTACHMENTS"))
+		for _, a := range p.Attachments {
+			row := "  " + a
+			if !strings.HasPrefix(a, "http://") && !strings.HasPrefix(a, "https://") && !fileExists(a) {
+				row += dimStyle.Render(" · missing")
+			}
+			b = append(b, row)
+		}
+		b = append(b, "")
+	}
+	b = append(b, colTitleStyle.Render("WORK ITEMS"))
 
 	if len(p.Targets) == 0 {
 		b = append(b, dimStyle.Render("  (no target sources — press + to add one)"))

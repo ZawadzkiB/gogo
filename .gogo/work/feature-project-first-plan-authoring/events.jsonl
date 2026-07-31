@@ -1,1 +1,19 @@
 {"ts":"2026-07-29T14:50:55Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T05:51:10Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:08:42Z","event":"phase-started","phase":"implement","status":"implementing","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:08:42Z","event":"phase-done","phase":"implement","status":"implementing","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:18:19Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:22:40Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"0 blockers, 2 majors, 4 minors, 1 nit - all agent-fixable","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:26:32Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:26:32Z","event":"phase-done","phase":"implement","status":"implementing","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:27:30Z","event":"round-opened","phase":"review","status":"reviewing","round":2,"slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:37:38Z","event":"issues-found","phase":"review","status":"reviewing","round":2,"note":"0 blockers, 0 majors, 2 minors - all 7 round-1 findings verified","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:37:38Z","event":"phase-done","phase":"review","status":"reviewing","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:39:27Z","event":"fix-round","phase":"implement","status":"implementing","round":3,"slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:39:27Z","event":"phase-done","phase":"implement","status":"implementing","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:40:46Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:52:00Z","event":"phase-done","phase":"test","status":"testing","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:52:01Z","event":"phase-started","phase":"report","status":"testing","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T06:55:46Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T08:04:35Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"project-first-plan-authoring"}
+{"ts":"2026-07-31T08:04:35Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-07-31-project-first-plan-authoring/","slug":"project-first-plan-authoring"}

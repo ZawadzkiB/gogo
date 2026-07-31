@@ -1,0 +1,22 @@
+{
+  "slug": "project-first-plan-authoring",
+  "updated": "2026-07-31",
+  "note": "AS-BUILT (0.30.0), three kinds chosen by what the diff introduced. flow = the shipped plans-tab authoring path: the p switcher + always-on project header, the conditional project Select (pre-seeded to focus), multi-line entry under gogoKeyMap, attachment validation (comma re-checked on the RESOLVED path, directories refused), focusChosenProject switching BEFORE minting, and WithAttachments decorating BEFORE FoldToPointer measures the budget. sequence = the runtime call sequence for p (switch in place) and A (plan-with-claude) once the project is explicit, ending anchored at the CHOSEN project's first source. class = the types the diff added: Plan.Attachments + SetAttachments (AddAttachment was planned in the class chart but dropped in review - no caller), the formBinding planProject/planAttach fields, gogoKeyMap/newForm (the ONE construction site, pinned by a source-scan test), the attachment helpers + focusChosenProject, and the bounded launch.WithAttachments decorator. No activity/use-case kind: no new state machine, and the new capabilities are already shown as real call paths in flow + sequence. before/ holds the plan-time as-is baseline (two kinds) copied in so this bundle is self-contained.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": ".gogo/work/feature-project-first-plan-authoring/report/flow.mmd",
+      "title": "As-built plans-tab authoring: p switcher + header, project-first mint, multi-line entry, validated attachments"
+    },
+    {
+      "kind": "sequence",
+      "file": ".gogo/work/feature-project-first-plan-authoring/report/sequence.mmd",
+      "title": "As-built runtime: p switches in place; A mints + launches anchored at the CHOSEN project's first source"
+    },
+    {
+      "kind": "class",
+      "file": ".gogo/work/feature-project-first-plan-authoring/report/class.mmd",
+      "title": "As-built types: Plan.Attachments + SetAttachments, formBinding fields, gogoKeyMap/newForm, WithAttachments"
+    }
+  ]
+}

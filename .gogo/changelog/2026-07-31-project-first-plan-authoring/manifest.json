@@ -1,0 +1,23 @@
+{
+  "slug": "2026-07-31-project-first-plan-authoring",
+  "updated": "2026-07-31",
+  "members": ["project-first-plan-authoring"],
+  "note": "Shipped 0.30.0 - project-first plan authoring. As-built set (3 kinds) + the plan-time before/ baseline (2 kinds), slug-prefixed; the viewer builds the interactive page from these sources.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "project-first-plan-authoring-flow.mmd",
+      "title": "project-first-plan-authoring: As-built plans-tab authoring - p switcher + header, project-first mint, multi-line entry, validated attachments"
+    },
+    {
+      "kind": "sequence",
+      "file": "project-first-plan-authoring-sequence.mmd",
+      "title": "project-first-plan-authoring: As-built runtime - p switches in place; A mints + launches anchored at the CHOSEN project's first source"
+    },
+    {
+      "kind": "class",
+      "file": "project-first-plan-authoring-class.mmd",
+      "title": "project-first-plan-authoring: As-built types - Plan.Attachments + SetAttachments, formBinding fields, gogoKeyMap/newForm, WithAttachments"
+    }
+  ]
+}

@@ -656,7 +656,7 @@ func (m *Model) startAttachPicker(f *contract.Feature, sessions []string) {
 		opts = append(opts, huh.NewOption(s, s))
 	}
 	opts = append(opts, huh.NewOption("Cancel", attachCancel))
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("Attach which session for " + f.Slug + "?").
 			Description("choose a live session to attach (tmux) — pipeline state is untouched").
@@ -733,7 +733,7 @@ func (m *Model) startKillForm(f *contract.Feature, sessions []string) {
 	}
 	title := "Kill " + f.Slug + "'s live " + noun + "?"
 	desc := "kills " + strings.Join(sessions, ", ") + " (tmux) — the pipeline state is untouched"
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewConfirm().
 			Title(title).
 			Description(desc).
@@ -762,7 +762,7 @@ func (m *Model) startKillPicker(f *contract.Feature, sessions []string) {
 		huh.NewOption(fmt.Sprintf("all %d sessions", len(sessions)), killAll),
 		huh.NewOption("Cancel", killCancel),
 	)
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("Kill which session for " + f.Slug + "?").
 			Description(fmt.Sprintf("kill one stray session, or all %d (tmux) — the pipeline state is untouched", len(sessions))).

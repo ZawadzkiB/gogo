@@ -20,7 +20,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.29.0"
+const Version = "0.30.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -197,7 +197,9 @@ board keys:
 
 plans tab keys (a 4-column KANBAN: drafts · ready · active · done):
   ←→ columns · ↑↓ cards · enter open · v view the plan (terminal) · w web page · n new (title + description) · A plan-with-claude (prompts for the goal, then attaches the analyst session)
-  m move (draft→ready: mark ready, no spawn · ready→active: go, spawns a work item per target · active→done: accept project-UAT + write a project changelog) · x delete
+  m move (draft→ready: mark ready, no spawn · ready→active: go, spawns a work item per target · active→done: accept project-UAT + write a project changelog) · p switch project · x delete
+  the tab header names the project on screen; both mint forms (n / A) ask WHICH project when several exist (pre-selected to the focused one)
+  multi-line entry: in a goal/description textarea, enter inserts a new line · tab advances · ctrl+e opens $EDITOR; an optional attachments field takes one local path or http(s) URL per line (stored in the plan's front matter + named to the launched session)
   in a plan: ↑↓ work items · c create work item (spawn /gogo:plan --correlation) · + add source · v view · w web · m move · e edit · esc back
   auto-pickup: a work item spawned into a source with planAcceptanceSkip auto-runs /gogo:go on reload when its source is under cap; at cap it shows "trigger manually"
 

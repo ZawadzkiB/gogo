@@ -1,0 +1,22 @@
+sequenceDiagram
+  actor U as User
+  participant M as tui.Model
+  participant F as huh.Form
+  participant S as plans store
+  participant L as launch
+  participant T as claude / tmux
+
+  U->>M: 'A' on the plans tab
+  M->>M: planWithClaude -- guards m.project and hasClaude only
+  M->>F: startPlanWithClaudeForm -- Text goal plus Input title
+  U->>F: types the goal, presses enter for a new paragraph
+  F-->>M: enter matches Text.Next and Text.Submit, so the field ADVANCES
+  Note over U,F: no newline is inserted, and a second enter completes the form
+  M->>M: finishPlanWithClaude
+  M->>S: plans.New with m.project.Name, title, goal
+  Note over M,S: m.project is still projs[0] -- the user was never asked
+  S-->>M: plan-XXXX lands under the WRONG project home
+  M->>M: loadPlans re-reads only m.project.Name
+  M->>L: AuthorPlanIntent with planPath, correlation, KnowledgeDir, sourceRefs
+  L->>T: one argv element, anchored at m.project's FIRST source
+  T-->>U: attach, and the analyst edits a plan filed in the wrong project

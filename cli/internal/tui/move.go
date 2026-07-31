@@ -458,7 +458,7 @@ func (m *Model) startFormOverriding(intent launch.Intent, isShip bool, override 
 	}
 	fields = append(fields, confirm)
 
-	m.form = huh.NewForm(huh.NewGroup(fields...))
+	m.form = newForm(huh.NewGroup(fields...))
 	m.mode = modeForm
 }
 

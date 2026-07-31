@@ -105,8 +105,15 @@ that source's `--skip-acceptance`, recording a member + flipping the plan active
 **targetless** plan is today's plain mark-ready with zero launches; idempotent - an
 already-spawned target is skipped) · `D` **accept project-UAT** (since 0.24.0 - the same
 gate as `gogo plan done`: refuses unless every member is shipped, else a confirm → flips
-the plan to `done`) · `x` delete. A plan whose members are all shipped renders the derived
-**`awaiting-project-uat`** status (distinct from `active`). In a plan's detail: `↑↓`
+the plan to `done`) · `p` **switch project** (since 0.30.0 - the config tab's switcher on
+the plans tab itself; a header row always names the on-screen project) · `x` delete. A
+plan whose members are all shipped renders the derived **`awaiting-project-uat`** status
+(distinct from `active`). Since **0.30.0** minting is **project-first**: both mint forms
+(`n` / `A`) open with a destination-project select when several projects are registered
+(pre-selected to the focused one), `enter` inserts a newline in every multi-line field
+(`tab` advances), and an optional **attachments** field takes one local path or http(s)
+URL per line - stored in the plan's front-matter `attachments:` list and named to the
+launched session. In a plan's detail: `↑↓`
 target sources · `c` **create work item** (launches `/gogo:plan <body> --correlation
 plan-<hash>` in that source) · `+` add a target source · `v` view · `w` web · `D` accept
 project-UAT · `e` edit the plan file · `esc` back.

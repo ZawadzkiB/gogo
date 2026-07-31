@@ -89,7 +89,7 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		if label == "" {
 			label = b.srcPath
 		}
-		m.form = huh.NewForm(huh.NewGroup(
+		m.form = newForm(huh.NewGroup(
 			huh.NewConfirm().
 				Title("Remove source " + label + "?").
 				Description("removes it from " + edit.project + "'s config.json (~/.gogo/) — the repo's .gogo/ is untouched").
@@ -107,7 +107,7 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 			b.srcBranch = "main"
 		}
 	}
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewInput().Title("Path").Description("the repo/service root that contains .gogo/").Value(&b.srcPath),
 		huh.NewInput().Title("Name").Description("display name (defaults to the folder name)").Value(&b.srcName),
 		huh.NewInput().Title("Main branch").Description("the source's default branch").Value(&b.srcBranch),
@@ -134,7 +134,7 @@ func (m *Model) startProjectColorForm() {
 	m.pendingProject = &projectEdit{name: p.Name}
 	b := &formBinding{projColor: p.Color}
 	m.binding = b
-	m.form = huh.NewForm(huh.NewGroup(
+	m.form = newForm(huh.NewGroup(
 		huh.NewInput().
 			Title("Project label color — " + p.Name).
 			Description("origin-dot hex or a swatch name (e.g. teal, #58a6ff) — the project's color in the switcher").

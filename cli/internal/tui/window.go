@@ -89,6 +89,22 @@ func (m *Model) reflowColumns() {
 	}
 }
 
+// planColAvail is the plans kanban's own vertical budget (REV-005). Counted
+// against the tab's ACTUAL chrome — tab bar + blank (View), project header +
+// blank (FR2.2), status + help (viewPlansBoard) = 6 rows, plus the column's own
+// head + blank (2) = 8 — where colAvail models the work board's 5. Without its
+// own budget a full plans column overflowed and pushed the status + help lines
+// off screen. One producer, used by BOTH the windowing (reflowPlanColumns) and
+// the renderer (renderPlanColumn), so the two can never disagree; pinned by
+// TestPlansBoardFitsTerminalHeight.
+func (m Model) planColAvail() int {
+	avail := m.colAvail() - 1 // tab bar + blank + status + help vs the board's 3-row chrome
+	if m.project != nil {
+		avail -= 2 // the always-on project header row + its blank line
+	}
+	return avail
+}
+
 // reflowPlanColumns re-clamps each plans-kanban column's scroll offset so every window
 // stays valid and the focused column keeps its focused card fully visible — the plans-tab
 // analog of reflowColumns over m.planCols (plans-board FR1). Runs on plans-tab navigation,
@@ -97,7 +113,7 @@ func (m *Model) reflowPlanColumns() {
 	if m.height <= 0 {
 		return // no size yet — View renders everything; offsets stay 0
 	}
-	avail := m.colAvail()
+	avail := m.planColAvail()
 	if avail < 1 {
 		avail = 1
 	}

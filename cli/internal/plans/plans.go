@@ -77,6 +77,12 @@ type Plan struct {
 	Targets     []string // source names this plan targets (spawnable into)
 	Members     []Member // work items spawned/linked (many-to-many)
 	Created     string   // RFC3339 — drives newest-first
+	// Attachments are absolute local file paths / http(s) URLs the user attached to
+	// the plan (project-first-plan-authoring FR4). REFERENCED, never copied (D3=A);
+	// comma-free by construction (the list format splits on `,` — D4=A). The
+	// front-matter key set is CLOSED (parsePlan/render), so this field must stay in
+	// both or a hand-added `attachments:` line vanishes on the next CLI write.
+	Attachments []string
 }
 
 // HasMembers reports whether the plan has ≥1 member (the old "epic" shape).
@@ -166,6 +172,8 @@ func parsePlan(id string, raw []byte) Plan {
 					p.Created = val
 				case "targets":
 					p.Targets = parseList(val)
+				case "attachments":
+					p.Attachments = parseList(val)
 				case "members":
 					p.Members = parseMembers(val)
 				}
@@ -239,6 +247,9 @@ func (p Plan) render() []byte {
 	}
 	if len(p.Targets) > 0 {
 		fmt.Fprintf(&b, "targets: %s\n", strings.Join(p.Targets, ", "))
+	}
+	if len(p.Attachments) > 0 {
+		fmt.Fprintf(&b, "attachments: %s\n", strings.Join(p.Attachments, ", "))
 	}
 	if len(p.Members) > 0 {
 		parts := make([]string, len(p.Members))
@@ -432,6 +443,26 @@ func RemoveMember(project, id string, m Member) (removed bool, err error) {
 	}
 	p.Members = kept
 	return true, Save(project, p)
+}
+
+// SetAttachments replaces the plan's attachment set (project-first-plan-authoring
+// FR4) and persists it — the same defensive load → mutate → Save shape as AddTarget.
+// Entries are trimmed and blanks dropped; the caller has already validated them
+// (existing local path or http(s) URL, no comma). Returns the updated plan; a
+// missing plan is an error.
+func SetAttachments(project, id string, atts []string) (Plan, error) {
+	p, ok := Get(project, id)
+	if !ok {
+		return Plan{}, os.ErrNotExist
+	}
+	var kept []string
+	for _, a := range atts {
+		if a = strings.TrimSpace(a); a != "" {
+			kept = append(kept, a)
+		}
+	}
+	p.Attachments = kept
+	return p, Save(project, p)
 }
 
 // SetStatus sets the plan's lifecycle status (normalized to the known set) and

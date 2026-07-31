@@ -244,6 +244,71 @@ func FoldToPointer(in Intent, planPath, section string) Intent {
 	return folded
 }
 
+// --- attachments clause (project-first-plan-authoring FR5) ---------------------
+//
+// A plan can carry attachments (local image paths / URLs, plans.Plan.Attachments).
+// WithAttachments names them to the launched session by appending ONE bounded
+// clause to the intent's single trailing argv element — a DECORATOR over Intent,
+// deliberately the same shape as FoldToPointer so the two compose and neither has
+// to edit PlanIntent/AuthorPlanIntent.
+
+// MaxAttachmentEntries caps how many attachments the clause names (FR5.4) — the
+// rest stay readable in the plan file's `attachments:` line, which the clause
+// points at when it truncates.
+const MaxAttachmentEntries = 12
+
+// MaxAttachmentClauseBytes caps the whole appended clause (FR5.4) so attachments
+// can never be the thing that overflows tmux's ~16 KB command budget: even the
+// full cap leaves >14 KB for the command it decorates.
+const MaxAttachmentClauseBytes = 2048
+
+// WithAttachments appends one bounded clause naming the plan's attachments to the
+// intent's command (FR5.1). An empty/all-blank list returns in UNCHANGED —
+// byte-for-byte, so every attachment-less launch is exactly today's. The clause is
+// bounded twice (MaxAttachmentEntries + MaxAttachmentClauseBytes); entries past
+// either bound are summarized as a count with a pointer at the plan file's
+// `attachments:` line, never silently dropped. Attachments are comma-free and
+// newline-free by store construction, and the clause stays INSIDE the single
+// trailing argv element — injection-safe, exactly like the --correlation param.
+func WithAttachments(in Intent, atts []string) Intent {
+	var kept []string
+	for _, a := range atts {
+		if a = strings.TrimSpace(a); a != "" {
+			kept = append(kept, a)
+		}
+	}
+	if len(kept) == 0 {
+		return in
+	}
+	const head = " The user ATTACHED these to the plan - read each one (a local path is a file on this machine; a URL is a link): "
+	named := 0
+	clause := head
+	for _, a := range kept {
+		if named >= MaxAttachmentEntries {
+			break
+		}
+		cand := a
+		if named > 0 {
+			cand = "; " + a
+		}
+		if len(clause)+len(cand) > MaxAttachmentClauseBytes-64 { // reserve room for the +N tail
+			break
+		}
+		clause += cand
+		named++
+	}
+	if named == 0 {
+		// Even the first entry blew the byte bound (a pathological path) — point at the
+		// plan file instead of inlining anything.
+		clause = head + fmt.Sprintf("%d attachment(s), listed in the plan file's attachments: line", len(kept))
+	} else if rest := len(kept) - named; rest > 0 {
+		clause += fmt.Sprintf(" (+%d more in the plan file's attachments: line)", rest)
+	}
+	out := in
+	out.Command += clause
+	return out
+}
+
 // intentFits reports whether the tmux new-session command line for in stays within
 // MaxTmuxCommandBytes, measured at the intent's own Root (the session name and the
 // anchor path are part of the same budget).

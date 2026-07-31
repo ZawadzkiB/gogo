@@ -64,7 +64,10 @@ must not be consumed or rewritten by this work item. Option C was rejected as du
     confusion.
 - **gogo recommends:** **A** — it fixes what the user actually hit (a silent wrong-project
   mint) with the smallest surface. B is a reasonable follow-up once A is in.
-- **Status:** OPEN
+- **Status:** RESOLVED
+
+### RESOLVED (user, 2026-07-31, at plan acceptance via /gogo:accept)
+**A.** Leave the `projs[0]` default; make it visible (FR2.2) and overridable (FR1.1, FR2.1).
 
 ---
 
@@ -89,7 +92,10 @@ must not be consumed or rewritten by this work item. Option C was rejected as du
 - **gogo recommends:** **A** — it closes the reported bug exactly, reuses an existing shared
   mover, and adds zero risk to the action sites. B stays viable later once `Plan` (or a
   loaded-plan wrapper) carries its project.
-- **Status:** OPEN
+- **Status:** RESOLVED
+
+### RESOLVED (user, 2026-07-31, at plan acceptance via /gogo:accept)
+**A.** Per-project switcher (`p` → `switchProject`) + project header row. No all-projects view.
 
 ---
 
@@ -113,7 +119,11 @@ must not be consumed or rewritten by this work item. Option C was rejected as du
   Claude Code is multimodal and reads a local path directly, and it avoids inventing a
   storage lifecycle before anyone has asked for one. B is a clean follow-up if broken links
   turn out to hurt in practice.
-- **Status:** OPEN
+- **Status:** RESOLVED
+
+### RESOLVED (user, 2026-07-31, at plan acceptance via /gogo:accept)
+**A.** Reference by path (~-expanded, absolute), validated at submit; URLs shape-checked, never
+fetched; a now-missing path is marked in the plan detail (FR4.5). No copying into the store.
 
 ---
 
@@ -139,7 +149,11 @@ must not be consumed or rewritten by this work item. Option C was rejected as du
 - **gogo recommends:** **A** — it matches the store's existing list fields exactly, round-trips
   for free, is what the launch decorator and the detail view read, and cannot be broken by
   prose edits. The comma limitation is explicit and enforced.
-- **Status:** OPEN
+- **Status:** RESOLVED
+
+### RESOLVED (user, 2026-07-31, at plan acceptance via /gogo:accept)
+**A.** Typed `attachments:` front-matter key (`Plan.Attachments []string` + parse + render),
+comma rejected at submit (FR4.4).
 
 ---
 
@@ -158,4 +172,7 @@ must not be consumed or rewritten by this work item. Option C was rejected as du
     repo's top failure mode.
 - **gogo recommends:** **A** — one construction site is the structural fix; B is a smaller
   diff that re-opens the bug on the next form.
-- **Status:** OPEN
+- **Status:** RESOLVED
+
+### RESOLVED (user, 2026-07-31, at plan acceptance via /gogo:accept)
+**A.** One `newForm()` wrapper with `gogoKeyMap()` at all 12 form sites (FR3.1, FR3.2).

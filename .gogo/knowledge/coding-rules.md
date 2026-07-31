@@ -117,6 +117,15 @@ Generated-by: /gogo:build
   producer (`orchestrator.CapSweepRemedy` → `gogo sweep <slug>...`), return `""`
   rather than degrading to the bare form, and guard both the presence of the
   targeted string **and the absence of the bare one**.
+- **Every huh form goes through `newForm()` — never a direct `huh.NewForm(`
+  (0.30.0):** `newForm` (cli/internal/tui/model.go) is the ONE construction site
+  applying `gogoKeyMap()`, whose Text group rebinds `enter` to INSERT A NEWLINE
+  (huh's default Text keymap has `enter` in both Next and Submit, so a typed
+  newline is impossible and a Text-bearing form submits mid-thought — measured).
+  A direct `huh.NewForm(` silently regresses the next Text field; the source-scan
+  guard `TestNewFormIsTheOnlyFormConstructionSite` fails the suite if one
+  reappears (and fails loudly on an empty scan — a guard must never pass
+  vacuously).
 - **Attribute sessions by exact convention parse, never substring (TEST-005,
   0.11.0):** matching a slug into session names with `strings.Contains`
   cross-attributes overlapping slugs (`auth`/`oauth`, `waiting-card` inside

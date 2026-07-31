@@ -2,6 +2,9 @@ package tui
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +16,7 @@ import (
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // TestPlansTabKanbanColumns (plans-board FR1): the plans tab renders a 4-column KANBAN
@@ -1047,6 +1051,7 @@ func TestPlanWithClaudeSubmitFormMessageDriven(t *testing.T) {
 	m = send(m, runes(goal))     // type the goal into the focused textarea
 	m = send(m, huh.NextField()) // blur goal (writes the binding) → title Input focused
 	m = send(m, runes(title))    // type the title
+	m = send(m, huh.NextField()) // → attachments Text focused (left empty — optional, FR4)
 
 	// Advance off the LAST field → huh emits its group-completion message; draining it routes
 	// through the shipped updateForm StateCompleted dispatch to finishPlanWithClaude.
@@ -1077,5 +1082,426 @@ func TestPlanWithClaudeSubmitFormMessageDriven(t *testing.T) {
 	// The attach/headless message landed (no-tmux launcher → the REV-006 headless status).
 	if !strings.Contains(m.status, "headless") {
 		t.Errorf("status = %q, want the headless message produced by the shipped dispatch", m.status)
+	}
+}
+
+// --- project-first plan authoring (0.30.0) -----------------------------------------
+
+// multiProjectPlansTab builds a sized UNIFIED cockpit over the given projects and
+// lands on the plans tab (focus = projs[0], exactly as NewCockpit seeds it).
+func multiProjectPlansTab(t *testing.T, projs ...projects.Project) Model {
+	t.Helper()
+	m := sizedWorkspaceAll(t, &contract.Repo{}, projs)
+	return tab(m)
+}
+
+// TestMintFormsProjectFirst (FR1.1/FR1.2/FR1.3): with SEVERAL projects registered,
+// both mint forms (n and A) open with a destination-project Select as their FIRST
+// field, pre-seeded to the focused project; with ONE project the Select is absent
+// (resolveProjectName's rule: one project = no ambiguity = no prompt).
+func TestMintFormsProjectFirst(t *testing.T) {
+	seedDataHome(t)
+	for _, key := range []string{"n", "A"} {
+		m := multiProjectPlansTab(t,
+			proj("alpha", src("a1", "/r/alpha1")),
+			proj("beta", src("b1", "/r/beta1")))
+		m.hasClaude = true
+		m = send(m, runes(key))
+		if m.mode != modeForm || m.binding == nil {
+			t.Fatalf("%q did not open a form", key)
+		}
+		if m.binding.planProject != "alpha" {
+			t.Errorf("%q: planProject pre-seeded to %q, want the focused project alpha", key, m.binding.planProject)
+		}
+		view := m.View()
+		if !strings.Contains(view, "the project this plan is created in") {
+			t.Errorf("%q: multi-project mint form has no project select:\n%s", key, view)
+		}
+	}
+	// Single project → byte-for-byte today's form: no project select at all.
+	for _, key := range []string{"n", "A"} {
+		m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("web", "/r/web")))
+		m.hasClaude = true
+		m.tab = tabPlans
+		m = send(m, runes(key))
+		if m.mode != modeForm {
+			t.Fatalf("%q did not open a form", key)
+		}
+		if strings.Contains(m.View(), "the project this plan is created in") {
+			t.Errorf("%q: single-project mint form must not carry a project select", key)
+		}
+		if m.binding.planProject != "" {
+			t.Errorf("%q: single-project planProject = %q, want empty (no select)", key, m.binding.planProject)
+		}
+	}
+}
+
+// TestMintLandsInChosenProject (FR1.5): selecting the NON-focused project mints the
+// plan under IT — not under allProjects[0] — and the status line names it (FR1.4).
+func TestMintLandsInChosenProject(t *testing.T) {
+	seedDataHome(t)
+	m := multiProjectPlansTab(t,
+		proj("alpha", src("a1", "/r/alpha1")),
+		proj("beta", src("b1", "/r/beta1")))
+	m = send(m, runes("n"))
+	if m.mode != modeForm {
+		t.Fatal("n did not open the mint form")
+	}
+	m = send(m, tea.KeyMsg{Type: tea.KeyDown}) // Select cursor alpha → beta (value updates on move)
+	if m.binding.planProject != "beta" {
+		t.Fatalf("down did not move the select: planProject = %q", m.binding.planProject)
+	}
+	m = send(m, huh.NextField()) // → title
+	m = send(m, runes("Beta plan"))
+	m = send(m, huh.NextField()) // → description
+	m = send(m, huh.NextField()) // → attachments
+	nm, cmd := m.Update(huh.NextField())
+	m = pumpNoBlink(t, nm.(Model), cmd)
+
+	if list, _ := plans.List("beta"); len(list) != 1 || list[0].Title != "Beta plan" {
+		t.Fatalf("plan did not land in the CHOSEN project beta: %+v", list)
+	}
+	if list, _ := plans.List("alpha"); len(list) != 0 {
+		t.Errorf("plan leaked into the focused-by-default alpha: %+v", list)
+	}
+	if !strings.Contains(m.status, "in beta") {
+		t.Errorf("status = %q, want it to name the destination project", m.status)
+	}
+	if m.project == nil || m.project.Name != "beta" {
+		t.Errorf("shared focus did not follow the choice (FR1.5): %+v", m.project)
+	}
+}
+
+// TestPlanWithClaudeAnchorFollowsChoice (FR1.5, the trap asserted directly): when
+// `A` mints into the chosen project, the launched session is anchored at the CHOSEN
+// project's first source — never the old focus's. Without the switch-before-mint the
+// plan file would land in beta while the analyst session anchored at alpha's source.
+func TestPlanWithClaudeAnchorFollowsChoice(t *testing.T) {
+	seedDataHome(t)
+	m := multiProjectPlansTab(t,
+		proj("alpha", src("a1", "/r/alpha1")),
+		proj("beta", src("b1", "/r/beta1")))
+	m.hasClaude = true
+	var gotRoot string
+	var gotCmd string
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		gotRoot, gotCmd = root, in.Command
+		return launch.Result{Mode: "background", LogPath: "/tmp/a.log", Command: in.Command}, nil
+	}
+	m = send(m, runes("A"))
+	m = send(m, tea.KeyMsg{Type: tea.KeyDown}) // choose beta
+	m = send(m, huh.NextField())               // → goal
+	m = send(m, runes("Build the beta thing"))
+	m = send(m, huh.NextField()) // → title
+	m = send(m, huh.NextField()) // → attachments
+	nm, cmd := m.Update(huh.NextField())
+	m = pumpNoBlink(t, nm.(Model), cmd)
+
+	if gotRoot != "/r/beta1" {
+		t.Errorf("session anchored at %q, want the CHOSEN project's first source /r/beta1", gotRoot)
+	}
+	if gotCmd == "" {
+		t.Fatal("launcher never fired")
+	}
+	if list, _ := plans.List("beta"); len(list) != 1 {
+		t.Errorf("plan not minted in beta: %+v", list)
+	}
+}
+
+// TestMintCancelMintsNothing (FR1.6, the 0.25.1 guarantee re-asserted with the new
+// fields): cancelling either mint form — esc, with the project select present —
+// mints NOTHING in ANY project.
+func TestMintCancelMintsNothing(t *testing.T) {
+	seedDataHome(t)
+	for _, key := range []string{"n", "A"} {
+		m := multiProjectPlansTab(t,
+			proj("alpha", src("a1", "/r/alpha1")),
+			proj("beta", src("b1", "/r/beta1")))
+		m.hasClaude = true
+		m = send(m, runes(key))
+		m = send(m, tea.KeyMsg{Type: tea.KeyEsc})
+		if m.mode == modeForm {
+			t.Fatalf("%q: esc did not cancel the form", key)
+		}
+		for _, p := range []string{"alpha", "beta"} {
+			if list, _ := plans.List(p); len(list) != 0 {
+				t.Errorf("%q: cancel minted a plan in %s: %+v", key, p, list)
+			}
+		}
+	}
+}
+
+// TestPlansTabPSwitchesInPlace (FR2.1/FR2.2): `p` on the plans kanban moves the
+// shared focus to the next project and reloads its plans WITHOUT leaving the tab,
+// and the header row always names the on-screen project.
+func TestPlansTabPSwitchesInPlace(t *testing.T) {
+	seedDataHome(t)
+	plans.New("alpha", "Alpha plan", "a")
+	plans.New("beta", "Beta plan", "b")
+	m := multiProjectPlansTab(t,
+		proj("alpha", src("a1", "/r/alpha1")),
+		proj("beta", src("b1", "/r/beta1")))
+	if view := m.View(); !strings.Contains(view, "alpha  (p to switch)") {
+		t.Errorf("plans tab header does not name the focused project:\n%s", lastLines(view, 30))
+	}
+	m = send(m, runes("p"))
+	if m.tab != tabPlans || m.mode != modeBoard {
+		t.Fatalf("p left the plans tab (tab=%d mode=%d)", m.tab, m.mode)
+	}
+	if m.project == nil || m.project.Name != "beta" {
+		t.Fatalf("p did not switch the focused project: %+v", m.project)
+	}
+	view := m.View()
+	if !strings.Contains(view, "beta  (p to switch)") {
+		t.Errorf("header does not name the new project:\n%s", lastLines(view, 30))
+	}
+	if !strings.Contains(view, "Beta plan") || strings.Contains(view, "Alpha plan") {
+		t.Errorf("p did not reload the plans to beta's set:\n%s", lastLines(view, 30))
+	}
+}
+
+// TestGoalMultilineEntry (FR3, the direct regression guard): typing `l1`, ENTER,
+// `l2` into the goal textarea — through the REAL huh form with gogoKeyMap — persists
+// the multi-line description "l1\nl2". Against the default keymap this exact
+// sequence submits at the first enter with the value "l1" (measured).
+func TestGoalMultilineEntry(t *testing.T) {
+	seedDataHome(t)
+	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("web", "/r/web")))
+	m.hasClaude = true
+	m.tab = tabPlans
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		return launch.Result{Mode: "background", LogPath: "/tmp/a.log", Command: in.Command}, nil
+	}
+	m = send(m, runes("A")) // goal Text is the FIRST field (single project — no select)
+	m = send(m, runes("l1"))
+	m = send(m, tea.KeyMsg{Type: tea.KeyEnter}) // FR3.1: enter INSERTS a newline
+	m = send(m, runes("l2"))
+	m = send(m, huh.NextField()) // blur goal → title
+	m = send(m, huh.NextField()) // → attachments
+	nm, cmd := m.Update(huh.NextField())
+	m = pumpNoBlink(t, nm.(Model), cmd)
+
+	list, _ := plans.List("app")
+	if len(list) != 1 {
+		t.Fatalf("no plan minted (enter submitted the form early?): %+v", list)
+	}
+	if got := strings.TrimSpace(list[0].Description); got != "l1\nl2" {
+		t.Errorf("description = %q, want the multi-line %q", got, "l1\nl2")
+	}
+}
+
+// TestAttachmentNormalize (FR4.3/FR4.4): the pure validator — a comma is refused
+// (the store's list format), an http(s) URL is shape-checked only, a local path is
+// ~-expanded + made absolute and must exist.
+func TestAttachmentNormalize(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "shot.png")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := normalizeAttachment(file); err != nil || got != file {
+		t.Errorf("existing file: got (%q, %v)", got, err)
+	}
+	if got, err := normalizeAttachment("https://example.com/spec"); err != nil || got != "https://example.com/spec" {
+		t.Errorf("https URL: got (%q, %v)", got, err)
+	}
+	if _, err := normalizeAttachment("/nonexistent/zzz.png"); err == nil {
+		t.Error("nonexistent path accepted")
+	}
+	if _, err := normalizeAttachment(file + ",b"); err == nil || !strings.Contains(err.Error(), "comma") {
+		t.Errorf("comma not refused with a named error: %v", err)
+	}
+	if _, err := normalizeAttachment("https://"); err == nil {
+		t.Error("bare https:// accepted")
+	}
+	// REV-007: a directory is not "an existing local file" — refuse it by name.
+	if _, err := normalizeAttachment(dir); err == nil || !strings.Contains(err.Error(), "directory") {
+		t.Errorf("directory attachment not refused with a named error: %v", err)
+	}
+	// REV-004: the comma refusal must also hold on the NORMALIZED value — a
+	// relative path resolved inside a comma-bearing directory re-enters the comma
+	// the raw-line check cannot see.
+	commaDir := filepath.Join(t.TempDir(), "a,b")
+	if err := os.MkdirAll(commaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	commaFile := filepath.Join(commaDir, "shot.png")
+	if err := os.WriteFile(commaFile, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// t.Chdir (Go 1.25) restores the cwd itself — a raw os.Chdir + manual restore
+	// left later same-package tests one dropped Cleanup away from a wrong cwd
+	// (REV-009's live dependency: the source-scan guard below runs from ".").
+	t.Chdir(commaDir)
+	if _, err := normalizeAttachment("shot.png"); err == nil || !strings.Contains(err.Error(), "comma") {
+		t.Errorf("comma re-entering via the resolved path not refused: %v", err)
+	}
+	if err := validateAttachments(file + "\nhttps://example.com\n"); err != nil {
+		t.Errorf("valid multi-line set refused: %v", err)
+	}
+	if err := validateAttachments("good-line-missing"); err == nil {
+		t.Error("validateAttachments accepted a broken line")
+	}
+}
+
+// TestAttachmentFormValidationAndPersist (FR4): an invalid attachment line keeps
+// the form OPEN with a named error (no plan minted); a valid local file + URL
+// submit, persist into the plan's front matter, and reach the launched session's
+// command (FR5 — the fake launcher's Intent.Command names them).
+func TestAttachmentFormValidationAndPersist(t *testing.T) {
+	seedDataHome(t)
+	dir := t.TempDir()
+	file := filepath.Join(dir, "mockup.png")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reject: a nonexistent path refuses to advance — the form stays open, nothing mints.
+	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("web", "/r/web")))
+	m.tab = tabPlans
+	m = send(m, runes("n"))
+	m = send(m, runes("T"))      // title
+	m = send(m, huh.NextField()) // → description
+	m = send(m, huh.NextField()) // → attachments
+	m = send(m, runes("/nonexistent/zzz.png"))
+	nm, cmd := m.Update(huh.NextField())
+	m = pumpNoBlink(t, nm.(Model), cmd)
+	if m.mode != modeForm {
+		t.Fatalf("invalid attachment did not keep the form open (mode=%d)", m.mode)
+	}
+	if list, _ := plans.List("app"); len(list) != 0 {
+		t.Fatalf("invalid attachment minted a plan anyway: %+v", list)
+	}
+
+	// Accept: a real file + an https URL (multi-line via the FR3 enter) submit + persist.
+	m2 := sizedWorkspace(t, &contract.Repo{}, proj("app", src("web", "/r/web")))
+	m2.hasClaude = true
+	m2.tab = tabPlans
+	var gotCmd string
+	m2.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		gotCmd = in.Command
+		return launch.Result{Mode: "background", LogPath: "/tmp/a.log", Command: in.Command}, nil
+	}
+	m2 = send(m2, runes("A"))
+	m2 = send(m2, runes("The goal"))
+	m2 = send(m2, huh.NextField()) // → title
+	m2 = send(m2, huh.NextField()) // → attachments
+	m2 = send(m2, runes(file))
+	m2 = send(m2, tea.KeyMsg{Type: tea.KeyEnter})
+	m2 = send(m2, runes("https://example.com/spec"))
+	nm2, cmd2 := m2.Update(huh.NextField())
+	m2 = pumpNoBlink(t, nm2.(Model), cmd2)
+
+	list, _ := plans.List("app")
+	if len(list) != 1 {
+		t.Fatalf("valid attachments did not submit: %+v", list)
+	}
+	atts := list[0].Attachments
+	if len(atts) != 2 || atts[0] != file || atts[1] != "https://example.com/spec" {
+		t.Fatalf("persisted attachments = %v, want [%s https://example.com/spec]", atts, file)
+	}
+	if !strings.Contains(gotCmd, file) || !strings.Contains(gotCmd, "https://example.com/spec") {
+		t.Errorf("launched command does not name the attachments (FR5):\n%s", gotCmd)
+	}
+}
+
+// TestSpawnCarriesAttachments (FR5.2): the plan-detail `c` spawn decorates its
+// /gogo:plan intent with the plan's stored attachments.
+func TestSpawnCarriesAttachments(t *testing.T) {
+	seedDataHome(t)
+	p, err := plans.New("app", "With shots", "the brief")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plans.SetAttachments("app", p.ID, []string{"/abs/shot.png"})
+	plans.AddTarget("app", p.ID, "web")
+	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("web", "/r/web")))
+	m.hasClaude = true
+	m.tab = tabPlans
+	var gotCmd string
+	m.launcher = func(root string, in launch.Intent) (launch.Result, error) {
+		gotCmd = in.Command
+		return launch.Result{Mode: "tmux", Session: in.Session, Command: in.Command}, nil
+	}
+	m = send(m, tea.KeyMsg{Type: tea.KeyEnter}) // open the plan detail
+	if m.planDetail == nil {
+		t.Fatal("no plan detail opened")
+	}
+	nm, cmd := m.Update(runes("c"))
+	m = pumpNoBlink(t, nm.(Model), cmd)
+	if !strings.Contains(gotCmd, "/abs/shot.png") {
+		t.Errorf("spawned command does not name the attachment:\n%s", gotCmd)
+	}
+	// FR4.5: the detail renders the ATTACHMENTS block, marking the (gone) path missing.
+	view := m.View()
+	if !strings.Contains(view, "ATTACHMENTS") || !strings.Contains(view, "/abs/shot.png · missing") {
+		t.Errorf("plan detail does not render the attachments block:\n%s", view)
+	}
+}
+
+// TestNewFormIsTheOnlyFormConstructionSite (REV-002, code-review-standards #12):
+// D5=A's justification is ONE construction site — every gogo form goes through
+// newForm() so gogoKeyMap's Text bindings apply. This pins the WIRING, not just
+// the producer: a future `huh.NewForm(` anywhere else in the package compiles,
+// vets and passes the suite while silently regressing the next Text field to
+// "enter submits". Source-scan guard, the TestSkillsBashNoUnsafeRm precedent.
+func TestNewFormIsTheOnlyFormConstructionSite(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// REV-009 (test-strategy variant 6): an empty scan must FAIL, not pass
+	// vacuously — a cwd left elsewhere by a sibling test would otherwise turn
+	// this guard green while scanning nothing (the skills_lint_test precedent).
+	scanned, sawModel := 0, false
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		scanned++
+		raw, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		count := strings.Count(string(raw), "huh.NewForm(")
+		switch {
+		case name == "model.go":
+			sawModel = true
+			if count != 1 {
+				t.Errorf("model.go must contain exactly ONE huh.NewForm( — inside newForm() — got %d", count)
+			}
+		case count > 0:
+			t.Errorf("%s calls huh.NewForm( directly (%d×) — use newForm(...) so gogoKeyMap's Text bindings (enter = new line) apply", name, count)
+		}
+	}
+	if scanned == 0 || !sawModel {
+		t.Fatalf("scanned %d non-test .go files (sawModel=%v) — wrong cwd? the guard must scan the tui package source", scanned, sawModel)
+	}
+}
+
+// TestPlansBoardFitsTerminalHeight (REV-005): the always-on project header row is
+// plans-tab CHROME, so the kanban's windowing budget (planColAvail) subtracts it —
+// a full column must never push the status + help lines past the terminal height.
+func TestPlansBoardFitsTerminalHeight(t *testing.T) {
+	seedDataHome(t)
+	for i := 0; i < 12; i++ {
+		plans.New("app", fmt.Sprintf("Filler plan %02d", i), "body")
+	}
+	m := sizedWorkspace(t, &contract.Repo{}, proj("app", src("web", "/r/web")))
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 200, Height: 24})
+	m = nm.(Model)
+	m.tab = tabPlans
+	m.status = "a status line that must stay on screen"
+	view := m.View()
+	if got := lipgloss.Height(view); got > m.height {
+		t.Errorf("plans tab renders %d rows into a %d-row terminal — the status/help lines scroll off", got, m.height)
+	}
+	last := lastLine(view)
+	if !strings.Contains(last, "q quit") {
+		t.Errorf("help line is not the last visible row: %q", last)
+	}
+	if !strings.Contains(view, "a status line that must stay on screen") {
+		t.Error("status line missing from the render")
 	}
 }

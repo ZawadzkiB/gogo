@@ -1,0 +1,17 @@
+{
+  "slug": "project-first-plan-authoring",
+  "updated": "2026-07-29",
+  "note": "As-is baseline, captured before any code change. flow = today's path from NewCockpit's projs[0] default through the two plans-tab mint forms into a project the user never chose, plus the focused-project-only loadPlans; sequence = today's 'A' plan-with-claude call sequence, where enter advances instead of inserting a newline and the plan is minted into m.project. Scoped to what this change touches.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": ".gogo/work/feature-project-first-plan-authoring/report/before/flow.mmd",
+      "title": "Today: projs[0] is the silent default, the plans tab has no project switcher and no attachment concept"
+    },
+    {
+      "kind": "sequence",
+      "file": ".gogo/work/feature-project-first-plan-authoring/report/before/sequence.mmd",
+      "title": "Today: 'A' mints into m.project and enter submits instead of inserting a newline"
+    }
+  ]
+}

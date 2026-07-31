@@ -1,0 +1,29 @@
+flowchart TD
+  entry["gogo global -- main.chooseBoard"] --> cockpit["tui.NewCockpit(projs)"]
+  cockpit --> sorted["projects.List() -- name-sorted: dotai, gogo, very-nice-mermaid"]
+  sorted --> focus["focus = &projs[0] -- always 'dotai'"]
+  focus --> mproj["m.project"]
+
+  mproj --> bar["tab bar: board · plans · config"]
+  bar --> board["updateBoard -- 'p' cycleProjectChip"]
+  bar --> config["updateConfig -- 'p' switchProject"]
+  bar --> plans["updatePlanList -- NO 'p', project name never rendered"]
+
+  plans --> keyN["'n' startPlanForm"]
+  plans --> keyA["'A' planWithClaude"]
+  keyN --> formN["huh: Input(title) + Text(description)"]
+  keyA --> formA["huh: Text(goal) + Input(title)"]
+  formN --> enter["default huh keymap -- 'enter' = Next/Submit"]
+  formA --> enter
+  enter --> flat["typed newline impossible; NewInput flattens a pasted newline to a space"]
+
+  formN --> mint["plans.New(m.project.Name, title, body)"]
+  formA --> mint
+  mint --> store["~/.gogo/projects/dotai/.gogo/plans/plan-XXXX.md"]
+  store --> keys["front matter closed set: id, title, status, created, targets, members"]
+  keys --> noatt["no attachment concept anywhere in the store"]
+  store --> wrong["the plan lands in whichever project sorts first"]
+
+  plans --> load["loadPlans() -- plans.List(m.project.Name) only"]
+  load --> hidden["every other project's plans: invisible AND unreachable from this tab"]
+  hidden --> detour["workaround: tab to board, press 'p', tab back"]
