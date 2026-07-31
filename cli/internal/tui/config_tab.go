@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -111,10 +112,9 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		huh.NewInput().Title("Name").Description("display name (defaults to the folder name)").Value(&b.srcName),
 		huh.NewInput().Title("Main branch").Description("the source's default branch").Value(&b.srcBranch),
 		huh.NewInput().Title("Label color").Description("origin-dot hex or a swatch name (e.g. teal, #58a6ff) — blank auto-assigns").Value(&b.srcColor),
-		// FR3.4: state the cap's REAL scope where it is set. It is per SOURCE, counts
-		// only in-progress work items that have a live session, and never counts plans -
-		// a cap of 1 does NOT stop other sources, other plans, or a plan spawn.
-		huh.NewInput().Title("Concurrent work items").Description("0 = unlimited; N caps THIS source's in-progress work items that have a live session - other sources are unaffected, and plans are never counted").Value(&b.srcCap),
+		huh.NewInput().Title("Concurrent work items").
+			Description(capFieldDescription()).
+			Value(&b.srcCap),
 		// Per-source gate-skip flags (FR4): opt this source OUT of the plan-acceptance /
 		// UAT gate. When on, `gogo go` appends --skip-acceptance / --skip-uat to the
 		// launched /gogo:go and the gogo skills auto-advance that gate. Default off →
@@ -470,13 +470,29 @@ func capText(n int) string {
 	return "cap ∞"
 }
 
+// capFieldDescription is the source-edit form's cap-field help text (FR3.4): the cap's REAL
+// scope stated where it is SET - a cap of 1 does not stop other sources, other plans, or a
+// plan spawn. The rule itself comes from orchestrator.CapRuleClause (FR12a); this field is
+// the one the user reads while choosing the number, so a stale copy here is the worst place
+// for an old rule to survive - which is exactly what happened when the sentence was
+// hand-copied across four surfaces.
+//
+// It is a named function rather than an inline string so the guard can assert the RENDERED
+// text (cap_rule_test.go). A file-level grep could not: config_tab.go carries TWO cap
+// surfaces plus comments naming the constant, so hand-writing just this one left the
+// identifier in the file and the whole suite green (REV-012).
+func capFieldDescription() string {
+	return "0 = unlimited; N caps THIS source only - the cap " + orchestrator.CapRuleClause
+}
+
 // capScopeNote spells out what the cap actually counts, next to the number (FR3.4).
 // The scope was invisible, so a cap of 1 read as a global "gogo will only run one
-// thing" - it is per SOURCE, counts only in-progress work items with a LIVE
-// session, and never counts plans (they are not work items at all).
+// thing". The rule text is orchestrator.CapRuleClause, the single source every surface
+// quotes (FR12a) - this note used to carry its own copy, which still stated the pre-0.29.0
+// class-filtered rule after the rule itself had changed.
 func capScopeNote(n int) string {
 	if n > 0 {
-		return "(this source only · counts in-progress work items with a live session · plans never count)"
+		return "(the cap " + orchestrator.CapRuleClause + ")"
 	}
 	return "(unlimited)"
 }

@@ -327,6 +327,55 @@ only truthful live-session state sooner.
   backgrounds `claude -p` and writes a launch log under the target's CLI-owned
   `.gogo/resources/cli/logs/`, the same sanctioned resources root the board's `Launch` uses.)
 
+### Changed in 0.29.0 (presentation + a reader-side gate; §2's enum, §3's classes and the class→column mapping are UNCHANGED)
+
+- **A derived `authoring` DISPLAY state - no new status value.** A work item whose `status`
+  reads `awaiting-plan-acceptance` (or carries no status at all) while `plan.md` is **absent
+  or still a stub** (fewer than **two `## ` sections**) is being **authored**, not waiting on
+  the user. Such an item reads `✎ authoring` (dim, no gate stripe), is **excluded** from the
+  `⏸ K need you` count and from `gogo status`'s `WAIT` column, and **every accept/build path
+  refuses it**: the board's `m` **and** its `M` force key bounce (a missing plan is a
+  *legality* rule, not a cap - `M` overrides only the cap), `gogo go` refuses a
+  `plan-accepted` item whose plan is unwritten, and `/gogo:accept` stops before presenting.
+  This is **derived at every read**, so it is crash-safe (an analyst killed mid-authoring
+  leaves an item that still reads authoring) and needs no migration. `status`'s enum (§2),
+  the four classes and the class→column mapping (§3) are **untouched** - an authoring item is
+  still `unfinished` → the **plan** column.
+- **Template placeholders read as EMPTY.** A `state.md` value that is a bare `<…>` (the
+  template's `<one-line title>`, `<YYYY-MM-DD>`, `<git branch | n/a>`) parses as absent, so a
+  card falls back to its slug and a placeholder `created:` no longer sorts a half-written item
+  to the TOP of the plan column (`'<'` 0x3C sorts above `'2'` 0x32).
+- **Phases write their status at ENTRY as well as at exit.** ②/③/④ write
+  `phase`/`status` + append `phase-started` as their FIRST act after validate-in, before doing
+  the work; the exit write ALSO writes `phase`/`status` (belt and braces - the entry write is
+  prose that gets skipped, and with only one writer `state.md` stops advancing at all), plus the
+  `iterations` bump and `phase-done`. So a reader sees
+  in-flight work within seconds of launch instead of after the phase ends, and `events.jsonl`
+  is a live stream rather than a post-hoc log. A killed phase now leaves a working status with
+  no live session, which reads **`· stalled`** (and is still resumable).
+  Because that write is prose an agent can skip, a reader can also DETECT a skip from the
+  telemetry alone: when a build session is live on a working status and the newest event either
+  is a `phase-done` for the very phase `state.md` still names, **or** is an entry event
+  (`phase-started`/`fix-round`) naming a DIFFERENT phase than the line does, the phase line is
+  behind and the card reads **`· state lags`**. The second shape covers the loop back to
+  implement - the pipeline's most common re-entry - and a half-completed occupancy write.
+  Deterministic and file-derived; a feature with no `events.jsonl`, or one at a terminal or gate
+  status, never trips it.
+- **The concurrency cap counts a live BUILD SESSION, per source.** `ActiveWorkSlugs` no longer
+  filters on the file-derived in-progress class: it counts a feature in the source whose live
+  session is a `gogo-go-<slug>` **build** (an authoring `gogo-plan-<slug>` session, and every
+  other action, is not counted). The class filter contradicted the rule the cap always
+  documented and lied exactly when it mattered - for the whole of a build the file still said
+  `plan-accepted`, so the build was invisible and a second one could clobber the same working
+  tree. The user-visible bounce states the new rule.
+- **The live-vs-file disagreement is CUED, never hidden.** A card with a live build session
+  whose status has not caught up keeps its **file-derived column** (one source of truth across
+  the TUI, `gogo status` and any headless reader) and gains an amber **`● building`** chip; its
+  agent chip is derived from the **session action**, so a card being built reads `● developer`,
+  never `● analyst`. `gogo status` gains a **`LIVE`** column (`building` / `authoring` / `live`
+  / `-`) when sessions are present; with tmux absent or nothing running the table is
+  byte-for-byte the pre-0.29.0 one.
+
 ## 1. The `.gogo/` layout a consumer reads
 
 Two roots matter: **work** (one folder per feature, the live pipeline state +
@@ -340,7 +389,7 @@ once that phase has run:
 
 | Path | Meaning | Guaranteed? |
 |---|---|---|
-| `plan.md` | The accepted plan - the prose contract + the feature's functional requirements. A leading `Status: **accepted** (...)` line once accepted. | **Guaranteed** (from plan ①) |
+| `plan.md` | The accepted plan - the prose contract + the feature's functional requirements. A leading `Status: **accepted** (...)` line once accepted. **Guaranteed from ① means: a folder WITHOUT a written `plan.md` is mid-authoring, and no reader may treat its `status` as a gate** (0.29.0) - see the note below. | **Guaranteed** (from plan ①) |
 | `state.md` | Current phase / status / iteration counters / resume hint. The human resume file; its bolded lines are the contract (§2). | **Guaranteed** (from plan ①) |
 | `decisions.md` | Open/closed forks that needed the user + gogo's recommendation + the resolution. | **Guaranteed** (from plan ①) |
 | `adjustments.md` | Running log of user-requested changes/clarifications during planning. | **Guaranteed** (from plan ①) |
@@ -361,6 +410,17 @@ once that phase has run:
 feature is report-complete (§3). Never assume a file exists; treat absence as
 "that phase hasn't run." A feature is **report-complete** iff
 `report/report.md` (new bundle) or a legacy root `report.md` exists.
+
+**`plan.md`'s guarantee, made explicit (0.29.0).** "**Guaranteed** (from plan ①)" is a
+statement about a folder ① actually FINISHED. Because `state.md` is written at a phase's
+exit, an analyst can leave a folder carrying `status: awaiting-plan-acceptance` with **no
+written `plan.md`** - so the guarantee runs the other way too: **a folder without a written
+`plan.md` is mid-authoring, and no reader may treat its `status` as a gate.** "Written"
+means present with at least **two `## ` sections** (a scaffold stub has 0-1; the smallest
+real plan in the tree carries 8). `plan.md` is **monotonic** - ⑤ updates it to as-built and
+nothing deletes it - so its **absence** can only ever mean "never written", never "stale".
+That is what makes this presence check safe where a presence check on `report/` is not: it
+may only ever **REFUSE** an action, never **PROMOTE** a class or unlock one.
 
 ### `.gogo/changelog/<YYYY-MM-DD>-<name>/` - append-only shipped history
 
@@ -392,6 +452,17 @@ A parser keys on the `- **<key>:**` prefix and takes the value up to end-of-line
 or a trailing `<!-- ... -->` comment (trim it). Only these keys are contract;
 ignore anything else and tolerate extra bolded lines a future version adds.
 
+**Comment blocks span lines, and a key inside one is not a key (0.29.0).** `state.md`'s legends
+are multi-line `<!-- … -->` blocks, and they contain EXAMPLE key lines - the template's own
+optional-`correlation` legend shows `- **correlation:** [plan-XXXX]` inside a comment. A reader
+must therefore track whether it is inside an unclosed `<!--` and skip those lines entirely;
+matching per-line and stripping only same-line comments parsed that example as a real field (it
+painted a bogus `⛓ ×3` chip on every fresh scaffold). Rules: `<!--` and `-->` on one line leave
+the parser outside (so a trailing comment behaves exactly as above); a `-->` with nothing open is
+ignored; and an **unterminated** `<!--` comments out the rest of the file - what a markdown
+renderer shows - so keys before it still parse and keys after it go missing. Like the placeholder
+rule, this may only ever make a value **missing**, never wrong.
+
 | Key | Value | Notes |
 |---|---|---|
 | `feature` | one-line title | free text |
@@ -407,9 +478,18 @@ ignore anything else and tolerate extra bolded lines a future version adds.
 | `correlation` | `[plan-XXXX, …]` | **additive, optional** (0.21.0): the cross-source PLAN id(s) this work item belongs to - a LIST (many-to-many; a ticket may be in several plans). Stamped by `/gogo:plan --correlation plan-XXXX` when a plan spawns/links the item; **absent = today's behaviour, byte-for-byte** (no chip, no `#plan-…` filter). Ids are `plan-<hex8>` ([a-z0-9-]); the reader parses the bracketed list defensively (bare id, empty `[]` → none) |
 
 Parse defensively: a value may carry a trailing `<!-- … -->` or a `(…)` note;
-strip those. `phase`/`status` are the two enums a reader can rely on. Every other
-key (incl. the additive `correlation` list) is optional - an absent line is the
-byte-for-byte default, never an error.
+strip those. **A value that is a bare `<…>` template placeholder** (`<one-line title>`,
+`<YYYY-MM-DD>`, `<git branch | n/a>` - what `templates/state.template.md` ships) **reads as
+EMPTY** (0.29.0): a scaffolded-but-unfinished `state.md` must not render its placeholders as
+real data, and a placeholder `created:` must not sort as a date. `phase`/`status` are the two
+enums a reader can rely on. Every other key (incl. the additive `correlation` list) is
+optional - an absent line is the byte-for-byte default, never an error.
+
+**`status: awaiting-plan-acceptance` is a CLAIM, not proof (0.29.0).** It means "planning is
+done, over to you", but `state.md` is written at a phase's **exit**, so it can be present
+before `plan.md` is. A reader must therefore pair it with §1's plan-written check before
+offering the item as a gate - see *Changed in 0.29.0*. **No enum value was added**; the
+`authoring` display state is derived.
 
 ## 3. The work-index classifier → the four board columns
 

@@ -5,16 +5,27 @@ sequenceDiagram
   participant C as claude /gogo:go &lt;slug&gt;
   participant D as gogo-implement
   participant S as state.md
+  participant T as tmux (ListSessions)
   participant K as cap (ActiveWorkSlugs)
 
   U->>B: m on a plan-accepted card
+  B->>B: attemptActionForce: planReadinessBounce runs FIRST (FR4/FR8)
   B->>C: launch tmux gogo-go-&lt;slug&gt;
   C->>D: phase 2 implement
-  D->>D: validate-in (plan-accepted AND plan.md exists)
-  D->>S: NEW 1b entry write: phase=implement status=implementing + phase-started
-  Note over S,K: TODAY this write happens only at step 4,<br/>after ALL the work - so for the whole build<br/>state.md still says plan-accepted
+  D->>D: validate-in: plan-accepted AND plan.md written (&gt;= 2 '## ')
+  D->>S: 1b ENTRY write: phase=implement status=implementing + phase-started
+  Note over S,K: BEFORE 0.29.0 this write happened only at step 4,<br/>after ALL the work - so for the whole build<br/>state.md still said plan-accepted
   D->>D: edit files, run tests (minutes)
-  B->>K: reload: is this repo busy?
-  K-->>B: NEW counts a live gogo-go session (Class filter dropped)
-  B-->>U: card reads implementing, in-progress column, cap enforced
-  D->>S: step 4 exit write: iterations bump + phase-done
+
+  U->>B: m on a DIFFERENT card in the same source (cap 1)
+  B->>T: ListSessions()
+  T-->>B: gogo-go-&lt;slug&gt; is live
+  B->>K: ActiveWorkSlugs(repo, root, sessions, target)
+  K->>K: HasSessionAction(slug, sessions, ActionGo)
+  Note over K: the Class filter is GONE, so the running build is<br/>counted even while the file still reads plan-accepted<br/>(file-derived class: unfinished)
+  K-->>B: 1 of 1 - the blocking slug is named
+  B-->>U: ⚠ cap 1 reached ... live build session, per source - press M to force
+
+  B->>B: renderCard: cardStateCue '● building', sessionAgent '● developer'
+  D->>S: step 4 EXIT write: iterations bump + phase-done
+  Note over B,S: from here the file itself says implementing,<br/>so the cue is redundant and disappears

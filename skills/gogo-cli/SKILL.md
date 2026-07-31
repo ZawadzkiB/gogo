@@ -120,8 +120,11 @@ is byte-for-byte unchanged. Session probes use tmux's exact-match `-t "=<name>"`
 prefix target killed/peeked the wrong session). The status line carries severity: `✗` red
 = failed · `⚠` amber = blocked/gate · dim = ok. On the board **`M`** forces a launch past
 the source's concurrency cap through the same confirm (which names the cap and the slugs
-already building) - the cap is **per source**, counts only in-progress work items with a
-live session, and **never counts plans**.
+already building) - the cap is **per source**, counts work items with a live **build**
+session (`gogo-go-<slug>`; since 0.29.0 the file-derived class is no longer part of the
+rule, because a mid-build item still reads `plan-accepted` and so went uncounted), and
+**never counts** an authoring `gogo-plan-<slug>` session or a plan itself. `M` overrides
+the cap **and only the cap**: a missing/stub `plan.md` is a legality rule and still bounces.
 
 **Config tab + per-source concurrency cap (since 0.21.0):** the config tab manages
 the focused project's **sources** (`a` add · `x` remove · `e` edit a source's
@@ -140,11 +143,38 @@ uncapped source behaves as before.
 state - **`running` is never a status**; a live session is the separate green `●`
 next to the name plus the header's `● N session` count) and, only while a session
 is actively working it, a green **`● <agent>` chip** (analyst / developer /
-reviewer / tester / reporter, from the phase). The heavy **left-border stripe**
-(red gate / purple UAT) is the per-card "act now" cue. The collapsed **changelog**
-carries a `●` on any shipped item still holding a session. In the drill, `a` (and
-`K`) open a **picker** to choose *which* session when the card has several - `K`
-also offers "all N".
+reviewer / tester / reporter - since 0.29.0 derived from the live **session's action**
+when the phase line disagrees, so a card being built reads `● developer`). The heavy
+**left-border stripe** (red gate / purple UAT) is the per-card "act now" cue. The
+collapsed **changelog** carries a `●` on any shipped item still holding a session. In the
+drill, `a` (and `K`) open a **picker** to choose *which* session when the card has several
+- `K` also offers "all N".
+
+**Three cues for files-vs-reality disagreement (since 0.29.0)** - `state.md` is written at
+each phase's boundary, so it can describe work that has not started or has already ended:
+- **`✎ authoring`** (dim, no stripe) - `status` says the plan gate but `plan.md` is absent
+  or a stub (< 2 `## ` sections). It is **not** a user gate: excluded from `⏸ K need you`
+  and from `gogo status`'s `WAIT`, and `m`, `M`, `gogo go` and `/gogo:accept` all **refuse**
+  it, naming how far short the plan falls and offering `gogo plan <slug>`.
+- **`● building`** (amber) - a live `gogo-go-<slug>` session while the file still reads
+  `plan-accepted` (the launch-to-first-write window). The card keeps its **file-derived
+  column**; only the cue is added.
+- **`· state lags`** - the telemetry contradicts the phase line while a build session is live,
+  i.e. a phase started without recording its occupancy, so every reader is describing an earlier
+  phase. Two shapes: the newest event is a `phase-done` for the phase `state.md` still names (a
+  forward hand-off nothing claimed), or an **entry** event (`phase-started`/`fix-round`) naming a
+  DIFFERENT phase than the line does (the loop back to implement, or a half-done step 1). The one
+  cue that can see a skipped entry write, since the live `gogo-go` session looks identical either
+  way. Only on a working status, so a terminal item with a lingering session never trips it.
+  Read it precisely: it means **`state.md` and `events.jsonl` disagree about the current phase -
+  one half of step 1 did not land** (a skipped state write and a failed event append look
+  identical on disk), so check which. **A BRIEF one at a phase hand-off is expected, not a bug:**
+  the `phase-done` shape also appears for the few seconds between one phase's exit write and the
+  next phase's entry write, and clears itself. **A cue that stays lit for a whole phase is the
+  real signal.** And its silence is not proof of health: a mid-phase event can replace the
+  `phase-done` the first shape keys on.
+- **`· stalled`** - a working status (`implementing`/`reviewing`/`testing`) with **no** live
+  session, i.e. the phase was killed. Still resumable with `m` / `gogo go`.
 
 ## The persistent-session model (what `gogo go`/`gogo plan` actually do)
 

@@ -14,9 +14,15 @@ Target: $ARGUMENTS  (the feature slug; required.)
 
 Load `gogo-accept` and follow it:
 
-1. **Resolve + gate** — the feature's `state.md` status MUST be
-   `awaiting-plan-acceptance`. Anything else → STOP with guidance (already
-   accepted → run `/gogo:go`; mid-pipeline → nothing to accept here).
+1. **Resolve + gate (TWO hard checks)** -
+   (a) the feature's `state.md` status MUST be `awaiting-plan-acceptance`. Anything
+   else → STOP with guidance (already accepted → run `/gogo:go`; mid-pipeline →
+   nothing to accept here).
+   (b) `plan.md` MUST exist and be **written** - at least two `## ` sections. A folder
+   whose status says `awaiting-plan-acceptance` while the plan is absent or still a
+   scaffold stub is **mid-authoring**: STOP before presenting, name how far short it
+   fell, and send the user to `/gogo:plan <slug>`. Never record acceptance for a plan
+   that is not written.
 2. **Present the plan** — show `plan.md`'s summary + any open decisions for the
    user to eyeball before they accept.
 3. **Record acceptance on the user's confirmation** — exactly as `gogo-plan`

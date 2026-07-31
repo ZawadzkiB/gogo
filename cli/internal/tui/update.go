@@ -300,7 +300,9 @@ func (m *Model) toggleSelect() {
 	if f == nil {
 		return
 	}
-	if f.Class != contract.ClassReadyToShip {
+	// selectableForShip (REV-027): the same predicate the ✓ renderer and the action
+	// path use, so the three can never drift apart again.
+	if !selectableForShip(f) {
 		m.status = "select only ready cards (space) — this card is " + f.Class
 		return
 	}

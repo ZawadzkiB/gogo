@@ -49,6 +49,15 @@ func TestCapBlock(t *testing.T) {
 	if msg := capBlock(root, repo, "target", false); msg == "" || !strings.Contains(msg, "--force") {
 		t.Errorf("over-cap capBlock = %q, want a refusal naming --force", msg)
 	}
+	// REV-015: the headless refusal carries the SAME remedy set as the board's bounce (the two
+	// cap surfaces are meant not to drift), and REV-011's targeted form: a bare `gogo sweep` is
+	// host-global and would reap another source's in-flight build as an orphan.
+	if msg := capBlock(root, repo, "target", false); !strings.Contains(msg, "`gogo sweep active`") {
+		t.Errorf("capBlock does not name the TARGETED sweep for its blocker: %q", msg)
+	}
+	if msg := capBlock(root, repo, "target", false); strings.Contains(msg, "`gogo sweep`") {
+		t.Errorf("capBlock recommends the BARE, host-global `gogo sweep`: %q", msg)
+	}
 	if msg := capBlock(root, repo, "target", true); msg != "" {
 		t.Errorf("--force capBlock = %q, want an empty (bypassed) message", msg)
 	}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
+	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -610,7 +611,7 @@ func correlationCountFallback(n int) string {
 // selected-for-ship card gets the select accent border + a ✓; a card with a
 // live tmux session shows an unmissable green ● session marker (TEST-006).
 func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width int) string {
-	selected := f.Class == contract.ClassReadyToShip && m.selected[featureKey(f)]
+	selected := selectableForShip(f) && m.selected[featureKey(f)]
 	hasSession := hasLiveSession(f.Slug, m.sessions)
 
 	title := f.Title
@@ -623,7 +624,11 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	// gate card, shows the status pill alone.
 	agent := ""
 	if hasSession && !f.WaitingForInput() {
-		agent = activeAgent(f)
+		// sessionAgent, not activeAgent (FR14): state.md is written at a phase's exit, so
+		// a card mid-build still reads `phase: plan` and the phase-derived chip said
+		// `● analyst` while the developer was working. The live session's ACTION is the
+		// correction.
+		agent = sessionAgent(f, m.sessions)
 	}
 
 	// Three rows: name (+ mark, + live ● dot, + right-aligned SOURCE tag) · one-line
@@ -736,6 +741,24 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 		}
 	}
 
+	// FR14/FR15: the live-session-vs-file cue. `● building` when a live build session
+	// contradicts a file-derived status that has not caught up (the launch-to-first-write
+	// window); `· stalled` when a working status has NO live session (a killed phase). The
+	// two are mutually exclusive by construction. Appended only when it FITS, exactly like
+	// the correlation chip, so it can never wrap the line and desync the window height math.
+	if cue := cardStateCue(f, m.sessions); cue != "" {
+		if room := width - lipgloss.Width(badgeLine) - 2; room >= lipgloss.Width(cue) {
+			switch {
+			case focused:
+				badgeLine += "  " + cue // plain - the focus fill carries one fg/bg
+			case strings.HasPrefix(cue, buildingMarker):
+				badgeLine += "  " + pillBuilding.Render(cue)
+			default:
+				badgeLine += "  " + dimStyle.Render(cue)
+			}
+		}
+	}
+
 	// plans-board FR6: a member work item auto-pickup-blocked by its source's cap (repo
 	// busy) shows a "needs manual trigger" cue — the user starts it with a manual go once a
 	// slot frees. Transient (cleared the moment a slot opens and it auto-fires).
@@ -789,18 +812,42 @@ func (m Model) contextualFooter() string {
 // footerChips are the action key-chips applicable to the focused card — the
 // column's legal move first (accept / go / ship), then the always-available
 // drill/view/web and, for a live card, peek/attach.
+// moveChip is the `m` key-chip for a go-capable card, in attemptActionForce's precedence
+// order so the footer can never promise a move that bounces. Advertising an affordance
+// that refuses is the same say-one-thing-do-another defect this release is about, in
+// miniature - so chip and guard are derived from the same conditions, not kept in step by
+// hand. TestFooterChipMatchesWhatMActuallyDoes sweeps the cross-product of both classes.
+func moveChip(f *contract.Feature) string {
+	switch {
+	case planUnready(f):
+		return "[m] ✗ plan not written"
+	case f.WaitingForUser():
+		return "[m] ✗ paused"
+	case f.Status == "awaiting-plan-acceptance":
+		return "[m] accept"
+	case !orchestrator.RunnableStatus(f.Status):
+		return "[m] ✗ not runnable"
+	}
+	return "[m] go"
+}
+
 func (m Model) footerChips(f *contract.Feature) []string {
 	chip := keyChipStyle.Render
 	var c []string
 	switch f.Class {
-	case contract.ClassUnfinished:
-		if f.Status == "awaiting-plan-acceptance" {
-			c = append(c, chip("[m] accept"))
-		} else {
-			c = append(c, chip("[m] go"))
-		}
-	case contract.ClassInProgress:
-		c = append(c, chip("[m] go"))
+	case contract.ClassUnfinished, contract.ClassInProgress:
+		// ONE producer for both go-capable classes (REV-030). They were two hand-kept
+		// copies - a 5-case arm and a 3-case one - and the short copy lied twice:
+		// `in-progress + awaiting-plan-acceptance` advertised "not runnable" while `m`
+		// legally ACCEPTS, and `in-progress + plan-accepted` with an unwritten plan
+		// advertised "[m] go" while FR8 bounces. Copies of a rule drift; this feature has
+		// now watched that happen four times (REV-002/012/016/031), so the two arms are
+		// one, in attemptActionForce's own precedence order.
+		//
+		// planUnready, not planReadinessBounce: this is a RENDER path, so it must not open
+		// plan.md (and build a refusal sentence it throws away) once per frame - the answer
+		// is already on the Feature, derived once at load.
+		c = append(c, chip(moveChip(f)))
 	case contract.ClassReadyToShip:
 		c = append(c, chip("[d] ship"))
 	}

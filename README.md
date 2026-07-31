@@ -364,13 +364,25 @@ cd cli && go build -o gogo .
   `state.md` state (`review r2` · `awaiting-uat` · `awaiting-plan-acceptance` ·
   `⏸ re-planning · UAT N` · …) plus, **only while a session is actively working
   it**, a green **`● <agent>` chip** (analyst · developer · reviewer · tester ·
-  reporter, from the current phase). Liveness is a signal **separate** from status
+  reporter - from the live **session**, so a card being built reads `● developer`
+  even before its `state.md` catches up). Liveness is a signal **separate** from status
   - **`running` is never a status**; a card blocked on you is flagged by a heavy
   **left-border stripe** (red gate / purple UAT) and tallied in the header's
   **`⏸ K need you`** pill, while live sessions are tallied in **`● N session`**.
+  Four cues cover the cases where the files and reality disagree: **`✎ authoring`**
+  (dim, no stripe, never counted in `⏸ K need you`) for an item whose `plan.md` is not
+  written yet - it cannot be accepted or built until it is; **`● building`** (amber) for
+  a card with a live build session whose status has not caught up; **`· state lags`** when the
+  telemetry contradicts the phase line while a build session is live - either the previous
+  phase's `phase-done` is still the newest event, or an entry event names a different phase than
+  the line does (a phase started without recording itself, or a fix-round re-entry). A **brief**
+  one at a phase hand-off is expected and clears itself; one that **stays lit for a whole phase**
+  is the real signal. And **`· stalled`**
+  for a working status whose session died (still resumable with `m`).
   The **changelog** is a collapsed `✓ slug … MM-DD` list carrying a `●` on any
   shipped item that still holds a session (drill in to kill it). `gogo status`
-  carries the ⏸ signal in a dedicated **WAIT** column. `/` filters live;
+  carries the ⏸ signal in a dedicated **WAIT** column, plus a **LIVE** column
+  (`building` / `authoring` / `live`) whenever sessions are running. `/` filters live;
   **fsnotify** refreshes the board while the pipeline runs.
 - **Drill-in** (`enter`) - a **rich card**: a detail panel (short description,
   work-folder name, status) over the feature's **session(s)** (registry ⨯
@@ -383,9 +395,12 @@ cd cli && go build -o gogo .
   are several (pipeline state untouched); `w` builds the
   interactive HTML page natively (goldmark, before/after compare) and opens the
   browser; `G` opens the file in `glow` when installed.
-- **Moves launch Claude** - `m` on an `awaiting-plan-acceptance` card runs
-  `claude "/gogo:accept <slug>"` (accept the plan from the board - closing the dead
-  end where it used to bounce into a `/gogo:go` that refuses); on any other
+- **Moves launch Claude** - `m` on an `awaiting-plan-acceptance` card **whose plan is
+  written** runs `claude "/gogo:accept <slug>"` (accept the plan from the board - closing
+  the dead end where it used to bounce into a `/gogo:go` that refuses); a `✎ authoring`
+  card bounces instead, naming how far short its `plan.md` falls and offering
+  `gogo plan <slug>` (**`M`**, the cap-force key, does not override this - a missing plan
+  is a legality rule, not a cap); on any other
   plan/in-progress card `m` runs `claude "/gogo:go <slug>"`; selecting ready cards
   (`space`) and pressing `m`/`d` runs `claude "/gogo:done a+b+c"` (multiple = ONE
   merged entry) - always behind a confirmation, in an attachable **tmux** session
@@ -497,12 +512,15 @@ cd cli && go build -o gogo .
   knowledge** (the project's `.knowledge/`) from **source knowledge** (each source's `.gogo/knowledge/`)
   into two labelled groups. The
   per-source **concurrency cap** refuses a `gogo go` (or board `m`→go) that would start work on an
-  **(N+1)th** live in-progress feature in that source (so two build sessions can't clobber one shared
+  **(N+1)th** live build in that source (so two build sessions can't clobber one shared
   working tree); `--force` overrides, and since **0.28.0** so does the board's **`M`** (the same confirm,
   naming the cap and the slugs already building - no need to leave the cockpit). Default cap `1`; `0` =
   unlimited; an uncapped source is inert. The cap's **scope** is spelled out where it is read (since
-  0.28.0): it is **per source**, counts only **in-progress work items with a live session**, and
-  **never counts plans** - a plan spawn is not cap-gated at all.
+  0.28.0): it is **per source** and counts **work items with a live build session**
+  (`gogo-go-<slug>`) - **never** an authoring/plan session, and never a plan itself. Since
+  **0.29.0** it no longer also requires the item's *file-derived* class to be in-progress: for
+  the whole of a build `state.md` still read `plan-accepted`, which made the running build
+  **invisible** to the cap and let a second one start in the same repo.
   All config writes land under `~/.gogo/` only - never a source's `.gogo/`.
 - **Self-reporting launches (since 0.28.0)** - a cockpit launch that fails now says why. tmux's own
   stderr is captured into a typed error (`tmux new-session failed: exit status 1: command too long`

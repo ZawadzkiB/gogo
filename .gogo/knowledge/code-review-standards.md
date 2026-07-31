@@ -67,6 +67,32 @@ Generated-by: /gogo:build
     require the assertion to name the **exact** reason (the tally, the specific string),
     not just the outcome. The check is a mutation, compile-checked first - see
     `test-strategy.md`.
+12. **A remedy must be as safe as the refusal that recommends it (0.29.0).** Flag any
+    user-visible message that names a **host-global destructive** command. 0.29.0's cap
+    bounce recommended a bare `gogo sweep`, which judges every `gogo-*` session on the
+    machine against *this* repo's feature list - so another source's in-flight build is
+    classified "orphan - no owning feature" and killed, unconfirmed. The refusal was
+    correct and its advice could destroy work. Require the **targeted** form from a single
+    producer, and a guard asserting the targeted string is present **and the bare form
+    absent**. Same review pass: flag a user-visible **rule stated in more than one place**
+    that is not a single constant (three of four copies had gone stale), and - one level up -
+    a constant whose **call sites** are unpinned, so a surface can stop calling the producer
+    and hand-write fresh copy with the suite green. The **fourteen** known shapes of "an
+    assertion that looks like a check and isn't" are enumerated in `test-strategy.md`; walk
+    them before approving a change that adds guards.
+13. **`state.md` must be current DURING a phase, not after it - and it takes TWO writers
+    (0.29.0).** Check #5 says "`state.md` is kept current at transitions"; that is not enough.
+    A phase writes `phase`/`status` as its **first act after validate-in** **and again at its
+    exit**. Flag a phase skill that writes occupancy **only at exit** (the line then describes
+    work that has already stopped) *and* one that writes it **only at entry** (the entry write
+    is LLM prose - skipped on all three of its live runs in the release that added it - so
+    without the exit write the line stops advancing at all, which is worse).
+    **Do NOT flag the exit write as duplication of the entry write: the redundancy is
+    deliberate and load-bearing.** 0.29.0 first removed the exit write as newly-redundant and
+    had to restore it by user decision; a reviewer "tidying" it away is exactly how that
+    regression comes back. Also flag any **safety** rule that depends on either write: a guard
+    that prevents *damage* must key on a deterministic signal (a live session, a file on disk),
+    and a writer that can skip must be **detectable** rather than silent.
 
 ## Severity guide
 - **Blocker** — breaks a hard invariant (writes outside `.gogo/`, implements

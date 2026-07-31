@@ -1,0 +1,27 @@
+{
+  "slug": "plan-readiness-gate",
+  "updated": "2026-07-31",
+  "note": "AS-BUILT (0.29.0), re-reconciled at the SECOND phase-5 pass, after review rounds 04-07 and test rounds 03-04 changed the shipped behaviour the first bundle described. Four kinds, chosen by what the diff introduced. flow: the whole read-side derivation (PlanSections -> planWritten -> Feature.PlanUnwritten -> Authoring(), feeding the pill, the gate counts, the accept paths, the unattended auto-pickup and the drill note) PLUS the m/M legality chain in its shipped order (decision gate -> plan readiness -> accept -> runnable -> cap, with only the cap skippable by M) and the single moveChip producer the footer quotes; SessionAction/HasSessionAction plus events.jsonl feeding the cap, its single-sourced rule sentence, the targeted sweep remedy, the three card cues and the gogo status LIVE column. sequence: the timing fix as it actually shipped - the occupancy write at ENTRY *and again* at EXIT (two writers on purpose; FR11's removal of the exit write was an unintended regression caught at phase 5 and reverted by user decision), plus the second m refused because the cap counts the live gogo-go session while the file still reads plan-accepted, and the hand-off blink arm A now produces. activity: the work-item lifecycle including the derived display states that carry no status enum value (authoring, stalled, state lags) and the decision / UAT gate the board now refuses to relaunch past. class: the release's central architectural idea - one producer, many quoting surfaces - which six review findings (REV-002, 012, 016, 030, 031 and both surviving mutations) were about, now including the skills-lint guards that make the entry+exit rule deterministic instead of prose. NO use-case diagram: the release adds no new user capability - no new command, no new key, no new screen - it changes what existing capabilities REFUSE and what existing cards SAY, which the flow and activity diagrams already carry.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "report/flow.mmd",
+      "title": "As-built control flow: plan readiness derived at every read drives the authoring pill, the gate counts, all four accept paths and the drill note; the m/M legality chain refuses in a fixed order with only the cap forceable; the session-action parser plus events.jsonl drive the cap, its single-sourced rule, the targeted sweep remedy and the three card cues"
+    },
+    {
+      "kind": "sequence",
+      "file": "report/sequence.mmd",
+      "title": "As-built build timing: gogo-implement writes phase=implement / status=implementing at ENTRY and AGAIN at EXIT (two writers on purpose), and a second m in the same source is refused because the cap counts the live gogo-go session even while the file still reads plan-accepted"
+    },
+    {
+      "kind": "activity",
+      "file": "report/activity.mmd",
+      "title": "As-built work-item lifecycle: the derived authoring state before acceptance, the entry-and-exit writes after it, the two derived failure cues (stalled, state lags), and the decision / UAT gate the board now refuses to relaunch past"
+    },
+    {
+      "kind": "class",
+      "file": "report/class.mmd",
+      "title": "As-built structure: the single-source producers (PlanUnwrittenReason, CapRuleClause + CapSweepRemedy, SessionAction, moveChip, selectableForShip, isUATReplan) and the surfaces that quote them, across contract / launch / orchestrator / tui / cli"
+    }
+  ]
+}

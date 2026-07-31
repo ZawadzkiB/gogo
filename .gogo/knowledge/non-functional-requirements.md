@@ -28,6 +28,27 @@ Generated-by: /gogo:build
 ## Reliability / determinism
 - Phases are **resumable**: `state.md` is the single source of truth for where a
   feature is; keep it current at every transition.
+- **`state.md` is an OCCUPANCY record, not a completion log (since 0.29.0).** Written
+  at a phase's exit it describes work that has already stopped, so every reader (the
+  board's column, `gogo status`, the concurrency cap, `pages`, any headless consumer)
+  can only narrate the past. A phase writes `phase`/`status` as its **first act after
+  validate-in**, **and again at the exit** alongside the `iterations` bump and `phase-done` -
+  two writers on purpose, because the entry write is prose that gets skipped and with only it
+  the line stops advancing at all.
+- **No safety property may depend on an LLM writing a file on time.** That entry write
+  is prose, and it was skipped on **all three** of its live runs in the release that
+  added it. So a guard that prevents *damage* keys on a **deterministic** signal - the
+  concurrency cap asks tmux whether a `gogo-go-<slug>` build session is live rather
+  than trusting a file-derived class, which is what closed the under-count that let two
+  builds share one working tree. Pair the prose with a reader-side **detector**
+  (`· state lags`) so the writer's failure is visible, and remember a detector's
+  **silence is not proof of health**.
+- **Prefer degrading to MISSING over degrading to WRONG.** Every defensive-reader
+  decision in the contract parser is decided that way: a bare `<...>` placeholder reads
+  empty, a line inside an unclosed comment block is skipped, an unreadable `plan.md`
+  counts as *written* so a permissions hiccup cannot invent a defect. A card that is
+  visibly missing data is recoverable; a card showing plausible-looking wrong data is
+  not.
 - Build is **idempotent**: re-runs reconcile, preserving user/owned content.
 - Because the workers are LLMs, **artifacts that cross a phase boundary should be
   validatable** (clear, checkable shape) so a bad hand-off is caught, not

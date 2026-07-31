@@ -1,0 +1,81 @@
+flowchart TD
+  subgraph disk["feature folder on disk"]
+    st["state.md<br/>status: awaiting-plan-acceptance<br/>plan-accepted / working / gate"]
+    pm["plan.md<br/>present? &gt;= 2 '## ' sections?"]
+    ej["events.jsonl<br/>newest line"]
+  end
+
+  st --> parse["contract.parseStateFile()<br/>advanceComment: skip lines inside a<br/>multi-line HTML comment block<br/>+ stripPlaceholder(stripComment(v))<br/>a bare &lt;...&gt; value reads EMPTY"]
+  pm --> ps["contract.PlanSections(dir) (int, error)<br/>bounded scan, stops at the threshold<br/>nil / ErrNotExist / other = 3 answers"]
+  ps --> pw["contract.planWritten(dir)<br/>absent = unwritten<br/>unreadable = WRITTEN (never invent a defect)"]
+
+  parse --> feat["contract.Feature"]
+  pw --> flag["Feature.PlanUnwritten bool<br/>defect-positive: zero value = pre-0.29 meaning"]
+  flag --> feat
+  ej --> feat
+
+  feat --> auth["Feature.Authoring()<br/>PlanUnwritten AND status in {apa, ''}"]
+  ps --> reason["contract.PlanUnwrittenReason(dir)<br/>the ONE reason clause:<br/>'no plan.md on disk yet' or<br/>'plan.md has 1 of the 2 sections...'"]
+
+  auth --> wfi["Feature.WaitingForInput()<br/>its apa arm returns !Authoring()"]
+  auth --> pill["tui.badge -&gt; 'authoring'<br/>pillLabel '✎ authoring' · pillStyleFor pillDim<br/>stripeAccent: no gate stripe"]
+  wfi --> hdr["header '⏸ K need you'<br/>and gogo status WAIT column"]
+
+  subgraph legality["tui.attemptActionForce - the m/M legality chain, in order"]
+    gate1["1. f.WaitingForUser()<br/>-&gt; decisionGateBounce"]
+    gate2["2. planReadinessBounce(f)<br/>FR4 authoring + FR8 accepted-unwritten"]
+    gate3["3. status == awaiting-plan-acceptance<br/>-&gt; ActionAccept (uncapped)"]
+    gate4["4. !RunnableStatus(f.Status)<br/>-&gt; notRunnableBounce<br/>in BOTH go-producing arms"]
+    gate5["5. capBounce - the ONLY guard M skips"]
+  end
+
+  feat --> gate1
+  gate1 --> gate2
+  gate2 --> gate3
+  gate3 --> gate4
+  gate4 --> gate5
+  reason --> gate2
+
+  gate1 --> uatd["tui.isUATReplan(f)<br/>uatRound &gt; 0 = a DIGIT after 'uat'<br/>names uat.md + re-accept,<br/>else decisions.md + /gogo:resume<br/>same predicate as the pill"]
+
+  gate2 --> sev["m.statusBlocked -&gt; renderStatus<br/>amber '⚠ ' + names the unblock"]
+  gate1 --> sev
+  gate4 --> sev
+
+  gate4 --> chip["tui.moveChip(f)<br/>ONE chip producer for BOTH go-capable<br/>classes, in attemptActionForce's own order<br/>- the footer never advertises a move<br/>that bounces"]
+  chip --> pure["tui.planUnready(f)<br/>PURE predicate: no disk I/O<br/>on a render path"]
+  flag --> pure
+
+  gate2 --> drill["tui.planColumnViewNote<br/>v says WHY instead of<br/>silently showing the file list"]
+
+  gate5 -.->|refused| acc["/gogo:accept &lt;slug&gt;"]
+  acc --> g2["gogo-accept step 2b<br/>hard gate: is plan.md written?"]
+  g2 -->|no| stop["STOP before presenting<br/>+ 'gogo plan &lt;slug&gt;'"]
+  g2 -->|yes| rec["record acceptance<br/>unchanged single owner"]
+
+  sess["launch.ListSessions()<br/>gogo-&lt;action&gt;-&lt;label&gt;[-N]"] --> sa["launch.SessionAction(session, slug)<br/>(Action, bool) - the ONE parser<br/>sessionActions x 2 label transforms"]
+  sa --> sms["launch.SessionMatchesSlug<br/>now a one-line delegation"]
+  sa --> has["launch.HasSessionAction(slug, sessions, want)<br/>scans EVERY session: order is not a contract"]
+  has --> capf["orchestrator.ActiveWorkSlugs<br/>live GO session only; Class filter REMOVED"]
+  has --> cue["tui.cardStateCue<br/>'● building' / '· state lags' / '· stalled'<br/>arms provably DISJOINT<br/>+ sessionAgent -&gt; '● developer'"]
+  feat --> lag["tui.phaseLineLags (2 arms)<br/>A: phase-done for the phase the line names<br/>B: an ENTRY event naming ANOTHER phase<br/>+ live build session + working status<br/>= a SKIPPED entry write, made visible"]
+  lag --> cue
+  has --> stat["cli/status.go liveMarker<br/>LIVE column: building / authoring / live"]
+  feat --> capf
+  capf --> gate5
+  capf --> rule["orchestrator.CapRuleClause<br/>+ CapSweepRemedy(active) + CapRefusal<br/>ONE producer for 4 rule surfaces<br/>and both refusals' sweep remedy"]
+  rule --> bounce["tui.capBounce + cli/go.go capBlock<br/>name the TARGETED 'gogo sweep &lt;slug&gt;'<br/>never the host-global bare form"]
+
+  feat --> selp["tui.selectableForShip / pruneSelection<br/>a selection the user did not make is never<br/>shipped: the stale entry is PRUNED on reload,<br/>not merely filtered at the read"]
+
+  auth --> pick["tui.autoPickupReady<br/>FR8 on the UNATTENDED path:<br/>PlanUnwritten = never auto-fire"]
+  flag --> pick
+
+  feat --> go["cli/go.go cmdGo<br/>refuses plan-accepted + PlanUnwritten<br/>before the cap and before the owner lock"]
+  reason --> go
+  feat --> hint["cli/go.go runnableHint(f)<br/>authoring: finish the plan,<br/>never 'accept its plan'"]
+
+  classDef new fill:#fff3d6,stroke:#caa54a,color:#111
+  classDef reuse fill:#e8ecff,stroke:#7c8bd9,color:#111
+  class ps,pw,flag,auth,reason,pure,chip,drill,g2,stop,sa,sms,has,capf,cue,lag,pick,sev,stat,rule,bounce,hint,gate1,gate2,gate4,uatd,selp new
+  class parse,feat,wfi,pill,hdr,acc,rec,go,sess,ej,gate3,gate5 reuse

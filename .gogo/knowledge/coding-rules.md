@@ -68,6 +68,55 @@ Generated-by: /gogo:build
   UAT rerun, so a classifier/validate rule keyed on file existence lies
   mid-pipeline. Key such rules on the `state.md` status (ready-to-ship = report
   AND `awaiting-uat`/legacy `done`), and treat any relaxation as a contract change.
+  - **The one sanctioned exception (0.29.0):** a presence check may only ever
+    **REFUSE**, never **PROMOTE**, and only on a **monotonic** artifact. The
+    original rule reacted to presence **over-claiming** (a stale `report/` present
+    while the state had moved on). `plan.md` is the mirror image: it is *Guaranteed
+    (from plan ①)* by `docs/cli-contract.md`, phase ⑤ updates it to as-built, and
+    nothing in the tree deletes it - so its **absence** can only mean "never
+    written", never "stale". `contract.planWritten` therefore drives only rules
+    that **narrow** (the `✎ authoring` pill dims; the four accept paths refuse) and
+    **never** a class, a column, or an unlocked action. Keep the flag
+    **defect-positive** (`PlanUnwritten`, zero value = "written") so a synthetic
+    struct keeps its old meaning, and treat a read error as *written* so a
+    permissions hiccup can never invent a defect.
+- **A phase writes its occupancy status at entry AND again at exit (0.29.0).**
+  `state.md` is what every reader believes - the board's column, `gogo status`, the
+  concurrency cap, `pages`, any headless consumer. Written only at a phase's exit it
+  records that the phase just *finished*, so for the whole run the disk describes the
+  previous phase and the board narrates the past. So write `phase` + `status` as the
+  **first act after validate-in passes** - and write them **again at the exit**, with
+  the `iterations` bump (a completion count) and `phase-done`.
+  **Keep both writers; the redundancy IS the design.** 0.29.0 first moved the write to
+  entry and *removed* the exit write as newly-redundant. That made it worse: the entry
+  write is prose an LLM follows, and with only that half `state.md` stopped advancing
+  at all - arbitrarily stale instead of reliably one phase behind. Two writers, one at
+  each end: floor = one phase behind, ceiling = live.
+  **But do not let a safety property depend on it.** This is LLM prose, and it was
+  skipped on **all three** of its live runs in the very release that added it - so
+  pair every occupancy-derived rule with a deterministic reader-side guard (the cap
+  keys on a live `gogo-go-<slug>` session, not on a file-derived class) and make the
+  writer's failure **visible** rather than silent (`tui.phaseLineLags` → the
+  `· state lags` cue). A detector is a detector, not a guarantee: its silence is not
+  proof of health.
+- **A user-visible rule stated in more than one place is ONE constant (TEST-006,
+  0.29.0):** 0.28.0 deliberately wrote the concurrency cap's rule into four
+  surfaces by hand; 0.29.0 changed the rule and found **three of the four stale** -
+  including the source-edit form the user reads *while setting the cap*, which
+  stated the opposite of the code. Extract the sentence
+  (`orchestrator.CapRuleClause`) and have every surface quote it, so the drift is
+  **impossible** rather than merely forbidden. Then **pin the wirings, not just the
+  producer** - a call site can stop calling the producer and hand-write fresh copy
+  with the whole suite green (see `test-strategy.md`, variant 8).
+- **A remedy a message recommends is part of the product's safety surface
+  (TEST-007, 0.29.0):** a cap refusal began recommending a **bare `gogo sweep`**,
+  which is HOST-GLOBAL - it judges every `gogo-*` session on the machine against
+  *one repo's* feature list, so another source's in-flight build is classified
+  "orphan" and killed with no confirmation. Never emit a host-global destructive
+  command from an inline remedy: produce the **targeted** form from a single
+  producer (`orchestrator.CapSweepRemedy` → `gogo sweep <slug>...`), return `""`
+  rather than degrading to the bare form, and guard both the presence of the
+  targeted string **and the absence of the bare one**.
 - **Attribute sessions by exact convention parse, never substring (TEST-005,
   0.11.0):** matching a slug into session names with `strings.Contains`
   cross-attributes overlapping slugs (`auth`/`oauth`, `waiting-card` inside

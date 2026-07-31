@@ -1,0 +1,114 @@
+stateDiagram-v2
+  [*] --> authoring: gogo-plan creates .gogo/work/feature-slug/
+  authoring --> authoring: analyst writes state.md / decisions.md / charts/
+  authoring --> authoring: analyst dies mid-write (STAYS here - derived, crash-safe)
+  authoring --> awaiting_acceptance: plan.md lands (present AND >= 2 '## ' sections)
+  awaiting_acceptance --> plan_accepted: user accepts (in-chat, or m -> /gogo:accept)
+  plan_accepted --> implementing: gogo-implement step 1 ENTRY write
+  implementing --> reviewing: gogo-review entry write (or implement's step 4 EXIT write)
+  reviewing --> testing: gogo-test entry write (or review's step 4 EXIT write)
+  testing --> awaiting_uat: report 5
+  implementing --> stalled: session killed, no live gogo-go
+  stalled --> implementing: gogo go slug resumes (RunnableStatus is true)
+
+  note right of authoring
+    DERIVED, display-only. The status on disk
+    is still awaiting-plan-acceptance (or
+    absent); plan.md's absence or stub-ness is
+    what makes it read as authoring. NO new
+    status enum value, NO new class: it stays
+    unfinished, in the plan column.
+    Card: dim '✎ authoring', no gate stripe,
+    footer chip '[m] ✗ plan not written'.
+    m AND M refuse; gogo go, /gogo:accept and
+    the unattended auto-pickup all refuse. Not
+    counted in '⏸ K need you' nor in gogo
+    status's WAIT column. The refusal names
+    its number and its unblock.
+  end note
+
+  note right of plan_accepted
+    BEFORE 0.29.0 the whole build ran INSIDE
+    this state: gogo-implement wrote
+    implementing only at its step 4, after the
+    work. The card sat in the plan column,
+    in-progress read 0, the agent chip read
+    '● analyst', and the cap did NOT count it -
+    so a second build could clobber the tree.
+    Now: the phases write at ENTRY *and again*
+    at EXIT (two writers on purpose), and -
+    deterministically - the cap counts a live
+    gogo-go session regardless of the
+    file-derived class. A card in the residual
+    launch-to-first-write window shows an amber
+    '● building' cue and keeps its file-derived
+    column (D6=A).
+  end note
+
+  note right of stalled
+    Not a status on disk - a DERIVED cue: a
+    working status (implementing / reviewing /
+    testing) with no live session for the slug.
+    The cost of an honest entry write is that a
+    killed phase leaves 'implementing' behind,
+    so it must read '· stalled' rather than
+    running. Quiet glyph: it is resumable.
+  end note
+
+  state entry_write_skipped <<choice>>
+  implementing --> entry_write_skipped: a phase BEGINS and does not record itself
+  reviewing --> entry_write_skipped: (observed on ALL THREE review rounds of this feature)
+  entry_write_skipped --> state_lags: events.jsonl contradicts the phase line
+  state_lags --> reviewing: the user checks which half did not land
+  state_lags --> implementing: (the cue names a disagreement, not a culprit)
+
+  note right of state_lags
+    The DETECTOR half, and the half that works:
+    tui.phaseLineLags -> the '· state lags' cue.
+    TWO arms, both needing a live BUILD session
+    and a working status:
+      A. newest event is phase-done for the very
+         phase state.md names (a forward hand-off
+         nothing claimed);
+      B. newest event is an ENTRY event
+         (phase-started / fix-round) naming a
+         DIFFERENT phase than the line does (the
+         loop BACK to implement, or a half-landed
+         entry write).
+    Arm B's shape is AMBIGUOUS by construction, so
+    the honest reading is narrower than 'the phase
+    line is stale': state.md and events.jsonl
+    DISAGREE about the current phase - one half of
+    step 1 did not land - and the user checks which.
+    And SILENCE IS NOT PROOF OF HEALTH: a later
+    mid-phase event overwrites the phase-done that
+    arm A keys on, and the cue goes quiet while the
+    phase line is still stale.
+    With the exit write restored, arm A also blinks
+    at every HEALTHY hand-off - accepted knowingly:
+    a blink self-clears, a whole-phase glow does not.
+  end note
+
+  awaiting_uat --> shipped: /gogo:done (the acceptance)
+  awaiting_uat --> waiting_for_user: UAT feedback locks the gate
+  waiting_for_user --> plan_accepted: the user re-accepts the adjusted plan
+  implementing --> waiting_for_user: a decision fork opens
+  waiting_for_user --> implementing: /gogo:resume folds the answer back in
+
+  note right of waiting_for_user
+    A GATE, and since 0.29.0 the board enforces it:
+    attemptActionForce refuses m AND M on a paused
+    card (the guard used to exist for DISPLAY only,
+    so the only thing between a keypress and a
+    relaunch was a STOP instruction inside the
+    spawned session's own prompt - prose guarding
+    prose, this release's own counter-example).
+    The refusal names the open decision BY ID and
+    the right artifact: decisions.md + /gogo:resume
+    for a plain fork, uat.md + re-acceptance for a
+    UAT re-plan round (isUATReplan: a DIGIT after
+    'uat', the same predicate the pill uses, so the
+    bounce and the pill agree by construction).
+    The exit write is SCOPED away from this status,
+    so a card that enters the gate STAYS in it.
+  end note

@@ -41,10 +41,18 @@ Delegated to the **`gogo-analyst`**: it reads the named knowledge set (incl.
 codebase (**code = source of truth**), creates `.gogo/work/feature-<slug>/`, writes
 `plan.md` (Goal / Context / Functional requirements / Approach + alternatives /
 Changes checklist / Tests / Out-of-scope), draws the intended design with
-`gogo-mermaid`, and inits `state.md`. **Present the plan and STOP for acceptance —
+`gogo-mermaid`, and inits `state.md` - **`state.md` last: `awaiting-plan-acceptance` is a
+claim that `plan.md` is written.** **Present the plan and STOP for acceptance -
 the orchestrator owns that gate.** Changes or clarifications are logged to
 `adjustments.md`, then the plan is revised and re-presented. **Do not implement
 until the user accepts — a hard gate.**
+
+**The gate needs a written plan, not just the status (0.29.0).** A folder whose `state.md`
+says `awaiting-plan-acceptance` while `plan.md` is absent or a scaffold stub (< 2 `## `
+sections) is **mid-authoring**: the cockpit shows it as `✎ authoring`, leaves it out of the
+"need you" count, and `m`/`M`, `gogo go` and `/gogo:accept` all refuse it until the plan
+lands. Derived at every read, so an analyst that dies mid-authoring leaves an item that is
+visibly incomplete rather than silently acceptable.
 
 ### ② Implement — skill `gogo-implement` (orchestrator runs it in-context)
 
@@ -207,3 +215,26 @@ everything else, decide, note it, and keep moving. When stopping:
 every transition — so a fresh session or a post-decision continuation picks up
 exactly where it left off. `/gogo:status` lists every feature's state;
 `/gogo:resume` folds in an answer and continues.
+
+**Occupancy, not completion (0.29.0).** ②/③/④ write their `phase`/`status` (and append
+`phase-started`) as their **first act after validate-in**, before doing the work - so
+`state.md` says what is happening *now*, not what just finished. Written at the exit
+instead, `status: implementing` meant "implementing just ended": the card sat in the plan
+column reading `plan-accepted` for the whole build, `in progress` read 0, and the
+concurrency cap did not count it. **The exit write still writes `phase`/`status` too**, plus the
+`iterations` bump and `phase-done` - belt and braces on purpose. 0.29.0 briefly dropped the exit
+write on the theory the entry write replaced it, which made things *worse*: the entry write is
+prose an LLM follows and has been skipped on every live run so far, so `state.md` stopped
+advancing at all rather than merely lagging by a phase. Two writers, one at each end: the floor
+is the old one-phase lag, the ceiling is the entry write's accuracy. A killed phase therefore leaves a working status with no live session, which
+the board reads as **`· stalled`** (and `gogo go` still resumes it).
+
+**That write is prose, so it is paired with a reader-side detector - and it needed one.** On
+its first live run, ③ skipped it: a whole review round executed with `state.md` still reading
+`implement` / `implementing`. Neither the cap nor the `● building` cue can see that, because
+the warm `gogo-go` session is live for ②③④⑤ alike. The telemetry can: with a build session live on a
+working status, either a `phase-done` for the phase `state.md` still names **or** an entry event
+naming a different phase than the line does means the phase line is behind, and the card reads
+**`· state lags`**. So the honest claim is: the
+board no longer narrates the past for ②, and for ③/④/⑤ it either narrates the present or
+**says out loud that it cannot** - a skipped occupancy write is visible, never silent.

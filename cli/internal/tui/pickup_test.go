@@ -111,6 +111,63 @@ func TestAutoPickupSkipsNonSkipSource(t *testing.T) {
 	}
 }
 
+// TestAutoPickupRefusesAnUnwrittenPlan pins FR8 on the ONE launch path with no human in the
+// loop (REV-003). The board's `m`/`M` and `gogo go` both refuse a plan-accepted card whose
+// plan.md is absent or a stub; before this guard the reload auto-pickup did not, so the
+// UNATTENDED path was the most permissive one - it fired `claude -p /gogo:go <slug>
+// --skip-acceptance` at a folder with no plan in it. That is reachable by exactly the failure
+// this feature exists to fix: an analyst writing state.md before plan.md in a source whose
+// planAcceptanceSkip auto-clears the plan gate.
+//
+// It asserts BOTH arms, so the guard is proven to bite only on the defect: zero launches for
+// the unwritten member, exactly one for an otherwise-identical written one.
+func TestAutoPickupRefusesAnUnwrittenPlan(t *testing.T) {
+	seedDataHome(t)
+	unwritten := member("web-token", "web", "/r/web", "plan-accepted")
+	unwritten.PlanUnwritten = true
+	m, fired := pickupModel(t, true /*skip*/, 1 /*cap*/, nil, unwritten)
+
+	if m.autoPickupReady(unwritten) {
+		t.Error("autoPickupReady = true for a plan-accepted member with an UNWRITTEN plan.md - " +
+			"the unattended path must be at least as strict as the board's m")
+	}
+	cmds := m.autoPickupCmds()
+	if len(cmds) != 0 {
+		t.Fatalf("autoPickupCmds fired %d cmd(s) for an unwritten plan, want 0", len(cmds))
+	}
+	// Nothing recorded either, so a later reload cannot "resume" the illegal launch.
+	if m.autoPickedUp[featureKey(unwritten)] {
+		t.Error("the unwritten member was recorded in the fire-once set")
+	}
+	if len(*fired) != 0 {
+		t.Errorf("the launcher fired %d time(s): %+v - an unattended build was launched at a folder with no plan", len(*fired), *fired)
+	}
+	// It is ILLEGAL, not cap-blocked: the misleading "trigger manually" cue must NOT show,
+	// because pressing m would refuse too. The card carries the plan-not-written cue instead.
+	if m.autoPickupBlocked(unwritten) {
+		t.Error("autoPickupBlocked = true - an unwritten plan is not a busy repo, and telling the " +
+			"user to trigger it manually would send them into a refusal")
+	}
+	if bounce := planReadinessBounce(unwritten); bounce == "" {
+		t.Error("planReadinessBounce is empty for the same card - the two paths disagree")
+	}
+
+	// The other arm: an identical member WITH a written plan still fires exactly once, so the
+	// new guard cannot be passing because auto-pickup stopped working.
+	written := member("web-token", "web", "/r/web", "plan-accepted")
+	m2, fired2 := pickupModel(t, true, 1, nil, written)
+	cmds2 := m2.autoPickupCmds()
+	if len(cmds2) != 1 {
+		t.Fatalf("a WRITTEN-plan member fired %d cmd(s), want 1 - the guard is over-refusing", len(cmds2))
+	}
+	if res, ok := cmds2[0]().(autoPickupResultMsg); !ok || !res.ok {
+		t.Fatalf("the written-plan auto-pickup did not resolve successfully: %#v", res)
+	}
+	if len(*fired2) != 1 || !strings.Contains((*fired2)[0].Command, "/gogo:go web-token") {
+		t.Errorf("launcher fired %+v, want exactly one /gogo:go web-token", *fired2)
+	}
+}
+
 // TestAutoPickupAtCapShowsCue pins case (d): a skip-source member whose source is AT its cap
 // (ConcurrentWorkItems=1 with a busy sibling) is NOT fired, and the "needs manual trigger"
 // cue renders on both its work-board card and its plan card.
@@ -315,8 +372,14 @@ func TestAutoPickupFiresOnReload(t *testing.T) {
 	}
 }
 
-// writePlanAcceptedMember writes an on-disk plan-accepted work item (state.md) carrying the
-// plan correlation, so the contract reader classifies it as an eligible auto-pickup member.
+// writePlanAcceptedMember writes an on-disk plan-accepted work item (state.md + a WRITTEN
+// plan.md) carrying the plan correlation, so the contract reader classifies it as an eligible
+// auto-pickup member.
+//
+// The plan.md matters: since 0.29.0 an auto-pickup candidate must have a written plan
+// (FR8/REV-003), and this fixture stands in for a member whose plan the source's
+// planAcceptanceSkip already accepted - so a folder with no plan in it would not be a
+// realistic fixture, it would be the defect.
 func writePlanAcceptedMember(t *testing.T, root, slug, planID string) {
 	t.Helper()
 	dir := filepath.Join(root, ".gogo", "work", "feature-"+slug)
@@ -329,6 +392,11 @@ func writePlanAcceptedMember(t *testing.T, root, slug, planID string) {
 		"- **created:** 2026-07-23\n" +
 		"- **correlation:** [" + planID + "]\n"
 	if err := os.WriteFile(filepath.Join(dir, "state.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan := "# Plan - " + slug + "\n\nStatus: **accepted** (user, 2026-07-23)\n\n" +
+		"## Goal\n\nauto-pickup fixture member.\n\n## Changes checklist\n\n- nothing (fixture only).\n"
+	if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte(plan), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

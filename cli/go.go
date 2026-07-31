@@ -157,7 +157,22 @@ func cmdGo(args []string) int {
 		return 0
 	}
 	if !orchestrator.RunnableStatus(f.Status) {
-		fmt.Fprintf(os.Stderr, "gogo go: feature %q is %q - not runnable here. %s\n", slug, f.Status, runnableHint(f.Status))
+		fmt.Fprintf(os.Stderr, "gogo go: feature %q is %q - not runnable here. %s\n", slug, f.Status, runnableHint(f))
+		return 1
+	}
+
+	// FR8: the unaccepted-plan invariant, strengthened. `plan-accepted` with no written
+	// plan.md is refused - there is nothing to build, and the acceptance itself is
+	// suspect (the plan-acceptance gate can be reached before the analyst writes the
+	// plan, because state.md is written at a phase's exit). This ADDS a requirement to
+	// the existing gate and removes none. Checked BEFORE the cap and before the owner
+	// lock, so a refusal never touches a lockfile. Only `plan-accepted` is gated: a
+	// mid-pipeline resume (implementing / reviewing / testing) must stay resumable, and
+	// an authoring item is already refused above by RunnableStatus.
+	if f.Status == "plan-accepted" && f.PlanUnwritten {
+		fmt.Fprintf(os.Stderr, "gogo go: %s is plan-accepted but its plan.md is not written (%s) - nothing to build.\n"+
+			"  re-plan it with `gogo plan %s`; /gogo:go builds an accepted plan, it does not write one.\n",
+			slug, contract.PlanUnwrittenReason(f.Dir), slug)
 		return 1
 	}
 
@@ -235,9 +250,19 @@ func capBlock(root string, repo *contract.Repo, slug string, force bool) string 
 	if !orchestrator.CapExceeded(cap, len(active)) {
 		return ""
 	}
-	return fmt.Sprintf("gogo go: %s is capped at %d concurrent feature(s) - already building: %s.\n"+
-		"  ship/finish one first, or re-run `gogo go %s --force` to override.",
-		root, cap, strings.Join(active, ", "), slug)
+	// REV-015: the headless refusal carries the SAME remedy set as the board's bounce - the
+	// two cap surfaces share CapForSource/CapExceeded precisely so they never drift, and this
+	// is the one an unattended operator reads. "ship/finish one first" is impossible advice
+	// when the blocker is an already-shipped item whose build session outlived a failed
+	// ship-reap, so name the TARGETED sweep (never the bare, host-global form - REV-011)
+	// through the shared producer.
+	return fmt.Sprintf("gogo go: %s is capped at %d concurrent feature(s) - already building: %s.\n  %s.",
+		root, cap, strings.Join(active, ", "),
+		orchestrator.CapRefusal(
+			"ship/finish one first",
+			orchestrator.CapSweepRemedy(active),
+			"or re-run `gogo go "+slug+" --force` to override",
+		))
 }
 
 // cmdPlan is the `gogo plan` entry. It serves TWO surfaces off the same verb (the
@@ -403,17 +428,33 @@ func newestRunnable(repo *contract.Repo) *contract.Feature {
 	return nil
 }
 
-// runnableHint mirrors /gogo:go's guidance for a non-runnable status.
-func runnableHint(status string) string {
-	switch status {
+// runnableHint mirrors /gogo:go's guidance for a non-runnable feature. It takes the
+// FEATURE, not just its status, because an AUTHORING item (status
+// awaiting-plan-acceptance with no written plan.md) needs the opposite advice from a
+// genuine plan gate: telling the user to accept a plan that does not exist is the dead end
+// this release closes. A nil feature degrades to the status-less default.
+func runnableHint(f *contract.Feature) string {
+	if f == nil {
+		return "run /gogo:plan and accept a plan first."
+	}
+	if f.Authoring() {
+		return fmt.Sprintf("its plan is still being written (%s) - finish it with `gogo plan %s`, then accept it.",
+			contract.PlanUnwrittenReason(f.Dir), f.Slug)
+	}
+	switch f.Status {
 	case "awaiting-uat":
 		return "it's at the UAT gate - run /gogo:done to ship, or give feedback to loop it back."
 	case "waiting-for-user":
 		return "it's paused on a decision - resolve it and re-accept (→ plan-accepted) first."
 	case "awaiting-plan-acceptance":
 		return "accept its plan first (/gogo:accept), then re-run gogo go."
-	case "shipped", "done", "aborted":
+	// NOTE: unreachable - cmdGo returns for orchestrator.TerminalStatus above (the reap
+	// path, exit 0) before ever calling this. Kept only so a future caller that skips that
+	// branch still gets a truthful answer; do not "align" another surface to it (REV-031).
+	case "shipped", "done":
 		return "it's already shipped."
+	case "aborted":
+		return "it was aborted."
 	default:
 		return "run /gogo:plan and accept a plan first."
 	}

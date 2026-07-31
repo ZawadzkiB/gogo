@@ -1,0 +1,120 @@
+classDiagram
+  direction LR
+
+  namespace contract {
+    class Feature {
+      +Dir string
+      +Slug string
+      +Status string
+      +Phase string
+      +LatestEvent *Event
+      +PlanUnwritten bool  «NEW, defect-positive»
+      +Authoring() bool  «NEW: PlanUnwritten AND status in apa/empty»
+      +WaitingForInput() bool  «apa arm now returns !Authoring()»
+      +WaitingForUser() bool  «now consulted by the MOVE, not only the display»
+    }
+    class planReadiness {
+      +PlanSectionsRequired = 2  «const»
+      -maxPlanScanBytes = 1MiB  «const»
+      +PlanSections(dir) (int, error)  «3 answers: count / absent / unreadable»
+      -planWritten(dir) bool  «unreadable == WRITTEN: never invent a defect»
+      +PlanUnwrittenReason(dir) string  «THE ONE reason clause»
+    }
+    class stateParser {
+      -advanceComment(line, in) bool  «NEW: carries open-comment state ACROSS lines»
+      -stripPlaceholder(s) string  «NEW: a bare <...> value reads EMPTY»
+      -stripComment(s) string  «unchanged, single-line»
+      -parseStateFile(path) *Feature
+    }
+  }
+
+  namespace launch {
+    class sessionConvention {
+      -sessionActions [6]Action  «go plan done accept author resume»
+      +SessionAction(session, slug) (Action, bool)  «THE ONE parser»
+      +SessionMatchesSlug(session, slug) bool  «now a one-line delegation»
+      +HasSessionAction(slug, sessions, want) bool  «scans EVERY session»
+    }
+  }
+
+  namespace orchestrator {
+    class cap {
+      +CapRuleClause string  «const: THE ONE rule sentence, 4 surfaces»
+      +CapSweepRemedy(blocking) string  «TARGETED sweep only; "" when empty»
+      +CapRefusal(remedies...) string  «drops the empty remedy»
+      +ActiveWorkSlugs(repo, root, sessions, exclude) []string
+      -liveBuildSession(slug, sessions) bool  «Class filter REMOVED»
+    }
+  }
+
+  namespace tui {
+    class cues {
+      -planUnready(f) bool  «PURE: no disk I/O on a render path»
+      -buildingDisagreement(f, sessions) bool  «pre-build status + live build»
+      -phaseLineLags(f, sessions) bool  «2 arms over events.jsonl»
+      -stalledPhase(f, sessions) bool  «working status, no session»
+      -cardStateCue(f, sessions) string  «arms provably DISJOINT»
+      -sessionAgent(f, sessions) string  «session action beats a stale phase»
+    }
+    class gates {
+      -attemptActionForce(ship, force)  «every legality rule OUTSIDE !force»
+      -decisionGateBounce(f) string  «NEW: a paused card is never relaunched»
+      -planReadinessBounce(f) string  «FR4 authoring + FR8 accepted-unwritten»
+      -notRunnableBounce(f) string  «NEW: in BOTH go-producing arms»
+      -capBounce(...)  «quotes the clause + the targeted remedy»
+      -autoPickupReady(f)  «the UNATTENDED path refuses too»
+    }
+    class gateKind {
+      -uatRound(f) int  «first integer after "uat" - see limitations»
+      -isUATReplan(f) bool  «THE discriminator: decisions.md vs uat.md»
+    }
+    class selection {
+      -selectableForShip(f) bool  «THE one selection predicate»
+      -pruneSelection()  «prune on reload, not filter at the read»
+    }
+    class footer {
+      -moveChip(f) string  «NEW: ONE chip producer for both go-capable classes»
+      -footerChips(f) []string
+    }
+  }
+
+  namespace cli {
+    class headless {
+      -cmdGo(slug)  «refuses before the cap and before the owner lock»
+      -runnableHint(f)  «authoring: finish the plan, never "accept its plan"»
+      -capBlock(...)
+      -liveMarker(f, sessions)  «NEW gogo status LIVE column»
+    }
+    class skillsLint {
+      -TestPhaseSkillsWriteOccupancyAtEntryAndExit()  «the rule, made deterministic»
+      -TestReviewStandardsDoNotInviteTheExitWriteRemoval()  «whitespace-normalised»
+    }
+  }
+
+  planReadiness ..> Feature : loadFeature sets PlanUnwritten at EVERY read
+  stateParser ..> Feature : parses, defensively
+  Feature <.. cues : reads status / phase / LatestEvent
+  Feature <.. gates
+  Feature <.. headless
+
+  sessionConvention <.. cap : liveBuildSession(want=ActionGo)
+  sessionConvention <.. cues : 4 call sites
+  sessionConvention <.. headless : liveMarker
+
+  planReadiness <.. gates : PlanUnwrittenReason x2
+  planReadiness <.. headless : PlanUnwrittenReason x2
+  planReadiness <.. cues : (drill note, x1)
+
+  cap <.. gates : CapRuleClause + CapSweepRemedy
+  cap <.. headless : CapRuleClause + CapSweepRemedy
+
+  gates <.. footer : moveChip mirrors the same precedence
+  gateKind <.. gates : decisionGateBounce picks the artifact
+  gateKind <.. cues : the pill keys on the SAME predicate
+  selection <.. gates : a stale selection can never ship
+
+  note for sessionConvention "TEST-005: exactly ONE parser of\ngogo-<action>-<label>[-N]. The Action return is\nUNAMBIGUOUS because no Action constant contains\na '-' - guarded structurally, not by example."
+  note for cap "The Class filter was the CLASSIFICATION half of the\ncap under-count (0.28.0 fixed the ATTRIBUTION half).\nThe cross-repo same-slug OVER-count is the OPPOSITE\ndirection and is deliberately untouched."
+  note for planReadiness "Sanctioned TEST-004 exception: a presence check may\nonly ever REFUSE, never PROMOTE, and only on a\nMONOTONIC artifact. plan.md is Guaranteed from phase 1\nand is never deleted, so its absence can only mean\n'never written', never 'stale'."
+  note for footer "The release's recurring shape: ONE producer, MANY\nquoting surfaces. Six review findings (REV-002, 012,\n016, 030, 031, plus both surviving mutations) were\nabout a rule kept in two hand-written copies drifting\napart. moveChip is the last one collapsed."
+  note for skillsLint "The entry+exit rule failed TWICE as prose, so it is\nnow a test: the phase skills must write occupancy at\nentry AND exit, must scope the exit write away from a\ngate status, and the review standards must keep the\n'do not flag the exit write as duplication' clause."

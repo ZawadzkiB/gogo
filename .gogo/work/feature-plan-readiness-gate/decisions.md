@@ -49,7 +49,7 @@ audit trail that lets the pipeline pause and resume safely.
 - **gogo recommends:** **A** — it is the only option enforced by something other than an
   LLM instruction, it is the cheapest (no frozen-contract change), and it is the only one
   that repairs folders that are already broken.
-- **Status:** OPEN
+- **Status:** RESOLVED - user accepted gogo's recommendation (2026-07-29)
 
 > **Reasoning note on TEST-004.** The recorded rule reacted to a **stale `report/`**
 > surviving a UAT rerun: the artifact was **present** while the state had moved on, so
@@ -78,13 +78,17 @@ audit trail that lets the pipeline pause and resume safely.
   - **C. Byte floor** — exists and ≥ ~1 KB. The smallest real plan is **5,494 bytes**, so a
     floor works too, but it is an arbitrary number that ages badly and would reject a
     deliberately short plan for a one-line change.
+    **Re-measured at HEAD (28 work items, up from 25):** all 28 have a `plan.md`, the
+    minimum is still **5,494 bytes** (`feature-cli-distribution`) and the minimum `## `
+    count is still **8** — six items sit at that floor. The A threshold's 4× margin holds
+    unchanged.
   - **D. Require the `## Summary (TL;DR)` closing section** (which `gogo-plan` mandates as
     the final section, so its presence proves the plan finished).
     — Rejected on evidence: **only 15 of 25** existing plans carry it (it post-dates most
     of them), so it would mark 10 real plans as stubs.
 - **gogo recommends:** **A** — the only option that satisfies "or still a stub" with a
   measured, generous margin and no arbitrary constant.
-- **Status:** OPEN
+- **Status:** RESOLVED - user accepted gogo's recommendation (2026-07-29)
 
 ## D3 — What does the board's `m` do on an authoring card?
 
@@ -111,7 +115,29 @@ audit trail that lets the pipeline pause and resume safely.
   the crashed-analyst card recoverable without leaving the board.
   **Note:** **FR13** adds `launch.SessionAction()` for Slice B anyway, so the live-vs-crashed
   discrimination B needs is now free. If you want B, this is the cheap moment to take it.
-- **Status:** OPEN
+- **Status:** RESOLVED - user accepted gogo's recommendation (2026-07-29)
+
+> **Re-verified against 0.28.0 — the recommendation is unchanged and now better founded.**
+> 0.28.0 wrote down a **confirm-default convention** (canonical statement at
+> `cli/internal/tui/move.go:238-254`): a **forward pipeline move** seeds `confirm: true`, so
+> *"a bare **Enter submits**"*; a **destructive** action seeds `false`, so Enter is safe.
+> `startPlanSpawnForm` and `startPlanDoneForm` were both flipped to `true`.
+>
+> This **strengthens option A**. Under the new convention, if `m` on an authoring card
+> opened *any* forward-move confirm, a bare Enter would **launch immediately** — spawning a
+> second analyst onto a folder a live analyst may be mid-write on. Option A opens **no form
+> at all**: there is nothing to confirm, so the convention cannot fire. That is the safest
+> possible interaction, and it is now the *simpler* one too.
+>
+> It also makes **B more dangerous than when first written**, not less. A resume-authoring
+> confirm is a forward move, so the convention says seed `true` → Enter launches. Making it
+> safe would mean either seeding `false` (violating the written convention, which explicitly
+> says *"Never 'align' the two families"*) or gating strictly on *no live session* — and
+> **FR13a** shows that liveness check is exactly the one that is unreliable for plan
+> sessions, because `PlanIntent` names the session after the plan **title** while the
+> analyst derives its own slug (`launch.go:557,574`; carried as a known limitation in
+> 0.28.0's report). **So if you pick B, it must be gated on FR13a being fixed first.**
+> Recommendation stands at **A**.
 
 ## D4 — Where the silent-build fix belongs: the writer, the classifier, or the display
 
@@ -151,7 +177,7 @@ audit trail that lets the pipeline pause and resume safely.
 - **gogo recommends:** **D** (A + the cue). A is the honest fix and the mirror image of
   Slice A's ordering rule; the cue costs ~15 lines and covers the seconds-to-a-minute
   window A cannot remove.
-- **Status:** OPEN
+- **Status:** RESOLVED - user accepted gogo's recommendation (2026-07-29)
 
 > **The unification the coordinator hypothesised holds, and it is the strongest version of
 > this plan.** Both sightings are the same defect: **`state.md` records phase COMPLETION,
@@ -187,7 +213,32 @@ audit trail that lets the pipeline pause and resume safely.
 - **gogo recommends:** **A** — a guard that exists to prevent working-tree corruption
   should not be contingent on an LLM's write ordering. B is acceptable only if you want
   the absolute minimum diff.
-- **Status:** OPEN
+- **Status:** RESOLVED - user accepted gogo's recommendation (2026-07-29)
+
+> **Re-verified against 0.28.0 — unchanged, and the repo now argues my side.** `cap.go` was
+> **not touched** by 0.28.0 (last `78691bc`), so the `Class` filter is still at line 37.
+> Two pieces of new evidence strengthen A:
+> 1. `SessionMatchesSlug`'s new doc comment (`launch.go:746-752`) states the severity in the
+>    repo's own words: *"`ActiveWorkSlugs` would UNDER-count the running build, so the
+>    per-source cap would let a second build start in the same repo and clobber the working
+>    tree, which is the exact safety property Leg 3 exists to protect."* 0.28.0 fixed the
+>    **attribution** half of that under-count (six actions + the label-cap widening); the
+>    **classification** half is this decision.
+> 2. `cap.go`'s own comment already says the rule is *"The clobber risk is a **LIVE build
+>    session**"* — and then the code adds a `Class` filter that is nowhere in that
+>    rationale. **A makes the code match its own documented intent**, which reframes it from
+>    "change the rule" to "remove a contradiction".
+>
+> **Naming collision to flag for review.** 0.28.0's commit defers its *own* **D5**: the
+> **cross-repo same-slug cap OVER-count** (two repos with an identically-named slug counting
+> each other). That is a *different* bug in the *opposite* direction from this D5's
+> **under**-count. They are complementary and both live in `ActiveWorkSlugs`; do not conflate
+> them, and note that FR12 neither fixes nor worsens the over-count.
+>
+> **FR12a follows from A:** 0.28.0 deliberately wrote the old rule into the user-visible
+> bounce string (`move.go:175`, *"the cap counts in-progress work items with a live session,
+> per source"*). Choosing A means updating that sentence in the same change, or the
+> cockpit's most legible message becomes its most wrong.
 
 ## D6 — On a live-vs-file disagreement, cue the card or move it?
 
@@ -205,7 +256,22 @@ audit trail that lets the pipeline pause and resume safely.
     for. Also creates a card that "moves back" when the session ends before a write.
 - **gogo recommends:** **A** — pick **B** only if a momentarily-wrong column is
   unacceptable to you, accepting that two surfaces will then disagree by design.
-- **Status:** OPEN
+- **Status:** RESOLVED - user accepted gogo's recommendation (2026-07-29)
+
+> **Re-verified against 0.28.0 — unchanged, but the *mechanism* is now supplied rather than
+> invented.** 0.28.0 added a real status-severity system, so the cue must route through it
+> instead of growing a parallel one: `setStatus(level, s)` with the `statusBlocked` (amber,
+> *carries the unblock*) and `statusFailed` (red, *carries the tool's words*) shorthands
+> (`model.go:57-83`), a severity reset at `Update`'s single `tea.KeyMsg` choke point
+> (`update.go:178` — *"resetting HERE … is what makes a stale severity impossible"*), and
+> `renderStatus` (`view.go:995-1006`). Folded in as **FR14a**.
+>
+> 0.28.0 also added a **Diagnosability** NFR that constrains the cue's *form*: the
+> blocked/failed/done distinction must survive a **colourless** terminal, *"so pair it with a
+> glyph or a word, which is also what makes it assertable in `View()`"*. That is why the cues
+> are `✎ authoring` / `● building` / `· stalled` (glyph **and** word) and why the refusals
+> reuse `statusWarnMarker` — folded in as **FR14b**. This does not change the A-vs-B choice;
+> it means A is now cheaper than when first written, since the plumbing already exists.
 
 ---
 

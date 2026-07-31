@@ -409,6 +409,81 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   seeds `confirm: true` so **Enter submits**; a destructive action (delete, kill) seeds `false` so
   **Enter is safe**. The asymmetry IS the rule - never align the two families. Version **0.28.0**.
 
+- **The board stops narrating the past (0.29.0):** one root cause, two live sightings.
+  **`state.md` was a completion log, not an occupancy record** - every phase wrote it once, at
+  a boundary, describing work that had already stopped. So a template-scaffolded folder was
+  born reading `awaiting-plan-acceptance` with **no `plan.md`** (the board offered an unwritten
+  plan and leaked the literal `<one-line title>` as a card title, and a placeholder `created:`
+  sorted the most-broken card to the **top** because `'<'` 0x3C > `'2'` 0x32); and an item
+  **mid-build** still read `plan-accepted`, failed `cap.go`'s `Class == ClassInProgress` test,
+  and was therefore **invisible to the concurrency cap** - a second `gogo go` in the same repo
+  was allowed and two claudes edited one working tree. **That cap hole was the severity; the
+  cosmetics were the symptom.** As built, in two halves. **Deterministic (the half that
+  works):** plan readiness is derived at **every read** - `contract.PlanSections(dir) (int,
+  error)` (3 answers: count / absent / unreadable, **unreadable counts as WRITTEN** so a
+  permissions hiccup cannot invent a defect) -> `planWritten` -> the **defect-positive**
+  `Feature.PlanUnwritten` (zero value = pre-0.29 meaning, so every synthetic Feature is
+  untouched) -> `Authoring()`; **one** reason clause (`PlanUnwrittenReason`) quoted by all four
+  refusals - board `m`/`M`, `gogo go`, `/gogo:accept`, and the **unattended reload
+  auto-pickup** - each naming its number (*"plan.md has 1 of the 2 sections a written plan
+  needs"*) and its unblock. The refusal is a **legality** rule, so it sits **outside**
+  `attemptActionForce`'s `!force` guards: **`M` forces past a cap, never past a missing plan.**
+  **The cap now counts a live `gogo-go-<slug>` BUILD session and nothing else** - the `Class`
+  filter is gone, which **supersedes the 0.28.0 sentence above** ("already counts only
+  in-progress work items with a live session"): that is no longer the rule. Framed as removing
+  a contradiction, since `cap.go`'s own comment already said the rule was "a LIVE build
+  session". A **terminal** feature still holding a build session **is** counted, deliberately
+  (review standard #9). The cross-repo same-slug **OVER**-count is the **opposite** direction
+  and is untouched - never conflate the two. `launch.SessionAction(session, slug) (Action,
+  bool)` is the **one** parser (TEST-005); `SessionMatchesSlug` delegates in one line; the
+  `Action` return is provably unambiguous because **no action name contains a `-`**, guarded
+  structurally rather than by example. **Prose (the half that has NOT paid off):** the three
+  phase skills are instructed to write occupancy at **ENTRY**, moved into **step 1 of the
+  numbered `## ② Steps` flow** - and it was **skipped on all three of its live runs (n=3)**,
+  including this feature's own review rounds. FR11 also *removed* ③/④'s exit write as newly-redundant, which made
+  a skipped entry write leave the line stale **indefinitely** rather than one phase late - ⑤
+  caught that, and the user restored it: the write now happens at **entry AND exit**, so the
+  floor is one phase behind and the ceiling is live. The redundancy is deliberate; do not tidy
+  it away. The shipped guarantee is therefore the **detector**:
+  `tui.phaseLineLags` -> **`· state lags`**, two arms (a `phase-done` for the phase the line
+  names; an **entry** event naming a *different* phase), both needing a live build session and
+  a working status. Its honest meaning is narrower than "the phase line is stale" -
+  **`state.md` and `events.jsonl` disagree about the current phase, one half of step 1 did not
+  land** - and its **silence is not proof of health**, since a later mid-phase event overwrites
+  the arm-A `phase-done`. So the release claim is scoped: the board narrates the present **for
+  ②**; for **③/④/⑤** it either narrates the present or **says out loud that it cannot**. Also:
+  three provably **disjoint** card cues (`● building` / `· state lags` / `· stalled`,
+  glyph+word so they survive a colourless terminal), `activeAgent` corrected by the session
+  action (a card being built no longer reads `● analyst`), a `gogo status` **LIVE** column (it
+  made **zero** session calls before), and the cap's rule + sweep remedy single-sourced as
+  `orchestrator.CapRuleClause` / `CapSweepRemedy` after **three of four** hand-written copies
+  went stale - the remedy can now only emit the **TARGETED** `gogo sweep <slug>`, never the
+  host-global bare form that reaps another source's in-flight build as an "orphan". **No status
+  enum value, no `classify()` change, no class->column change**: `authoring`, `building`,
+  `stalled` and `state lags` are all **derived display states**. Phase ④ also fixed the `x3`
+  badge from the original bug report (mis-attributed by an earlier analysis to the header's
+  `⏸ 3 need you` pill): `parseStateFile` had no notion of a multi-line `<!-- -->` block, so the
+  shipped template's **commented-out** `correlation:` legend example parsed as real data and
+  painted `⛓ ×3` on any fresh scaffold - now `contract.advanceComment` carries the open-comment
+  state across lines, guarded by tests that read `templates/state.template.md` **itself**.
+  **The same principle then had to be applied to the MOVE path** (review rounds 04-07, test
+  rounds 03-04), because the board was still saying one thing and doing another there:
+  `attemptActionForce` consulted `WaitingForUser()` for **display only**, so `m`/`M` on a card
+  paused at a decision gate returned a real `/gogo:go` intent with an **empty** bounce - the only
+  guard was a STOP instruction inside the spawned session's own prompt (TEST-002); the
+  `RunnableStatus` guard was added to one class arm only, so the other returned `ActionGo` for a
+  status `gogo go` refuses (REV-026); and `footerChips` kept two hand-written copies of one rule,
+  one of which promised `[m] go` where FR8 bounces (REV-030). As built, the chain is
+  **decision gate -> plan readiness -> accept -> runnable -> cap**, with **only the cap** skippable
+  by `M`, and `tui.moveChip` derives the footer chip from that same precedence. The
+  decision-gate refusal names the right artifact via `isUATReplan` - `decisions.md` +
+  `/gogo:resume` for a plain fork, `uat.md` + re-acceptance for a UAT round - the **same**
+  predicate the pill uses, so the two agree by construction. **Process note worth keeping:** this
+  ran to **7 review rounds against a ~3-round bound**, and several later rounds fixed defects
+  earlier fixes introduced; the rounds that ended a defect family were the ones that produced a
+  **single producer** or a **structural guard**, never another instance fix.
+  Version **0.29.0**.
+
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
      reconcile copy it 1:1 (byte-for-byte), exactly like `## gogo overrides`. Put any

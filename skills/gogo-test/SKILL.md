@@ -37,10 +37,31 @@ bad input.
 
 ## ② Steps
 
-1. Read `testing-tools.md`, `test-strategy.md`, `tech-stack.md`, `plan.md`'s
+1. **Record occupancy - FIRST, before you run a single test (FR11).** Write `state.md`
+   `phase: test` + `status: testing`, and append
+   `{"ts":"<RFC3339>","event":"phase-started","phase":"test","status":"testing","slug":"<slug>"}`
+   to `events.jsonl`. Only then continue to step 2. §④ writes `phase`/`status` **again** at the
+   end and bumps `iterations` there - deliberate belt-and-braces, not redundancy to tidy away
+   (see §④). Do **not** bump `iterations` here - that is a completion count.
+
+   `state.md` is what every reader believes (the board's column, `gogo status`, the cap,
+   `pages`). Written ONLY at §④, after the work, the line records that testing just
+   **finished** - so for the whole round the disk still describes the PREVIOUS phase and the
+   board narrates the past. Idempotent on a resume: the values are already correct.
+
+   **This is step 1 of the numbered flow on purpose** - it shipped once as a separate `①b`
+   section, which was worse. Be honest about the track record though: this write has been
+   skipped on **all three** of its live runs so far, twice AFTER the move into the numbered
+   steps, so the move helped less than hoped. That is exactly why §④ writes `phase`/`status`
+   again and why the board carries a detector: skip this and a card whose telemetry contradicts
+   its phase line, with a build session still live, reads **`· state lags`**. Visible, and still
+   wrong - §④'s write will eventually move the line, but every reader describes the previous
+   phase until it does.
+
+2. Read `testing-tools.md`, `test-strategy.md`, `tech-stack.md`, `plan.md`'s
    Tests section, `non-functional-requirements.md` (the bars to verify), and the
    as-built `charts/` (what to exercise).
-2. **Delegate** to `gogo-tester` via `Task`, passing the plan, the test
+3. **Delegate** to `gogo-tester` via `Task`, passing the plan, the test
    strategy/tools, the as-built charts, the current `test/issues.json`, and the
    round number `NN`. The tester:
    - runs existing suites first (build, unit, then e2e — require green),
@@ -55,7 +76,7 @@ bad input.
    `{"ts":"<RFC3339>","event":"round-opened","phase":"test","status":"testing","round":NN,"slug":"<slug>"}`.
    Create the file if absent; **best-effort** — never fail the phase if the append
    fails (append-only telemetry; `state.md` stays the human resume file).
-3. **Update the living `test/issues.json`** (the contract — D1/D2, same shape as
+4. **Update the living `test/issues.json`** (the contract - D1/D2, same shape as
    review's). For this round:
    - **New issue** → append with a fresh stable `id` (e.g. `TEST-004`),
      `origin: test`, `found_in_round: NN`, `status: new`, all FR4 fields.
@@ -68,7 +89,7 @@ bad input.
    **If this round has any `open`/`new` issues, append the findings event**
    (best-effort, per `events.schema.json`):
    `{"ts":"<RFC3339>","event":"issues-found","phase":"test","status":"testing","round":NN,"note":"<e.g. 1 blocker>","slug":"<slug>"}`.
-4. **Render the human snapshot** `test-NN.md`: what was exercised (UI/CLI/API),
+5. **Render the human snapshot** `test-NN.md`: what was exercised (UI/CLI/API),
    results, new/extended tests, and this round's issues with id/severity/priority/
    status. The JSON is the contract; the markdown is the readable companion.
 
@@ -97,11 +118,30 @@ Decide purely on the **issues list** (count of `open`/`new`):
   was either run or explicitly user-skipped**) → advance to **⑤ report**
   (`gogo-knowledge`).
 
-Update `state.md`: phase=test, status=testing, bump `iterations: test=<n+1>` each
-round. (`issues.json`/`result.json` are the machine state; `state.md` stays the
+Update `state.md`: **`phase: test`, `status: testing`**, and bump
+`iterations: test=<n+1>` - the *completion* count - each round.
+
+**Scope: only on the routes that CONTINUE.** A route that parks the item at a **user gate**
+(a decision gate → `waiting-for-user`, and for ④ a blocked hands-on check → the same) has
+already written the status that matters, and it is the one status a reader must not lose:
+it feeds the `⏸ K need you` count, the card's gate stripe, and the `/gogo:go` refusal that
+stops an unattended rerun. **Never overwrite a gate status with the working status** - write
+`phase`/`status` here only when the round loops back to ② or advances to the next phase.
+(`issues.json`/`result.json` are the machine state; `state.md` stays the
 human-facing file.)
 
-**Append the terminal event (telemetry).** Only when the feature is **all-green**
+**Write phase/status here EVEN THOUGH §② step 1 already did. The redundancy IS the design -
+do not "clean it up".** 0.29.0 briefly dropped this exit write on the theory that the entry
+write covers it. It does not: the entry write is **prose an LLM follows**, and it was skipped
+on all three of its first live runs. With only the entry write, `state.md` stops advancing at
+all - it sticks at whatever phase last actually wrote it, which is *worse* than the
+one-phase-behind lag this release set out to fix. Two writers, one at each end, means the
+floor is that old one-phase lag and the ceiling is the entry write's accuracy. One of the two
+is an LLM following prose, so the other one is what makes the line move at all.
+
+
+**Append the terminal event (telemetry).** The `phase-started` line was appended at §② step 1 -
+do not re-emit it. Only when the feature is **all-green**
 (no `open`/`new` issues — advancing to ⑤ report), append one compact JSON line to
 `.gogo/work/feature-<slug>/events.jsonl` per `events.schema.json`
 (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`) — this skill owns `phase-done`/test

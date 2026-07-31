@@ -27,11 +27,19 @@
 - **feature:** <one-line title>
 - **phase:** plan            <!-- plan | implement | review | test | knowledge | done -->
 - **status:** awaiting-plan-acceptance   <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
+<!-- `awaiting-plan-acceptance` is only meaningful once plan.md EXISTS and is written (>= 2 `## ` sections):
+     write this file AFTER plan.md. Until then every reader shows the item as `✎ authoring`, leaves it out of
+     the "need you" gate count, and `m`/`M`/`gogo go`/`/gogo:accept` all refuse it (there is nothing to accept).
+     Likewise fill in every `<...>` placeholder below - a placeholder reads as an EMPTY value. -->
 - **created:** <YYYY-MM-DD>
 - **branch:** <git branch | n/a>
 - **iterations:** plan=0 · implement=0 · review=0 · test=0   <!-- add · uat=N once a UAT round loops back to planning -->
 - **resume:** none           <!-- <phase to re-enter> — <next action> | none -->
 - **open-decision:** none    <!-- <decisions.md anchor> | none -->
 <!-- optional, additive — include ONLY when this work item belongs to one or more cross-source plans (a LIST; stamped by /gogo:plan --correlation). Absent = today's behaviour, byte-for-byte.
+     The example line below sits INSIDE this comment block, so readers skip it (a reader tracks
+     multi-line HTML comment blocks, not just same-line ones); uncomment it only if this item really
+     belongs to a plan. Never write an HTML comment opener or closer inside this block - either one
+     ends it early, and the example would then parse as a real field.
 - **correlation:** [plan-XXXX]   plan id(s) this item belongs to, e.g. [plan-7f3a, plan-9c2e]
 -->

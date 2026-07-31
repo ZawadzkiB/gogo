@@ -37,6 +37,18 @@ func (m Model) autoPickupReady(f *contract.Feature) bool {
 	if f.Status != "plan-accepted" {
 		return false // the exact initial-handoff state a first manual `gogo go` acts on
 	}
+	// FR8 on the ONE launch path with no human in the loop. An unwritten plan.md is not a
+	// cap problem to wait out, it is ILLEGAL: there is nothing to build. The board's `m`/`M`
+	// and `gogo go` both refuse this exact card, so without this check the UNATTENDED path
+	// would be the most permissive one - a `claude -p /gogo:go <slug> --skip-acceptance`
+	// fired at a folder with no plan in it, which is precisely the aggravating case this
+	// feature exists to close (an analyst writing state.md before plan.md, in a source whose
+	// planAcceptanceSkip auto-clears the gate). Returning false here also routes the card to
+	// the plan-not-written cue instead of the misleading "trigger manually", because
+	// autoPickupBlocked shares this helper.
+	if f.PlanUnwritten {
+		return false
+	}
 	planSkip, _ := projects.SkipForSource(m.capWatchSources(), f.Root)
 	if !planSkip {
 		return false // the source did NOT opt out of the plan gate — it waits for a manual go

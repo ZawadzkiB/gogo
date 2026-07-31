@@ -1,37 +1,60 @@
 flowchart TD
   subgraph disk["feature folder on disk"]
-    st["state.md<br/>status: awaiting-plan-acceptance"]
-    pm["plan.md<br/>(present? substantive?)"]
+    st["state.md<br/>status: awaiting-plan-acceptance<br/>or plan-accepted"]
+    pm["plan.md<br/>present? &gt;= 2 '## ' sections?"]
   end
 
-  st --> parse["contract.parseStateFile()<br/>+ NEW stripPlaceholder()"]
-  pm --> pw["NEW contract.planWritten(dir)<br/>exists AND &gt;= 2 '## ' headings"]
+  st --> parse["contract.parseStateFile()<br/>advanceComment: skip lines inside a<br/>multi-line HTML comment block<br/>+ stripPlaceholder(stripComment(v))<br/>a bare &lt;...&gt; value reads EMPTY"]
+  pm --> ps["contract.PlanSections(dir) (int, error)<br/>bounded scan, stops at the threshold<br/>nil / ErrNotExist / other = 3 answers"]
+  ps --> pw["contract.planWritten(dir)<br/>absent = unwritten<br/>unreadable = WRITTEN (never invent a defect)"]
 
   parse --> feat["contract.Feature"]
-  pw --> flag["NEW Feature.PlanUnwritten<br/>(defect-positive; zero value = today)"]
+  pw --> flag["Feature.PlanUnwritten bool<br/>defect-positive: zero value = pre-0.29 meaning"]
   flag --> feat
 
-  feat --> auth["NEW Feature.Authoring()<br/>PlanUnwritten AND status in {apa, ''}"]
+  feat --> auth["Feature.Authoring()<br/>PlanUnwritten AND status in {apa, ''}"]
+  ps --> reason["contract.PlanUnwrittenReason(dir)<br/>the ONE reason clause:<br/>'no plan.md on disk yet' or<br/>'plan.md has 1 of the 2 sections...'"]
 
-  auth --> wfi["Feature.WaitingForInput()<br/>authoring EXCLUDED"]
-  auth --> pill["tui.pillLabel / pillStyleFor<br/>dim '✎ authoring'"]
-  auth --> mv["tui.attemptAction (m)<br/>BOUNCE, never ActionAccept"]
+  auth --> wfi["Feature.WaitingForInput()<br/>its apa arm returns !Authoring()"]
+  auth --> pill["tui.badge -&gt; 'authoring'<br/>pillLabel '✎ authoring' · pillStyleFor pillDim<br/>stripeAccent: no gate stripe"]
+  auth --> mv["tui.planReadinessBounce(f)<br/>2 gates: authoring (FR4)<br/>and plan-accepted+unwritten (FR8)"]
+  reason --> mv
 
-  wfi --> hdr["header '⏸ K need you'<br/>+ gogo status WAIT column"]
+  gate["Feature.WaitingForUser()<br/>a paused DECISION gate"] --> dgb["tui.decisionGateBounce<br/>names the open decision ID<br/>+ the unblock /gogo:resume &lt;slug&gt;"]
+  dgb --> aaf
+  mv --> aaf["tui.attemptActionForce(ship, force)<br/>legality rules checked OUTSIDE every<br/>!force guard, so M cannot force them<br/>(FR4a: unwritten plan; TEST-002: decision gate)"]
+  aaf --> sev["m.statusBlocked -&gt; renderStatus<br/>amber '⚠ ' + names 'gogo plan &lt;slug&gt;'"]
+  mv --> pure["tui.planUnready(f)<br/>pure predicate: no disk I/O<br/>(render paths only)"]
+  pure --> chip["tui.footerChips<br/>'[m] ✗ plan not written'<br/>never offers an illegal move"]
+  mv --> drill["tui.planColumnViewNote<br/>v says WHY instead of<br/>silently showing the file list"]
 
-  mv -.->|blocked| acc["/gogo:accept &lt;slug&gt;"]
-  acc --> g2["gogo-accept step 2<br/>NEW hard gate: plan.md written?"]
-  g2 -->|no| stop["STOP with reason<br/>+ 'gogo plan &lt;slug&gt;'"]
-  g2 -->|yes| rec["record acceptance<br/>(unchanged single owner)"]
+  wfi --> hdr["header '⏸ K need you'<br/>and gogo status WAIT column"]
 
-  sess["launch.ListSessions()<br/>gogo-&lt;action&gt;-&lt;slug&gt;"] --> sa["NEW launch.SessionAction()<br/>returns go | plan | done | accept"]
-  sa --> capf["orchestrator.ActiveWorkSlugs<br/>NEW: live GO session, drop Class filter"]
-  sa --> cue["tui: '● building' chip<br/>+ activeAgent from the session"]
+  aaf -.->|refused| acc["/gogo:accept &lt;slug&gt;"]
+  acc --> g2["gogo-accept step 2b<br/>hard gate: is plan.md written?"]
+  g2 -->|no| stop["STOP before presenting<br/>+ 'gogo plan &lt;slug&gt;'"]
+  g2 -->|yes| rec["record acceptance<br/>unchanged single owner"]
+
+  sess["launch.ListSessions()<br/>gogo-&lt;action&gt;-&lt;label&gt;[-N]"] --> sa["launch.SessionAction(session, slug)<br/>(Action, bool) - the ONE parser<br/>sessionActions x 2 label transforms"]
+  sa --> sms["launch.SessionMatchesSlug<br/>now a one-line delegation"]
+  sa --> has["launch.HasSessionAction(slug, sessions, want)<br/>scans EVERY session: order is not a contract"]
+  has --> capf["orchestrator.ActiveWorkSlugs<br/>live GO session only; Class filter REMOVED"]
+  has --> cue["tui.cardStateCue<br/>'● building' / '· state lags' / '· stalled'<br/>+ sessionAgent -&gt; '● developer'"]
+  ev["events.jsonl newest line<br/>Feature.LatestEvent"] --> lag["tui.phaseLineLags (2 arms)<br/>A: phase-done for the phase the line names<br/>B: an ENTRY event naming ANOTHER phase<br/>+ live build session + working status<br/>= a SKIPPED entry write, made visible"]
+  lag --> cue
+  has --> stat["cli/status.go liveMarker<br/>LIVE column: building / authoring / live"]
   feat --> capf
+  capf --> rule["orchestrator.CapRuleClause<br/>+ CapSweepRemedy(active)<br/>ONE producer for 4 rule surfaces<br/>and both refusals' sweep remedy"]
+  rule --> bounce["tui.capBounce + cli/go.go capBlock<br/>name the TARGETED 'gogo sweep &lt;slug&gt;'<br/>never the host-global bare form"]
 
-  feat --> go["cli/go.go cmdGo<br/>NEW: refuse plan-accepted + unwritten plan"]
+  auth --> pick["tui.autoPickupReady<br/>FR8 on the UNATTENDED path:<br/>PlanUnwritten = never auto-fire"]
+  flag --> pick
+
+  feat --> go["cli/go.go cmdGo<br/>refuses plan-accepted + PlanUnwritten<br/>before the cap and before the owner lock"]
+  reason --> go
+  feat --> hint["cli/go.go runnableHint(f)<br/>authoring: finish the plan,<br/>never 'accept its plan'"]
 
   classDef new fill:#fff3d6,stroke:#caa54a,color:#111
   classDef reuse fill:#e8ecff,stroke:#7c8bd9,color:#111
-  class pw,flag,auth,g2,stop,sa,capf,cue new
-  class parse,feat,wfi,pill,mv,hdr,acc,rec,go,sess reuse
+  class ps,pw,flag,auth,reason,mv,pure,chip,drill,g2,stop,sa,sms,has,capf,cue,lag,pick,sev,stat,rule,bounce,hint,dgb new
+  class parse,feat,wfi,pill,aaf,hdr,acc,rec,go,sess,ev,gate reuse

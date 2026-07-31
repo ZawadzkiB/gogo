@@ -1,0 +1,12 @@
+{ "schema": 2, "name": "plan-readiness-gate", "release": "0.29.0", "date": "2026-07-31",
+  "members": [ { "slug": "plan-readiness-gate", "title": "the board stops narrating the past: plan readiness derived at read time, the concurrency cap counts live builds regardless of class, and a state-lags cue when state.md and events.jsonl disagree", "version": "0.29.0" } ],
+  "diagrams": [
+    { "kind": "flow", "file": "plan-readiness-gate-flow.mmd", "title": "As-built control flow: plan readiness derived at every read; m/M refuse outside the force condition" },
+    { "kind": "sequence", "file": "plan-readiness-gate-sequence.mmd", "title": "As-built build timing: the two writers - phase/status at entry AND again at exit" },
+    { "kind": "activity", "file": "plan-readiness-gate-activity.mmd", "title": "As-built work-item lifecycle: the derived authoring state and the gates that refuse it" },
+    { "kind": "class", "file": "plan-readiness-gate-class.mmd", "title": "As-built structure: single-source producers - PlanUnwrittenReason, selectableForShip, moveChip, CapRuleClause" }
+  ],
+  "before": [
+    { "kind": "flow", "file": "before/plan-readiness-gate-flow.mmd", "title": "Before: a template-scaffolded folder was born accept-ready, with no plan.md on disk" },
+    { "kind": "sequence", "file": "before/plan-readiness-gate-sequence.mmd", "title": "Before: state.md written only at each phase's exit - a completion log, not an occupancy record" }
+  ] }

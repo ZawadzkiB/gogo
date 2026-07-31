@@ -7,6 +7,10 @@
 package contract
 
 import (
+	"bufio"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -78,7 +82,19 @@ type Feature struct {
 	// both ids. nil when the state.md carries no correlation line (the byte-for-byte
 	// pre-correlation fallback — no `⛓` chip, no `#plan-…` filter effect). This
 	// supersedes the removed epics-store overlay: correlation now lives in state.md.
-	Correlations  []string
+	Correlations []string
+	// PlanUnwritten records that this folder's plan.md is NOT a written plan - absent,
+	// or still a scaffold stub (fewer than PlanSectionsRequired `## ` sections). Derived
+	// by loadFeature at EVERY read (planWritten), so an analyst that dies mid-authoring
+	// leaves an item that reads as authoring forever - nothing to un-set, no migration
+	// (FR7). DEFECT-POSITIVE on purpose: the zero value is false = "the plan is written",
+	// so a synthetic Feature (every existing test, every non-loader caller) keeps its
+	// pre-0.29.0 meaning byte-for-byte. It never PROMOTES anything - the only rules it
+	// feeds REFUSE (the accept gates) or DIM (the authoring pill), per the sanctioned
+	// TEST-004 exception: a presence check may only ever refuse, and only on a MONOTONIC
+	// artifact (plan.md is Guaranteed from ① and is never deleted, so its absence can
+	// only mean "never written", never "stale").
+	PlanUnwritten bool
 	Title         string
 	Phase         string
 	Status        string
@@ -118,6 +134,26 @@ func (f *Feature) AwaitingUAT() bool { return f.Status == "awaiting-uat" }
 // a plan is shipped before the plan can be accepted.
 func (f *Feature) Shipped() bool { return f.Status == "shipped" || f.Status == "done" }
 
+// Authoring reports whether the feature is still being AUTHORED: its plan.md is not
+// written (absent or a stub) while its state.md already reads the plan-acceptance gate
+// (or carries no status at all - a bare/garbage state.md). This is a DERIVED display
+// state, not a status enum value: `status` on disk is still awaiting-plan-acceptance,
+// and docs/cli-contract.md §2's enum, §3's four classes and the class→column mapping are
+// all unchanged (an authoring item stays ClassUnfinished → the plan column). It exists
+// because state.md is written at a phase's exit: a folder scaffolded from
+// templates/state.template.md is born reading `awaiting-plan-acceptance` with no plan.md
+// on disk, and every reader used to offer that unwritten plan for acceptance.
+//
+// Being derived at every read is what makes it crash-safe (FR7): there is no flag to
+// un-set, so an analyst killed mid-authoring leaves an item that still reads as
+// authoring, and folders already broken on disk are fixed with no migration.
+func (f *Feature) Authoring() bool {
+	if !f.PlanUnwritten {
+		return false
+	}
+	return f.Status == "awaiting-plan-acceptance" || f.Status == ""
+}
+
 // WaitingForInput reports whether the feature is parked at a genuine USER gate —
 // the union of the three statuses that block on the user: awaiting-plan-acceptance
 // (the plan-acceptance gate), waiting-for-user (a decision gate / mid-UAT re-plan
@@ -127,9 +163,16 @@ func (f *Feature) Shipped() bool { return f.Status == "shipped" || f.Status == "
 // the user vs which flow (docs/cli-contract.md §2/§3). WaitingForUser() and
 // AwaitingUAT() stay for the badge precedence each carries; WaitingForInput() is
 // the additive presentation union (unattended-ops-input-signals, FR-B1).
+// An AUTHORING item is NOT a user gate (FR2): its plan.md does not exist yet, so
+// there is nothing for the user to accept and it must not inflate the header's
+// "⏸ K need you" pill or the `gogo status` WAIT column. Because Authoring() requires
+// PlanUnwritten (defect-positive), a zero-value Feature answers exactly as it did
+// before 0.29.0.
 func (f *Feature) WaitingForInput() bool {
 	switch f.Status {
-	case "awaiting-plan-acceptance", "waiting-for-user", "awaiting-uat":
+	case "awaiting-plan-acceptance":
+		return !f.Authoring()
+	case "waiting-for-user", "awaiting-uat":
 		return true
 	}
 	return false
@@ -295,16 +338,102 @@ func (r *Repo) Feature(slug string) *Feature {
 	return nil
 }
 
-// loadFeature parses one feature folder (state.md + latest event).
+// loadFeature parses one feature folder (state.md + latest event + plan readiness).
 func loadFeature(dir, slug string) *Feature {
 	f := parseStateFile(filepath.Join(dir, "state.md"))
 	f.Dir = dir
 	f.Slug = slug
+	f.PlanUnwritten = !planWritten(dir)
 	if evs := ReadEvents(filepath.Join(dir, "events.jsonl")); len(evs) > 0 {
 		last := evs[len(evs)-1]
 		f.LatestEvent = &last
 	}
 	return f
+}
+
+// PlanSectionsRequired is how many `## ` sections a plan.md must carry to count as a
+// WRITTEN plan rather than a scaffold stub (D2=A). Measured over the 28 work items on
+// disk when this shipped: all 28 had a plan.md, the smallest was 5 494 bytes and the
+// FEWEST `## ` sections any real plan carried was 8 - a 4× margin. Structural rather
+// than size-based on purpose, so a legitimately terse plan is never rejected for
+// brevity; a freshly scaffolded stub has 0-1.
+const PlanSectionsRequired = 2
+
+// maxPlanScanBytes bounds the plan.md read: the check only needs the first
+// PlanSectionsRequired `## ` lines, so it stops early on any real plan, and a
+// pathological (or non-text) file can never make the deterministic read path expensive.
+const maxPlanScanBytes = 1 << 20 // 1 MiB - ~50× the largest plan.md in the tree
+
+// PlanSections counts the `## ` sections in dir's plan.md. The error distinguishes the
+// three answers a refusal has to tell apart: nil = read it, n is the count · an
+// fs.ErrNotExist = there is no plan.md at all · any other error = present but
+// unreadable. Scanning stops as soon as PlanSectionsRequired sections are seen, so this
+// is cheap on every real plan. Exported because a refusal must NAME ITS NUMBER (the
+// Diagnosability bar): "plan.md has 1 of the 2 sections a written plan needs" is
+// actionable where "too small" is not.
+func PlanSections(dir string) (int, error) {
+	if dir == "" {
+		return 0, fs.ErrInvalid
+	}
+	file, err := os.Open(filepath.Join(dir, "plan.md"))
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	n, read := 0, 0
+	sc := bufio.NewScanner(file)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		line := sc.Text()
+		read += len(line) + 1
+		if strings.HasPrefix(line, "## ") {
+			if n++; n >= PlanSectionsRequired {
+				return n, nil
+			}
+		}
+		if read >= maxPlanScanBytes {
+			break
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
+// planWritten reports whether dir carries a real, substantive plan.md (D2=A). An
+// UNREADABLE plan.md counts as WRITTEN: a permissions hiccup or a mid-write truncation
+// must never invent a defect that refuses the user's accept - only a plan that is
+// provably absent or provably a stub does that.
+func planWritten(dir string) bool {
+	n, err := PlanSections(dir)
+	switch {
+	case err == nil:
+		return n >= PlanSectionsRequired
+	case errors.Is(err, fs.ErrNotExist), errors.Is(err, fs.ErrInvalid):
+		return false // no plan.md (or no folder to look in) - genuinely unwritten
+	default:
+		return true // present but unreadable - never invent a defect
+	}
+}
+
+// PlanUnwrittenReason is the ONE clause every refusal quotes to say WHY a plan.md does
+// not count as written, so the board bounce, `gogo go`'s refusal and the drill-in note
+// can never drift into three different diagnoses of the same fact (and so a test can
+// assert the exact reason, not a proxy). "" when the plan IS written.
+func PlanUnwrittenReason(dir string) string {
+	n, err := PlanSections(dir)
+	switch {
+	case err == nil && n >= PlanSectionsRequired:
+		return ""
+	case err == nil:
+		return fmt.Sprintf("plan.md has %d of the %d sections a written plan needs", n, PlanSectionsRequired)
+	case errors.Is(err, fs.ErrNotExist), errors.Is(err, fs.ErrInvalid):
+		return "no plan.md on disk yet"
+	default:
+		return "" // unreadable == written (planWritten), so there is nothing to refuse
+	}
 }
 
 // classify applies the work-index classifier (docs/cli-contract.md §3),

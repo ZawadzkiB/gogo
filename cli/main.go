@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/ZawadzkiB/gogo/cli/internal/contract"
+	"github.com/ZawadzkiB/gogo/cli/internal/orchestrator"
 	"github.com/ZawadzkiB/gogo/cli/internal/plans"
 	"github.com/ZawadzkiB/gogo/cli/internal/projects"
 	"github.com/ZawadzkiB/gogo/cli/internal/tui"
@@ -19,7 +20,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.28.0"
+const Version = "0.29.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -201,8 +202,8 @@ plans tab keys (a 4-column KANBAN: drafts · ready · active · done):
   auto-pickup: a work item spawned into a source with planAcceptanceSkip auto-runs /gogo:go on reload when its source is under cap; at cap it shows "trigger manually"
 
 concurrency cap (concurrentWorkItems, per SOURCE - config tab):
-  0 = unlimited; N caps THAT source's in-progress work items that have a live session.
-  Other sources are unaffected, and PLANS are never counted (a plan spawn is never cap-gated).
+  0 = unlimited; N caps THAT source only - the cap ` + orchestrator.CapRuleClause + `.
+  Other sources are unaffected (a plan spawn is never cap-gated).
   Over cap: press M on the board to force past it, or run gogo go <slug> --force.
 
 drill-in keys (enter on a card - shows description / folder / status / sessions / events):

@@ -153,10 +153,18 @@ Delegated to the **`gogo-analyst`**: it reads the named knowledge set (incl.
 truth**, following `analysis.md`'s procedure), creates `.gogo/work/feature-<slug>/`,
 writes `plan.md` (Goal / Context / Functional requirements / Approach +
 alternatives / Changes checklist / Tests / Out-of-scope), draws the intended design
-with `gogo-mermaid`, and inits `state.md`. **Present the plan and STOP for
-acceptance** — you (the orchestrator) own that gate. Changes/clarification → log to
-`adjustments.md`, revise, re-present. **Do not implement until the user accepts.**
+with `gogo-mermaid`, and inits `state.md` - **`state.md` last, always: `status:
+awaiting-plan-acceptance` is a claim that `plan.md` is written.** **Present the plan and
+STOP for acceptance** - you (the orchestrator) own that gate. Changes/clarification → log
+to `adjustments.md`, revise, re-present. **Do not implement until the user accepts.**
 Hard gate.
+
+**The gate needs a written plan, not just a status.** Before you present anything for
+acceptance, confirm `plan.md` exists and carries at least two `## ` sections. A folder
+with the status but no written plan is **mid-authoring** - every reader shows it as
+`✎ authoring`, leaves it out of the "need you" count, and refuses `m`/`M`, `gogo go` and
+`/gogo:accept` until the plan lands. Same precondition for ②: never implement a
+`plan-accepted` item whose `plan.md` is absent or a stub - send it back to ①.
 
 **Pre-declared skip (`--skip-acceptance`).** When the run's invocation carries the
 `--skip-acceptance` flag (the gogo cockpit appends it when this work item's SOURCE opted
@@ -174,6 +182,18 @@ keep build/typecheck/unit green. **Run this yourself, in-context** — do not de
 to a fresh `gogo-developer`, so your understanding of the code carries across the
 loop. Re-enter here to apply review/test fixes **without re-exploring the tree**.
 (`gogo-developer` still backs standalone `/gogo:implement` and hands-off runs.)
+
+**Record occupancy at ENTRY (`gogo-implement` §② step 1) - this applies to the in-context
+path too.** The moment validate-in passes, and *before* you touch a line of product code,
+write `state.md` `phase: implement` + `status: implementing` and append the
+`phase-started` line. Same for ③ and ④ (`reviewing`, `testing`). `state.md` is what every
+reader believes - the board's column, `gogo status`, the concurrency cap, `pages` - so
+writing it after the work means it records the phase that just **finished**: the card sits
+in the plan column reading `plan-accepted` for the whole build, and a second `gogo go` in
+the same repo can clobber the working tree. **§④ then writes `phase`/`status` AGAIN** at the
+end, plus the `iterations` bump and `phase-done` - belt and braces on purpose, because the
+entry write is prose an LLM follows and has been skipped in practice; with only the entry
+write, `state.md` stops advancing at all.
 
 ### ③ Review → skill `gogo-review` (delegate to `gogo-reviewer`)
 Review the diff against `code-review-standards.md` + `non-functional-requirements.md`.
@@ -332,7 +352,11 @@ from the vendored `.gogo/resources/` assets, and opens it.
 At **every** phase/status transition, append one compact JSON line to
 `.gogo/work/feature-<slug>/events.jsonl` **beside** (never instead of) the
 `state.md` write, per `events.schema.json`
-(`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`). This append-only stream is what a
+(`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`). A phase's **entry** transition happens at
+the phase's START, not its end: ②/③/④ append `phase-started` as their §② step 1, beside the
+occupancy `state.md` write, and `phase-done` only when the phase actually hands off.
+(Emitting both in one burst at the end made this a post-hoc log rather than a live stream.)
+This append-only stream is what a
 deterministic consumer (the `gogo` CLI cockpit) reads for live progress and
 per-item history; `state.md` stays the single human resume file. Create the file
 if absent; **best-effort** — a failed append never fails a phase, and a missing

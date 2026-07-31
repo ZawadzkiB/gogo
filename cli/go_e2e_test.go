@@ -182,7 +182,14 @@ func setupScratchFeature(t *testing.T, slug string) (root, gotSlug string) {
 	if err := os.WriteFile(filepath.Join(featureDir, "state.md"), []byte(state), 0o644); err != nil {
 		t.Fatalf("write state.md: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(featureDir, "plan.md"), []byte("PLACEHOLDER plan\n"), 0o644); err != nil {
+	// A WRITTEN plan (≥ contract.PlanSectionsRequired `## ` sections), because this fixture
+	// stands in for an ACCEPTED plan: since 0.29.0 `gogo go` refuses a plan-accepted feature
+	// whose plan.md is absent or still a scaffold stub (FR8), so a placeholder body here
+	// would make every e2e assert the refusal instead of the launch.
+	plan := "# Plan - " + slug + "\n\nStatus: **accepted** (user, 2026-07-11)\n\n" +
+		"## Goal\n\ne2e dry-run scratch feature.\n\n" +
+		"## Changes checklist\n\n- nothing (fixture only).\n"
+	if err := os.WriteFile(filepath.Join(featureDir, "plan.md"), []byte(plan), 0o644); err != nil {
 		t.Fatalf("write plan.md: %v", err)
 	}
 	t.Chdir(root)

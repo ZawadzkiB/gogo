@@ -129,10 +129,23 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
    flowchart cards + before/after compare), using the same renderer as reports. Keep
    the diagram set clean and per-kind so the plan page reads well; do **not** move
    `plan.md` into a `plan/` folder — its path is the contract every phase reads.
-5. **Init state.** Copy `${CLAUDE_PLUGIN_ROOT}/templates/state.template.md` →
+5. **Init state - AFTER `plan.md` exists, never before (hard rule).** Copy
+   `${CLAUDE_PLUGIN_ROOT}/templates/state.template.md` →
    `state.md` and `decisions.template.md` → `decisions.md`; create
    `adjustments.md` (header only). Set `state.md`: phase=plan,
-   status=awaiting-plan-acceptance, created=<today>, iterations all 0.
+   status=awaiting-plan-acceptance, created=<today>, iterations all 0. **Fill every
+   `<…>` placeholder** the template ships (`feature`, `created`, `branch`) - a
+   placeholder left behind reads as an EMPTY value, so the card falls back to the slug.
+
+   **`status: awaiting-plan-acceptance` is a claim that the plan is WRITTEN.** It means
+   "planning is done, over to you", so writing it before step 3's `plan.md` lands offers
+   the user a plan that does not exist. This is not hypothetical: an analyst reordered
+   these steps and left a folder with `state.md` + `decisions.md` + `charts/` and **no
+   `plan.md`**, which the board then offered for acceptance. Since 0.29.0 the readers do
+   not trust it - every reader shows such an item as **`✎ authoring`**, excludes it from
+   the "need you" gate count, and **`m` / `M` / `gogo go` / `/gogo:accept` all refuse it**
+   until `plan.md` is present with at least two `## ` sections. So a reordered write no
+   longer breaks anything; it just makes the item unacceptable until you finish the plan.
 
    **Stamp the correlation (only when Step 0 captured a `--correlation plan-XXXX`).**
    Add an additive bolded line to `state.md` (see `templates/state.template.md` + the
@@ -180,3 +193,8 @@ hard gate the orchestrator owns** — never implement an unaccepted plan.
 ## Hard rule
 Never start implementing in this phase. Acceptance is the gate between plan and
 implement — `/gogo:go` refuses unless `state.md` reads `plan-accepted`.
+
+**Write `plan.md` before `state.md`, always.** `status: awaiting-plan-acceptance` on a
+folder with no written `plan.md` is a gate the user cannot answer. The readers enforce it
+(`✎ authoring`; `m`/`M`, `gogo go` and `/gogo:accept` all refuse), so the only thing a
+reordered write costs you is an item that stays unacceptable until the plan lands.

@@ -756,21 +756,80 @@ func SlugFromLabel(label string) string { return sanitizeLabel(label) }
 // as a WHOLE base (exact, or base + a purely-numeric suffix) - adding a second
 // candidate can never turn a prefix into a match.
 func SessionMatchesSlug(session, slug string) bool {
+	_, ok := SessionAction(session, slug)
+	return ok
+}
+
+// sessionActions is the list of actions sessionName can mint, in the order
+// SessionAction tries them. It MUST cover every Action constant: an action missing from
+// this list is a session no reader can attribute (that is exactly how 0.28.0's board
+// lost `gogo-author-*` / `gogo-resume-*` sessions). launch_test.go parses the Action
+// const block out of this file and fails if the two ever disagree, so a new action
+// cannot silently reopen the hole.
+var sessionActions = []Action{ActionGo, ActionPlan, ActionDone, ActionAccept, ActionAuthor, ActionResume}
+
+// SessionAction parses a running session name against slug and returns the ACTION
+// component of the `gogo-<action>-<label>[-N]` convention (sessionName + uniqueSession's
+// collision suffix). This is the ONE parser of that convention (TEST-005):
+// SessionMatchesSlug is a one-line delegation to it, so the six-action list and the two
+// label candidates exist exactly once.
+//
+// It returns precisely what SessionMatchesSlug returned before 0.29.0 in its bool, plus
+// the action - no behaviour change. Callers need the action because the convention is
+// the only thing that tells an AUTHORING session (`gogo-plan-<slug>`) from a BUILD
+// session (`gogo-go-<slug>`), and the concurrency cap must count only the latter: a
+// plan session is not fighting over the working tree, and counting it would let Slice B
+// paper over Slice A.
+//
+// The Action return is UNAMBIGUOUS, and here is the argument. The match is on the
+// literal `"gogo-" + action + "-"`, and no Action constant contains a `-` (`go`, `plan`,
+// `done`, `resume`, `accept`, `author`) - so the action is the token between the first
+// and second `-` after `gogo`, and no action can be confused with another, nor with a
+// label that merely STARTS with an action name (`gogo-go-plan-foo` reads as action `go`
+// with label `plan-foo`, because the text after `gogo-` begins `go-`, not `plan-`). A
+// test guards that invariant structurally rather than by example.
+//
+// Every genuine ambiguity in the convention lives in the LABEL and leaves the action
+// identical: two >MaxSessionLabel slugs sharing a 48-char prefix mint the same bounded
+// label, and a label ending in digits collides with uniqueSession's `-N` suffix
+// (`gogo-go-foo-2` reads as either slug `foo` run 2 or slug `foo-2`). In all of those the
+// SLUG attribution is fuzzy but the ACTION is not - so the Action return is safe even
+// where the bool inherits the pre-existing attribution fuzziness.
+func SessionAction(session, slug string) (Action, bool) {
 	bases := []string{sanitizeLabel(slug)}
 	if unbounded := unboundedLabel(slug); unbounded != bases[0] {
 		bases = append(bases, unbounded) // only differs for a label past the cap
 	}
-	for _, action := range []Action{ActionGo, ActionPlan, ActionDone, ActionAccept, ActionAuthor, ActionResume} {
+	for _, action := range sessionActions {
 		for _, label := range bases {
 			base := "gogo-" + string(action) + "-" + label
 			if session == base {
-				return true
+				return action, true
 			}
 			// uniqueSession appends "-<n>" (n≥2) on a name collision — accept the
 			// base name followed by a purely-numeric suffix, nothing else.
 			if rest, ok := strings.CutPrefix(session, base+"-"); ok && allDigits(rest) {
-				return true
+				return action, true
 			}
+		}
+	}
+	return "", false
+}
+
+// HasSessionAction reports whether ANY session in sessions attributes to slug AND was
+// minted for the given action. This is the shared read primitive for every consumer that
+// asks "is this slug's live session actually DOING <action>" - the cap's build-session
+// test (want=ActionGo) and the board's `● building` / agent cues - so they all parse the
+// convention through the one SessionAction and never re-derive it.
+//
+// It scans EVERY session rather than taking the first attributed one on purpose: a slug
+// can legitimately hold two live sessions (an authoring `gogo-plan-<slug>` and a build
+// `gogo-go-<slug>`), and tmux's list order is not a contract - so "first match wins"
+// would make the cap's answer depend on session ordering.
+func HasSessionAction(slug string, sessions []string, want Action) bool {
+	for _, s := range sessions {
+		if action, ok := SessionAction(s, slug); ok && action == want {
+			return true
 		}
 	}
 	return false

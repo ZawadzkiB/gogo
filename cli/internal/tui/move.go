@@ -72,6 +72,40 @@ func (m *Model) attemptActionForce(ship, force bool) (launch.Intent, bool, strin
 		return m.intentFor(launch.ActionDone, f), true, ""
 	}
 
+	// TEST-002: a card paused at a genuine DECISION GATE is not launchable. Checked here,
+	// before the class switch and OUTSIDE every `!force` condition, for exactly the reason
+	// FR4a gives for the plan-readiness gate: `M` overrides the per-source cap "and only that
+	// guard - every other legality rule still applies". A decision gate is a legality rule.
+	//
+	// Why this needs to be code. `waiting-for-user` is the status the orchestrator sets when it
+	// stops and asks; the answer belongs in `decisions.md` and `/gogo:resume` folds it back in.
+	// The board consulted WaitingForUser() for DISPLAY (the badge, the ⏸ count, the gate stripe)
+	// but never for the MOVE, so `m` on a paused card opened a real `/gogo:go` confirmation and
+	// the only thing standing between a keypress and a relaunch was a STOP instruction in the
+	// spawned session's own prompt. That is prose enforcement - and the central evidence of this
+	// very release is that prose enforcement fails (FR11's entry write: n=3, skipped every time).
+	// A gate guarded only by an instruction to the thing being gated is not guarded.
+	//
+	// It pairs with the exit write's new scoping (REV-022): §④ never overwrites a gate status,
+	// so a card that enters the gate STAYS there, and this keeps it un-launchable while it does.
+	// Leaving the gate legitimately - `/gogo:resume` records the answer and moves the status on -
+	// makes the card launchable again, so the gate is closed, not sealed.
+	if f.WaitingForUser() {
+		return launch.Intent{}, false, decisionGateBounce(f)
+	}
+
+	// FR4a MUST precede the accept route: it is the guard that stops `m`/`M` accepting a
+	// plan that was never written. Round 06 hoisted the accept route above the class
+	// switch and briefly jumped over this - the suite caught it immediately. Outside every
+	// !force condition, so M cannot override it.
+	if bounce := planReadinessBounce(f); bounce != "" {
+		return launch.Intent{}, false, bounce
+	}
+	// A plan-pending card's legal `m` is ACCEPT, and it must be decided BEFORE the
+	// runnable check because `awaiting-plan-acceptance` is deliberately not runnable.
+	if f.Status == "awaiting-plan-acceptance" {
+		return m.intentFor(launch.ActionAccept, f), false, ""
+	}
 	switch f.Class {
 	case contract.ClassUnfinished:
 		// A plan-pending card's legal `m` move is ACCEPT — route it to the launched
@@ -80,14 +114,33 @@ func (m *Model) attemptActionForce(ship, force bool) (launch.Intent, bool, strin
 		// Every other unfinished card (incl. an accepted plan awaiting its first build)
 		// goes — behind the concurrency-cap guard. Branch on status, not class, because
 		// both share ClassUnfinished.
-		if f.Status == "awaiting-plan-acceptance" {
-			return m.intentFor(launch.ActionAccept, f), false, ""
+		// REV-026: `/gogo:go` only runs a RUNNABLE status. This lives in BOTH go-producing
+		// arms and NOT above the switch: ClassReadyToShip's legal status IS `awaiting-uat`
+		// and its legal move is /gogo:done, so an above-switch check refuses a ship (the
+		// suite caught exactly that). Round 05 guarded only ClassUnfinished - but
+		// `classify()` derives ClassInProgress from the `phase:` line ALONE, so a card with
+		// `phase: review` + `status: awaiting-uat` took the OTHER arm and returned ActionGo
+		// with an EMPTY bounce while `gogo go` refused it. A lagging phase line is this
+		// release's own subject matter, so that combination is reachable by construction.
+		if !orchestrator.RunnableStatus(f.Status) {
+			return launch.Intent{}, false, notRunnableBounce(f)
 		}
 		if bounce := m.capBounce(f); bounce != "" && !force {
 			return launch.Intent{}, false, bounce
 		}
 		return m.intentFor(launch.ActionGo, f), false, ""
 	case contract.ClassInProgress:
+		// REV-026: `/gogo:go` only runs a RUNNABLE status. This lives in BOTH go-producing
+		// arms and NOT above the switch: ClassReadyToShip's legal status IS `awaiting-uat`
+		// and its legal move is /gogo:done, so an above-switch check refuses a ship (the
+		// suite caught exactly that). Round 05 guarded only ClassUnfinished - but
+		// `classify()` derives ClassInProgress from the `phase:` line ALONE, so a card with
+		// `phase: review` + `status: awaiting-uat` took the OTHER arm and returned ActionGo
+		// with an EMPTY bounce while `gogo go` refused it. A lagging phase line is this
+		// release's own subject matter, so that combination is reachable by construction.
+		if !orchestrator.RunnableStatus(f.Status) {
+			return launch.Intent{}, false, notRunnableBounce(f)
+		}
 		if bounce := m.capBounce(f); bounce != "" && !force {
 			return launch.Intent{}, false, bounce
 		}
@@ -98,6 +151,119 @@ func (m *Model) attemptActionForce(ship, force bool) (launch.Intent, bool, strin
 		return launch.Intent{}, false, "already shipped — no move (illegal)"
 	}
 	return launch.Intent{}, false, "no legal move for " + f.Slug
+}
+
+// notRunnableBounce explains why a card whose status is not runnable cannot take `m`,
+// naming the legal move instead of refusing bare (Diagnosability). It must not
+// contradict cmdGo's runnableHint - see the REV-031 note inside.
+func notRunnableBounce(f *contract.Feature) string {
+	// REV-031: this and cmdGo answer the same question, so they must not contradict each
+	// other. Round 06 aligned the wording to runnableHint's terminal arm - which is DEAD
+	// CODE: cmdGo returns earlier for TerminalStatus (go.go:153) with its own sentence and
+	// exit 0. Aligning to a string the CLI never prints, and calling an ABORTED feature
+	// "already shipped", put a falsehood in front of the user. Both surfaces now key on
+	// orchestrator.TerminalStatus and each says what is actually true of that status.
+	switch f.Status {
+	case "awaiting-uat":
+		return f.Slug + " is at the UAT gate - run `/gogo:done " + f.Slug +
+			"` to ship it, or give feedback to loop it back"
+	case "aborted":
+		return f.Slug + " was aborted - no move (illegal)"
+	case "shipped", "done":
+		return f.Slug + " is already shipped - no move (illegal)"
+	case "":
+		return f.Slug + " has no status on disk - run `gogo plan " + f.Slug +
+			"` and accept a plan first"
+	}
+	return f.Slug + " is " + f.Status + " - not a runnable status; `/gogo:go` needs " +
+		"plan-accepted, implementing, reviewing or testing"
+}
+
+// decisionGateBounce is the refusal for a card paused at a decision gate (TEST-002). Per the
+// Diagnosability bar a refusal must carry its UNBLOCK, so it names the legal move
+// (`/gogo:resume <slug>`) rather than only saying no - and it names the open decision's ID when
+// `state.md` carries one, because "paused on D3" is actionable where "paused on a decision" is
+// not. The wording deliberately mirrors cmdGo's runnableHint("waiting-for-user") so the board
+// and the headless surface tell the user the same story.
+//
+// A mid-UAT re-plan parks on the same status with an `open-decision: UAT round N`, and the same
+// answer applies: resolve it, then resume. Routed through statusBlocked by launchActionForce -
+// nothing failed, the user is blocked.
+// notRunnableBounce explains why a card whose status is not runnable cannot take `m`,
+// naming the legal move. It mirrors cmdGo's runnableHint so board and CLI agree (REV-026).
+func decisionGateBounce(f *contract.Feature) string {
+	gate := "a decision"
+	if d := strings.TrimSpace(f.OpenDecision); d != "" && !strings.EqualFold(d, "none") {
+		gate = d
+	}
+	// REV-025: `waiting-for-user` covers TWO gates with different artifacts and different
+	// exits. A plain decision is answered in decisions.md and folded back by /gogo:resume.
+	// A UAT re-plan round lives in uat.md, and ONLY the user's re-acceptance
+	// (-> plan-accepted) leaves it - /gogo:resume does not. Naming the wrong artifact sends
+	// the user to a file that does not hold their question.
+	//
+	// Round 06 first branched on `strings.Contains(gate, "uat")`, which is wrong in BOTH
+	// directions: an ordinary decision whose text merely mentions uat ("D4 - uat asked for a
+	// different header") was sent to uat.md, and it disagreed with the card's own pill.
+	// isUATReplan is the deterministic answer that already existed - it requires a DIGIT
+	// after "uat" (the orchestrator writes "UAT round N"), and pillLabel/badge key on the
+	// same predicate, so the bounce and the pill now agree by construction.
+	where, how := "decisions.md", "run `/gogo:resume "+f.Slug+"`"
+	if isUATReplan(f) {
+		where, how = "uat.md", "re-accept the adjusted plan"
+	}
+	return f.Slug + " is paused on " + gate + " - answer it in " + where + ", then " + how +
+		" to continue (a paused card is never relaunched by m or M)"
+}
+
+// planUnready is the PURE predicate half of planReadinessBounce: "is this card's plan
+// unready", with no I/O and no message formatting. Render paths use it; keystroke paths that
+// actually SHOW the sentence use planReadinessBounce.
+//
+// The split exists because footerChips runs on every View() - every keystroke, every fsnotify
+// reload - and deciding a chip through planReadinessBounce meant opening and scanning plan.md
+// once per frame just to test a boolean, then discarding the sentence it built. Worse, it made
+// the rendered answer depend on disk state that can differ from the loaded model, which is the
+// one-source-of-truth split this feature otherwise works to remove: f.PlanUnwritten is derived
+// once per load by loadFeature, and that is the value the columns, the cap and the pill all
+// use. TestPlanUnreadyAgreesWithTheBounce pins the two in step; TestFooterChipDoesNoDiskIO
+// pins the render path to this one.
+func planUnready(f *contract.Feature) bool {
+	if f == nil {
+		return false
+	}
+	return f.Authoring() || (f.Status == "plan-accepted" && f.PlanUnwritten)
+}
+
+// planReadinessBounce returns the status-line refusal when f's plan.md is not written,
+// else "". TWO distinct gates, and the message says WHICH one refused (a refusal the user
+// cannot explain is a bug even when the code is right):
+//
+//   - AUTHORING (FR4) - the status reads the plan-acceptance gate (or nothing) while the
+//     plan does not exist, so there is nothing to accept. This is the card the board used
+//     to offer for acceptance, launching /gogo:accept at a folder with no plan in it.
+//   - ACCEPTED-BUT-UNWRITTEN (FR8) - the status says `plan-accepted` while the plan does
+//     not exist, so there is nothing to build. This ADDS a requirement to the
+//     unaccepted-plan invariant and removes none.
+//
+// Both name their unblock (`gogo plan <slug>`) and both name their NUMBER when they have
+// one (`plan.md has 1 of the 2 sections a written plan needs`) - the exact reason, quoted
+// from the one contract-side producer so this can never drift from `gogo go`'s refusal.
+// Routed through statusBlocked (amber `⚠ `) by launchActionForce, never statusFailed:
+// nothing failed, the user is blocked.
+func planReadinessBounce(f *contract.Feature) string {
+	if f == nil {
+		return ""
+	}
+	switch {
+	case f.Authoring():
+		return "plan.md not written yet - " + f.Slug + " is still being authored (" +
+			contract.PlanUnwrittenReason(f.Dir) + "); finish it with `gogo plan " + f.Slug + "`"
+	case f.Status == "plan-accepted" && f.PlanUnwritten:
+		return f.Slug + " is plan-accepted but its plan.md is not written (" +
+			contract.PlanUnwrittenReason(f.Dir) + ") - nothing to build; re-plan it with `gogo plan " + f.Slug + "`"
+	}
+	return ""
 }
 
 // intentFor builds a single-card launch intent for f, stamping its OWN repo root (via
@@ -149,8 +315,9 @@ func selectionSpansProjects(feats []*contract.Feature) bool {
 // clobber a repo's shared working tree. It resolves the cap from EVERY project's
 // SOURCES on the unified board (else the focused project's — capWatchSources, FR5), by
 // the target feature's OWN root (rootFor), and counts that
-// root's active in-progress+live features EXCLUDING f itself (so resuming an
-// already-active feature is never blocked). Empty when uncapped / unregistered — the
+// root's features with a live BUILD session EXCLUDING f itself (so resuming an
+// already-active feature is never blocked; since 0.29.0 the file-derived class is no
+// longer part of the count - see ActiveWorkSlugs). Empty when uncapped / unregistered - the
 // byte-for-byte single-repo fallback (a lone repo has no sources, so CapForSource
 // returns 0). Read-side only; it writes nothing and composes with the one-owner
 // lock. Over the cap it drops the user to `gogo go --force` (the CLI escape hatch),
@@ -172,8 +339,27 @@ func (m *Model) capBounce(f *contract.Feature) string {
 	}
 	// FR3.4: say plainly what the cap counts - the scope was invisible, so a bounce
 	// read as "gogo won't let me work" rather than "this ONE repo is busy".
-	return fmt.Sprintf("cap %d reached in %s - already building %s (the cap counts in-progress work items with a live session, per source; plans are never counted); press M to force, ship one, or run `gogo go %s --force`",
-		cap, filepath.Base(root), strings.Join(active, ", "), f.Slug)
+	// 0.29.0 (FR12a): the RULE changed, so the sentence had to change with it - and it now
+	// comes from orchestrator.CapRuleClause, the single source every surface quotes, because
+	// the hand-copied version left three of four surfaces stating the old rule.
+	// The unblock list names a sweep too (REV-008): since the cap counts a live build session
+	// regardless of the feature's status, a blocker can be an already-SHIPPED item whose
+	// session outlived a failed ship-reap - and for that one "ship one" is useless advice.
+	// It must be the TARGETED `gogo sweep <slug>` (REV-011): a bare `gogo sweep` is
+	// host-global and judges every `gogo-*` session on the machine against THIS repo's
+	// features, so on a multi-source host it kills another source's in-flight build as an
+	// "orphan", without confirmation. This bounce appears in the multi-source cockpit BY
+	// CONSTRUCTION (the cap is per-source on the unified board), and it already has the
+	// blocking slugs - so naming them costs nothing. One producer (CapSweepRemedy) shared
+	// with cmdGo's capBlock, so the two refusals cannot drift.
+	return fmt.Sprintf("cap %d reached in %s - already building %s (the cap %s); %s",
+		cap, filepath.Base(root), strings.Join(active, ", "), orchestrator.CapRuleClause,
+		orchestrator.CapRefusal(
+			"press M to force",
+			"ship one",
+			orchestrator.CapSweepRemedy(active),
+			"or run `gogo go "+f.Slug+" --force`",
+		))
 }
 
 // launchAction runs the guard, then either bounces or opens the huh

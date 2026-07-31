@@ -38,7 +38,28 @@ contract error; do not review on bad input.
 
 ## ② Steps
 
-1. **Delegate** to `gogo-reviewer` via `Task`, passing:
+1. **Record occupancy - FIRST, before you read the diff (FR11).** Write `state.md`
+   `phase: review` + `status: reviewing`, and append
+   `{"ts":"<RFC3339>","event":"phase-started","phase":"review","status":"reviewing","slug":"<slug>"}`
+   to `events.jsonl`. Only then continue to step 2. §④ writes `phase`/`status` **again** at the
+   end and bumps `iterations` there - deliberate belt-and-braces, not redundancy to tidy away
+   (see §④). Do **not** bump `iterations` here - that is a completion count.
+
+   `state.md` is what every reader believes (the board's column, `gogo status`, the cap,
+   `pages`). Written ONLY at §④, after the work, the line records that reviewing just
+   **finished** - so for the whole round the disk still describes the PREVIOUS phase and the
+   board narrates the past. Idempotent on a resume: the values are already correct.
+
+   **This is step 1 of the numbered flow on purpose** - it shipped once as a separate `①b`
+   section, which was worse. Be honest about the track record though: this write has been
+   skipped on **all three** of its live runs so far, twice AFTER the move into the numbered
+   steps, so the move helped less than hoped. That is exactly why §④ writes `phase`/`status`
+   again and why the board carries a detector: skip this and a card whose telemetry contradicts
+   its phase line, with a build session still live, reads **`· state lags`**. Visible, and still
+   wrong - §④'s write will eventually move the line, but every reader describes the previous
+   phase until it does.
+
+2. **Delegate** to `gogo-reviewer` via `Task`, passing:
    - the diff scope (changed files / `git diff` against the base branch),
    - the feature's `plan.md` (so review is against intent),
    - the as-built `charts/` (the diagram set implement emitted, when present),
@@ -54,7 +75,7 @@ contract error; do not review on bad input.
    `{"ts":"<RFC3339>","event":"round-opened","phase":"review","status":"reviewing","round":NN,"slug":"<slug>"}`.
    Create the file if absent; **best-effort** — never fail the phase if the append
    fails (append-only telemetry; `state.md` stays the human resume file).
-2. **Update the living `review/issues.json`** (the contract — D1/D2). For this round:
+3. **Update the living `review/issues.json`** (the contract - D1/D2). For this round:
    - **New finding** → append an issue with a fresh stable `id` (e.g. `REV-007`),
      `origin: review`, `found_in_round: NN`, `status: new`, and all FR4 fields
      (title, description, proposed_solution, severity, priority).
@@ -68,7 +89,7 @@ contract error; do not review on bad input.
    **If this round has any `open`/`new` findings, append the findings event**
    (best-effort, per `events.schema.json`):
    `{"ts":"<RFC3339>","event":"issues-found","phase":"review","status":"reviewing","round":NN,"note":"<e.g. 2 blockers, 1 minor>","slug":"<slug>"}`.
-3. **Render the human snapshot** `review-NN.md` from this round's issues (the
+4. **Render the human snapshot** `review-NN.md` from this round's issues (the
    audit view): per finding, its id, severity/priority, status, the finding and
    proposed fix; plus the verdict (clean vs has-open). The JSON is the contract;
    the markdown is the readable companion.
@@ -93,11 +114,30 @@ Decide purely on the **issues list** (count of `open`/`new`):
 - **Clean** (no `open`/`new` blockers/majors) → set `state.md` review done;
   advance to **④ test**.
 
-Update `state.md`: phase=review, status=reviewing, bump `iterations: review=<n+1>`
-each round. (`issues.json`/`result.json` are the machine state; `state.md` stays
+Update `state.md`: **`phase: review`, `status: reviewing`**, and bump
+`iterations: review=<n+1>` - the *completion* count - each round.
+
+**Scope: only on the routes that CONTINUE.** A route that parks the item at a **user gate**
+(a decision gate → `waiting-for-user`, and for ④ a blocked hands-on check → the same) has
+already written the status that matters, and it is the one status a reader must not lose:
+it feeds the `⏸ K need you` count, the card's gate stripe, and the `/gogo:go` refusal that
+stops an unattended rerun. **Never overwrite a gate status with the working status** - write
+`phase`/`status` here only when the round loops back to ② or advances to the next phase.
+(`issues.json`/`result.json` are the machine state; `state.md` stays
 the human-facing file.)
 
-**Append the terminal event (telemetry).** Only when this round is **clean** (no
+**Write phase/status here EVEN THOUGH §② step 1 already did. The redundancy IS the design -
+do not "clean it up".** 0.29.0 briefly dropped this exit write on the theory that the entry
+write covers it. It does not: the entry write is **prose an LLM follows**, and it was skipped
+on all three of its first live runs. With only the entry write, `state.md` stops advancing at
+all - it sticks at whatever phase last actually wrote it, which is *worse* than the
+one-phase-behind lag this release set out to fix. Two writers, one at each end, means the
+floor is that old one-phase lag and the ceiling is the entry write's accuracy. One of the two
+is an LLM following prose, so the other one is what makes the line move at all.
+
+
+**Append the terminal event (telemetry).** The `phase-started` line was appended at §② step 1 -
+do not re-emit it. Only when this round is **clean** (no
 `open`/`new` blockers/majors — review is done and advancing to ④ test), append one
 compact JSON line to `.gogo/work/feature-<slug>/events.jsonl` per
 `events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`) — this skill

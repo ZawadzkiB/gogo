@@ -40,13 +40,33 @@ in-chat plan-acceptance gate does.
 
 1. **Resolve the feature.** From the slug, find `.gogo/work/feature-<slug>/`. If it
    does not exist → **STOP** with a precise error (unknown feature).
-2. **Gate on status (hard).** Read `state.md`. Proceed **only** when
+2. **Gate - TWO hard checks, both before you present anything.**
+
+   **2a. Status.** Read `state.md`. Proceed **only** when
    `status: awaiting-plan-acceptance`. Otherwise **STOP** and guide:
    - `plan-accepted` (or any downstream state) → "already accepted — run
      `/gogo:go <slug>` to build it."
    - `implementing` / `reviewing` / `testing` / `awaiting-uat` / `waiting-for-user`
      / `shipped` / `done` → "nothing to accept here — this feature is <status>."
    **Never** record acceptance for a feature that is not at the plan-acceptance gate.
+
+   **2b. The plan is WRITTEN.** `plan.md` must exist **and** be substantive - at least
+   **two `## ` sections** (a scaffolded stub has 0-1). Otherwise **STOP**, before
+   presenting and before asking:
+
+   > `<slug>` is still being authored: `plan.md` <is not on disk yet | has N of the 2
+   > sections a written plan needs>. There is nothing to accept. Finish the plan with
+   > `/gogo:plan <slug>` (or `gogo plan <slug>`), then re-run `/gogo:accept <slug>`.
+
+   **Why this gate exists.** `status` alone was not enough. `state.md` is written at a
+   phase's exit, so an analyst that writes it before `plan.md` (or dies mid-authoring)
+   leaves a folder reading `awaiting-plan-acceptance` with **no plan in it** - and this
+   skill would sail through 2a, reach step 3 ("present the plan") with no file to read,
+   and record acceptance at step 5 anyway. The only thing preventing it was noticing the
+   missing file. Now it is a gate. The cockpit refuses the same case from its side
+   (`✎ authoring`; `m`/`M` bounce), so the two agree - but **this check must hold on its
+   own**, because `/gogo:accept` is also reachable directly and from a
+   `--skip-acceptance` auto-accept.
 3. **Present the plan.** Show `plan.md`'s summary (Goal / Functional requirements /
    Approach / Changes checklist / Out-of-scope) plus any open decisions from
    `decisions.md`, so the user eyeballs what they are accepting. This is the
@@ -78,6 +98,8 @@ in-chat plan-acceptance gate does.
   a pipeline phase and writes no product code.
 - **Gate before recording.** Only an `awaiting-plan-acceptance` feature can be
   accepted here; anything else stops with guidance.
+- **Never record acceptance for a plan that is not written.** `plan.md` must exist and
+  carry ≥ 2 `## ` sections (step 2b). A status line is a claim; the file is the fact.
 - **One acceptance recording.** Reuse gogo-plan's recording (state flip + plan line
   + single-owner `plan-accepted` event). Never a second acceptance path or a second
   event emitter.

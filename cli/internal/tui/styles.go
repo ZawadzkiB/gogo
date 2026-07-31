@@ -8,6 +8,26 @@ import "github.com/charmbracelet/lipgloss"
 // rune-count math is unaffected.
 const waitingMarker = "⏸"
 
+// Derived-state card cues (0.29.0). Each is GLYPH + WORD, never colour alone: the
+// Diagnosability bar says a distinction that colour carries is flattened by a no-colour
+// terminal AND by TTY-less `go test`, so pairing the glyph with the word is what makes
+// the cue survive anywhere and stay assertable in View().
+//
+//   - authoringMarker - the plan.md is not written yet, so this card is being AUTHORED.
+//     Deliberately NOT the ⏸ gate glyph: an authoring item is not waiting on the user,
+//     it is waiting on its own analyst, and it must not read like an acceptable plan.
+//   - buildingMarker  - a live `gogo-go-<slug>` session contradicts a file-derived state
+//     that has not caught up yet (the launch-to-first-write window). Reuses the green
+//     `●` liveness glyph the name-row dot already uses, on the amber "in flight" tint.
+//   - stalledMarker   - the mirror case: a WORKING status (implementing/reviewing/
+//     testing) with NO live session, i.e. the session died mid-phase. `·` is a
+//     deliberately quiet glyph - a stalled card is not an error, it is resumable.
+const (
+	authoringMarker = "✎"
+	buildingMarker  = "●"
+	stalledMarker   = "·"
+)
+
 // Status-line severity markers (FR3.2). Every cockpit outcome - a cap bounce, a
 // dangling plan target, a tmux failure and a plain success - used to render
 // through ONE faint-grey voice, so the user could not tell a blocked launch from
@@ -62,6 +82,13 @@ var (
 	pillAmber  = lipgloss.NewStyle().Bold(true).Foreground(columnAccent[1]).Background(amberTint).Padding(0, 1)
 	pillPurple = lipgloss.NewStyle().Bold(true).Foreground(uatAccent).Background(purpleTint).Padding(0, 1)
 	pillDim    = lipgloss.NewStyle().Foreground(dimText).Background(dimTint).Padding(0, 1)
+
+	// pillBuilding tints the `● building` disagreement chip (FR14): amber, the "work in
+	// flight" family the in-progress column and the in-flight status pill already use -
+	// it says "this is running", not "this is broken". Distinct from pillAmber only in
+	// that it is not bold, so the chip reads as a note ON the pill rather than a second
+	// pill competing with it.
+	pillBuilding = lipgloss.NewStyle().Foreground(columnAccent[1]).Background(amberTint).Padding(0, 1)
 
 	secondaryStyle = lipgloss.NewStyle().Foreground(secondaryText)
 	faintStyle     = lipgloss.NewStyle().Foreground(faintText)

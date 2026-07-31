@@ -40,7 +40,11 @@ cold shell on resume). Same steps below; only the executor differs.
 ## ① validate-in (gate — FR2)
 
 Via `gogo-contracts`: confirm `state.md` is `plan-accepted` (first pass) or a
-resumable in-loop state, and `plan.md` exists. **If `--issues <path>` is given,**
+resumable in-loop state, and `plan.md` **exists and is written** - present with at least
+two `## ` sections, not a scaffold stub. A folder whose `state.md` says
+`plan-accepted` while `plan.md` is absent or a stub was **never planned**: the readers
+refuse it (`gogo go` and the board's `m`/`M` both bounce), so STOP and send the user to
+`/gogo:plan <slug>` rather than inventing a plan here. **If `--issues <path>` is given,**
 validate that file against `issues-list.schema.json` (structural + semantic:
 right slug, real paths, unique ids, valid enums). Missing/invalid required input
 → **STOP** with a precise contract error; never build on bad input. **Never
@@ -48,22 +52,55 @@ implement an unaccepted plan.**
 
 ## ② Steps
 
-1. **Pick the work set:**
+1. **Record occupancy - FIRST, before you read a line of product code (FR11).** Write
+   `state.md` `phase: implement` + `status: implementing`, and append the entry event (the
+   `phase-started` / `fix-round` line specified in §④). Only then continue to step 2.
+
+   `state.md` is what every reader believes - the board's column, `gogo status`, the
+   concurrency cap, `pages`, any headless consumer. Written ONLY at §④, after the work, the line
+   records that implementing just **finished**: for the whole of a build the disk still says
+   `plan-accepted`, so the card sits in the **plan** column, the header reads
+   `in progress 0`, and a **second `gogo go` in the same repo is allowed to clobber the
+   working tree**. Recording occupancy at entry makes the file describe what is happening
+   *now*.
+
+   §④ writes `phase`/`status` **again** at the end, and bumps `iterations` there. That
+   duplication is deliberate belt-and-braces, not redundancy to tidy away: this write is prose,
+   and if you skip it the §④ write is what still moves the line (see §④). Do **not** bump
+   `iterations` here - that is a completion count. The write
+   is idempotent: on a resume the values are already correct, so re-writing them changes
+   nothing. (This is **step 1 of the numbered flow on purpose** - it shipped once as a
+   separate `①b` section and the very next phase skill to run skipped it. The move helped less
+   than hoped: the write has been skipped on **all three** live runs so far, twice after the
+   move, which is why §④ writes `phase`/`status` again rather than trusting this one.)
+
+   **The CLI does not depend on this for safety**, and does not depend on it for visibility
+   either: the cap counts a live `gogo-go-<slug>` session whatever any file says; a card
+   whose status has not caught up reads `● building`; a killed phase reads `· stalled`; and
+   if you skip this write, the board reads **`· state lags`** as soon as the telemetry
+   contradicts the phase line while a build session is live - either the previous phase's
+   `phase-done` is the newest event, or an **entry event names a different phase than the line
+   does**, which is exactly the shape a `--issues` re-entry leaves when you append `fix-round`
+   but skip the `state.md` half. So a skipped occupancy write is usually *visible* rather than
+   silent - but it is still wrong, because it makes every reader describe the previous phase,
+   and the cue is a detector, not a guarantee (a later mid-phase event can mask it).
+
+2. **Pick the work set:**
    - **Plain mode** → work the `plan.md` **Changes checklist** in order, scoped to
      the plan.
    - **`--issues` mode** → fix every issue whose `status` is `open` or `new`
      (skip `verified`/`wontfix`). Address exactly those findings, using each
      issue's `proposed_solution` as the guide.
-2. Follow `coding-rules.md`; match surrounding code. Smallest correct change; no
+3. Follow `coding-rules.md`; match surrounding code. Smallest correct change; no
    opportunistic refactors outside the plan.
-3. Keep it green: run build / typecheck / unit (commands from `tech-stack.md`)
+4. Keep it green: run build / typecheck / unit (commands from `tech-stack.md`)
    and fix what you break. Don't leave the tree broken.
-4. **Write fixes back into the issues list** (`--issues` mode — FR6). For each
+5. **Write fixes back into the issues list** (`--issues` mode - FR6). For each
    issue you fixed, set `status: fixed`, `fixed_in_round: <this round>`, and a
    one-line `fix_summary` of what you changed. Leave anything you intentionally
    skipped as `wontfix` with the reason in `fix_summary`. Do **not** flip to
    `verified` — that's the next review/test's job. Bump the list's `round`/`updated`.
-5. **Emit the as-built chart set** via `gogo-mermaid` (FR7). Diagram the *shipped
+6. **Emit the as-built chart set** via `gogo-mermaid` (FR7). Diagram the *shipped
    product* — never the gogo phases or the plan's task checklist. Produce only the
    kinds that carry signal (per the diagram-subject rules): **flow** (control/data
    flow), **sequence** (key runtime interaction), **class** (structure/types),
@@ -72,11 +109,11 @@ implement an unaccepted plan.**
    `charts/`, refresh `charts/diagrams.html`, and write `charts/manifest.json`
    listing the kinds/files/titles you produced (empty `diagrams` + a `note` if you
    drew nothing). Review ③ and test ④ consume this set.
-6. Small, obvious plan corrections → make them and note in `plan.md`. A
+7. Small, obvious plan corrections → make them and note in `plan.md`. A
    **material** change, a new fork, or anything destructive/irreversible →
    **don't decide it**: return it as a decision for the orchestrator (it owns the
    gate), with enough context to log to `decisions.md`.
-7. Commit only if the user has asked for commits (gogo defers to the user on
+8. Commit only if the user has asked for commits (gogo defers to the user on
    commits). If committing, use small safe increments.
 
 ## ③ validate-out (gate — FR3)
@@ -89,26 +126,45 @@ against `issues-list.schema.json` (every `fixed` issue now has `fixed_in_round` 
 On success, write `implement/result.json` (`phase: implement`, `status: ok`,
 `inputs`, `outputs`, `validated_in: true`, `validated_out: true`, `summary`).
 
-## ④ Update state
+## ④ Update state (exit)
 
-Update `state.md`: phase=implement, status=implementing, bump
-`iterations: implement=<n+1>`. (`issues.json`/`charts/manifest.json`/`result.json`
-are the machine state; `state.md` stays the human-facing file.)
+Update `state.md`: **`phase: implement`, `status: implementing`**, and bump
+`iterations: implement=<n+1>` - the *completion* count.
 
-**Append the transition event(s) (telemetry).** Beside this `state.md` write,
-append compact JSON line(s) to `.gogo/work/feature-<slug>/events.jsonl` per
-`events.schema.json` (`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`). First the
-**entry** event — **plain mode** → `{"ts":"<RFC3339>","event":"phase-started","phase":"implement","status":"implementing","slug":"<slug>"}`;
+**Scope: only on the routes that CONTINUE.** A route that parks the item at a **user gate**
+(a decision gate → `waiting-for-user`, and for ④ a blocked hands-on check → the same) has
+already written the status that matters, and it is the one status a reader must not lose:
+it feeds the `⏸ K need you` count, the card's gate stripe, and the `/gogo:go` refusal that
+stops an unattended rerun. **Never overwrite a gate status with the working status** - write
+`phase`/`status` here only when the round loops back to ② or advances to the next phase.
+(`issues.json`/`charts/manifest.json`/`result.json` are the machine state; `state.md`
+stays the human-facing file.)
+
+**Write phase/status here EVEN THOUGH §② step 1 already did. The redundancy IS the design -
+do not "clean it up".** 0.29.0 briefly dropped this exit write on the theory that the entry
+write covers it. It does not: the entry write is **prose an LLM follows**, and it was skipped
+on all three of its first live runs. With only the entry write, `state.md` stops advancing at
+all - it sticks at whatever phase last actually wrote it, which is *worse* than the
+one-phase-behind lag this release set out to fix. Two writers, one at each end, means the
+floor is that old one-phase lag and the ceiling is the entry write's accuracy. One of the two
+is an LLM following prose, so the other one is what makes the line move at all.
+
+**Append the terminal event (telemetry).** The **entry** event was appended at §② step 1 -
+**plain mode** → `{"ts":"<RFC3339>","event":"phase-started","phase":"implement","status":"implementing","slug":"<slug>"}`;
 **`--issues` mode** (re-entering to fix) →
 `{"ts":"<RFC3339>","event":"fix-round","phase":"implement","status":"implementing","round":<this round>,"slug":"<slug>"}`.
-Then, because `implement/result.json` was written `ok` in ③ (validate-out passed —
-this run hands off to review), the phase's **terminal** event (this skill owns
-`phase-done`/implement; the orchestrator no longer emits it):
-`{"ts":"<RFC3339>","event":"phase-done","phase":"implement","status":"implementing","slug":"<slug>"}`
-(emit it *after* the entry event so ordering reads start → done). A run that stops
-`blocked` in ③ never reaches here, so `phase-done` marks only a successful hand-off.
-Create the file if absent; **best-effort** — never fail the phase if the append
-fails (append-only telemetry; `state.md` stays the human resume file).
+Do **not** re-emit it here. Now, because `implement/result.json` was written `ok` in ③
+(validate-out passed - this run hands off to review), append the phase's **terminal**
+event to `.gogo/work/feature-<slug>/events.jsonl` per `events.schema.json`
+(`${CLAUDE_PLUGIN_ROOT}/templates/contracts/`) - this skill owns
+`phase-done`/implement; the orchestrator no longer emits it:
+`{"ts":"<RFC3339>","event":"phase-done","phase":"implement","status":"implementing","slug":"<slug>"}`.
+Because step 1 already appended the start, the stream now reads start → done **with the
+work between them**, in real time - not both lines in one burst at the end (which made
+`events.jsonl` a post-hoc log rather than a live stream). A run that stops `blocked` in
+③ never reaches here, so `phase-done` marks only a successful hand-off. Create the file
+if absent; **best-effort** - never fail the phase if the append fails (append-only
+telemetry; `state.md` stays the human resume file).
 
 ## Return
 

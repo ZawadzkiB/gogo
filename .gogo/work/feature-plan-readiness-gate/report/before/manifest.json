@@ -1,0 +1,17 @@
+{
+  "slug": "plan-readiness-gate",
+  "updated": "2026-07-31",
+  "note": "COPIED INTO THE REPORT BUNDLE at phase 5 from charts/before/ (re-copied byte-for-byte at the second phase-5 pass, md5-verified against charts/before/) so the archive is self-contained (the `file` paths are rewritten to report/before/; the schema shape is unchanged - decision D5 forbids a schema change, not a path correction). The as-is baseline captured before any code change, scoped to the paths the fix touches. flow.mmd is sighting 1 (a plan offered before it is written); sequence.mmd is sighting 2 (an item being built sits in the plan column and escapes the cap). Both are the same root cause: state.md records phase COMPLETION, not phase OCCUPANCY.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "report/before/flow.mmd",
+      "title": "As-is: a mid-authoring folder is classified, titled from the template placeholder, painted as a red accept gate, counted in the header pill, and accepted end to end - plan.md's absence is read by nobody"
+    },
+    {
+      "kind": "sequence",
+      "file": "report/before/sequence.mmd",
+      "title": "As-is timing: gogo-implement writes state.md only at step 4, after all the work - so during the whole build the card sits in the plan column, shows the analyst agent, and is invisible to the concurrency cap"
+    }
+  ]
+}

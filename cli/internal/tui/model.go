@@ -672,6 +672,7 @@ func (m Model) Init() tea.Cmd {
 // rebuild partitions the (filtered) features into the four columns and clamps
 // focus indices.
 func (m *Model) rebuild() {
+	m.pruneSelection()
 	known := m.knownCorrelationIDs()
 	var cols [4][]*contract.Feature
 	for _, f := range m.repo.Features {
@@ -761,13 +762,54 @@ func featureKey(f *contract.Feature) string {
 	return f.Root + "\x00" + f.Slug
 }
 
+// pruneSelection drops any selection entry whose card is no longer selectable, and it
+// runs on every rebuild (so on every reload). REV-027 filtered the stale entry at the
+// READ, which stopped it shipping - but the entry SURVIVED, so REV-033: a card that went
+// ready -> waiting-for-user (✓ gone, correctly) -> ready again came back SELECTED, with
+// its ✓ restored and `m` returning /gogo:done, without the user ever pressing space. A
+// selection the user did not make and cannot remember making is exactly the invisible-arm
+// failure REV-027 was about; filtering hid it, pruning removes it.
+func (m *Model) pruneSelection() {
+	if len(m.selected) == 0 {
+		return
+	}
+	live := map[string]bool{}
+	for _, f := range m.repo.Features {
+		if selectableForShip(f) {
+			live[featureKey(f)] = true
+		}
+	}
+	for k := range m.selected {
+		if !live[k] {
+			delete(m.selected, k)
+		}
+	}
+}
+
+// selectableForShip is the ONE predicate deciding whether a card may be part of a
+// ship selection. Every surface that touches the selection quotes it - the `space`
+// toggle, the card's ✓ marker, and the action path below - because they used to
+// disagree (REV-027): the toggle and the renderer both filtered on
+// ClassReadyToShip while selectedFeatures filtered on nothing. A card selected
+// while ready and then RECLASSIFIED (a UAT round locks it to waiting-for-user, a
+// rerun moves it back to in-progress) stayed in m.selected, vanished from the
+// display because the renderer filtered it, and still shipped because the action
+// path did not - `m` returned /gogo:done for a card the user could not see was
+// selected, straight past the decision-gate guard that runs later in the function.
+// Selection is not cleared on reload by design (it survives a refresh), so the
+// filter has to live at the read, not at the write.
+func selectableForShip(f *contract.Feature) bool {
+	return f != nil && f.Class == contract.ClassReadyToShip
+}
+
 // selectedFeatures returns the loaded features currently selected for ship, resolved by
 // their composite featureKey (so two same-slug cards from different projects never
-// collapse into one — REV-001), sorted by slug for a deterministic merged-release name.
+// collapse into one - REV-001), sorted by slug for a deterministic merged-release name.
+// Filtered by selectableForShip at the READ (REV-027).
 func (m *Model) selectedFeatures() []*contract.Feature {
 	var out []*contract.Feature
 	for _, f := range m.repo.Features {
-		if m.selected[featureKey(f)] {
+		if m.selected[featureKey(f)] && selectableForShip(f) {
 			out = append(out, f)
 		}
 	}
@@ -914,6 +956,13 @@ func badge(f *contract.Feature) string {
 	if f.AwaitingUAT() {
 		return "awaiting-uat"
 	}
+	// Still being AUTHORED (0.29.0): the status on disk reads the plan-acceptance gate
+	// (or nothing at all) while plan.md is absent or a stub, so this card must NOT read
+	// like a plan waiting for the user. Checked BEFORE the gate arm it shadows - and only
+	// there, so the three real gates above keep their precedence untouched.
+	if f.Authoring() {
+		return "authoring"
+	}
 	// The plan-acceptance gate: surface its state name like the other two gates
 	// (it had no distinct badge before — FR-B2). Mutually exclusive with the
 	// statuses above, so this does not disturb their precedence.
@@ -989,6 +1038,243 @@ func activeAgent(f *contract.Feature) string {
 	return ""
 }
 
+// sessionAgent is the FR14 agent chip: activeAgent (the phase-derived label) corrected by
+// what the live session is actually DOING, whenever the two disagree.
+//
+// The bug it fixes: state.md is written at a phase's exit, so for the whole of a build the
+// file still reads `phase: plan` - and activeAgent maps that to "analyst". A card being
+// BUILT therefore displayed `● analyst`, wrong in its column, its status pill AND its
+// agent chip, all from the same stale phase line. A live `gogo-go-<slug>` session is
+// direct evidence of the developer working, so it wins over a phase line that has not
+// caught up; a live `gogo-plan-<slug>` session is the same evidence for the analyst.
+// Every other action (done / accept / author / resume) is not a pipeline phase, so it
+// leaves the phase-derived answer alone.
+func sessionAgent(f *contract.Feature, sessions []string) string {
+	if f == nil {
+		return ""
+	}
+	switch {
+	case launch.HasSessionAction(f.Slug, sessions, launch.ActionGo):
+		// Only OVERRIDE when the file disagrees. In implement/review/test the phase line
+		// is the more precise answer (the same warm `go` session drives all three), so a
+		// reviewing card keeps `● reviewer`.
+		if a := activeAgent(f); a != "" && isPipelinePhase(f.Phase) {
+			return a
+		}
+		return "developer"
+	case launch.HasSessionAction(f.Slug, sessions, launch.ActionPlan):
+		return "analyst"
+	}
+	return activeAgent(f)
+}
+
+// isPipelinePhase reports whether f.Phase names a phase a warm `go` session genuinely
+// runs, i.e. whether the phase line is more precise than "there is a build session".
+func isPipelinePhase(phase string) bool {
+	switch phase {
+	case "implement", "review", "test", "knowledge", "report":
+		return true
+	}
+	return false
+}
+
+// buildingDisagreement reports the FR14 live-vs-file disagreement: a live BUILD session
+// says the feature is being built while its file-derived status still reads a pre-build
+// state (`plan-accepted`, or the plan-acceptance gate). It covers the
+// launch-to-first-write window that moving the phases' state write to phase ENTRY
+// shrinks but cannot close.
+//
+// D6=A: the card keeps its FILE-derived column and gains a cue. Overriding the column
+// from the session signal would make the TUI structurally disagree with `gogo status` and
+// with every headless reader (which have no tmux), which is the split this plan rejected
+// for the classifier too - one source of truth for placement, a cue for the disagreement.
+func buildingDisagreement(f *contract.Feature, sessions []string) bool {
+	if f == nil {
+		return false
+	}
+	switch f.Status {
+	case "plan-accepted", "awaiting-plan-acceptance":
+	default:
+		return false
+	}
+	return launch.HasSessionAction(f.Slug, sessions, launch.ActionGo)
+}
+
+// stalledPhase reports the FR15 mirror case: the feature's status says a phase is
+// WORKING (implementing / reviewing / testing) but no session is live for it, so the
+// session died mid-phase. With the phases writing their status at ENTRY this becomes the
+// normal shape of a killed build, and it must read as stalled rather than running -
+// otherwise the honest writer would trade one silent lie for another. It is resumable
+// (RunnableStatus is true for all three), which is why the cue is quiet and the recovery
+// is named in the footer/status line rather than shouted on the card.
+func stalledPhase(f *contract.Feature, sessions []string) bool {
+	if f == nil {
+		return false
+	}
+	switch f.Status {
+	case "implementing", "reviewing", "testing":
+		return !hasLiveSession(f.Slug, sessions)
+	}
+	return false
+}
+
+// phaseLineLags reports the THIRD disagreement shape, and the one that catches a phase skill
+// forgetting its entry write (REV-006). It is deterministic and file-derived: the telemetry
+// contradicts the phase line while a build session is still live, so work has moved on while
+// `state.md` still describes an earlier phase.
+//
+// Why this is worth its own cue: FR11 moves the occupancy write to phase ENTRY, but that is
+// LLM prose, and it was skipped on ALL THREE live runs of this very feature - ③ kept
+// `implement` / `implementing` through a whole review round three times, including twice after
+// the instruction was moved into the numbered step list. The other two cues cannot see it -
+// `● building` and the cap both key on a live `gogo-go` session, which is present for the WHOLE
+// warm run through ②③④⑤, so a phase line lagging by one phase looks identical to a healthy one.
+// `events.jsonl` is the missing evidence, and it is already loaded (Feature.LatestEvent).
+//
+// TWO arms, because a skipped occupancy write leaves two different traces (REV-009):
+//
+//	A. the newest event is a `phase-done` for the phase `state.md` names - the named phase is,
+//	   per its own telemetry, finished, and nothing has claimed the next one. This catches a
+//	   FORWARD hand-off (②→③, ③→④, ④→⑤) where the next phase emitted no entry event either.
+//	   ARM A IS TRANSIENT-BY-DESIGN SINCE THE EXIT WRITE CAME BACK. Each phase now writes
+//	   phase/status at its END as well as its start (belt and braces, because the entry write is
+//	   prose that gets skipped), so every HEALTHY hand-off passes through arm A's exact shape for
+//	   the gap between one phase's exit write and the next phase's entry write - a gap that
+//	   includes the next phase's validate-in and, for ③/④, spawning a subagent, so seconds to
+//	   about a minute. That is not a false positive in the strict sense (the phase the line names
+//	   HAS ended, and nothing has claimed the next one yet), and it self-clears the moment the
+//	   next phase writes - exactly how `● building` covers the launch-to-first-write window. But
+//	   it does mean arm A alone is weaker evidence than arm B: it says "consistent but nothing
+//	   has moved on yet", where arm B says "these two files actively disagree". When the entry
+//	   write really is skipped, arm A stays lit for the whole phase instead of blinking, which is
+//	   the difference the user actually sees. Both shapes are pinned in TestPhaseLineLagsCue so
+//	   the trade-off is deliberate rather than inherited.
+//
+//	   DO NOT "FIX" THE BLINK BY DELETING ARM A, and note the sharper reason: before the exit
+//	   write was restored, arm A was SILENT EXACTLY WHEN THE FILE WAS WORST. With the entry write
+//	   skipped, `state.md` kept naming an earlier phase, so `e.Phase == line` failed and nothing
+//	   fired at all. §④'s write is what makes arm A's precondition hold in the first place - so
+//	   restoring it made this arm MORE useful, not less, and deleting it now would surrender both
+//	   the blink and the detection.
+//
+//	   The one feasible narrowing was considered and REJECTED: gating on
+//	   `time.Since(e.TS) > grace` to let the hand-off blink expire. It puts a wall clock into a
+//	   pure file-derived predicate (against the read-path determinism NFR - the same reasoning
+//	   that kept `classify()` host-independent), no grace constant can be chosen safely across
+//	   unknown hosts and subagent spawn times, and the board re-renders on **fsnotify, not a
+//	   timer**, so a grace would only move WHEN the cue appears unless a ticker were added to
+//	   drive a purely cosmetic cue.
+//	B. the newest event is an ENTRY event (`phase-started` / `fix-round`) for a DIFFERENT phase
+//	   than `state.md` names - the telemetry asserts work began on X while the phase line still
+//	   says Y. This catches the pipeline's most common re-entry, the loop BACK to implement
+//	   (`fix-round`/implement while the line still reads review/reviewing), and the partial
+//	   step 1 where the event landed and the `state.md` write did not.
+//
+// Arm B is deliberately restricted to ENTRY events rather than "any event whose phase
+// disagrees". An entry event is the only kind that asserts a phase has BEGUN. The shape that
+// makes the narrowing right is `implement`/`implementing` with a newest `issues-found`/review:
+// there, `state.md` is CORRECT - it names the phase actually running - and only the
+// best-effort telemetry is behind, so there is no lag to report. (Not, as an earlier version
+// of this comment claimed, because "the writer did everything right": implement's own
+// `fix-round` would be the newest event if it had. Something did fail there - the event
+// append - but it is not the half this cue is about.)
+//
+// WHAT THE CUE CAN AND CANNOT PROVE. Arm B's shape is AMBIGUOUS by construction:
+// `implement`/`implementing` + newest `phase-started`/review is byte-identical on disk whether
+// (i) review started and skipped its state write - the cue is right - or (ii) implement
+// re-entered, wrote its state, and its best-effort event append failed - `state.md` is correct
+// and the cue blames the right file for the wrong reason. Nothing on disk separates them, so
+// the honest reading of `· state lags` is narrower than "the phase line is stale": it is
+// **`state.md` and `events.jsonl` disagree about the current phase - one half of step 1 did
+// not land**, and the user should check which. That is still worth surfacing, because either
+// half failing is a defect.
+//
+// And SILENCE IS NOT PROOF OF HEALTH: arm A can be masked. A phase that skips step 1 entirely
+// but later appends a mid-phase event (`issues-found`/`round-opened`) overwrites the
+// `phase-done` that arm A keys on, and the cue goes quiet while the phase line is still stale.
+// The cue is a detector, not a guarantee - which is exactly why the writer-side rule stays in
+// the skills rather than being replaced by it.
+//
+// The remaining conditions make false positives impossible in the healthy case:
+//   - a live BUILD session - work is genuinely continuing, so some phase should have claimed
+//     it (an authoring or done session is not a build and never implies a phase moved on);
+//   - a WORKING status (implementing / reviewing / testing) - the statuses the entry write is
+//     supposed to have set. This mirrors stalledPhase's whitelist and is what keeps a terminal
+//     item with a lingering session from reading "lagging" when nothing is (REV-010): an
+//     `aborted` feature whose phase is still `implement` classifies ClassInProgress and so
+//     renders as a real card. A user gate is excluded by the same whitelist - `awaiting-uat`
+//     legitimately sits after a completed phase with its `state.md` correct.
+//
+// state.md's fifth phase is `knowledge` while events call it `report`, hence EventsPhase on
+// every comparison. A feature with no events.jsonl (best-effort telemetry, absent on older
+// features) has a nil LatestEvent and never trips this - absence degrades to today's output.
+func phaseLineLags(f *contract.Feature, sessions []string) bool {
+	if f == nil || f.LatestEvent == nil || f.Phase == "" {
+		return false
+	}
+	// The working-status whitelist also subsumes the user gates and every terminal status,
+	// so it is the single status rule rather than two overlapping ones.
+	switch f.Status {
+	case "implementing", "reviewing", "testing":
+	default:
+		return false
+	}
+	e, line := f.LatestEvent, contract.EventsPhase(f.Phase)
+	lagging := false
+	switch {
+	case e.Event == "phase-done" && e.Phase == line:
+		lagging = true // arm A: the named phase ended, nothing claimed the next
+	case isEntryEvent(e.Event) && e.Phase != line:
+		lagging = true // arm B: an entry event names a phase the line does not
+	}
+	if !lagging {
+		return false
+	}
+	return launch.HasSessionAction(f.Slug, sessions, launch.ActionGo)
+}
+
+// isEntryEvent reports whether an events.jsonl event name is one a phase appends as it
+// BEGINS - the only kind whose phase, when it disagrees with the phase line, is evidence that
+// work moved on rather than ordinary telemetry lag. `phase-started` opens a phase;
+// `fix-round` marks implement re-entering to fix an issues list (its entry event in
+// `--issues` mode). Every other event in the vocabulary (`phase-done`, `round-opened`,
+// `issues-found`, the gate/uat/ship events) is mid- or post-phase.
+func isEntryEvent(name string) bool {
+	return name == "phase-started" || name == "fix-round"
+}
+
+// cardStateCue is the one producer of a card's live-vs-file cue text (glyph + word, so it
+// survives a colourless terminal and is assertable in View()): `● building` for the FR14
+// disagreement, `· state lags` when the telemetry contradicts the phase line while work
+// continues (REV-006/REV-009), `· stalled` for the FR15 mirror, and "" for a card whose file,
+// telemetry and sessions all agree. Pure, so the renderer stays free of the decision.
+//
+// The three arms are MUTUALLY EXCLUSIVE, so the switch order is not load-bearing - and that
+// is a property worth stating precisely, because an earlier version of this comment claimed
+// "order matters" and a mutation proved the claim unpinned (REV-013). What actually holds:
+//
+//   - buildingDisagreement needs a PRE-BUILD status (plan-accepted / awaiting-plan-acceptance)
+//     plus a live build session;
+//   - phaseLineLags needs a WORKING status (implementing / reviewing / testing) plus a live
+//     build session - a disjoint status set, since REV-010 added that whitelist;
+//   - stalledPhase needs a WORKING status and NO live session.
+//
+// So no two can be true at once. TestCueArmsAreMutuallyExclusive pins it over a cross-product,
+// which is what turns "the order happens not to matter today" into a guard: widening any arm's
+// status set into another's fails that test and forces the precedence to be decided on purpose
+// rather than inherited from the switch.
+func cardStateCue(f *contract.Feature, sessions []string) string {
+	switch {
+	case buildingDisagreement(f, sessions):
+		return buildingMarker + " building"
+	case phaseLineLags(f, sessions):
+		return stalledMarker + " state lags"
+	case stalledPhase(f, sessions):
+		return stalledMarker + " stalled"
+	}
+	return ""
+}
+
 // isChangelogCol reports whether board column i is the collapsed changelog list.
 func isChangelogCol(i int) bool { return columnOrder[i] == contract.ColChangelog }
 
@@ -1000,6 +1286,11 @@ func isChangelogCol(i int) bool { return columnOrder[i] == contract.ColChangelog
 // what the analyst is doing rather than looking like a stuck decision gate.
 func pillLabel(f *contract.Feature) string {
 	switch b := badge(f); b {
+	case "authoring":
+		// Glyph + word (FR14b): a dim `✎ authoring` where an acceptable plan shows the
+		// red `⏸ accept plan`, so "the analyst is still writing this" and "your turn"
+		// can never look the same.
+		return authoringMarker + " authoring"
 	case "awaiting-plan-acceptance":
 		return waitingMarker + " accept plan"
 	case "awaiting-uat":
@@ -1065,6 +1356,8 @@ func pillStyleFor(f *contract.Feature) lipgloss.Style {
 		return pillRed
 	case f.AwaitingUAT():
 		return pillPurple
+	case f.Authoring():
+		return pillDim // not a gate: nothing to act on yet (mirrors badge()'s precedence)
 	case f.Status == "awaiting-plan-acceptance":
 		return pillRed
 	}

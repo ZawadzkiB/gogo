@@ -150,6 +150,13 @@ func (m *Model) quickView(f *contract.Feature) tea.Cmd {
 	m.openDrill(f) // sets up the file list + modeDrill as the fallback
 	a, ok := m.defaultArtifact(f)
 	if !ok {
+		// SAY WHY (0.29.0, the Diagnosability bar). `v` on a plan-column card with no
+		// plan.md used to drop SILENTLY to the file list, so the single most confusing
+		// card on the board answered a keypress with no message at all. Name the reason,
+		// the number where there is one, and the unblock.
+		if note, level := planColumnViewNote(f); note != "" {
+			m.setStatus(level, note)
+		}
 		return nil // stay on the file list
 	}
 	// Highlight the matching row in the file list, when it is one of the
@@ -161,6 +168,31 @@ func (m *Model) quickView(f *contract.Feature) tea.Cmd {
 		}
 	}
 	return m.openArtifact(a)
+}
+
+// planColumnViewNote is the status line + severity `v` shows when a PLAN-column card has
+// no plan.md to open, and "" for every other card (so an in-progress card's file-list
+// fallback is byte-for-byte unchanged).
+//
+// A card at one of the two plan gates gets the SAME sentence the move guard bounces with
+// (one producer, so `v` and `m` can never describe the same fact differently) at
+// statusLevelWarn - it is a gate and it names its unblock. Any other plan-column card with
+// no plan (e.g. an aborted one) gets a plain dim note: there is nothing to unblock, so
+// amber would over-signal.
+func planColumnViewNote(f *contract.Feature) (string, statusLevel) {
+	if f == nil || f.Class != contract.ClassUnfinished {
+		return "", statusLevelOK
+	}
+	// planUnready decides (pure, off the loaded Feature); planReadinessBounce only builds
+	// the sentence once we know we are showing one. `v` is a keystroke path, so the one
+	// plan.md read here is fine - it is the per-FRAME read that was not.
+	if planUnready(f) {
+		return planReadinessBounce(f), statusLevelWarn
+	}
+	if f.PlanUnwritten {
+		return "no plan.md to view for " + f.Slug + " (" + contract.PlanUnwrittenReason(f.Dir) + ")", statusLevelOK
+	}
+	return "", statusLevelOK
 }
 
 // defaultArtifact resolves the column's default view file for f, or ok=false to

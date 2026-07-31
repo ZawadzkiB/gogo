@@ -1,34 +1,71 @@
 stateDiagram-v2
   [*] --> authoring: gogo-plan creates .gogo/work/feature-slug/
   authoring --> authoring: analyst writes state.md / decisions.md / charts/
-  authoring --> authoring: analyst dies mid-write  (STAYS here - derived, crash-safe)
-  authoring --> awaiting_acceptance: plan.md lands (written + substantive)
+  authoring --> authoring: analyst dies mid-write (STAYS here - derived, crash-safe)
+  authoring --> awaiting_acceptance: plan.md lands (present AND >= 2 '## ' sections)
   awaiting_acceptance --> plan_accepted: user accepts (in-chat, or m -> /gogo:accept)
-  plan_accepted --> implementing: gogo-implement 1b ENTRY write (NEW timing)
-  implementing --> reviewing: gogo-review entry write
-  reviewing --> testing: gogo-test entry write
+  plan_accepted --> implementing: gogo-implement step 1 ENTRY write (else its exit write)
+  implementing --> reviewing: gogo-review step 1 ENTRY write (else its exit write)
+  reviewing --> testing: gogo-test step 1 ENTRY write (else its exit write)
   testing --> awaiting_uat: report 5
   implementing --> stalled: session killed, no live gogo-go
-  stalled --> implementing: gogo go slug resumes
+  stalled --> implementing: gogo go slug resumes (RunnableStatus is true)
 
   note right of authoring
-    DERIVED, display-only:
-    status on disk is still
-    awaiting-plan-acceptance; plan.md's
-    absence is what makes it read as
-    authoring. NO new status enum value.
-    m refuses. /gogo:accept refuses.
-    Not counted in the header gate count.
+    DERIVED, display-only. The status on disk
+    is still awaiting-plan-acceptance (or
+    absent); plan.md's absence or stub-ness is
+    what makes it read as authoring. NO new
+    status enum value, NO new class: it stays
+    unfinished, in the plan column.
+    Card: dim '✎ authoring', no gate stripe.
+    m AND M refuse; gogo go and /gogo:accept
+    refuse. Not counted in '⏸ K need you' nor
+    in gogo status's WAIT column. The refusal
+    names its number and its unblock.
   end note
 
   note right of plan_accepted
-    TODAY the build runs entirely INSIDE
-    this state: gogo-implement writes
-    implementing only at its step 4, after
-    the work. So the card sits in the plan
-    column, in-progress reads 0, and the
-    cap does not count it.
-    FR11 moves the write to phase ENTRY;
-    FR12 makes the cap count a live
-    gogo-go session regardless of class.
+    TWO writers move this line, on purpose:
+    each phase writes phase/status at its
+    START (accurate when it fires) and AGAIN
+    at its END. 0.29.0 briefly dropped the exit
+    write, and state.md then stopped advancing
+    at all - the entry write is prose an LLM
+    follows and was skipped on all 3 live runs.
+    Floor = one phase behind, ceiling = live.
+
+    BEFORE 0.29.0 the whole build ran INSIDE
+    this state: gogo-implement wrote
+    implementing only at its step 4, after the
+    work. The card sat in the plan column,
+    in-progress read 0, the agent chip read
+    '● analyst', and the cap did NOT count it -
+    so a second build could clobber the tree.
+    Now: the phases write at ENTRY, and the cap
+    counts a live gogo-go session regardless of
+    the file-derived class. A card in the
+    residual launch-to-first-write window shows
+    an amber '● building' cue and keeps its
+    file-derived column.
+  end note
+
+  note right of stalled
+    Not a status on disk - a DERIVED cue: a
+    working status (implementing / reviewing /
+    testing) with no live session for the slug.
+    The cost of an honest entry write is that a
+    killed phase leaves 'implementing' behind,
+    so it must read '· stalled' rather than
+    running. Quiet glyph: it is resumable.
+
+    A SECOND derived cue covers the opposite
+    writer failure - a phase that starts and
+    forgets to record itself (observed live on
+    this very feature's review round). When the
+    newest event is a phase-done for the phase
+    state.md still names AND a build session is
+    live, the phase line is provably behind:
+    the card reads '· state lags'. So a skipped
+    entry write is visible, never silent.
   end note

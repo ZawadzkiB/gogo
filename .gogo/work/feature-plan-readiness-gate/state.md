@@ -25,10 +25,10 @@
 -->
 
 - **feature:** Plan-readiness + phase-occupancy gate — the board stops narrating the past
-- **phase:** plan            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** awaiting-plan-acceptance   <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
+- **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
+- **status:** shipped        <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
 - **created:** 2026-07-29
 - **branch:** main
-- **iterations:** plan=0 · implement=0 · review=0 · test=0   <!-- add · uat=N once a UAT round loops back to planning -->
-- **resume:** none           <!-- <phase to re-enter> — <next action> | none -->
-- **open-decision:** D1, D2, D3, D4, D5, D6   <!-- six forks open at the plan-acceptance gate; see decisions.md -->
+- **iterations:** plan=0 · implement=12 · review=7 · test=4 · report=2   <!-- add · uat=N once a UAT round loops back to planning -->
+- **resume:** none           <!-- shipped 2026-07-31 as 0.29.0 via /gogo:done -->
+- **open-decision:** none    <!-- D1-D6 resolved on gogo's recommendations (user, 2026-07-29) -->

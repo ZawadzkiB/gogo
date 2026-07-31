@@ -55,6 +55,17 @@ additive). A consumer that wants to surface the pending sign-off can read the ra
 **that badge is a CLI concern (Stage C / the 0.11.0 CLI)**; the classifier itself only
 labels the four classes.
 
+**A folder with no WRITTEN `plan.md` is mid-authoring - a consumer concern, not a class
+(0.29.0).** `state.md` is written at a phase's exit, so a folder can read
+`status: awaiting-plan-acceptance` while `plan.md` is absent or still a scaffold stub
+(< 2 `## ` sections) - the plan gate is then a claim with nothing behind it. **The
+classification above is unchanged**: such a feature is still **unfinished** → the plan
+column. But a consumer must not treat its `status` as a user gate: the CLI shows it as
+`✎ authoring`, leaves it out of the WAIT/"need you" counts, and refuses every accept/build
+path until the plan lands. Like the `awaiting-uat` badge, that is a **consumer** concern
+derived from the raw `status` + `plan.md`'s presence; the classifier still emits only the
+four classes.
+
 **A stale report during a UAT rerun does NOT re-open ready-to-ship.** The UAT loop
 re-runs ②→⑤ on the **same** feature and never clears the prior `report/`, so between
 re-acceptance and the next ⑤ the feature is mid-pipeline (`implementing` / `plan-accepted`

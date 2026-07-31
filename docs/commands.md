@@ -105,6 +105,15 @@ attaches, and now `m` accepts).
 
 - **Reads:** `state.md` (must be `awaiting-plan-acceptance` — refuses otherwise
   with guidance) and `plan.md` + `decisions.md` (presented for you to eyeball).
+- **Refuses (two hard gates, both before it presents anything):**
+  1. **Wrong status** - `plan-accepted` or downstream → "already accepted, run
+     `/gogo:go`"; mid-pipeline / shipped → "nothing to accept here".
+  2. **The plan is not written** (0.29.0) - `plan.md` absent, or a stub with fewer than
+     two `## ` sections → it stops and names how far short it fell (e.g. *"`plan.md` has
+     1 of the 2 sections a written plan needs"*), then sends you to `/gogo:plan <slug>`.
+     `state.md` is written at a phase's exit, so the status can be present before the
+     plan is; without this gate a never-written plan could be *accepted* end to end. The
+     board refuses the same card from its side (`✎ authoring`; `m` **and** `M` bounce).
 - **Writes:** on your confirmation, records acceptance **exactly as `gogo-plan`
   does** — `state.md` → `plan-accepted`, the `Status: **accepted** (user, <date>)`
   line on `plan.md`, `open-decision` cleared, and the single-owner `plan-accepted`
