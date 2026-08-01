@@ -20,9 +20,10 @@ Generated-by: /gogo:build
   regenerate with `node assets/vnm/build-bundle.mjs`. The gogo orchestrator
   (`assets/vnm/viewer.js`) and the layout tool (`assets/vnm/layout.mjs`) ARE
   authored.
-- **Python (vendored, authored) — since 0.7.0** — `assets/kanban/board.py`, the
-  `/gogo:done` work-board curses TUI. **Pure stdlib** (no pip), pure ASCII, ships a
-  `--selftest`; a soft dep (see below).
+- **Python (vendored, authored) — RETIRED in 0.33.0** — `assets/kanban/board.py`
+  (the 0.7.0 `/gogo:done` work-board curses TUI) was deleted with the no-auto-board
+  rule: bare `/gogo:done` ships in chat, and the interactive cockpit is the `gogo`
+  binary. No vendored python ships today.
 - **JSON** — `.claude-plugin/plugin.json` (manifest + version), `marketplace.json`,
   `.mcp.json` (Playwright MCP server).
 - **Go (since 0.10.0)** — the **`gogo` CLI** in `cli/` (module
@@ -54,11 +55,13 @@ The markdown-plugin side has no unit suite — verification = **dogfood**:
 install, then run `/gogo:build`, `/gogo:plan`, `/gogo:go` on a sample repo and
 inspect the produced `.gogo/` artifacts. The **CLI** (since 0.10.0) has a real
 Go suite: `cd cli && gofmt -l . && go vet ./... && go test -race ./...`
-(**559** test functions as of 0.32.0 - verified by grep, was 544 as of 0.31.0 - across
+(**566** test functions as of 0.33.0 - verified by grep, was 559 as of 0.32.0 - across
 13 packages: contract/tui/launch/pages/plans/projects/orchestrator/diagram/**trash**/config
 + a `gogo status` golden; 0.31.0 added the two `notify_hook_test.go` guards, which also
 run `hooks/notify.sh --selftest` in CI; 0.32.0 added the session-binding suites incl.
-`TestBoardKeyHelpInSync`, the anti-vacuity-floored board/drill key-help guard). UI/browser testing for *target* projects
+`TestBoardKeyHelpInSync`, the anti-vacuity-floored board/drill key-help guard; 0.33.0
+added the sessions-panel suite + `TestNoInteractiveBoardInSkills`, the no-auto-board
+source guard). UI/browser testing for *target* projects
 uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
 `testing-tools.md` / `test-strategy.md`.
 
@@ -70,13 +73,12 @@ uses the bundled **Playwright MCP** (boots via `npx`, needs Node). See
   used anywhere in gogo.**
 - `jq` — handy for validating/reading JSON artifacts when present.
 - Node.js — only for the Playwright MCP.
-- `python3` + `tmux` (since 0.7.0) — soft deps for the `/gogo:done` interactive
-  work board (`board.py` curses TUI in a tmux pane; since 0.9.0 the pipeline
-  **cockpit** — action keys + filter + intent relaunch loop). Detected at use
-  (`command -v` + tty check); absent → the status-table + `AskUserQuestion`
-  multi-select fallback. tmux is installed on this dev host (so the live-TUI test
-  path in `test-strategy.md` applies), but it **stays a soft dep** — same
-  detection, same fallback.
+- `tmux` — a soft dep of the **launch/session machinery** (attachable sessions,
+  the S sessions panel, `/gogo:session-update`); absent → the backgrounded
+  `claude -p` fallback and in-chat flows. `python3` is **no longer needed by
+  gogo** (0.33.0 retired the `/gogo:done` board.py; bare `/gogo:done` ships in
+  chat with no environment deps). tmux is installed on this dev host, so the
+  live-TUI test path in `test-strategy.md` applies to the Go board.
 
 ## tmux platform constraints (measured on tmux 3.7b, 0.28.0)
 

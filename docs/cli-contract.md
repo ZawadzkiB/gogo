@@ -378,6 +378,27 @@ only truthful live-session state sooner.
   / `-`) when sessions are present; with tmux absent or nothing running the table is
   byte-for-byte the pre-0.29.0 one.
 
+### Changed in 0.33.0 (all additive - CLI-owned tmux acts + a retired external board; no `.gogo/` key added or changed)
+
+- **`S` opens the sessions panel** (board + drill): every live `gogo-*` session as a
+  live-refreshed cursored list (the same `name · bound|unbound · repo · age
+  [· attached]` rows as the 0.32.0 adopt picker), from which `R` re-assigns the
+  focused session onto a picked **drivable** work item (the picker shows the resulting
+  name; the rename is the same exact-target act as the card-anchored `R`, through one
+  shared core) and `K` closes it (Cancel-default confirm, exact-name kill). `esc`/`q`
+  return to the opening surface. CLI-owned tmux acts — **no pipeline state is
+  written**; every consumer re-derives from the session name as before.
+- **A drifted session can re-bind ITSELF:** the new `/gogo:session-update [slug]`
+  slash command (plugin-side, not a CLI verb) renames its own host session onto the
+  item it is actually driving — one `tmux rename-session`, no file written. The CLI
+  reads nothing new; the corrected name flows through the existing attribution.
+- **The `/gogo:done` interactive board is retired.** Bare `/gogo:done` ships via an
+  in-chat table; the `.gogo/resources/kanban/` scratch (board.py, work-index,
+  board-intent, board-exit.code) is no longer written by anything. A consumer must
+  not expect those files; stale copies may exist in old repos and mean nothing.
+  Standing rule: no gogo command opens an interactive TUI as a side effect of
+  another action — the interactive cockpit is this `gogo` binary, user-launched.
+
 ### Changed in 0.32.0 (all additive - CLI-owned tmux acts; no `.gogo/` key added or changed)
 
 - **The session NAME remains the one binding** between a tmux session and a work item

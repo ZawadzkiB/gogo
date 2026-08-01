@@ -19,8 +19,8 @@
 # Playwright MCP working dir (test tooling scratch — page snapshots, layout)
 .playwright-mcp/
 
-# Python bytecode cache — assets/kanban/board.py is vendored source; the .pyc
-# it compiles to on run is regenerable and must never be committed.
+# Python bytecode cache — no vendored python ships today (the /gogo:done board.py
+# was retired in 0.33.0), but regenerable bytecode must never be committed.
 __pycache__/
 *.pyc
 

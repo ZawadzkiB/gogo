@@ -1,0 +1,11 @@
+{
+  "slug": "sessions-panel-and-no-auto-board",
+  "updated": "2026-08-01",
+  "note": "AS-BUILT report set (phase 5). Three deliberately separate surfaces over ONE binding (a session's tmux name): bare /gogo:done ships in chat (board.py + the intent protocol retired; TestNoInteractiveBoardInSkills is the durable guard), S opens modeSessions on the gogo board+drill (adoptRow rows; R re-assigns via the one shared reassign() core; K closes; esc/q to the opener), and /gogo:session-update lets a session rename ITSELF onto the item it is driving (arg -> conversation -> ask; bindAction's cited rule; exact-target rename; writes nothing). before/ carries the plan-time as-is baseline (board-launching done, card-only session ops, the drift with no in-session repair) for the side-by-side compare.",
+  "diagrams": [
+    { "kind": "flow", "file": "flow.mmd", "title": "As-built: the three doors onto the one session-name binding, and every reader downstream" },
+    { "kind": "sequence", "file": "session-update.mmd", "title": "As-built: the drift case end to end - ship, retask, /gogo:session-update renames the session from inside, the board corrects" },
+    { "kind": "sequence", "file": "sequence.mmd", "title": "As-built: the S sessions panel runtime - open, re-assign via the shared core, close, return to the opener" },
+    { "kind": "activity", "file": "activity.mmd", "title": "As-built: the cockpit mode machine with modeSessions - board/drill S in, esc/q out, forms via pickerOrigin" }
+  ]
+}

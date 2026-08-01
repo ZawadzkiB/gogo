@@ -1,0 +1,48 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant CL as claude (this session)
+  participant SK as gogo-session-update SKILL
+  participant TX as tmux
+  participant BD as gogo board (readers)
+
+  Note over U,BD: the drift - one session, two work items over time
+  U->>CL: /gogo:done alpha
+  CL->>BD: alpha state.md becomes shipped - it moves to the changelog column
+  Note over TX: this pane is gogo-done-alpha and the ship-reap spares its own host
+  BD-->>U: a live session dot on a CHANGELOG card
+  U->>CL: /gogo:plan beta   (same session - new work item)
+  CL->>BD: .gogo/work/feature-beta/ appears
+  BD-->>U: beta shows NO session - the binding is still the string gogo-done-alpha
+
+  Note over U,BD: the repair, on demand, from inside
+  U->>CL: /gogo:session-update        (optionally with an explicit slug)
+  CL->>SK: load the skill
+  SK->>TX: is $TMUX set
+  alt not inside tmux
+    SK-->>U: no tmux session to update - nothing done (graceful, never an error)
+  else inside tmux
+    TX-->>SK: display-message -p '#S' gives gogo-done-alpha
+    SK->>SK: target = arg slug, else inferred from THIS conversation, else ask
+    Note over SK: the conversation is the evidence the cockpit provably lacks
+    SK->>SK: validate the target exists and is NON-terminal
+    alt target is shipped or aborted
+      SK-->>U: refused - that item has nothing left to drive
+    else drivable
+      SK->>SK: action = RunnableStatus ? go : plan   (bindAction rule, cited)
+      SK->>SK: name = gogo-<action>-<slug>          (launch.sessionName transform)
+      SK->>TX: has-session -t "=name"
+      alt name already taken by a LIVE session
+        TX-->>SK: exists - so suffix -2, -3 like launch.uniqueSession
+        Note over SK,TX: measured - renaming onto a live duplicate is REFUSED rc=1
+      end
+      SK->>TX: rename-session -t "=gogo-done-alpha" gogo-plan-beta
+      TX-->>SK: rc=0
+      SK-->>U: moved gogo-done-alpha to gogo-plan-beta - beta now owns this session
+      TX-->>BD: next 5s tick re-derives every binding from the NAME
+      BD-->>U: alpha (changelog) clean - beta shows its live session
+    end
+  end
+
+  Note over SK,BD: NOTHING is written - not state.md, not the registry, not the lock
+  Note over SK,BD: the rename IS the move (0.32.0 D3=A)

@@ -14,10 +14,11 @@ Generated-by: /gogo:build
 - The **core plan→implement→review→test loop needs zero external dependencies.**
 - **The renderer is vendored** - `very-nice-mermaid`'s browser build renders
   offline over `file://` (no `mmdc`, no Chromium, no network).
-- Anything else (Playwright MCP, `very-nice-mermaid`, `jq`, ntfy, and - since 0.7.0 - `python3`
-  + `tmux` for the `/gogo:done` work board) is **optional** and must be detected at
-  use; absence → graceful fallback, never a failure. The interactive terminal TUI
-  (`board.py`) degrades to the status table + `AskUserQuestion` multi-select.
+- Anything else (Playwright MCP, `very-nice-mermaid`, `jq`, ntfy, `tmux` for the
+  launch/session machinery) is **optional** and must be detected at use; absence →
+  graceful fallback, never a failure. (`python3` is no longer needed anywhere —
+  0.33.0 retired the `/gogo:done` board.py; bare `/gogo:done` is an in-chat flow
+  with no environment deps to degrade over.)
 
 ## Safety
 - **Writes are confined to `.gogo/`** (one user-gated exception — see gogo
@@ -58,10 +59,11 @@ Generated-by: /gogo:build
 - One vendored renderer per project at `.gogo/resources/vnm-browser.js`
   (~450 KB, shared by all features), not per feature.
 - Keep the published plugin lean; no build artifacts committed except the
-  intentional vendored `vnm-browser.js` (and authored source like `board.py`).
-- **Vendored Python must never ship compiled bytecode** — `__pycache__/` and
-  `*.pyc` are gitignored so a vendored tool (e.g. `assets/kanban/board.py`) never
-  drags platform-specific bytecode into the bundle.
+  intentional vendored `vnm-browser.js`.
+- **Vendored executables must never ship compiled bytecode** — `__pycache__/` and
+  `*.pyc` stay gitignored so any future vendored tool never drags
+  platform-specific bytecode into the bundle (the rule's original example,
+  `board.py`, was retired in 0.33.0).
 - **Changelog entries are high-level syntheses with a slim footprint** (since
   0.8.0): an entry is a *written* summary + slug-prefixed `.mmd` set +
   `manifest.json` (+ `before/`) — never a full-report copy and never a

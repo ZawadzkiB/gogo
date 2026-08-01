@@ -346,10 +346,8 @@ func (m Model) adoptRow(meta launch.SessionMeta) string {
 	return row
 }
 
-// finishAdopt runs after the adopt picker completes: resolve the choice, apply
-// the named refusals (already bound · foreign anchor), then rename via the
-// renamer seam. Nothing else is written (D3=A): no pipeline state, no registry
-// rewrite — the old card's tracked leg truthfully renders stale.
+// finishAdopt runs after the adopt picker completes: resolve the choice, then
+// hand (session, target) to the shared reassign core.
 func (m Model) finishAdopt() (tea.Model, tea.Cmd) {
 	target := m.pendingAdopt
 	sel := ""
@@ -364,26 +362,186 @@ func (m Model) finishAdopt() (tea.Model, tea.Cmd) {
 		m.status = "cancelled"
 		return m, nil
 	}
-	if launch.SessionMatchesSlug(sel, target.Slug) {
-		m.statusBlocked(sel + " is already bound to " + target.Slug + " — nothing to move")
-		return m, nil
+	return m.reassign(sel, target), nil
+}
+
+// reassign is the ONE producer of the re-assign act (FR4.4 — a user-visible rule
+// stated twice must be one constant): the refusal chain (already bound · foreign
+// anchor), the derived-action rename via the renamer seam, and the status
+// message. Both doors call it — the card-anchored `R` (finishAdopt, session
+// picked) and the sessions panel's `R` (finishReassignSession, target picked).
+// Nothing else is written (D3=A): no pipeline state, no registry rewrite — the
+// old card's tracked leg truthfully renders stale.
+func (m Model) reassign(session string, target *contract.Feature) Model {
+	if launch.SessionMatchesSlug(session, target.Slug) {
+		m.statusBlocked(session + " is already bound to " + target.Slug + " — nothing to move")
+		return m
 	}
 	root := m.rootFor(target)
-	if meta := m.metaFor(sel); meta != nil && meta.Path != "" && !pathWithinRoot(meta.Path, root) {
+	if meta := m.metaFor(session); meta != nil && meta.Path != "" && !pathWithinRoot(meta.Path, root) {
 		m.statusBlocked("that session is anchored at " + meta.Path + ", but " + target.Slug +
 			" lives in " + root + " — a claude working elsewhere cannot drive this item")
-		return m, nil
+		return m
 	}
 	base := launch.SessionNameFor(bindAction(target), target.Slug)
-	newName, err := m.renamer(sel, base)
+	newName, err := m.renamer(session, base)
 	if err != nil {
 		m.statusFailed("re-assign failed: " + err.Error())
-		return m, nil
+		return m
 	}
 	m.refreshSessions()
+	m.clampSessIdx()
 	if m.drill != nil {
 		m.loadDrillCard(m.drill) // refresh live/stale rows after the move
 	}
-	m.setStatus(statusLevelOK, "re-assigned "+sel+" → "+newName+" — "+target.Slug+"'s readers follow the new name")
+	m.setStatus(statusLevelOK, "re-assigned "+session+" → "+newName+" — "+target.Slug+"'s readers follow the new name")
+	return m
+}
+
+// --- S: the sessions panel (0.33.0 FR3-FR5) ----------------------------------
+
+// openSessions (S on the board or in the drill) opens the sessions panel —
+// modeSessions, a full-screen live list of EVERY gogo-* session from the cached
+// meta. It ALWAYS opens (FR3.2): an empty panel names why it is empty, so the
+// key never reads as a dead no-op. It records the opening mode so esc/q return
+// exactly there (D2=C).
+func (m Model) openSessions() (tea.Model, tea.Cmd) {
+	m.sessionsOrigin = m.mode
+	m.mode = modeSessions
+	m.clampSessIdx()
+	m.status = ""
+	return m, nil
+}
+
+// focusedSession returns the panel's cursored session meta, or nil on an empty
+// list.
+func (m Model) focusedSession() *launch.SessionMeta {
+	if len(m.sessionMeta) == 0 {
+		return nil
+	}
+	return &m.sessionMeta[clamp(m.sessIdx, 0, len(m.sessionMeta)-1)]
+}
+
+// clampSessIdx keeps the panel cursor in range — the list is LIVE (the 5s
+// session tick refreshes it in every mode), so rows can vanish under the cursor.
+func (m *Model) clampSessIdx() {
+	m.sessIdx = clamp(m.sessIdx, 0, len(m.sessionMeta)-1)
+}
+
+// hasDrivableFeature reports whether any loaded work item is non-terminal —
+// the panel `R`'s zero-target guard shares this with the picker's own filter,
+// so the refusal and the row set can never disagree.
+func (m Model) hasDrivableFeature() bool {
+	for _, f := range m.repo.Features {
+		if f != nil && !orchestrator.TerminalStatus(f.Status) {
+			return true
+		}
+	}
+	return false
+}
+
+// startReassignPicker opens the panel's `R` target Select (FR4.1): every
+// DRIVABLE (non-terminal) work item, each row reading
+// `<slug> · <status> · → <resulting name>` — the name bindAction derives, so the
+// user sees that adopting onto a runnable item mints a cap-counted build session.
+// All drivable targets are shown, never silently filtered (FR4.2): a refusal
+// explains, a missing row puzzles.
+func (m *Model) startReassignPicker(session string) {
+	m.pendingReassign = session
+	m.pickerOrigin = m.mode
+	m.binding = &formBinding{}
+	var opts []huh.Option[string]
+	for _, f := range m.repo.Features {
+		if f == nil || orchestrator.TerminalStatus(f.Status) {
+			continue
+		}
+		status := f.Status
+		if status == "" {
+			status = "no status"
+		}
+		row := f.Slug + " · " + status + " · → " + launch.SessionNameFor(bindAction(f), f.Slug)
+		opts = append(opts, huh.NewOption(row, featureKey(f)))
+	}
+	opts = append(opts, huh.NewOption("Cancel", adoptCancel))
+	m.form = newForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Re-assign " + session + " onto which work item?").
+			Description("renames the session — every reader (dot, cues, cap, lock, sweep) follows the name; no pipeline state is written").
+			Options(opts...).
+			Value(&m.binding.selected),
+	))
+	m.mode = modeForm
+}
+
+// finishReassignSession runs after the panel's `R` picker completes: resolve the
+// chosen feature by its workspace-unique key, then hand (session, target) to the
+// shared reassign core. The user stays in the panel (pickerOrigin).
+func (m Model) finishReassignSession() (tea.Model, tea.Cmd) {
+	session := m.pendingReassign
+	sel := ""
+	if m.binding != nil {
+		sel = m.binding.selected
+	}
+	m.pendingReassign = ""
+	m.binding = nil
+	m.form = nil
+	m.mode = m.pickerOrigin
+	if sel == "" || sel == adoptCancel || session == "" {
+		m.status = "cancelled"
+		return m, nil
+	}
+	var target *contract.Feature
+	for _, f := range m.repo.Features {
+		if featureKey(f) == sel {
+			target = f
+			break
+		}
+	}
+	if target == nil {
+		m.statusBlocked("that work item is no longer present — nothing renamed")
+		return m, nil
+	}
+	return m.reassign(session, target), nil
+}
+
+// startKillSessionForm opens the panel's `K` destructive confirm for the exact
+// named session — Cancel default (the confirm-default convention: destructive
+// actions must not submit on a bare Enter).
+func (m *Model) startKillSessionForm(session string) {
+	m.pendingKillSession = session
+	m.pickerOrigin = m.mode
+	m.binding = &formBinding{confirm: false}
+	m.form = newForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title("Close session " + session + "?").
+			Description("kills the tmux session (exact name) — the pipeline state is untouched").
+			Affirmative("Kill").
+			Negative("Cancel").
+			Value(&m.binding.confirm),
+	))
+	m.mode = modeForm
+}
+
+// finishKillSession runs after the panel's `K` confirm: kill exactly the named
+// session via the killer seam, refresh, clamp the cursor, stay in the panel. The
+// status line carries tmux's own words on failure.
+func (m Model) finishKillSession() (tea.Model, tea.Cmd) {
+	session := m.pendingKillSession
+	confirmed := m.binding != nil && m.binding.confirm
+	m.pendingKillSession = ""
+	m.binding = nil
+	m.form = nil
+	m.mode = m.pickerOrigin
+	if !confirmed || session == "" {
+		m.status = "cancelled"
+		return m, nil
+	}
+	if err := m.killer(session); err != nil {
+		m.statusFailed("close failed: " + err.Error())
+		return m, nil
+	}
+	m.refreshSessions()
+	m.clampSessIdx()
+	m.setStatus(statusLevelOK, "closed "+session)
 	return m, nil
 }

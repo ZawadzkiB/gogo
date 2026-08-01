@@ -46,9 +46,9 @@ TUI — see the 0.9.0 section below):
 - **Run the fallback for real** — the status table + `AskUserQuestion` multi-select
   is the live path when the soft dep is absent; dogfood it on a fixture with every
   work-index class (add a plan-only `unfinished` exemplar).
-- **Exercise the vendored tool headlessly** — `python3 assets/kanban/board.py
-  --selftest` and `--headless --ship a,b` assert the exit-code contract
-  (0 confirm / 1 cancel / 2 error) and the ready-only guard without a terminal.
+- **(historical — the vendored board.py was retired in 0.33.0;** bare
+  `/gogo:done` is an in-chat flow with no headless tool to exercise. The
+  headless-selftest pattern below stays valid for any future vendored tool.)
 - **Code-read the interactive routing** — confirm launch is nesting-safe and that
   launch-failure vs. cancel vs. confirm route to the right outcome. Recording
   manual steps instead of running the TUI is only the **tmux-absent** fallback —
@@ -60,7 +60,8 @@ manual-test-only: drive it for real with `tmux send-keys` / `capture-pane`
 (proven in the 0.9.0 board-cockpit round — guards, filter, per-action intents,
 cancel, all asserted live):
 - **Launch detached** into a throwaway session on a fixture work-index:
-  `tmux new-session -d -s "gogo-test-board-$$" "python3 assets/kanban/board.py --index <idx> --result <res>"`.
+  `tmux new-session -d -s "gogo-test-board-$$" "<the TUI under test>"` (today
+  that is the Go `gogo` board; the retired board.py was driven the same way).
   Use a unique per-run session name; NEVER a real session name like `gogo-done`.
 - **Send keystrokes** with `tmux send-keys -t <sess>` (keys like `v`, `s`, `m`,
   `g`, `/text`, `Space`, `C-m`, `Escape`, `q`) and **assert the rendered screen**

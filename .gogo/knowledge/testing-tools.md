@@ -33,17 +33,19 @@ artifacts it produces.
   → fall back to CLI/API checks + written manual steps.
 - **mermaid offline viewer** — open `.gogo/work/feature-<slug>/charts/diagrams.html`
   in a browser to confirm diagrams render.
-- **Vendored Python tools ship a `--selftest`** (since 0.7.0) — run
-  `python3 assets/kanban/board.py --selftest` (and `--headless --ship a,b`) to
-  exercise the `/gogo:done` board logic live without a terminal/tmux. `python3` is
-  a soft dep; absent → skip and rely on code-read + the table fallback.
+- **No vendored python remains (0.33.0)** — `assets/kanban/board.py` (and its
+  `--selftest`) was retired with the no-auto-board rule; bare `/gogo:done` is an
+  in-chat flow with nothing to selftest. The `--selftest` + exit-code-contract
+  convention stays recorded in `coding-rules.md` for any FUTURE authored
+  vendored executable.
 - **Go toolchain for `cli/`** (since 0.10.0) — `cd cli && gofmt -l . &&
   go vet ./... && go test -race ./...` (always `-race`; the tui suite depends on
   it). `go build -o gogo .` for a live binary; `gogo status` on this repo's real
   `.gogo/` is a free end-to-end classifier check (golden file in `cli/testdata/`).
 - **tmux drive for the Go TUI** (since 0.10.0) — the send-keys/capture-pane
-  method (see test-strategy) applies to the `gogo` board exactly as to `board.py`:
-  launch detached in a throwaway session, send keystrokes, assert the pane.
+  method (see test-strategy): launch the `gogo` board detached in a throwaway
+  session, send keystrokes, assert the pane. Since 0.33.0 this covers the S
+  sessions panel too (open, R re-assign, K close, esc-to-opener).
 - **Stubbed `claude` on PATH** — to test launches without running Claude, prepend
   a scratchpad dir with an executable `claude` stub that records its argv (and a
   call count) to a file; assert **one** argv element (e.g. `/gogo:done a+b`) and

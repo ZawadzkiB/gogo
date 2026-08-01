@@ -77,25 +77,36 @@ func TestBoardKeyHelpInSync(t *testing.T) {
 	boardBlock := mainHelpBlock(t, string(mainSrc), "board keys:")
 	drillBlock := mainHelpBlock(t, string(mainSrc), "drill-in keys")
 
+	sessionsBlock := mainHelpBlock(t, string(mainSrc), "sessions panel keys")
+
 	cases := []struct {
 		fn     string
 		inTUI  string
 		inCLI  string
+		floor  int               // per-case anti-vacuity floor (a shared floor is wrong for a small switch)
 		exempt map[string]string // handled key → the documented key it aliases
 	}{
 		{
 			fn:    "updateBoard",
 			inTUI: boardAllKeysLine,
 			inCLI: boardBlock,
+			floor: 8,
 		},
 		{
 			fn:    "updateDrill",
 			inTUI: drillKeysLine,
 			inCLI: drillBlock,
+			floor: 8,
 			exempt: map[string]string{
 				"left": "esc", "h": "esc", // back aliases
 				"right": "enter", "l": "enter", // open aliases
 			},
+		},
+		{
+			fn:    "updateSessions",
+			inTUI: sessionsKeysLine,
+			inCLI: sessionsBlock,
+			floor: 8, // esc q up k down j R K — the switch's real key count
 		},
 	}
 	for _, c := range cases {
@@ -103,10 +114,12 @@ func TestBoardKeyHelpInSync(t *testing.T) {
 		// a guard must never pass vacuously). A renamed/split handler, a key switch
 		// that stops being `switch msg.String()`, a renamed help header or an
 		// emptied const would zero one of these sets and turn every per-key
-		// assertion below into a green no-op — fail loudly instead. updateBoard
-		// handles 19 cases and updateDrill 9, so 8 is a safe floor for both.
+		// assertion below into a green no-op — fail loudly instead. The floor is
+		// PER-CASE, set to each switch's real key count (or a safe margin under
+		// it), so drift on a big switch is caught without spuriously failing a
+		// small one.
 		keys := switchKeys(t, "update.go", c.fn)
-		if len(keys) < 8 {
+		if len(keys) < c.floor {
 			t.Fatalf("parsed only %d keys from %s (%v) - parser drift?", len(keys), c.fn, keys)
 		}
 		tuiDoc, cliDoc := helpKeyTokens(c.inTUI), helpKeyTokens(c.inCLI)

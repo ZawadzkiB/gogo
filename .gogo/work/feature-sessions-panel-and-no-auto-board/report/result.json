@@ -1,0 +1,35 @@
+{
+  "slug": "sessions-panel-and-no-auto-board",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/plan.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/state.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/review/issues.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/test/issues.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/charts/manifest.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/charts/before/manifest.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/decisions.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/report.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/flow.mmd",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/session-update.mmd",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/sequence.mmd",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/activity.mmd",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/manifest.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/layouts.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/report/before/manifest.json",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/plan.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Report complete for a clean green run: as-built report.md (three slices, no deviations; decisions D1-D5 + the honest-form framing; review approved in 2 rounds / test green incl. real-tmux hands-on), the four-diagram as-built set + prebuilt layouts + the before/ compare, and the REV-007 knowledge reconcile completed (six knowledge files; 0.33.0 overrides entry; python3 dropped from soft deps; test count 566). state.md -> awaiting-uat."
+}

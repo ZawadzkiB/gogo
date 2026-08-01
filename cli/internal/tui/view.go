@@ -19,6 +19,8 @@ func (m Model) View() string {
 	switch m.mode {
 	case modeDrill:
 		return m.viewDrill()
+	case modeSessions:
+		return m.viewSessions()
 	case modeViewer:
 		return m.viewViewer()
 	case modeForm:
@@ -209,10 +211,41 @@ func (m Model) boardStatusLine() string {
 		line = m.sessionsLine()
 	}
 	if n := len(m.unboundHere()); n > 0 {
-		line += dimStyle.Render(fmt.Sprintf(" · %d unbound %s (matches no card here — R on a card adopts it)",
+		// The pointer names the handler's own key (FR6.4): S opens the panel this
+		// count is begging for — chip and handler share the one `S` surface.
+		line += dimStyle.Render(fmt.Sprintf(" · %d unbound %s (matches no card here — S sessions, or R on a card adopts it)",
 			n, plural(n, "session")))
 	}
 	return line
+}
+
+// viewSessions renders the sessions panel (0.33.0 FR3): every live gogo-*
+// session from the cached meta as a cursored list — reusing adoptRow so this
+// list and the R adopt picker can never drift — with the empty state naming its
+// reason (the key must never read as a dead no-op) and the footer carrying
+// sessionsKeysLine.
+func (m Model) viewSessions() string {
+	var b []string
+	b = append(b, colTitleStyle.Render("sessions — every live gogo-* session"), "")
+	switch {
+	case !m.hasTmux:
+		b = append(b, dimStyle.Render("  tmux not installed — no sessions to manage"))
+	case len(m.sessionMeta) == 0:
+		b = append(b, dimStyle.Render("  no live gogo-* sessions"))
+	default:
+		for i, meta := range m.sessionMeta {
+			cursor := "  "
+			if i == clamp(m.sessIdx, 0, len(m.sessionMeta)-1) {
+				cursor = "▸ "
+			}
+			b = append(b, cursor+m.adoptRow(meta))
+		}
+	}
+	if m.status != "" {
+		b = append(b, "", m.renderStatus(m.status))
+	}
+	b = append(b, "", helpStyle.Render(sessionsKeysLine))
+	return strings.Join(b, "\n")
 }
 
 func (m Model) renderColumn(i, colWidth int) string {
@@ -803,8 +836,11 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 // (TestBoardKeyHelpInSync) asserts against exactly the strings that render, and
 // a new key can never ship undocumented.
 const (
-	boardAllKeysLine = "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · M force (past the source cap) · d ship · a attach · l peek · P plan session · K kill session · R re-assign session · x del · p source · tab plans/config · / filter · ? keys · q quit"
-	drillKeysLine    = "↑↓/jk files · enter/v open · a attach · K kill · P plan session · R re-assign · G glow · w web · esc/q back"
+	boardAllKeysLine = "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · M force (past the source cap) · d ship · a attach · l peek · P plan session · K kill session · R re-assign session · S sessions panel · x del · p source · tab plans/config · / filter · ? keys · q quit"
+	drillKeysLine    = "↑↓/jk files · enter/v open · a attach · K kill · P plan session · R re-assign · S sessions panel · G glow · w web · esc/q back"
+	// sessionsKeysLine is the sessions panel's footer (0.33.0 FR6.2) — mirrored in
+	// cli/main.go's `sessions panel keys` block and guarded by TestBoardKeyHelpInSync.
+	sessionsKeysLine = "↑↓/jk sessions · R re-assign · K close · esc/q back"
 )
 
 // contextualFooter is the FR-7 footer: the focused card's applicable action

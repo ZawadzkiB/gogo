@@ -37,8 +37,8 @@ Generated-by: /gogo:build
 - **`${CLAUDE_PLUGIN_ROOT}`** for all in-plugin asset/template paths — never
   hard-code absolute paths.
 
-## Vendored executable assets (since 0.7.0)
-- An **authored** vendored executable (e.g. `assets/kanban/board.py`, distinct from
+## Vendored executable assets (since 0.7.0; no live example since 0.33.0 retired board.py)
+- An **authored** vendored executable (e.g. the retired `assets/kanban/board.py`, distinct from
   the third-party `vnm-browser.js` snapshot) must be **pure standard library** (no
   pip/network), **pure ASCII**, ship a **`--selftest`**, and expose a **documented
   exit-code contract** the calling skill branches on. It stays a **soft dep**

@@ -80,8 +80,8 @@ Lists every `.gogo/work/feature-*/` with slug, title, phase, status, iteration
 counts, and resume hint; flags any `waiting-for-user` feature with its open
 decision. Read-only. It is also the home of the shared **work-index classifier**
 (Step A) that labels each feature **shipped · ready-to-ship · in-progress ·
-unfinished** — the same classifier the `/gogo:done` work board reuses to decide what
-is shippable.
+unfinished** — the same classifier `/gogo:done`'s in-chat ship table reuses to decide
+what is shippable.
 
 ### `/gogo:resume [feature-slug]`
 
@@ -120,6 +120,29 @@ attaches, and now `m` accepts).
   event. **Accept-only** — it does not chain into `/gogo:go` (the board's `m` on the
   now-accepted card is the natural second step). The CLI never mutates state; only
   the launched session does.
+
+### `/gogo:session-update [feature-slug]`
+
+Re-bind **this claude session's** tmux session to the work item it is *actually*
+driving, via `gogo-session-update` — runnable at any time, from inside any session
+(new in 0.33.0). A session's binding is its tmux name (`gogo-<action>-<slug>`),
+minted once at launch; ship one item and start the next in the same pane and the
+board shows a live session on a **changelog** card while the new item shows none.
+
+- **Reads:** `$TMUX` + `tmux display-message -p '#S'` (its own session name); the
+  target's `.gogo/work/feature-<slug>/state.md` status.
+- **Target resolution (never a guess):** an explicit slug argument pins it; else the
+  session infers the item from **its own conversation** (the evidence the cockpit
+  provably lacks); else it **asks** over the non-terminal items.
+- **Refuses:** a terminal target (`shipped`/`aborted`/`done` — nothing left to
+  drive); outside tmux it says so and does nothing (never an error).
+- **Writes: nothing.** Its entire effect is one `tmux rename-session -t "=<old>"
+  <new>` — action derived from the target's status (runnable → `gogo-go-<slug>`,
+  else `gogo-plan-<slug>`), collision-suffixed like the launcher. Every board reader
+  (dot, agent chip, cues, cap, lock, sweeper, unbound count) re-derives from the new
+  name on its next tick. A non-`gogo-*` host session is renamed too, with a
+  disclosed consequence: it becomes gogo-managed, so `gogo sweep` may reap it once
+  the item is terminal.
 
 ## Standalone phase commands
 
@@ -183,27 +206,21 @@ broken run.
 
 Ship report-complete features into a high-level changelog, via `gogo-done`. The
 explicit post-report "this is the end" gate. A **slug** ships that one;
-**`slug1+slug2+...`** ships those as ONE merged release entry; **no slug opens the
-work board**.
+**`slug1+slug2+...`** ships those as ONE merged release entry; **no slug ships in
+chat** — never an interactive board (the standing rule since 0.33.0: no gogo command
+opens a terminal UI as a side effect of another action; the interactive cockpit is
+the separate `gogo` binary).
 
-- **Work board cockpit (no slug):** classifies every `.gogo/work/feature-*` via the
-  shared `gogo-status` Step A classifier (shipped · ready-to-ship · in-progress ·
-  unfinished) and, from the four-class table, lets you act with **action keys** — an
-  **interactive terminal kanban** (`assets/kanban/board.py` in a tmux pane; `python3`
-  + `tmux` are soft deps) when the tooling and a tty are present, otherwise a
-  **status table + `AskUserQuestion` multi-select** ship fallback (never fails over the
-  board). Keys: **space/enter** select a ready-to-ship card, **v** view the focused card
-  (any class), **s** ship the selection separately, **m** ship it merged (≥2), **g**
-  run/resume the pipeline on an unbuilt card, **/** filter by text (Esc clears), **q**
-  cancel. Each key writes a single-shot **intent** `{schema:2, action, items}`; the
-  orchestrator executes it (view build / ship writer / pipeline handoff) and
-  **relaunches** the board — `go` ends the loop, `cancel` stops. The board only
-  *collects intents*; it never mutates gogo state.
-- **Merge gate:** when you ship merged (`m`), or a fallback selection is **≥2** slugs,
-  one `AskUserQuestion` — ship **separately** (N entries) or **merged** (1 entry). A
-  `+`-joined arg pre-answers *merged*; an explicit `s` pre-answers *separate*; a single
-  slug never asks. For a merged entry gogo suggests a release name from the members'
-  common theme and confirms it (you can override).
+- **No-slug mode (in chat):** classifies every `.gogo/work/feature-*` via the shared
+  `gogo-status` Step A classifier (shipped · ready-to-ship · in-progress ·
+  unfinished), renders the four-class **status table**, and offers the
+  **ready-to-ship** items via one `AskUserQuestion` multi-select. Non-ready items are
+  shown for context; the flow points at `/gogo:view <slug>`, `/gogo:go <slug>`, and
+  the `gogo` cockpit for everything it does not act on.
+- **Merge gate:** when the selection is **≥2** slugs, one `AskUserQuestion` — ship
+  **separately** (N entries) or **merged** (1 entry). A `+`-joined arg pre-answers
+  *merged*; a single slug never asks. For a merged entry gogo suggests a release name
+  from the members' common theme and confirms it (you can override).
 - **`/gogo:done` IS the UAT acceptance (0.11.0 — the plan-gate symmetry).** Phase ⑤ now
   leaves a feature at `status: awaiting-uat`; running `/gogo:done` is what accepts the UAT
   gate — **no extra confirmation question is asked** (mirroring how accepting a plan
@@ -226,15 +243,14 @@ work board**.
   idempotent; **no `diagrams.html` copy** — the viewer builds from source); builds the
   interactive viewer page under `.gogo/resources/view/` (best-effort, reusing the
   `gogo-view` build); and sets **each member's** `state.md` to a terminal `shipped`
-  status. Board mode also writes runtime scratch under `.gogo/resources/kanban/`
-  (`board.py`, `work-index.json`, `board-intent.json`, `board-exit.code`).
+  status.
 - **Prints:** the `file://` link to each built interactive viewer page (with the
   changelog folder path as a fallback — it never fails the command over the link).
 - **Validate-in:** a named slug must be **report-complete** *and* at the UAT gate
   (`status: awaiting-uat`; a pre-0.11 `done`/`shipped` member is accepted for
   back-compat). A missing report STOPs with "No report found for `<feature>` — run
-  `/gogo:report <feature>` first, then `/gogo:done`."; board mode opens the cockpit
-  whenever **any** feature exists (view `v` and go `g` are useful with nothing
+  `/gogo:report <feature>` first, then `/gogo:done`."; the no-slug table renders
+  whenever **any** feature exists (the full picture is useful with nothing
   ready-to-ship) and stops only when there are zero features.
 
 ### `/gogo:view [changelog-entry | feature-slug[:plan|:report]]`

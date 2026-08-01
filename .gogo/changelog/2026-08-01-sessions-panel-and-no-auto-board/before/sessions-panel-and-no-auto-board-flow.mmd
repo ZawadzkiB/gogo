@@ -1,0 +1,36 @@
+flowchart TD
+  subgraph done["/gogo:done - skills/gogo-done/SKILL.md (today)"]
+    ARG{"$ARGUMENTS"}
+    ARG -->|"slug"| ONE["members = [slug]"]
+    ARG -->|"slug1+slug2"| MANY["members = split('+')"]
+    ARG -->|"empty"| BOARDMODE["Board mode - the work COCKPIT"]
+
+    BOARDMODE --> IDX["work-index.json (gogo-status Step A classifier)<br/>written to .gogo/resources/kanban/"]
+    IDX --> DETECT{"python3 + tmux + tty ?"}
+    DETECT -->|"no"| FALLBACK["status table + AskUserQuestion multi-select<br/>(the guaranteed fallback - ship-focused)"]
+    DETECT -->|"yes"| COPY["cp assets/kanban/board.py -&gt; .gogo/resources/kanban/board.py"]
+    COPY --> LAUNCH["tmux new-window / new-session / detached + wait-for<br/>THE TERMINAL IS TAKEN OVER"]
+    LAUNCH --> CURSES["board.py curses kanban<br/>4 columns · v view · s ship · m merged · g go · / filter · q cancel"]
+    CURSES --> EXIT["board-exit.code + board-intent.json<br/>{schema:2, action, items} · 0 action / 1 cancel / 2 error"]
+    EXIT --> ROUTE{"action"}
+    ROUTE -->|"view"| VIEWB["gogo-view build + print file:// link"]
+    ROUTE -->|"ship / ship-merged"| WRITER
+    ROUTE -->|"go"| HANDOFF["hand off to /gogo:go - loop ENDS"]
+    ROUTE -->|"cancel (exit 1)"| STOP["stop - nothing shipped"]
+    VIEWB --> RELAUNCH["RELAUNCH the board (feels persistent)"]
+    RELAUNCH --> LAUNCH
+    WRITER["Write changelog entry (1..N members)"] --> RELAUNCH
+    FALLBACK --> GATE{"picks &gt;= 2 ?"} --> WRITER
+    ONE --> WRITER
+    MANY --> WRITER
+  end
+
+  subgraph cockpit["gogo cockpit - cli/internal/tui (today, 0.32.0)"]
+    BOARD["modeBoard"] -->|"P / K / R - CARD-ANCHORED"| CARDOPS["planFeature · killFeature · adoptFeature<br/>every op starts from the FOCUSED CARD"]
+    CARDOPS --> ADOPT["R: picker of every live gogo-* session<br/>-&gt; rename onto THIS card"]
+    BOARD -.->|"no way to list or act on sessions themselves"| GAP["a session bound to NOTHING is only a COUNT<br/>on the status line ('N unbound - R on a card adopts it')"]
+    BOARD -->|"d ship"| DLAUNCH["claude '/gogo:done &lt;slug&gt;+&lt;slug&gt;' - always a NAMED ship"]
+  end
+
+  DLAUNCH -.->|"named, so it never opened the board"| ONE
+  GAP -.->|"0.32.0 D5 = A: card keys only, no sessions screen"| CARDOPS

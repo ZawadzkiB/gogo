@@ -1,0 +1,27 @@
+{
+  "slug": "sessions-panel-and-no-auto-board",
+  "updated": "2026-08-01",
+  "note": "AS-BUILT (implement ②, matches the intended design — the build followed the plan; one shared reassign(session,target) core now backs both R doors as FR4.4 required). Three deliberately separate surfaces over ONE binding — a session's tmux name. (1) /gogo:done becomes a pure in-chat ship (the board.py kanban + intent protocol retired; TestNoInteractiveBoardInSkills is the durable no-auto-board guard). (2) S opens modeSessions (board + drill): every live gogo-* session via the cached ListSessionMeta, rows from adoptRow; R re-assigns through the shared reassign core (refusals + derived action + rename via RenameSessionUnique), K closes via the killer seam; esc/q return to sessionsOrigin; forms route back through pickerOrigin. (3) /gogo:session-update (markdown skill) renames its own host session from inside — arg slug → conversation → ask, bindAction's cited rule, has-session collision suffix, exact =target, writes nothing. flow.mmd: the three doors onto the one name + every reader downstream. session-update.mmd: the drift case end to end. sequence.mmd: the panel's runtime. state.mmd: the cockpit mode machine with modeSessions. before/: the as-is baseline (board-launching done, card-only ops, the drift with no repair).",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Intended: /gogo:done ships in chat only, and two new doors onto the session binding - the cockpit's S panel and the in-session /gogo:session-update"
+    },
+    {
+      "kind": "sequence",
+      "file": "session-update.mmd",
+      "title": "Intended runtime: the drift case fixed from inside - ship alpha, plan beta in the same session, /gogo:session-update moves the binding off the changelog card onto beta"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "Intended runtime: S opens the panel, R re-assigns via the shared reassign producer, K closes via KillSession, and the user stays in the panel"
+    },
+    {
+      "kind": "activity",
+      "file": "state.mmd",
+      "title": "Cockpit mode machine with modeSessions added: S from board and drill, and how every picker returns via pickerOrigin"
+    }
+  ]
+}

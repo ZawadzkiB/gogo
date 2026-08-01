@@ -85,7 +85,8 @@ live session** onto the focused card (since 0.32.0 - a picker of every live
 `gogo-*` session showing `bound item | unbound · repo · age`; the choice renames it
 `gogo-<go|plan>-<slug>` - action derived from the target's status, so the cap stays
 honest - and every reader corrects on the next tick; refusals name a terminal
-target, a foreign anchor repo, an already-bound session) · `x` delete→trash · `tab`/`shift+tab` cycle the
+target, a foreign anchor repo, an already-bound session) · `S` **sessions panel**
+(since 0.33.0 - every live `gogo-*` session, re-assign or close; see below) · `x` delete→trash · `tab`/`shift+tab` cycle the
 **board · plans · config** tabs · `p` cycles the board's **project chips** (`all` +
 one per project) / the config-tab **project switcher** (they share one focus) · `/`
 filter (an `@name` token narrows to a project **or** source; a `#plan-<id>` token to
@@ -164,7 +165,15 @@ when the phase line disagrees, so a card being built reads `● developer`). The
 **left-border stripe** (red gate / purple UAT) is the per-card "act now" cue. The
 collapsed **changelog** carries a `●` on any shipped item still holding a session (`K`
 kills it from the board; `R` on the card it should DRIVE adopts it — `R` refuses a
-terminal target, naming that move). In the
+terminal target, naming that move; and since 0.33.0 the drifted session can also fix
+ITSELF: run `/gogo:session-update` inside it — the in-session twin of `R`). Since
+**0.33.0** `S` (board + drill) opens the **sessions panel**: every live `gogo-*`
+session as a live-refreshed cursored list (`name · bound item | unbound · repo · age
+[· attached]`), from which `R` **re-assigns** the focused session onto a picked
+drivable work item (the picker rows show the RESULTING name, so a runnable target
+visibly mints a cap-counted `gogo-go-` session) and `K` **closes** it behind a
+Cancel-default confirm; `esc`/`q` return to wherever `S` was pressed. It always
+opens — an empty panel names why. The board's unbound-session count points at it. In the
 drill, `a` (and `K`) open a **picker** to choose *which* session when the card has several
 - `K` also offers "all N"; `P` and `R` work in the drill exactly as on the board (0.32.0).
 The idle status line **counts unbound sessions** - live `gogo-*` sessions anchored in a

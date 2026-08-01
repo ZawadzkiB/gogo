@@ -509,6 +509,31 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   not an inlined `!TerminalStatus`) or it advertises a guaranteed bounce — the REV-003/006
   pair here was the same chip-lies class 0.29.0 fought, caught at review because the
   key-help guard + chip tests now exist. Version **0.32.0**.
+- **No auto-board + the S sessions panel + `/gogo:session-update` (since 0.33.0):** a
+  hard user direction landed as a **standing rule — no gogo command opens an interactive
+  TUI as a side effect of another action** (memory: the bare-`/gogo:done` board popping
+  up mid-flow was rejected the day after it shipped a release). Three surfaces over the
+  one session-name binding: (1) **bare `/gogo:done` ships in chat** — the four-class
+  table + one `AskUserQuestion` multi-select + the merge gate; the 0.7.0-0.9.0
+  `board.py` curses kanban, its schema-v2 intent protocol and the
+  `.gogo/resources/kanban/` scratch are **deleted**, and
+  `TestNoInteractiveBoardInSkills` (source scan, anti-vacuity floored) keeps the rule a
+  test, not a sentence. (2) **`S` opens `modeSessions`** (board + drill): every live
+  `gogo-*` session via cached `ListSessionMeta`, rows from `adoptRow`; `R` re-assigns
+  the focused session onto a picked drivable item through the **one extracted
+  `reassign(session, target)` core** both R doors share (TEST-006 applied to the rule
+  itself); `K` closes (Cancel-default); `esc`/`q` return to `sessionsOrigin`; forms
+  route back via `pickerOrigin` — the five-place `pending*` contract (field, dispatch,
+  returnMode, clear, preserve) is the recorded trap, and the returnMode leg is now
+  mutation-pinned. (3) **`/gogo:session-update [slug]`** — a session renames ITSELF
+  onto the item it is driving (arg → its own conversation → ask, never guess): the
+  honest, user-invoked form of the auto-rename 0.32.0's D2 rejected, legitimate
+  because the claude *inside* the session has the item-level evidence the cockpit
+  provably lacks. It writes **nothing**; D5=A: a non-`gogo-*` host is renamed with the
+  sweep-lifecycle enrolment disclosed. Review lesson: a markdown skill's **bash
+  fragments are product code** — round 2 caught the skill minting from the raw slug
+  three lines under the corrected cap prose (REV-011); keep skill bash consuming the
+  values its own prose defines. Version **0.33.0**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

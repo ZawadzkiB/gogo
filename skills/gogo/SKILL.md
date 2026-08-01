@@ -302,17 +302,14 @@ Otherwise (no `--skip-uat`), the user does exactly one of two things:
 
 ### Ship → command `/gogo:done` (skill `gogo-done`)
 The explicit post-report gate. A **slug** ships that one feature; **`slug1+slug2+...`**
-ships those as ONE merged release entry; with **no slug** `/gogo:done` opens the **work
-board cockpit** — the shared `gogo-status` classifier labels every `.gogo/work/feature-*`
-(shipped · ready-to-ship · in-progress · unfinished) and from the four-class table the
-user **views** any card (`v`), **ships** ready cards separately (`s`) or **merged**
-(`m`), **runs/resumes** the pipeline on an unbuilt card (`g`), and **filters** (`/`) —
-an interactive terminal-TUI kanban, `assets/kanban/board.py`, when `python3` + `tmux` +
-a tty are present; otherwise a status table + `AskUserQuestion` multi-select ship
-fallback — never failing over the board (D5=A). Each key writes a single-shot **intent**
-the orchestrator executes before **relaunching** the board (`go` hands off to the
-pipeline; `cancel` stops); the board never mutates gogo state. When shipping merged (or a
-≥2 fallback selection), one `AskUserQuestion` gates separate (N entries) vs merged (1
+ships those as ONE merged release entry; with **no slug** `/gogo:done` ships **in
+chat** — the shared `gogo-status` classifier labels every `.gogo/work/feature-*`
+(shipped · ready-to-ship · in-progress · unfinished), the four-class table is rendered,
+and the ready-to-ship items are offered via one `AskUserQuestion` multi-select — never
+an interactive terminal board (0.33.0 standing rule: **no gogo command opens an
+interactive TUI as a side effect of another action**; the interactive cockpit is the
+separate `gogo` binary the user launches on purpose). For a ≥2
+selection, one `AskUserQuestion` gates separate (N entries) vs merged (1
 entry). Every entry is a **high-level synthesis, not a copy** of the report
 bundle: gogo **writes** a `report/report.md`-style summary (*what was
 changed/done/implemented*, key outcomes, one-line decisions, review/test verdict, a
@@ -336,6 +333,17 @@ renders **before / after side by side**). Surfaces both **plans and reports** vi
 grouped **Work** (each feature's plan + report) / **Changelog** (shipped reports)
 picker — plans rendered in place from `plan.md` + `charts/` (D1=A) — builds the page
 from the vendored `.gogo/resources/` assets, and opens it.
+
+### Session update → command `/gogo:session-update` (skill `gogo-session-update`)
+An **ops** command, not a pipeline phase: re-bind **this claude session's** tmux
+session to the work item it is actually driving — runnable at any time. A session's
+binding is its tmux name; ship one item and start the next in the same pane and the
+board shows a live session on a changelog card while the new item shows none. The
+skill resolves its own session from `$TMUX`, determines the target (arg slug → this
+conversation → ask, never guess), derives the action from the target's status
+(`RunnableStatus` → `go`, else `plan` — `bindAction`'s rule), and renames itself with
+the exact `=<old>` target. **Writes nothing** — the rename is the whole move; every
+board reader re-derives on its next tick. Outside tmux it says so and does nothing.
 
 ## Loops & bounds
 

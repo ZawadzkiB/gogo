@@ -247,16 +247,13 @@ prerequisite. (The in-pipeline ⑤, right after a green test, keeps its strict g
 **`/gogo:done [feature-slug | slug1+slug2+...]`**
 
 Ship report-complete features into a high-level changelog. A **slug** ships that one;
-**`slug1+slug2+...`** ships those as ONE merged release entry; **no slug opens the work
-board cockpit** over every `.gogo/work/feature-*` - the shared `/gogo:status` classifier
-labels each **shipped · ready-to-ship · in-progress · unfinished** and from the
-four-class table you **view** any card (`v`), **ship** ready cards separately (`s`) or
-**merged** (`m`), **run/resume** the pipeline on an unbuilt card (`g`), and **filter**
-(`/`) - an interactive terminal kanban when `python3` + `tmux` + a tty are present,
-otherwise a status table + multi-select ship fallback (never failing over the board).
-Each key writes a single-shot **intent** the orchestrator runs before **relaunching**
-the board (`go` hands off to the pipeline; `q` cancels). When you ship merged (or pick
-**≥2** in the fallback), one question gates separate (N entries) vs merged (1
+**`slug1+slug2+...`** ships those as ONE merged release entry; **no slug ships in
+chat** - the shared `/gogo:status` classifier labels every `.gogo/work/feature-*`
+**shipped · ready-to-ship · in-progress · unfinished**, the four-class **status
+table** renders, and the ready items are offered via one multi-select - never an
+interactive terminal board (the 0.33.0 standing rule: **no gogo command opens a TUI
+as a side effect of another action**; the interactive cockpit is the separate `gogo`
+binary). When you pick **≥2**, one question gates separate (N entries) vs merged (1
 entry). Every entry is a **high-level synthesis, not a copy** of the report bundle -
 gogo **writes** a `report.md` summarizing *what was changed/done/implemented* (key
 outcomes, one-line decisions, a review/test verdict, a member table + per-member section
@@ -288,8 +285,8 @@ back to printing the `file://` path if it can't auto-open.
 
 Lists every feature under `.gogo/work/` with its phase, status, and iteration counts.
 Read-only. It also hosts the shared **work-index classifier** (shipped · ready-to-ship
-· in-progress · unfinished) that the `/gogo:done` work board reuses to decide what is
-shippable.
+· in-progress · unfinished) that `/gogo:done`'s in-chat ship table reuses to decide
+what is shippable.
 
 **`/gogo:resume [feature-slug]`**
 
@@ -306,6 +303,20 @@ acceptance exactly as planning does (`state.md` → `plan-accepted`, the
 `Status: **accepted**` line, the single-owner `plan-accepted` event). **Accept-only**
 - it does not chain into `/gogo:go` (the board's `m` on the now-accepted card is the
 natural second step). The CLI never mutates state; only the launched session does.
+
+**`/gogo:session-update [feature-slug]`**
+
+Re-binds **this claude session's** tmux session to the work item it is *actually*
+driving - run it at any time, from inside any session. A session's binding to a work
+item is its tmux name, minted once at launch; ship one item and start planning the
+next in the same pane, and the board shows a live session on a **changelog** card
+while the new item shows none. This command fixes that from the inside: the session
+resolves its own name from `$TMUX`, determines the target item (your slug argument →
+this conversation → asks, **never guesses**), derives the action from the target's
+status (runnable → `gogo-go-`, else `gogo-plan-`), and renames itself - one
+`tmux rename-session`, **no file written**. Every board reader corrects itself on
+its next tick. Outside tmux it says so and does nothing. (The in-session twin of the
+`gogo` cockpit's `R` re-assign key.)
 
 ## The gogo CLI
 
@@ -400,6 +411,15 @@ cd cli && go build -o gogo .
   sessions** (live `gogo-*` in a board repo matching no card) so a retasked or
   title-named session is visible instead of lost. No pipeline state is written —
   renaming/killing a tmux session is a CLI-owned tmux act.
+- **Sessions panel (`S`, board + drill — 0.33.0)** - a full-screen, live-refreshed
+  list of **every** live `gogo-*` session (`name · bound item | unbound · repo ·
+  age [· attached]`). `R` **re-assigns** the focused session onto a picked drivable
+  work item — the inverse of the card-anchored `R`, through one shared core, with
+  the picker showing the resulting name — and `K` **closes** it behind a
+  Cancel-default confirm; `esc`/`q` return to wherever `S` was pressed. Always
+  opens (an empty panel names why); the unbound count points at it. And a drifted
+  session can fix **itself**: `/gogo:session-update` run inside it renames it onto
+  the item it is actually driving.
 - **Drill-in** (`enter`) - a **rich card**: a detail panel (short description,
   work-folder name, status) over the feature's **session(s)** (registry ⨯
   live-tmux, each flagged live/stale, plus any untracked-live racer), a
@@ -624,9 +644,8 @@ when you approve that candidate (the one sanctioned write outside `.gogo/`).
 
 **`.gogo/resources/`** - one vendored renderer per project
 (`vnm-browser.js`, the very-nice-mermaid browser build, shared by every feature)
-plus the viewer (`viewer/`) that `/gogo:view` and `/gogo:done` build pages from (into `view/`), and
-`kanban/` (the `/gogo:done` work-board scratch - the vendored `board.py`, the
-work-index, and the board-intent). Offline, no network, no build.
+plus the viewer (`viewer/`) that `/gogo:view` and `/gogo:done` build pages from
+(into `view/`). Offline, no network, no build.
 
 **`.gogo/work/feature-<slug>/`** - one folder per piece of work:
 

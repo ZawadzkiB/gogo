@@ -80,6 +80,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionsMsg:
 		m.sessions = msg.sessions
 		m.sessionMeta = msg.meta
+		// The sessions panel's list is LIVE (FR3.4) — rows can vanish under the
+		// cursor on this very tick, so clamp it here, not just at read/render.
+		m.clampSessIdx()
 		return m, sessionTick()
 
 	case peekContentMsg:
@@ -189,6 +192,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateViewer(msg)
 		case modeDrill:
 			return m.updateDrill(msg)
+		case modeSessions:
+			return m.updateSessions(msg)
 		default:
 			return m.updateActive(msg)
 		}
@@ -303,6 +308,10 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "R":
 		// FR3: re-assign a live session onto the focused card (adopt picker).
 		return m.adoptFeature(m.focusedCard())
+	case "S":
+		// 0.33.0 FR3: open the sessions panel — every live gogo-* session, each
+		// re-assignable (R) or closeable (K).
+		return m.openSessions()
 	}
 	// Cursor/column moves change which card is focused — re-window so it stays
 	// fully visible (scroll-into-view), and refresh each column's offset (TEST-014).
@@ -383,6 +392,10 @@ func (m Model) updateDrill(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "R":
 		// FR3: re-assign a live session onto the drilled card.
 		return m.adoptFeature(m.drill)
+	case "S":
+		// 0.33.0 FR3 (D2=C): the sessions panel opens from the drill too; esc
+		// returns here.
+		return m.openSessions()
 	case "w":
 		return m, m.buildPageCmd()
 	case "G":
@@ -390,6 +403,42 @@ func (m Model) updateDrill(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// HIGHLIGHTED file in the full glow pager. Freeing `G` here lets the open
 		// VIEWER use g/G for top/bottom without a conflict.
 		return m.openInGlow()
+	}
+	return m, nil
+}
+
+// updateSessions is the sessions panel's key handler (0.33.0 FR3): cursor over
+// the live session list, R re-assign, K close, esc/q back to wherever S was
+// pressed (board or drill — sessionsOrigin).
+func (m Model) updateSessions(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q":
+		m.mode = m.sessionsOrigin
+		return m, nil
+	case "up", "k":
+		m.sessIdx = clamp(m.sessIdx-1, 0, len(m.sessionMeta)-1)
+	case "down", "j":
+		m.sessIdx = clamp(m.sessIdx+1, 0, len(m.sessionMeta)-1)
+	case "R":
+		// FR4: re-assign the focused session onto a drivable work item. Zero
+		// drivable items → a NAMED refusal, never a Cancel-only picker (FR4.2:
+		// a refusal explains, a missing row puzzles — REV-003).
+		if s := m.focusedSession(); s != nil {
+			if !m.hasDrivableFeature() {
+				m.statusBlocked("no drivable work item to re-assign onto — every card here is shipped/aborted; K closes the session, or plan a new item first")
+				return m, nil
+			}
+			m.startReassignPicker(s.Name)
+			return m, m.form.Init()
+		}
+		m.statusBlocked("no live gogo-* session to re-assign")
+	case "K":
+		// FR5: close the focused session behind the destructive confirm.
+		if s := m.focusedSession(); s != nil {
+			m.startKillSessionForm(s.Name)
+			return m, m.form.Init()
+		}
+		m.statusBlocked("no live gogo-* session to close")
 	}
 	return m, nil
 }
@@ -500,6 +549,14 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingPlanSession != nil {
 			return m.finishPlanSession()
 		}
+		// The sessions panel's R target picker (0.33.0 FR4) → finishReassignSession,
+		// and its K confirm (FR5) → finishKillSession. Both return to the panel.
+		if m.pendingReassign != "" {
+			return m.finishReassignSession()
+		}
+		if m.pendingKillSession != "" {
+			return m.finishKillSession()
+		}
 		// A config-tab per-source add/edit/remove form (FR9) completes to
 		// finishSourceForm — its own path (stays on the config tab), mutually
 		// exclusive with every launch/kill/attach path above and the ship path below.
@@ -560,7 +617,7 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 // cancelling them must NOT wipe the user's multi-selection (only a SHIP form's
 // cancel does). REV-012.
 func (m Model) formPreservesSelection() bool {
-	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingProject != nil || m.pendingPlan || m.pendingPlanWithClaude || m.pendingPlanDone != nil || m.pendingPlanSpawn != nil || m.pendingAdopt != nil || m.pendingPlanSession != nil
+	return m.pendingDelete != nil || m.pendingKill != nil || m.pendingAttach != nil || m.pendingSource != nil || m.pendingProject != nil || m.pendingPlan || m.pendingPlanWithClaude || m.pendingPlanDone != nil || m.pendingPlanSpawn != nil || m.pendingAdopt != nil || m.pendingPlanSession != nil || m.pendingReassign != "" || m.pendingKillSession != ""
 }
 
 // cancelForm returns to the board and clears the in-flight form state. For a SHIP
@@ -579,7 +636,7 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	// stale for a board-originated picker after an earlier drill visit (the FR2
 	// in-passing fix). Every other form (ship / delete) cancels to the board.
 	returnMode := modeBoard
-	if m.pendingKill != nil || m.pendingAttach != nil || m.pendingAdopt != nil || m.pendingPlanSession != nil {
+	if m.pendingKill != nil || m.pendingAttach != nil || m.pendingAdopt != nil || m.pendingPlanSession != nil || m.pendingReassign != "" || m.pendingKillSession != "" {
 		returnMode = m.pickerOrigin
 	}
 	// A config-tab per-source form was opened while the config TAB was active;
@@ -596,6 +653,8 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	m.pendingAttach = nil
 	m.pendingAdopt = nil
 	m.pendingPlanSession = nil
+	m.pendingReassign = ""
+	m.pendingKillSession = ""
 	m.pendingSource = nil
 	m.pendingProject = nil
 	m.pendingPlan = false

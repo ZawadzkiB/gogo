@@ -120,7 +120,7 @@ gogo/
 │   ├── gogo-review/          #   ③ review
 │   ├── gogo-test/            #   ④ test
 │   ├── gogo-knowledge/       #   ⑤ report + knowledge update (strict + lenient)
-│   ├── gogo-done/            #   ship: synthesize high-level entry (single or merged) → .gogo/changelog/ + build/print viewer link; no-slug work board cockpit (view/ship/merge/go/filter intents + relaunch loop)
+│   ├── gogo-done/            #   ship: synthesize high-level entry (single or merged) → .gogo/changelog/ + build/print viewer link; no-slug = the in-chat ship table (never an interactive board)
 │   ├── gogo-view/            #   interactive viewer for plans + reports (rich draggable nodes + before/after compare)
 │   ├── gogo-status/          #   read-only overview + the shared work-index classifier (shipped/ready/in-progress/unfinished)
 │   ├── gogo-accept/          #   accept a plan from the board (records via gogo-plan's single-owner recording; Slice C)
@@ -154,7 +154,6 @@ gogo/
 │   │   │                     #   (.mmd → layouts.json) · viewer.js · viewer.css ·
 │   │   │                     #   viewer.template.html
 │   │   │                     #   (also go:embed-copied into cli/internal/pages/assets/)
-│   └── kanban/              #   board.py — vendored python3 curses TUI for the /gogo:done work board (soft dep; --selftest headless)
 ├── .mcp.json                 # Playwright MCP (optional; UI testing)
 └── .claude-plugin/
     ├── plugin.json           # manifest + version (bump on any behaviour change)
@@ -170,7 +169,7 @@ your-project/
 │   ├── skills/               # knowledge-kind skills live here; index.md registers ALL extractions
 │   │   ├── index.md          #   the registry of every extraction: kind · destination · trigger · source · lines saved
 │   │   └── <slug>/SKILL.md   #   one per knowledge extraction (+ optional scripts/, .env.example)
-│   ├── resources/            # vendored vnm-browser.js (shared by all features) + viewer/ (viewer.js+css) + view/ built pages + kanban/ (work board scratch: board.py, work-index.json, board-intent.json, board-exit.code)  [gogo-mermaid, /gogo:view, /gogo:done write]
+│   ├── resources/            # vendored vnm-browser.js (shared by all features) + viewer/ (viewer.js+css) + view/ built pages  [gogo-mermaid, /gogo:view, /gogo:done write]
 │   ├── changelog/            # append-only shipped archive: <YYYY-MM-DD>-<name>/ (SYNTHESIZED report.md + slug-prefixed .mmd + manifest.json{members[]} + before/; single or merged; no diagrams.html)  [/gogo:done writes]
 │   └── work/
 │       └── feature-<slug>/   # one folder per piece of work:

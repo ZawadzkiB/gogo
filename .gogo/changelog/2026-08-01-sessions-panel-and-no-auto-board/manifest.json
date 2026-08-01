@@ -1,0 +1,28 @@
+{
+  "slug": "sessions-panel-and-no-auto-board",
+  "updated": "2026-08-01",
+  "members": ["sessions-panel-and-no-auto-board"],
+  "note": "Changelog entry for 0.33.0 (single member): quiet /gogo:done (board.py retired; the no-auto-board standing rule, test-enforced), the S sessions panel (re-assign/close over every live gogo-* session), and /gogo:session-update (a session re-binds itself). Synthesized report.md; slug-prefixed as-built diagram set + before/ compare set.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "sessions-panel-and-no-auto-board-flow.mmd",
+      "title": "sessions-panel-and-no-auto-board: The three doors onto the one session-name binding, and every reader downstream"
+    },
+    {
+      "kind": "sequence",
+      "file": "sessions-panel-and-no-auto-board-session-update.mmd",
+      "title": "sessions-panel-and-no-auto-board: The drift case end to end — ship, retask, /gogo:session-update renames the session from inside"
+    },
+    {
+      "kind": "sequence",
+      "file": "sessions-panel-and-no-auto-board-sequence.mmd",
+      "title": "sessions-panel-and-no-auto-board: The S sessions panel runtime — open, re-assign via the shared core, close, return"
+    },
+    {
+      "kind": "activity",
+      "file": "sessions-panel-and-no-auto-board-activity.mmd",
+      "title": "sessions-panel-and-no-auto-board: The cockpit mode machine with modeSessions"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "sessions-panel-and-no-auto-board",
+  "phase": "test",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/plan.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/review-02.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/review/issues.json",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    "cli/no_interactive_board_test.go",
+    "cli/internal/tui/sessions_panel_test.go",
+    "cli/internal/tui/session_ops.go",
+    "cli/internal/tui/session_ops_test.go",
+    "cli/internal/tui/key_help_sync_test.go",
+    "cli/internal/launch/session_binding_test.go",
+    "cli/internal/launch/launch.go",
+    "cli/main.go",
+    "skills/gogo-done/SKILL.md",
+    "skills/gogo-session-update/SKILL.md",
+    "commands/session-update.md",
+    "docs/cli-contract.md",
+    "assets/kanban (confirmed absent)"
+  ],
+  "outputs": [
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/test/issues.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/test-01.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/test/result.json",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/state.md",
+    ".gogo/work/feature-sessions-panel-and-no-auto-board/events.jsonl"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "All green: gofmt/go vet/go test -race -count=1 ./... clean across all 12 CLI packages (0.33.0 built and gogo --version confirmed). Full hands-on pass: real tmux drive of the S sessions panel against disposable sptest-* fixture repos (never touching the two real live host sessions) proved open/rows/R re-assign (verified via an independent `tmux list-sessions`, same session creation-timestamp = true rename)/status old->new/K Cancel-default then explicit Kill/esc-to-opener from both board and drill/the zero-drivable named refusal; the /gogo:session-update skill's bash contract was executed literally step-by-step inside a fixture session via send-keys (display-message self-resolve, has-session collision pre-check + suffix loop against a real collision, self-rename-from-inside, already-correct no-op) with no divergence from the documented steps; slice 1 verified by inspection + a mutation check of TestNoInteractiveBoardInSkills in a scratch copy (bites on a reintroduced board.py reference and on an empty-scan anti-vacuity probe) plus confirming assets/kanban/ and .gogo/resources/kanban/ are both gone and no skill/command references the retired board. Zero issues found; all fixture sessions/repos and the temp binary were cleaned up and the real host sessions were confirmed untouched throughout."
+}

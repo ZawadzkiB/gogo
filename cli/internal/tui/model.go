@@ -35,6 +35,10 @@ const (
 	modeDrill
 	modeViewer
 	modeForm
+	// modeSessions is the S sessions panel (0.33.0): a full-screen list of EVERY
+	// live gogo-* session (modelled on modeDrill — it stays open, unlike a picker),
+	// from which R re-assigns the focused session onto a work item and K closes it.
+	modeSessions
 )
 
 // tabID is the top-level cockpit tab (FR8/D6). tab / shift+tab cycle
@@ -303,8 +307,14 @@ type Model struct {
 	sessions []string
 	// sessionMeta is the live gogo-* sessions WITH their tmux facts (anchor path /
 	// created / attached), refreshed alongside m.sessions (session tick + reload) —
-	// what the `R` adopt picker rows and the unbound-session count read (FR3/FR4).
+	// what the `R` adopt picker rows, the sessions panel, and the unbound-session
+	// count read (FR3/FR4).
 	sessionMeta []launch.SessionMeta
+	// Sessions panel state (0.33.0): sessIdx is the panel's cursor into
+	// m.sessionMeta (clamped on every tick — the list is live); sessionsOrigin is
+	// the mode `S` was pressed in (board or drill), so esc/q return exactly there.
+	sessIdx        int
+	sessionsOrigin mode
 
 	// drill-in
 	drill     *contract.Feature
@@ -341,6 +351,12 @@ type Model struct {
 	// live session is renamed onto (FR3). Both nil when no such form is open.
 	pendingPlanSession *contract.Feature
 	pendingAdopt       *contract.Feature
+	// pendingReassign marks the sessions panel's in-flight `R` target picker
+	// (0.33.0 FR4): the live session name the chosen work item is renamed FOR.
+	// pendingKillSession is the panel's `K` confirm target. "" when no such form
+	// is open. Both route back to the panel via pickerOrigin.
+	pendingReassign    string
+	pendingKillSession string
 	// pickerOrigin is the mode a kill/attach/adopt picker (or a P confirm) was opened
 	// FROM — set where each picker starts, so cancel/finish restore exactly that mode.
 	// It replaces the pickerFromDrill bool, which inferred the origin from

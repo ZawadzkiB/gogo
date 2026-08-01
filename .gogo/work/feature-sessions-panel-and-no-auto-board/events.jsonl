@@ -1,0 +1,22 @@
+{"ts":"2026-08-01T09:31:34Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:14:34Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:14:53Z","event":"phase-started","phase":"implement","status":"implementing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:27:21Z","event":"phase-done","phase":"implement","status":"implementing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:28:31Z","event":"phase-started","phase":"review","status":"reviewing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:28:31Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:40:59Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"1 major, 6 minors, 1 nit - no blockers","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:41:30Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:44:56Z","event":"phase-done","phase":"implement","status":"implementing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:45:42Z","event":"phase-started","phase":"review","status":"reviewing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:45:43Z","event":"round-opened","phase":"review","status":"reviewing","round":2,"slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:59:41Z","event":"issues-found","phase":"review","status":"reviewing","round":2,"note":"7 of 8 round-1 findings verified (mutations re-run); REV-007 stays open for phase 5; 3 new: 2 minors + 1 nit - no blockers/majors","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T10:59:41Z","event":"phase-done","phase":"review","status":"reviewing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T11:00:17Z","event":"fix-round","phase":"implement","status":"implementing","round":3,"slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T11:00:59Z","event":"phase-done","phase":"implement","status":"implementing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T11:02:09Z","event":"phase-started","phase":"test","status":"testing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T11:02:09Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T11:16:36Z","event":"phase-done","phase":"test","status":"testing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T11:17:31Z","event":"phase-started","phase":"report","status":"testing","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T11:21:01Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T18:28:23Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"sessions-panel-and-no-auto-board"}
+{"ts":"2026-08-01T18:28:23Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-08-01-sessions-panel-and-no-auto-board/","slug":"sessions-panel-and-no-auto-board"}

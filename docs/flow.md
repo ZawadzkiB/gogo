@@ -119,19 +119,14 @@ question**. Two ways forward:
 ### Ship — command `/gogo:done` (skill `gogo-done`)
 
 The explicit post-report gate. A **slug** ships that one feature; **`slug1+slug2+...`**
-ships those as ONE merged release entry; with **no slug** `/gogo:done` opens the **work
-board cockpit** over every `.gogo/work/feature-*` — the shared `gogo-status` classifier
-labels each **shipped · ready-to-ship · in-progress · unfinished** and from the
-four-class table you **view** any card (`v`), **ship** ready cards separately (`s`) or
-**merged** (`m`), **run/resume** the pipeline on an unbuilt card (`g`), and **filter**
-(`/`). The board is an **interactive terminal kanban** (`assets/kanban/board.py` in a
-tmux pane; `python3` + `tmux` are soft deps) when the tooling and a tty are present,
-otherwise a **status table + `AskUserQuestion` multi-select** ship fallback — it never
-fails over the board. Each key writes a single-shot **intent** `{schema:2, action,
-items}` the orchestrator executes before **relaunching** the board (`go` hands off to the
-pipeline; `q` cancels); the board only *collects intents* and never mutates gogo state.
-When shipping merged (or a ≥2 fallback selection) one `AskUserQuestion` gates separate (N
-entries) vs merged (1 entry).
+ships those as ONE merged release entry; with **no slug** `/gogo:done` ships **in
+chat**: the shared `gogo-status` classifier labels every `.gogo/work/feature-*`
+**shipped · ready-to-ship · in-progress · unfinished**, the four-class **status
+table** renders, and the ready-to-ship items are offered via one `AskUserQuestion`
+multi-select — never an interactive terminal board (the 0.33.0 standing rule: no gogo
+command opens a TUI as a side effect of another action; the interactive cockpit is
+the separate `gogo` binary). For a ≥2 selection one `AskUserQuestion` gates separate
+(N entries) vs merged (1 entry).
 
 Every changelog entry is a **high-level synthesis, not a copy** of the report bundle.
 `/gogo:done` **writes** a `report.md` summarizing *what was changed/done/implemented*
@@ -146,8 +141,8 @@ viewer page for the entry and prints its `file://` link** (best-effort, reusing 
 over the link), and sets **each member's** `state.md` to a terminal `shipped` status.
 The audit trail stays in `.gogo/work/`; idempotent — re-running overwrites the same dated
 entry. A named slug with no report STOPs and tells you to run `/gogo:report <feature>`
-first; board mode opens the cockpit whenever any feature exists (`v`/`g` are useful
-with nothing ready-to-ship) and stops only when there are zero features.
+first; the no-slug table renders whenever any feature exists (the full picture is
+useful with nothing ready-to-ship) and stops only when there are zero features.
 
 ### View — command `/gogo:view` (skill `gogo-view`)
 

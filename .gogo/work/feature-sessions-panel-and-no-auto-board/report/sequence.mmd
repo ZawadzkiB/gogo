@@ -1,0 +1,51 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant B as tui.updateBoard
+  participant P as tui.updateSessions (modeSessions)
+  participant V as tui.viewSessions
+  participant F as huh form (newForm)
+  participant C as tui.reassign (one producer)
+  participant L as launch (tmux)
+  participant R as readers (dot, cap, lock, sweep)
+
+  U->>B: S
+  B->>P: mode = modeSessions, sessIdx = 0
+  P->>V: render rows from cached m.sessionMeta
+  V-->>U: name · bound item / unbound · repo · age · attached
+  V-->>U: empty panel names its reason - no live gogo-* sessions / tmux not installed
+
+  Note over P,V: the 5s sessionTick keeps m.sessionMeta fresh in every mode
+  Note over P,V: the cursor clamps when the list shrinks
+
+  U->>P: R - re-assign the highlighted session
+  P->>F: Select of DRIVABLE work items - slug · status · resulting name - plus Cancel
+  U->>F: pick a work item
+  F->>C: finishReassignSession(session, target)
+  C->>C: refusals - already bound, foreign session_path anchor
+  alt refused
+    C-->>U: status line names the reason and the unblock (amber)
+  else accepted
+    C->>L: renamer to RenameSessionUnique(old, SessionNameFor(bindAction(target), slug))
+    L-->>C: final name, with a -2 / -3 collision suffix if taken
+    C->>P: refreshSessions and stay in modeSessions
+    C-->>U: re-assigned old to new (ok)
+    L-->>R: next tick re-derives every binding from the NAME
+  end
+
+  U->>P: K - close the highlighted session
+  P->>F: destructive confirm, Cancel default, names the exact session
+  U->>F: Kill
+  F->>L: killer to KillSession(name) - kill-session -t =name
+  L-->>P: refreshSessions, cursor clamps, stay in the panel
+  alt tmux failed
+    P-->>U: failure carrying tmux own words (red)
+  else killed
+    P-->>U: killed 1 session (ok)
+  end
+
+  U->>P: esc / q
+  P->>B: mode = modeBoard
+
+  Note over C,R: no pipeline state is written anywhere here
+  Note over C,R: renaming and killing a tmux session are not state writes

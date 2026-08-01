@@ -1,0 +1,22 @@
+{
+  "slug": "sessions-panel-and-no-auto-board",
+  "updated": "2026-08-01",
+  "note": "As-is baseline captured before any code change, scoped to what this change touches. flow.mmd: bare /gogo:done runs Board mode - it writes a work-index, detects python3+tmux+tty, copies assets/kanban/board.py into .gogo/resources/kanban/, launches it in a tmux window (taking over the terminal), then reads board-exit.code + board-intent.json and RELAUNCHES the board after every view/ship intent; the same skill already carries a complete non-interactive fallback (status table + AskUserQuestion) that only runs when the environment lacks python3/tmux/tty. Meanwhile the gogo cockpit's session ops are all CARD-ANCHORED (P/K/R on a focused card) and a session bound to nothing is only a count on the status line - 0.32.0 D5 explicitly chose 'card keys only, no sessions screen'. sequence.mmd: the reported incident end to end - shipping 0.32.0 with a bare /gogo:done popped the curses board, the relaunch loop brought it back, and the user had to press q to escape; and the panel they actually wanted does not exist. drift.mmd: the SECOND as-is defect, the one the user described in round 1 - a session's name is minted once and never re-minted, so shipping the item you were on leaves a live session dot on a CHANGELOG card (symptom 1) while the new item planned in that SAME session shows no session at all (symptom 2); both are the same stale string, and the only repair today is to leave claude, open the cockpit and press R on the right card.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-is: bare /gogo:done launches the curses board.py cockpit in tmux and relaunches it after every intent; the gogo cockpit has only card-anchored session ops"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "As-is incident: shipping 0.32.0 with no slug took over the terminal with a second kanban, while the wanted sessions list has no surface at all"
+    },
+    {
+      "kind": "sequence",
+      "file": "drift.mmd",
+      "title": "As-is drift: one session outlives the item it was named for - a live dot stuck on a changelog card while the item actually being planned shows none, with no in-session repair"
+    }
+  ]
+}

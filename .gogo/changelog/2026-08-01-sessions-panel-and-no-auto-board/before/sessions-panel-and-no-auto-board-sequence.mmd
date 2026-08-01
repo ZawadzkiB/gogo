@@ -1,0 +1,36 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant CH as claude (chat)
+  participant SK as gogo-done SKILL
+  participant TM as tmux
+  participant BP as board.py (curses)
+  participant W as entry writer
+  participant CO as gogo cockpit (tui)
+
+  Note over U,CH: the 2026-08-01 incident - shipping 0.32.0
+  U->>CH: /gogo:done with no slug - just ship it
+  CH->>SK: Board mode (no slug)
+  SK->>SK: classify into work-index.json under .gogo/resources/kanban/
+  SK->>SK: detect python3 + tmux + tty - all present
+  SK->>TM: copy board.py then tmux new-window running it
+  TM->>BP: start the curses TUI
+  BP-->>U: THE TERMINAL IS TAKEN OVER by a second kanban
+
+  U->>BP: move cursor, space to select, s to ship
+  BP->>SK: board-intent.json action ship plus exit code 0
+  SK->>W: Write changelog entry
+  W-->>U: entry written plus viewer link
+  SK->>TM: RELAUNCH the board so the loop feels persistent
+  TM->>BP: start the curses TUI again
+  U->>BP: q - cancel just to get out
+  BP-->>SK: exit 1 with no intent file - board cancelled
+
+  Note over U,BP: verdict - opening this board automatically on a gogo action is a bad idea
+
+  Note over U,CO: and what WAS wanted, which does not exist yet
+  U->>CO: gogo - the real cockpit
+  CO-->>U: board cards, status line says 2 unbound sessions (R on a card adopts it)
+  U->>CO: but there is no screen that LISTS the sessions
+  Note over CO: every session op is card-anchored - P / K / R on a focused card
+  Note over CO: 0.32.0 D5 chose card keys only - no sessions screen

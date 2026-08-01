@@ -5,8 +5,8 @@ description: >-
   Read-only overview of every gogo feature — and the home of the shared work-index
   classifier that labels each .gogo/work/feature-* as shipped / ready-to-ship /
   in-progress / unfinished. /gogo:status renders that index as a table (phase,
-  status, iterations, resume hint); other surfaces (the /gogo:done work board,
-  roadmap #7) reuse the same classifier. Never modifies anything.
+  status, iterations, resume hint); other surfaces (the /gogo:done in-chat ship
+  table, roadmap #7) reuse the same classifier. Never modifies anything.
 ---
 
 # gogo-status — feature overview + the shared work-index classifier
@@ -19,8 +19,8 @@ prints it. `/gogo:status` **never writes** — it only reports.
 
 Given the repo's `.gogo/`, produce one **work-index record** per
 `.gogo/work/feature-*/`. This is the single source of truth for "what state is each
-feature in" — consumed by `/gogo:status` (Step B) and by the **`/gogo:done` work
-board** (Stage B) and roadmap #7's commenter. It **reads only**.
+feature in" — consumed by `/gogo:status` (Step B) and by **`/gogo:done`'s in-chat
+ship table** and roadmap #7's commenter. It **reads only**.
 
 ### Inputs read per feature
 - `state.md` — the `phase` and `status` lines, plus `iterations` and `resume`.
@@ -72,9 +72,10 @@ re-acceptance and the next ⑤ the feature is mid-pipeline (`implementing` / `pl
 / `waiting-for-user`) with a **pre-feedback** report still on disk. Report-presence alone
 therefore no longer decides ready-to-ship — the `status` ship-gate check above (`awaiting-uat`
 or legacy `done`) is what distinguishes a genuine ship gate from a stale-report rerun, which
-classifies **in-progress** so it is never shippable from the board until ⑤ lands again.
+classifies **in-progress** so it is never shippable (from the in-chat ship table or the
+`gogo` cockpit) until ⑤ lands again.
 
-### Output shape (the documented contract the board + status consume)
+### Output shape (the documented contract the consumers read)
 
 An array of records, newest-first (by `state.md` `created` or dir mtime). Each:
 

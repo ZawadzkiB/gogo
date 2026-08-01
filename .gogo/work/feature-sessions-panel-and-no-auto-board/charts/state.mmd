@@ -1,0 +1,40 @@
+stateDiagram-v2
+  [*] --> board
+
+  board: modeBoard (4-column kanban)
+  drill: modeDrill (card detail)
+  viewer: modeViewer (glamour / peek)
+  sessions: modeSessions (NEW - the session panel)
+  form: modeForm (huh - pickers and confirms)
+
+  board --> drill: enter
+  drill --> board: esc / q / left / h
+  drill --> viewer: enter / v (open a file)
+  viewer --> drill: esc / q
+
+  board --> sessions: S
+  drill --> sessions: S
+  sessions --> board: esc / q (opened from the board)
+  sessions --> drill: esc / q (opened from the drill)
+
+  board --> form: m / M / d / x / a / K / P / R
+  drill --> form: a / K / P / R
+  sessions --> form: R (target select) / K (kill confirm)
+
+  form --> board: finish or cancel (pickerOrigin = modeBoard)
+  form --> drill: finish or cancel (pickerOrigin = modeDrill)
+  form --> sessions: finish or cancel (pickerOrigin = modeSessions)
+
+  note right of sessions
+    lists EVERY live gogo-* session
+    (m.sessionMeta - host-wide, not root-scoped)
+    R re-assign - K close - cursor clamps
+    on the 5s tick; no pipeline state written
+  end note
+
+  note right of form
+    a new pending* path must be added in FIVE places:
+    the field, the StateCompleted dispatch,
+    cancelForm returnMode, cancelForm clear,
+    formPreservesSelection
+  end note

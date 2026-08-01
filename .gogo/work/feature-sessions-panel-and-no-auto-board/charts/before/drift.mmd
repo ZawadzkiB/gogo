@@ -1,0 +1,29 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant CL as claude (one session)
+  participant TX as tmux
+  participant BD as gogo board (readers)
+
+  Note over U,BD: as-is - the binding is one string, minted once, never re-minted
+  U->>CL: work on item alpha
+  TX-->>BD: session name gogo-done-alpha
+  BD-->>U: alpha shows a live session dot - CORRECT
+
+  U->>CL: /gogo:done alpha
+  CL->>BD: alpha state.md becomes shipped - card moves to the changelog column
+  Note over TX: the ship-reap sweeps the member slugs but SPARES its own host pane
+  TX-->>BD: the session is still called gogo-done-alpha
+  BD-->>U: SYMPTOM 1 - a live session dot on a CHANGELOG card
+
+  U->>CL: /gogo:plan beta        (same session, new work item)
+  CL->>BD: .gogo/work/feature-beta/ appears
+  BD-->>U: SYMPTOM 2 - beta shows NO session, though a claude is driving it
+
+  Note over U,BD: both symptoms are the SAME stale string
+
+  Note over U,BD: the only repair that exists today
+  U->>BD: leave claude, open the gogo cockpit, find beta's card, press R
+  BD->>BD: adopt picker over every live session - rename onto the focused card
+  Note over BD: there is no screen that LISTS sessions, and no way to fix it from INSIDE
+  Note over BD: 0.32.0 D2 - the cockpit has no item-level evidence, so it can never do this alone

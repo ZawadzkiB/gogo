@@ -1,0 +1,45 @@
+flowchart TD
+  subgraph done["/gogo:done - skills/gogo-done/SKILL.md"]
+    ARG{"$ARGUMENTS"}
+    ARG -->|"slug"| ONE["members = [slug]"]
+    ARG -->|"slug1+slug2"| MANY["members = split('+') - merge pre-answered"]
+    ARG -->|"empty"| TABLE["in-chat status table + AskUserQuestion multi-select"]
+    TABLE --> GATE{"picks &gt;= 2 ?"}
+    GATE -->|"yes"| ASK["one AskUserQuestion: separate or merged"]
+    GATE -->|"no"| ONE
+    ASK --> MANY
+    ONE --> WRITER
+    MANY --> WRITER
+    WRITER["Write changelog entry (1..N members)<br/>uat round - synthesized report.md - state.md shipped - viewer link"]
+  end
+
+  subgraph su["/gogo:session-update [slug] - runs INSIDE a claude session"]
+    T1{"$TMUX set ?"}
+    T1 -->|"no"| T2["say so - do nothing (graceful)"]
+    T1 -->|"yes"| T3["tmux display-message -p '#S' -&gt; own name"]
+    T3 --> T4{"target work item"}
+    T4 -->|"$ARGUMENTS slug"| T5
+    T4 -->|"inferred from THIS conversation<br/>(evidence the cockpit provably lacks)"| T5
+    T4 -->|"ambiguous -&gt; AskUserQuestion, never a guess"| T5
+    T5["validate: exists · non-terminal"] --> T6["action = RunnableStatus ? go : plan<br/>(bindAction's rule, cited not forked)"]
+    T6 --> T7["name = gogo-&lt;action&gt;-&lt;slug&gt;<br/>collision -&gt; has-session '=name' -&gt; -2 / -3"]
+    T7 --> REN
+  end
+
+  subgraph cockpit["gogo cockpit - cli/internal/tui"]
+    BOARD["modeBoard"] -->|"S"| PANEL
+    DRILL["modeDrill"] -->|"S"| PANEL
+    PANEL["modeSessions - every live gogo-* session<br/>name · bound item / unbound · repo · age · attached"]
+    PANEL -->|"esc/q"| BOARD
+    PANEL -->|"R"| PICK["Select a DRIVABLE work item<br/>slug · status · resulting name"]
+    PANEL -->|"K"| CONF["destructive confirm (Cancel default)"]
+    BOARD -.->|"R on a card (0.32.0)"| CORE
+    PICK --> CORE["reassign(session, target) - ONE producer<br/>refusals: already bound · foreign anchor"]
+    CONF --> KILL["m.killer -&gt; KillSession - kill-session -t '=name'"]
+  end
+
+  CORE --> REN["tmux rename-session -t '=old' &lt;new&gt;<br/>NO pipeline-state write - the rename IS the move"]
+  REN --> NAMES["tmux session NAMES (the one binding)"]
+  KILL --> NAMES
+  NAMES --> READERS["readers re-derive on the next 5s tick<br/>dot · agent chip · cues · cap · lock · sweep · unbound count"]
+  WRITER -.->|"never launches a TUI - FR1.5"| BOARD
