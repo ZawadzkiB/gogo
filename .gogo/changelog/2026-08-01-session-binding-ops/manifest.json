@@ -1,0 +1,23 @@
+{
+  "slug": "session-binding-ops",
+  "updated": "2026-08-01",
+  "members": ["session-binding-ops"],
+  "note": "Changelog entry for 0.32.0 session-binding ops (single member). Synthesized report.md; slug-prefixed as-built diagram set + before/ compare set copied from the member's report bundle.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "session-binding-ops-flow.mmd",
+      "title": "session-binding-ops: As-built control flow — P/K/R write the tmux session NAME; every reader re-derives from it"
+    },
+    {
+      "kind": "sequence",
+      "file": "session-binding-ops-sequence.mmd",
+      "title": "session-binding-ops: Adopting a retasked session with R — picker, bindAction, RenameSessionUnique, readers correct on the next tick"
+    },
+    {
+      "kind": "activity",
+      "file": "session-binding-ops-activity.mmd",
+      "title": "session-binding-ops: Session lifecycle — bound-authoring / bound-build / lingering / unbound and the P/R/K transitions"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{"ts":"2026-07-31T14:27:05Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"session-binding-ops"}
+{"ts":"2026-07-31T22:53:05Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","slug":"session-binding-ops"}
+{"ts":"2026-07-31T23:26:55Z","event":"phase-started","phase":"implement","status":"implementing","slug":"session-binding-ops"}
+{"ts":"2026-07-31T23:46:43Z","event":"phase-done","phase":"implement","status":"implementing","slug":"session-binding-ops"}
+{"ts":"2026-07-31T23:47:36Z","event":"phase-started","phase":"review","status":"reviewing","slug":"session-binding-ops"}
+{"ts":"2026-07-31T23:47:40Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:02:31Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"1 major, 2 minor, 2 nits","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:03:42Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:05:52Z","event":"phase-done","phase":"implement","status":"implementing","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:06:23Z","event":"phase-started","phase":"review","status":"reviewing","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:06:24Z","event":"round-opened","phase":"review","status":"reviewing","round":2,"slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:16:11Z","event":"issues-found","phase":"review","status":"reviewing","round":2,"note":"5 verified fixed; 2 new nits, 0 blockers/majors","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:16:11Z","event":"phase-done","phase":"review","status":"reviewing","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:17:31Z","event":"fix-round","phase":"implement","status":"implementing","round":3,"slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:18:08Z","event":"phase-done","phase":"implement","status":"implementing","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:19:33Z","event":"phase-started","phase":"test","status":"testing","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:19:33Z","event":"round-opened","phase":"test","status":"testing","round":1,"slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:31:30Z","event":"phase-done","phase":"test","status":"testing","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:32:30Z","event":"phase-started","phase":"report","status":"testing","slug":"session-binding-ops"}
+{"ts":"2026-08-01T00:35:24Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"session-binding-ops"}
+{"ts":"2026-08-01T09:01:27Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"session-binding-ops"}
+{"ts":"2026-08-01T09:01:27Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-08-01-session-binding-ops/","slug":"session-binding-ops"}

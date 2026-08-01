@@ -1,0 +1,29 @@
+flowchart TD
+  L1["board m / d - launch.BuildIntent"]
+  L2["plans-tab spawn - launch.PlanIntent(label, body)"]
+  L3["gogo go / gogo plan - orchestrator.Session"]
+
+  L1 --> MINT["launch.sessionName(action, label)<br/>gogo-&lt;action&gt;-&lt;sanitizeLabel(label)&gt;<br/>MINTED ONCE, NEVER RE-DERIVED"]
+  L2 --> MINT
+  L3 --> MINT
+
+  MINT --> TM["tmux session name"]
+  TM --> LIST["launch.ListSessions() - names only"]
+  LIST --> PARSE["launch.SessionAction(name, slug)"]
+
+  PARSE --> DOT["card ● dot / ● agent chip"]
+  PARSE --> CUE["cardStateCue - · stalled when a working status has no match"]
+  PARSE --> CL["collapsed changelog ● on a shipped item"]
+  PARSE --> CAP["cap: counts gogo-go-&lt;slug&gt; only"]
+  PARSE --> LOCK["one-owner lock liveness"]
+  PARSE --> SWEEP["sweeper: no owning feature = 'orphan' -> reaped"]
+
+  HUMAN["human retasks the claude INSIDE the pane<br/>(/gogo:plan then /gogo:go on a NEW item)"] -.->|"name cannot follow"| TM
+  LABEL["plan title != analyst-derived slug"] -.->|"born unbound"| TM
+
+  DOT --> S1["symptom 1: shipped item keeps ●"]
+  CUE --> S2["symptom 2: the item really being built reads · stalled"]
+  CAP --> S3["symptom 3: that live build is NOT counted - a 2nd go is allowed in the same tree"]
+  SWEEP --> S4["symptom 4: an unbound live analyst is reaped by a bare gogo sweep"]
+
+  OPS["no cockpit op can change the name:<br/>K exists in the DRILL only, no P, no rename anywhere"]

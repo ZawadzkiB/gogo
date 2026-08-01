@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant SK as /gogo:done (skill)
+  participant SW as gogo sweep (targeted)
+  participant TM as tmux
+  participant BD as gogo board (tui)
+
+  U->>SK: /gogo:done item-a (typed INSIDE item-a's own pane)
+  SK->>SK: state.md -> shipped, changelog entry written
+  SK->>SW: gogo sweep item-a
+  SW->>TM: display-message -p '#S' (self-guard)
+  TM-->>SW: gogo-go-item-a  == its own host
+  SW-->>SK: skipped - never reap the session I run in
+  Note over TM: the pane survives the ship, still named gogo-go-item-a
+
+  U->>TM: /gogo:plan ... then /gogo:go in the SAME pane -> item-b
+  Note over BD: item-b/state.md = implementing, but no gogo-*-item-b exists
+  BD->>BD: stalledPhase(item-b, sessions) -> true
+  BD-->>U: item-b '· stalled', no ● , no agent chip
+  BD->>BD: hasLiveSession(item-a, sessions) -> true
+  BD-->>U: shipped item-a still carries ● in the changelog
+  BD->>BD: ActiveWorkSlugs(root) -> [] (no gogo-go-item-b)
+  BD-->>U: the cap sees NO build - a second gogo go is allowed in this tree
+
+  U-->>BD: only remedies today: kill the pane (drill K) or ignore the lie

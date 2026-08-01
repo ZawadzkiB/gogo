@@ -1,0 +1,29 @@
+stateDiagram-v2
+  [*] --> BoundAuthoring: P / gogo plan - mints gogo-plan-&lt;slug&gt;
+  [*] --> BoundBuild: m / gogo go - mints gogo-go-&lt;slug&gt;
+  [*] --> Unbound: plans-tab spawn - name from the PLAN TITLE, analyst derives another slug
+
+  BoundAuthoring --> BoundBuild: R onto a runnable item (rename to gogo-go-&lt;slug&gt;)
+  BoundBuild --> Lingering: owning item shipped, sweep self-guard spares its own host
+  BoundAuthoring --> Lingering: owning item shipped
+
+  Lingering --> BoundBuild: R - re-assign onto the item it now drives
+  Unbound --> BoundBuild: R - adopt (target is implementing/plan-accepted)
+  Unbound --> BoundAuthoring: R - adopt (target is at the plan gate)
+
+  Lingering --> [*]: K kill / gogo sweep &lt;slug&gt; (terminal owner)
+  Unbound --> [*]: bare gogo sweep reaps it as 'orphan - no owning feature'
+  BoundBuild --> [*]: K kill / ship-reap
+  BoundAuthoring --> [*]: K kill
+
+  note right of BoundBuild
+    counted by the per-source cap
+    (liveBuildSession: gogo-go-&lt;slug&gt;)
+  end note
+  note right of Lingering
+    the shipped card's ● in the changelog
+  end note
+  note right of Unbound
+    no card shows it;
+    the item it drives reads · stalled
+  end note

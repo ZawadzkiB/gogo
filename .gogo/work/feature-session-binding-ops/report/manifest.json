@@ -1,0 +1,22 @@
+{
+  "slug": "session-binding-ops",
+  "updated": "2026-08-01",
+  "note": "AS-BUILT report set (phase 5). The binding between a tmux session and a work item is the session NAME; 0.32.0 makes it editable from the cockpit (P start+attach, K kill from the board, R re-assign via one exact-target rename), with every reader re-deriving from the name on its next tick and an unbound-session count on the idle status line. No class diagram: the change adds one launch seam plus pure TUI helpers over existing types, so a structure view would carry no signal the flow does not already carry. before/ carries the plan-time as-is baseline for the side-by-side compare.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-built control flow: P/K/R write the tmux session NAME, and ListSessions/ListSessionMeta -> SessionAction feeds the dot, the cues, the cap, the lock, the sweeper, the footer chips and the unbound count"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "As-built runtime: adopting a retasked session with R - picker, bindAction, RenameSessionUnique, and the readers correcting themselves on the next session tick"
+    },
+    {
+      "kind": "activity",
+      "file": "activity.mmd",
+      "title": "Session lifecycle: bound-authoring / bound-build / lingering / unbound, and the transitions P, R and K move a session through"
+    }
+  ]
+}

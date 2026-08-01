@@ -20,7 +20,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.31.0"
+const Version = "0.32.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -191,8 +191,9 @@ view flags:
 board keys:
   ←→/h columns · ↑↓/jk cards · space select (ready) · enter drill-in · v quick-view
   w web page · m move/launch (accepts a plan-pending card) · M force past the source cap · d ship · a attach session
-  l peek log · x delete→trash · p project chip (unified board) · tab board/plans/config · @name / #plan-<id> filter · / filter · G glow · q quit
-  ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate)
+  l peek log · P plan session (starts /gogo:plan in tmux + attaches; joins a live one) · K kill a session (confirm; one/all picker if ≥2) · R re-assign a live session onto the focused card (renames it; every reader follows)
+  x delete→trash · p project chip (unified board) · tab board/plans/config · @name / #plan-<id> filter · / filter · G glow · q quit
+  ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate) · the status line counts sessions bound to no card here (unbound)
   status line severity: ✗ red = failed (carries tmux's own words) · ⚠ amber = blocked/gate (carries the unblock) · dim = ok
 
 plans tab keys (a 4-column KANBAN: drafts · ready · active · done):
@@ -209,7 +210,8 @@ concurrency cap (concurrentWorkItems, per SOURCE - config tab):
   Over cap: press M on the board to force past it, or run gogo go <slug> --force.
 
 drill-in keys (enter on a card - shows description / folder / status / sessions / events):
-  ↑↓/jk files · enter open file · a attach session (picker if ≥2) · K kill session (confirm; one/all picker if ≥2)
+  ↑↓/jk files · enter/v open file · a attach session (picker if ≥2) · K kill session (confirm; one/all picker if ≥2)
+  P plan session (starts /gogo:plan in tmux + attaches) · R re-assign a live session onto this card
   G glow · w web page · esc/q back
 
 launch permission mode (FR8): board-launched claude sessions run in auto

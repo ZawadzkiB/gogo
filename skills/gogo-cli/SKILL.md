@@ -76,7 +76,16 @@ whole cross-repo plan.
 
 **Board keys:** `←→`/`h` columns · `↑↓`/`jk` cards · `space` select (ready) ·
 `enter` drill-in · `v` quick-view · `w` web page · `m` move/launch · `d` ship ·
-`a` attach session · `l` peek log · `x` delete→trash · `tab`/`shift+tab` cycle the
+`a` attach session · `l` peek log · `P` **plan session** (since 0.32.0 - starts
+`claude "/gogo:plan <slug>"` in a tmux session anchored at the card's own repo and
+**attaches**; a live plan session is joined, never duplicated) · `K` **kill a
+session** (since 0.32.0 on the board too - the drill's confirm / one-all-cancel
+picker, incl. a shipped changelog card's lingering session) · `R` **re-assign a
+live session** onto the focused card (since 0.32.0 - a picker of every live
+`gogo-*` session showing `bound item | unbound · repo · age`; the choice renames it
+`gogo-<go|plan>-<slug>` - action derived from the target's status, so the cap stays
+honest - and every reader corrects on the next tick; refusals name a terminal
+target, a foreign anchor repo, an already-bound session) · `x` delete→trash · `tab`/`shift+tab` cycle the
 **board · plans · config** tabs · `p` cycles the board's **project chips** (`all` +
 one per project) / the config-tab **project switcher** (they share one focus) · `/`
 filter (an `@name` token narrows to a project **or** source; a `#plan-<id>` token to
@@ -153,9 +162,14 @@ is actively working it, a green **`● <agent>` chip** (analyst / developer /
 reviewer / tester / reporter - since 0.29.0 derived from the live **session's action**
 when the phase line disagrees, so a card being built reads `● developer`). The heavy
 **left-border stripe** (red gate / purple UAT) is the per-card "act now" cue. The
-collapsed **changelog** carries a `●` on any shipped item still holding a session. In the
+collapsed **changelog** carries a `●` on any shipped item still holding a session (`K`
+kills it from the board; `R` on the card it should DRIVE adopts it — `R` refuses a
+terminal target, naming that move). In the
 drill, `a` (and `K`) open a **picker** to choose *which* session when the card has several
-- `K` also offers "all N".
+- `K` also offers "all N"; `P` and `R` work in the drill exactly as on the board (0.32.0).
+The idle status line **counts unbound sessions** - live `gogo-*` sessions anchored in a
+board repo that match no card (a plans-tab spawn named after the plan TITLE, or a retasked
+pane) - so a session bound to nothing is visible; `R` on the right card adopts it.
 
 **Three cues for files-vs-reality disagreement (since 0.29.0)** - `state.md` is written at
 each phase's boundary, so it can describe work that has not started or has already ended:

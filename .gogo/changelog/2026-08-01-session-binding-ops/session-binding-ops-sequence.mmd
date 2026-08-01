@@ -1,0 +1,29 @@
+sequenceDiagram
+  autonumber
+  actor U as user
+  participant TM as tmux
+  participant BD as gogo board (tui)
+  participant LA as launch (SessionAction)
+  participant CAP as orchestrator cap
+
+  Note over TM: pane 'gogo-go-item-a' survives item-a's ship<br/>(sweeper self-guard spares its own host)
+  U->>TM: types /gogo:plan then /gogo:go inside it -> item-b reaches implementing
+  BD->>LA: SessionAction("gogo-go-item-a", "item-b")
+  LA-->>BD: no match
+  BD-->>U: item-b '· stalled', item-a (shipped) still shows ●
+
+  U->>BD: R on item-b
+  BD->>TM: list-sessions -F name|path|created|attached
+  TM-->>BD: gogo-go-item-a | /repos/gogo | ...
+  BD-->>U: picker: 'gogo-go-item-a - bound: item-a (shipped) - gogo - 2h'
+  U->>BD: choose it
+  BD->>BD: bindAction(item-b): implementing -> ActionGo
+  BD->>TM: launch.RenameSessionUnique -> rename-session -t '=gogo-go-item-a' gogo-go-item-b
+  TM-->>BD: ok
+
+  Note over BD: next session tick (5s) - every reader re-derives from the NEW name
+  BD->>LA: SessionAction("gogo-go-item-b", "item-b")
+  LA-->>BD: (go, true)
+  BD->>CAP: ActiveWorkSlugs(repo, root, sessions)
+  CAP-->>BD: [item-b] - the live build is counted again
+  BD-->>U: item-b ● developer (stalled cleared) - item-a's changelog ● gone

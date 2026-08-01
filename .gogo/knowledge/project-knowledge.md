@@ -487,6 +487,28 @@ Three layers, all plain markdown (+ a little bash and one vendored JS):
   earlier fixes introduced; the rounds that ended a defect family were the ones that produced a
   **single producer** or a **structural guard**, never another instance fix.
   Version **0.29.0**.
+- **Session-binding ops — the tmux session NAME is cockpit-editable (since 0.32.0):** a
+  session's binding to a work item is its **name** (`gogo-<action>-<slug>`, minted once,
+  parsed only by `launch.SessionAction`), and every reader (card dot, agent chip, cues,
+  per-source cap, one-owner lock, sweeper) re-derives from it each tick — so 0.32.0 adds
+  the three card-anchored ops that edit that one string instead of a second binding store:
+  board+drill **`P`** (confirm → `claude "/gogo:plan <slug>"` anchored at the card's own
+  root → attach; a live plan session is joined, never duplicated), board **`K`** (the
+  drill's confirm / one-all-cancel kill picker, incl. shipped changelog cards), and
+  **`R`** (adopt picker over every live `gogo-*` session via the new
+  `launch.ListSessionMeta` — `bound|unbound · repo · age · attached` rows — renaming the
+  choice with `launch.RenameSessionUnique`, exact `=` target; the action component is
+  **derived from the target's status** so the cap keeps counting builds, D4=A). Refusals
+  are named (terminal target → points at the card the session should DRIVE; foreign
+  `session_path` anchor; already bound); the idle status line **counts unbound sessions**
+  (anchored in a board root, matching no card). All CLI-owned tmux acts — **no pipeline
+  state, no registry rewrite** (a moved session's old tracked leg truthfully renders
+  stale, D3=A). Pickers record **`pickerOrigin`** where they open (the stale
+  `m.drill != nil` inference bounced board cancels into a dead drill). Review lesson worth
+  keeping: a footer chip must share its handler's **exact predicate** (`PlannableStatus`,
+  not an inlined `!TerminalStatus`) or it advertises a guaranteed bounce — the REV-003/006
+  pair here was the same chip-lies class 0.29.0 fought, caught at review because the
+  key-help guard + chip tests now exist. Version **0.32.0**.
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase

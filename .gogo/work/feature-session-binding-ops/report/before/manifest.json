@@ -1,0 +1,17 @@
+{
+  "slug": "session-binding-ops",
+  "updated": "2026-07-31",
+  "note": "As-is baseline captured before any code change, scoped to the paths the change touches. flow.mmd: the session NAME is minted once (launch.sessionName) and read by every consumer through launch.SessionAction, with no op anywhere that can change it - so a retasked pane, or a plans-tab spawn named after a plan title, produces four symptoms including a live build the per-source cap cannot see. sequence.mmd: the reported incident end to end - the sweeper's self-guard spares the pane that hosts /gogo:done, the user retasks it, and the board then shows a ● on the shipped card while the item actually being built reads · stalled.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "report/before/flow.mmd",
+      "title": "As-is: the tmux session name is the only binding, minted at launch and never re-derivable - dot, cues, cap, lock and sweeper all inherit its mistakes"
+    },
+    {
+      "kind": "sequence",
+      "file": "report/before/sequence.mmd",
+      "title": "As-is incident: ship inside the item's own pane (self-guard spares it), retask it to a new item, and the board narrates the old binding with no remedy but killing"
+    }
+  ]
+}

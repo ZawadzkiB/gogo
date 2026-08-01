@@ -196,13 +196,23 @@ func columnSeparator(height int) string {
 }
 
 // boardStatusLine surfaces the attach hint for the focused card when it has a
-// live session (TEST-006), else the running-sessions summary.
+// live session (TEST-006), else the running-sessions summary — plus a count of
+// UNBOUND sessions (session-binding ops FR4): live gogo-* sessions anchored in a
+// root this board shows that attribute to no card here, so a session bound to
+// nothing is visible instead of silently invisible.
 func (m Model) boardStatusLine() string {
+	line := ""
 	if f := m.focusedCard(); f != nil && hasLiveSession(f.Slug, m.sessions) {
-		return sessionStyle.Render("● "+f.Slug) + " has a live session — " +
+		line = sessionStyle.Render("● "+f.Slug) + " has a live session — " +
 			slugStyle.Render("l") + " peek · " + slugStyle.Render("a") + " attach"
+	} else {
+		line = m.sessionsLine()
 	}
-	return m.sessionsLine()
+	if n := len(m.unboundHere()); n > 0 {
+		line += dimStyle.Render(fmt.Sprintf(" · %d unbound %s (matches no card here — R on a card adopts it)",
+			n, plural(n, "session")))
+	}
+	return line
 }
 
 func (m Model) renderColumn(i, colWidth int) string {
@@ -788,13 +798,21 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	return style.Width(width).Render(body)
 }
 
+// boardAllKeysLine / drillKeysLine are the `?`-toggled full board key list and
+// the drill footer — package consts so the key-help sync guard
+// (TestBoardKeyHelpInSync) asserts against exactly the strings that render, and
+// a new key can never ship undocumented.
+const (
+	boardAllKeysLine = "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · M force (past the source cap) · d ship · a attach · l peek · P plan session · K kill session · R re-assign session · x del · p source · tab plans/config · / filter · ? keys · q quit"
+	drillKeysLine    = "↑↓/jk files · enter/v open · a attach · K kill · P plan session · R re-assign · G glow · w web · esc/q back"
+)
+
 // contextualFooter is the FR-7 footer: the focused card's applicable action
 // key-chips (a live card leading with a green ●) + a right-aligned `[?] all
 // keys`. `?` (FR-10) swaps it for the full pre-redesign key list.
 func (m Model) contextualFooter() string {
 	if m.showAllKeys {
-		full := "←→/h cols · ↑↓/jk cards · space select · enter drill · v view · w web · m move · M force (past the source cap) · d ship · a attach · l peek · x del · p source · tab plans/config · / filter · ? keys · q quit"
-		return helpStyle.Render(full)
+		return helpStyle.Render(boardAllKeysLine)
 	}
 	right := keyChipStyle.Render("[?] all keys")
 	f := m.focusedCard()
@@ -854,6 +872,25 @@ func (m Model) footerChips(f *contract.Feature) []string {
 	c = append(c, chip("[enter] drill"), chip("[v] view"))
 	if hasLiveSession(f.Slug, m.sessions) {
 		c = append(c, chip("[l] peek"), chip("[a] attach"))
+	}
+	// Session-binding chips follow the symptom (FR4): a stalled card points at the
+	// adopt that clears it; a shipped card holding a session points at pruning it;
+	// any non-terminal card can start its plan session. A shipped card gets [K]
+	// ONLY (REV-003): R refuses a terminal TARGET by design (FR3), so a bare
+	// `[R] re-assign` chip there would advertise a guaranteed bounce — the
+	// re-assign move lives on the card the session should DRIVE, which the unbound
+	// count and the terminal refusal both point at.
+	switch {
+	case stalledPhase(f, m.sessions):
+		c = append(c, chip("[R] adopt"))
+	case f.Shipped() && hasLiveSession(f.Slug, m.sessions):
+		c = append(c, chip("[K] kill"))
+	}
+	// PlannableStatus, the same named producer planFeature gates on (REV-006):
+	// chip and handler share ONE predicate, so the chip can never advertise a P
+	// the handler refuses.
+	if orchestrator.PlannableStatus(f.Status) {
+		c = append(c, chip("[P] plan"))
 	}
 	c = append(c, chip("[w] web"))
 	return c
@@ -961,7 +998,7 @@ func (m Model) viewDrill() string {
 	if m.status != "" {
 		b = append(b, "", m.renderStatus(m.status))
 	}
-	help := lipgloss.NewStyle().Faint(true).Render("↑↓ files · enter open · a attach · K kill · G glow · w web · esc back")
+	help := lipgloss.NewStyle().Faint(true).Render(drillKeysLine)
 	b = append(b, "", help)
 	return strings.Join(b, "\n")
 }

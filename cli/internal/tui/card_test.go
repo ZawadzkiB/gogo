@@ -342,7 +342,7 @@ func TestDrillAttachPicker(t *testing.T) {
 		}
 	})
 
-	// The BOARD-origin picker (pickerFromDrill=false) is a distinct reachable branch:
+	// The BOARD-origin picker (pickerOrigin=modeBoard) is a distinct reachable branch:
 	// cancel must restore modeBoard AND preserve the ready-ship multi-selection (the
 	// attach-cancel is unrelated to the selection — formPreservesSelection now covers
 	// pendingAttach, mirroring the kill/delete rule, REV-012).
@@ -358,8 +358,8 @@ func TestDrillAttachPicker(t *testing.T) {
 
 		nm, _ := m.Update(runes("a")) // board a → attach picker (≥2)
 		m = nm.(Model)
-		if m.mode != modeForm || m.pendingAttach == nil || m.pickerFromDrill {
-			t.Fatalf("board a did not open a board-origin attach picker (mode=%d pending=%v fromDrill=%v)", m.mode, m.pendingAttach, m.pickerFromDrill)
+		if m.mode != modeForm || m.pendingAttach == nil || m.pickerOrigin != modeBoard {
+			t.Fatalf("board a did not open a board-origin attach picker (mode=%d pending=%v origin=%d)", m.mode, m.pendingAttach, m.pickerOrigin)
 		}
 		m = keyPress(t, m, tea.KeyMsg{Type: tea.KeyEsc})
 		if m.mode != modeBoard {

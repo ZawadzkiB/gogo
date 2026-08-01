@@ -199,6 +199,7 @@ const (
 	killAll      = " kill-all"      // kill every pendingKill session
 	killCancel   = " kill-cancel"   // cancel the kill picker
 	attachCancel = " attach-cancel" // cancel the attach picker
+	adoptCancel  = " adopt-cancel"  // cancel the R re-assign (adopt) picker
 )
 
 // columnOrder / columnTitles fix the 4-column layout left→right.
@@ -300,6 +301,10 @@ type Model struct {
 	mode          mode
 
 	sessions []string
+	// sessionMeta is the live gogo-* sessions WITH their tmux facts (anchor path /
+	// created / attached), refreshed alongside m.sessions (session tick + reload) —
+	// what the `R` adopt picker rows and the unbound-session count read (FR3/FR4).
+	sessionMeta []launch.SessionMeta
 
 	// drill-in
 	drill     *contract.Feature
@@ -324,14 +329,25 @@ type Model struct {
 	dark          bool              // terminal background, detected ONCE before the program starts
 
 	// form
-	form            *huh.Form
-	pending         launch.Intent
-	pendingShip     bool
-	pendingDelete   *contract.Feature // FR6: the card a confirmed `x` moves to trash
-	pendingKill     []string          // FR-B3: the drill card's live session(s) a confirmed `K` kills
-	pendingAttach   []string          // the attach picker's candidate sessions (≥2 live) — FR-2
-	pickerFromDrill bool              // the attach picker was opened from the drill (cancel restores modeDrill vs modeBoard)
-	binding         *formBinding      // heap-stable targets for the live huh fields
+	form          *huh.Form
+	pending       launch.Intent
+	pendingShip   bool
+	pendingDelete *contract.Feature // FR6: the card a confirmed `x` moves to trash
+	pendingKill   []string          // FR-B3: the focused/drilled card's live session(s) a confirmed `K` kills
+	pendingAttach []string          // the attach picker's candidate sessions (≥2 live) — FR-2
+	// pendingPlanSession marks an in-flight `P` plan-session confirm: the card whose
+	// /gogo:plan session a completed confirm launches THEN attaches (session-binding
+	// ops FR1). pendingAdopt marks an in-flight `R` adopt picker: the card the chosen
+	// live session is renamed onto (FR3). Both nil when no such form is open.
+	pendingPlanSession *contract.Feature
+	pendingAdopt       *contract.Feature
+	// pickerOrigin is the mode a kill/attach/adopt picker (or a P confirm) was opened
+	// FROM — set where each picker starts, so cancel/finish restore exactly that mode.
+	// It replaces the pickerFromDrill bool, which inferred the origin from
+	// `m.drill != nil` — stale for a board-originated picker after an earlier drill
+	// visit, landing the user in a drill they never opened (FR2's in-passing fix).
+	pickerOrigin mode
+	binding      *formBinding // heap-stable targets for the live huh fields
 
 	// peek (FR7): a read-only session-log viewer reusing the async viewer.
 	peeking     bool   // the open viewer is a session-log peek (r re-captures)
@@ -355,6 +371,12 @@ type Model struct {
 	// real tmux/registry file — never nil once a Model comes from New.
 	killer   func(session string) error
 	registry func(root, slug string) *orchestrator.Registry
+
+	// renamer re-binds a live tmux session onto a work item by renaming it to the
+	// conventional base name (collision-suffixed), returning the final name. A seam
+	// (defaults to launch.RenameSessionUnique) so the `R` adopt wiring is asserted
+	// with a fake — never nil once a Model comes from New.
+	renamer func(old, base string) (string, error)
 
 	hasTmux, hasClaude, hasGlow bool
 	reloadCh                    chan struct{}
@@ -449,6 +471,7 @@ func newFromRepo(repo *contract.Repo, root string, project *projects.Project, al
 		launcher:    launch.Launch,
 		capturer:    launch.CapturePane,
 		killer:      launch.KillSession,
+		renamer:     launch.RenameSessionUnique,
 		registry:    orchestrator.LoadRegistry,
 		reloadCh:    make(chan struct{}, 1),
 		viewport:    viewport.New(0, 0),
@@ -471,10 +494,18 @@ func newFromRepo(repo *contract.Repo, root string, project *projects.Project, al
 			}
 		}
 	}
-	m.sessions = launch.ListSessions()
+	m.refreshSessions()
 	m.loadPlans() // load the project's plans for the plans tab (project board only)
 	m.rebuild()
 	return m
+}
+
+// refreshSessions re-reads the live tmux session names AND their meta (anchor
+// path / created / attached) together, so every reader of one sees the other
+// move in the same tick (session-binding ops FR3/FR4).
+func (m *Model) refreshSessions() {
+	m.sessions = launch.ListSessions()
+	m.sessionMeta = launch.ListSessionMeta()
 }
 
 // sources returns the focused project's sources (nil in single-repo mode) — what the
@@ -753,7 +784,7 @@ func (m *Model) reload() {
 			m.repo = repo
 		}
 	}
-	m.sessions = launch.ListSessions()
+	m.refreshSessions()
 	m.loadPlans() // re-read the focused project's plans after the reload
 	m.rebuild()
 }

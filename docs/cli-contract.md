@@ -378,6 +378,29 @@ only truthful live-session state sooner.
   / `-`) when sessions are present; with tmux absent or nothing running the table is
   byte-for-byte the pre-0.29.0 one.
 
+### Changed in 0.32.0 (all additive - CLI-owned tmux acts; no `.gogo/` key added or changed)
+
+- **The session NAME remains the one binding** between a tmux session and a work item
+  (`gogo-<action>-<sanitized-slug>[-N]`, parsed exactly - §"session attribution"). 0.32.0
+  makes that binding **editable from the cockpit**; nothing about how a consumer READS it
+  changes.
+- **Three card-anchored session ops (board + drill).** `P` launches
+  `claude "/gogo:plan <slug>"` in a detached tmux session anchored at the card's own repo
+  root and attaches (an existing live `gogo-plan-<slug>` is attached, never duplicated);
+  `K` - previously drill-only - kills a **chosen** session behind the existing
+  confirm/picker, including on a shipped changelog card; `R` **renames** a chosen live
+  session onto the focused card (`tmux rename-session -t "=<old>" <new>`, exact target),
+  the new name's action component derived from the target's status
+  (runnable → `go`, else `plan`). All three are **CLI-owned tmux acts, never pipeline
+  state**: no `.gogo/` file is written, no registry is rewritten (a moved session's old
+  tracked leg truthfully renders stale), and every reader (dot, agent chip, cues, cap,
+  lock, sweep) re-derives the corrected binding from the name on its next tick.
+- **Unbound sessions are visible.** The board's idle status line counts live `gogo-*`
+  sessions anchored (by `#{session_path}`) inside a repo the board shows that attribute to
+  **no** feature there - e.g. a plans-tab spawn named after the plan TITLE, or a retasked
+  pane before it is adopted. Presentation only; a consumer reading `.gogo/` sees nothing
+  new.
+
 ## 1. The `.gogo/` layout a consumer reads
 
 Two roots matter: **work** (one folder per feature, the live pipeline state +

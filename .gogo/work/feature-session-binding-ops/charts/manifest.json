@@ -1,0 +1,22 @@
+{
+  "slug": "session-binding-ops",
+  "updated": "2026-08-01",
+  "note": "AS-BUILT (implement ②). The binding between a tmux session and a work item is the session NAME (launch.sessionName mints it once; launch.SessionAction is the only parser), so every reader - the card dot, the agent chip, the building/stalled cues, the per-source concurrency cap, the one-owner lock's liveness cross-check and the sweeper - re-derives from that one string. 0.32.0 makes the string editable from the cockpit: P mints a correctly-named /gogo:plan session for a card (confirm -> launch -> attach; a live one is joined), K (promoted to the board) kills a chosen session behind the existing confirm/picker, and R renames a live session onto the item it is really driving via the tui renamer seam -> launch.RenameSessionUnique (action derived from the target's status by bindAction, so the cap keeps counting builds). New pure pieces: launch.SessionMeta/ListSessionMeta/parseSessionMeta, launch.SessionNameFor/RenameSessionArgs/RenameSession(Unique), tui/session_ops.go (bindAction, boundFeature, unboundSessions, pathWithinRoot, plan/kill/adopt flows), the pickerOrigin cancel-origin fix, and the unbound count on the idle status line. No class diagram: the change adds one launch seam plus pure TUI helpers over existing types, so a structure view would carry no signal the flow does not already carry. before/ holds the plan-time as-is baseline.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-built control flow: the cockpit's P/K/R write the tmux session NAME, and ListSessions/ListSessionMeta -> SessionAction feeds the dot, the cues, the cap, the lock, the sweeper, the footer chips and the unbound count"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "As-built runtime: adopting a retasked session with R - picker, bindAction, RenameSessionUnique, and the readers correcting themselves on the next session tick"
+    },
+    {
+      "kind": "activity",
+      "file": "state.mmd",
+      "title": "Session lifecycle: bound-authoring / bound-build / lingering / unbound, and the transitions P, R and K move a session through"
+    }
+  ]
+}

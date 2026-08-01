@@ -958,6 +958,55 @@ func ListSessions() []string {
 	return sessions
 }
 
+// SessionMeta is one live gogo-* tmux session with the facts the session-binding
+// ops (cockpit P/K/R) read: Path is the session's launch anchor (`-c root`,
+// #{session_path}) — the repo the session belongs to; Created is the session's
+// start time; Attached whether any client is on it right now.
+type SessionMeta struct {
+	Name     string
+	Path     string
+	Created  time.Time
+	Attached bool
+}
+
+// ListSessionMeta returns the running gogo-* sessions with their tmux facts
+// (name|path|created|attached). ListSessions above is deliberately untouched —
+// every existing reader of the bare name list stays byte-for-byte. Empty when
+// tmux is absent or none exist.
+func ListSessionMeta() []SessionMeta {
+	if !HasTmux() {
+		return nil
+	}
+	out, err := exec.Command("tmux", "list-sessions", "-F",
+		"#{session_name}|#{session_path}|#{session_created}|#{session_attached}").Output()
+	if err != nil {
+		return nil
+	}
+	return parseSessionMeta(string(out))
+}
+
+// parseSessionMeta is the pure line parser behind ListSessionMeta (unit-testable
+// without tmux). Lenient per the CLI's reader contract: a line without all four
+// `|`-separated fields, or whose name is not gogo-*, is skipped — never a crash;
+// a non-numeric created leaves the zero time (the row survives — the NAME is the
+// binding, the timestamp is cosmetic).
+func parseSessionMeta(out string) []SessionMeta {
+	var metas []SessionMeta
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		parts := strings.SplitN(strings.TrimSpace(line), "|", 4)
+		if len(parts) != 4 || !strings.HasPrefix(parts[0], "gogo-") {
+			continue
+		}
+		meta := SessionMeta{Name: parts[0], Path: parts[1]}
+		if secs, err := strconv.ParseInt(parts[2], 10, 64); err == nil && secs > 0 {
+			meta.Created = time.Unix(secs, 0)
+		}
+		meta.Attached = parts[3] != "" && parts[3] != "0"
+		metas = append(metas, meta)
+	}
+	return metas
+}
+
 // CurrentSession returns the name of the tmux session this process is running
 // inside (via `tmux display-message -p '#S'`), or "" when not inside tmux or
 // tmux is absent. The sweeper's self-guard (FR3) uses it so `gogo sweep` never
@@ -1107,6 +1156,53 @@ func KillSession(name string) error {
 // exact-target contract is assertable without tmux.
 func KillSessionArgs(name string) []string {
 	return []string{"kill-session", "-t", exactTarget(name)}
+}
+
+// SessionNameFor mints the conventional session name for an action + slug — the
+// same transform sessionName applies, exported for the cockpit's `R` re-assign
+// path, which renames an EXISTING session INTO the convention so every reader
+// (dot, cues, cap, lock, sweep) re-derives the new binding from it.
+func SessionNameFor(action Action, slug string) string {
+	return sessionName(string(action), slug)
+}
+
+// RenameSessionArgs is the argv for the exact-name rename: `-t` is a SESSION
+// target, so it takes the exact `=<name>` form (the prefix/fnmatch fallback
+// provably hit the wrong session — FR1.5), while new-name is a bare NAME — like
+// `new-session -s`, a `=` prefix would become part of the name (verified on
+// tmux 3.7b). Exported so the exact-target contract is assertable without tmux.
+func RenameSessionArgs(old, new string) []string {
+	return []string{"rename-session", "-t", exactTarget(old), new}
+}
+
+// RenameSession renames a live tmux session by exact name (single argv, no
+// shell — injection-safe, typed *TmuxError on failure via runTmux). This is the
+// whole `R` re-assign primitive: a session's binding IS its name, so renaming it
+// re-binds it for every reader on their next tick. No tmux or an empty name → a
+// returned error; never a panic.
+func RenameSession(old, new string) error {
+	if old == "" || new == "" {
+		return fmt.Errorf("empty tmux session name")
+	}
+	if !HasTmux() {
+		return fmt.Errorf("tmux not installed")
+	}
+	return runTmux("rename-session", RenameSessionArgs(old, new))
+}
+
+// RenameSessionUnique renames old to the conventional base name, suffixing
+// -2, -3, … (uniqueSession) when the base is already taken by ANOTHER live
+// session — the same collision rule minting uses. Returns the final name so the
+// caller can report exactly what the session is now called.
+func RenameSessionUnique(old, base string) (string, error) {
+	if !HasTmux() {
+		return "", fmt.Errorf("tmux not installed")
+	}
+	name := uniqueSession(base)
+	if err := RenameSession(old, name); err != nil {
+		return "", err
+	}
+	return name, nil
 }
 
 // PidAlive reports whether a process is alive via signal 0 (no signal is

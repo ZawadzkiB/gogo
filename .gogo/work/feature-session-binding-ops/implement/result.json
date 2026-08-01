@@ -1,0 +1,37 @@
+{
+  "slug": "session-binding-ops",
+  "phase": "implement",
+  "status": "ok",
+  "round": 3,
+  "inputs": [
+    ".gogo/work/feature-session-binding-ops/plan.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/tech-stack.md"
+  ],
+  "outputs": [
+    ".claude-plugin/plugin.json",
+    ".gogo/work/feature-session-binding-ops/charts/flow.mmd",
+    ".gogo/work/feature-session-binding-ops/charts/manifest.json",
+    ".gogo/work/feature-session-binding-ops/charts/sequence.mmd",
+    ".gogo/work/feature-session-binding-ops/review/issues.json",
+    "README.md",
+    "cli/internal/launch/launch.go",
+    "cli/internal/launch/session_binding_test.go",
+    "cli/internal/tui/card_test.go",
+    "cli/internal/tui/key_help_sync_test.go",
+    "cli/internal/tui/model.go",
+    "cli/internal/tui/session_ops.go",
+    "cli/internal/tui/session_ops_test.go",
+    "cli/internal/tui/tui_test.go",
+    "cli/internal/tui/update.go",
+    "cli/internal/tui/view.go",
+    "cli/main.go",
+    "cli/version_test.go",
+    "docs/cli-contract.md",
+    "skills/gogo-cli/SKILL.md",
+    "skills/gogo-done/SKILL.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Fix round 3: REV-006 ([P] chip gates on PlannableStatus, one predicate with the handler) + REV-007 (comment cites the move.go rule, not a colliding id). gofmt/vet/test -race green."
+}

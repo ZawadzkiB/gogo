@@ -300,6 +300,17 @@ approval.
    `gogo sweep` / next-launch reap stays the backstop. Never fails a ship; writes
    nothing itself under `.gogo/`.
 
+   **Name the pane the sweep cannot reap (0.32.0).** When `$TMUX` is set, this ship is
+   running inside a tmux pane the sweeper's self-guard deliberately spares — so after
+   the targeted sweep, print one line telling the user:
+
+   > this pane's own session survives the ship-reap (the sweeper never kills its own
+   > host) — quit it when you're done, or re-assign it to another item from the
+   > cockpit (`R` on the card it should drive).
+
+   Text only; no behaviour and no safety property depends on it — it exists because a
+   spared pane retasked by hand is how a session ends up narrating the wrong item.
+
 7. **Build the interactive viewer page for the entry (FR10, best-effort).** Reuse the
    **`gogo-view` build** — don't reimplement it — so the entry gets the same xplan-style
    interactive page (draggable token-styled node cards + owned edge layer + minimap for

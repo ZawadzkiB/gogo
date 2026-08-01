@@ -1,0 +1,41 @@
+flowchart TD
+  subgraph cockpit["gogo cockpit - tui/session_ops.go (board + drill keys in update.go)"]
+    P["P - plan this item"]
+    K["K - kill a session"]
+    R["R - re-assign a session"]
+    A["a - attach"]
+  end
+
+  P --> PGUARD{"terminal status?<br/>live gogo-plan-slug already?"}
+  PGUARD -->|terminal / no claude - refuse, named| STATUS["status line - blocked (amber)"]
+  PGUARD -->|already live| ATT["tui.attachSession - suspend + tmux attach"]
+  PGUARD -->|confirm| BI["launch.BuildIntent(ActionPlan, slug) + card root<br/>claude '/gogo:plan slug' -c cardRoot"]
+  BI --> MINT["launch.sessionName('plan', slug)<br/>= gogo-plan-&lt;slug&gt;"]
+  BI --> ATT
+
+  K --> KF["killFeature (shared with the drill K)<br/>0 -> hint - 1 -> Enter-safe confirm - >=2 -> one/allN/cancel picker"]
+  KF --> KS["launch.KillSession(name)<br/>kill-session -t '=name'"]
+
+  R --> PICK["adopt picker: every live gogo-* session (sessionMeta)<br/>name - bound item / unbound - repo - age"]
+  PICK --> GUARD{"target terminal? already bound?<br/>session_path outside card root?"}
+  GUARD -->|refuse, named| STATUS
+  GUARD -->|ok| BIND["bindAction(target): RunnableStatus -> go, else plan<br/>base = launch.SessionNameFor(action, slug)"]
+  BIND --> REN["renamer seam -> launch.RenameSessionUnique(old, base)<br/>rename-session -t '=old' gogo-&lt;action&gt;-&lt;slug&gt;[-N]"]
+
+  MINT --> NAMES["tmux session NAMES<br/>(the one binding)"]
+  REN --> NAMES
+  KS --> NAMES
+
+  NAMES --> LIST["launch.ListSessions()<br/>launch.ListSessionMeta() - name|path|created|attached (parseSessionMeta)"]
+  LIST --> PARSE["launch.SessionAction(name, slug)<br/>exact gogo-&lt;action&gt;-&lt;label&gt;[-N] parse"]
+
+  PARSE --> DOT["card ● dot + ● agent chip<br/>tui/model.go sessionAgent"]
+  PARSE --> CUE["cardStateCue: ● building / · stalled / · state lags"]
+  PARSE --> CL["collapsed changelog ● on a shipped item"]
+  PARSE --> CAP["orchestrator.ActiveWorkSlugs<br/>per-source cap counts gogo-go-&lt;slug&gt; only"]
+  PARSE --> LOCK["orchestrator.DefaultLiveness<br/>one-owner lock (untracked owner)"]
+  PARSE --> SWEEP["orchestrator.Sweeper<br/>orphan + kill-at-ship"]
+  LIST --> UNB["unbound count on the idle status line<br/>unboundSessions: session_path in a board root, matches no feature"]
+  PARSE --> CHIPS["footer chips follow the symptom<br/>stalled -> [R] adopt - shipped+session -> [K] only - non-terminal -> [P]"]
+
+  A --> LIST

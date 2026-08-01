@@ -1,0 +1,99 @@
+{
+  "slug": "session-binding-ops",
+  "track": "review",
+  "round": 3,
+  "updated": "2026-08-01",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "TestBoardKeyHelpInSync passes VACUOUSLY when the AST scan finds no keys - the sibling guard it copies has the floor, this one dropped it",
+      "description": "cli/internal/tui/key_help_sync_test.go:103 iterates `switchKeys(t, \"update.go\", c.fn)` and asserts nothing when the slice is empty, so any drift that makes the parse return zero keys (updateBoard/updateDrill renamed or split, the key switch stopping being `switch msg.String()`, update.go renamed) turns the guard into a green no-op - silently. PROVEN by mutation: changing only the test's function name to `c.fn+\"NoSuchFunc\"` (go vet clean) leaves `go test -run TestBoardKeyHelpInSync` reporting `ok`. The guard is the plan's Tests-table deliverable (\"so a new key can never ship undocumented\"), and its own sibling - TestPlansTabKeyHelpInSync at cli/internal/tui/plans_view_test.go:980, whose parser this test reuses - already carries the floor `if len(keys) < 8 { t.Fatalf(\"parsed only %d keys from %s (%v) - parser drift?\") }`. coding-rules.md:126-128 makes it a hard rule (\"fails loudly on an empty scan - a guard must never pass vacuously\"); test-strategy.md variant 6 is the same shape. It bites correctly today (verified: replacing `· P plan session ` in boardAllKeysLine with a marker fails the test with the exact key name), so this is about the guard's durability, not today's behaviour. --- VERIFIED (round 2): both floors are in place at key_help_sync_test.go:108-115, inside the case loop and ahead of every per-key assertion. Re-ran the ORIGINAL mutation on a scratch copy: `c.fn+\"NoSuchFunc\"` now FAILS with `key_help_sync_test.go:110: parsed only 0 keys from updateBoard ([]) - parser drift?`. Second mutation (emptying the boardAllKeysLine const) FAILS with `key_help_sync_test.go:114: updateBoard: empty documented-key set (tui=0 cli=31)`. Floor margin measured, not assumed: switchKeys returns 23 keys for updateBoard and 18 for updateDrill, so 8 leaves ample headroom in both directions (no false-failure risk).",
+      "proposed_solution": "AGENT-FIXABLE. In key_help_sync_test.go, add the sibling's anti-vacuity floor inside the case loop before the per-key assertions, e.g. `keys := switchKeys(t, \"update.go\", c.fn); if len(keys) < 8 { t.Fatalf(\"parsed only %d keys from %s (%v) - parser drift?\", len(keys), c.fn, keys) }` (updateBoard handles 19 cases and updateDrill 9, so 8 is a safe floor for both), and while there also fail loudly on an empty help surface: `if len(tuiDoc) == 0 || len(cliDoc) == 0 { t.Fatalf(...) }` so a renamed `board keys:` header or an emptied const cannot make the documented-token set trivially permissive either.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Added the sibling guard anti-vacuity floors: switchKeys < 8 keys fails loudly, and an empty tui/cli documented-token set fails loudly (key_help_sync_test.go)."
+    },
+    {
+      "id": "REV-002",
+      "title": "FR2's distinguishing clause - K on a shipped/changelog card - has no test that bites; the board's 1-session arm is untested at board level too",
+      "description": "FR2 is explicitly \"bound to `K` on the board as well - including a focused changelog/shipped card, which is where a lingering session shows up\", and that clause is the whole point (it is the incident's own symptom: a shipped card still carrying `gogo-go-<A>`). Nothing asserts it. PROVEN by mutation: inserting `if orchestrator.TerminalStatus(f.Status) { m.statusBlocked(...); return m, nil }` into `killFeature` (cli/internal/tui/session_ops.go:245) - i.e. deleting exactly the FR2 clause - leaves the entire cli suite green (only the scratch-copy's unrelated template-path test failed). TestSessionBindingFooterChips only asserts that the `[K] kill` CHIP renders on a shipped card, never that pressing K there does anything, so the wiring is one level away from what is asserted (code-review-standards #11(b): \"a wiring was named in the plan, shipped, and had no test that bites\"). Separately, the plan's Tests row asks for \"`K` on the board: the 0/1/>=2 arms\" and TestBoardKill covers only 0 and >=2 (the 1-session confirm arm is reached only through the drill's older test). --- VERIFIED (round 2): the new subtest is cli/internal/tui/session_ops_test.go:202-228 and it bites on BOTH claims. Mutation A (re-inserting the TerminalStatus refusal at the top of killFeature) now FAILS: `board K on a shipped card did not open the kill confirm (mode=0 pending=[])` - and that failure also proves the fixture card really is terminal, so the subtest does not pass for a weaker reason (standard #11(c)). Mutation B (routing killFeature's `case 1` to startKillPicker instead of the Enter-safe startKillForm) also FAILS: `killer calls = [], want exactly [gogo-done-shipped-status]` - so the 1-session confirm arm is genuinely pinned, not merely reached. The assertion names the exact session string, as asked.",
+      "proposed_solution": "AGENT-FIXABLE. Add a subtest to TestBoardKill in cli/internal/tui/session_ops_test.go: focus a changelog card (colIdx=3), set `m.hasTmux = true`, `m.killer = rk.kill`, `m.sessions = []string{\"gogo-done-\" + f.Slug}`, press `K`, drive the single-session confirm to Enter and assert `rk.calls == [\"gogo-done-<slug>\"]` and `m.mode == modeBoard` - one subtest covers BOTH the shipped-card clause and the missing 1-session arm. Name the exact session string in the assertion (not just a call count) so a fixture that stops resolving fails loudly.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "New TestBoardKill subtest: K on a focused shipped changelog card with ONE session drives the Enter-safe confirm to Kill and asserts the exact session name + return to the board — pins both the shipped-card clause and the board 1-session arm."
+    },
+    {
+      "id": "REV-003",
+      "title": "The `[R] re-assign` footer chip on a shipped card advertises a key that always refuses on that card",
+      "description": "cli/internal/tui/view.go:882 renders `[K] kill` AND `[R] re-assign` on a `f.Shipped() && hasLiveSession(...)` card, but `adoptFeature` (cli/internal/tui/session_ops.go:279) refuses first thing when `orchestrator.TerminalStatus(f.Status)` - and `Feature.Shipped()` (status shipped|done) is a strict subset of TerminalStatus{shipped, aborted, done}. So the chip is unconditionally a dead end: pressing R on the card the chip is attached to can never re-assign anything. The contradiction is enshrined by two adjacent tests in the same new file - TestAdoptRefusals/\"terminal target\" drives R at colIdx=3 and asserts the refusal, while TestSessionBindingFooterChips/\"shipped card holding a session\" asserts the chip renders on that same column. It comes from a tension inside the accepted plan itself (FR3 lists \"the target is terminal (nothing to drive)\" among the refusals, FR4 says \"a shipped card holding a session offers [K] kill and [R] re-assign\"); the implementation kept both and softened it with a redirecting refusal string. It is still a footer chip that lies, which is the class code-review-standards #8 exists for (a hint the mode cannot honour). --- VERIFIED (round 2), option A taken end to end: view.go:883-888's switch renders `[K] kill` ONLY on the shipped arm. Mutation (restoring `chip(\"[R] re-assign\")` to that arm) FAILS with `shipped card advertises [R] re-assign, a key that always refuses there`, so the chip cannot creep back. The doc sweep is complete and greppable - no surface still promises R on a shipped card: plan.md FR4 carries an explicit, marked `(Implement-time correction, REV-003: ...)` note rather than a silent deviation; README.md:383-384 and skills/gogo-cli/SKILL.md:165-167 both now read \"`K` kills it from the board; `R` on the card it should DRIVE adopts it\"; charts/flow.mmd's CHIPS node reads \"shipped+session -> [K] only\". docs/cli-contract.md and cli/main.go never made the claim.",
+      "proposed_solution": "AGENT-FIXABLE, recommended option A. (A) Drop `[R] re-assign` from the shipped-card arm - keep `[K] kill` - so every chip on a card names an action that card can perform; the discoverability of \"R lives on the card the session should DRIVE\" is already carried by the unbound-count status line (\"R on a card adopts it\") and by the terminal refusal text, which stays as the safety net for a user who presses R anyway. Update TestSessionBindingFooterChips accordingly (assert `[K] kill` present AND `[R] re-assign` absent on a shipped card, so the chip cannot silently come back). (B) If the chip must stay per FR4's letter, make it truthful instead - render it as the pointer it is (e.g. `[R] on the target card`) - but do not leave a bare `[R] re-assign` on a card where R is a guaranteed bounce. Either way note the FR3/FR4 tension in the phase-5 report so the plan text and the shipped behaviour agree.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Option A: the shipped-card arm renders [K] kill ONLY (view.go); the test now asserts [R] re-assign is ABSENT there; plan.md FR4 + README + gogo-cli SKILL corrected to say the re-assign lives on the card the session should drive."
+    },
+    {
+      "id": "REV-004",
+      "title": "planFeature re-derives the plannable rule (`!TerminalStatus`) instead of calling the named producer `orchestrator.PlannableStatus`",
+      "description": "cli/internal/tui/session_ops.go:163 gates `P` on `orchestrator.TerminalStatus(f.Status)`, while the other door to the same act - `gogo plan <slug>` at cli/go.go:318 - gates on `orchestrator.PlannableStatus(status)`. They agree today only because `PlannableStatus` is literally `return !TerminalStatus(status)` (internal/orchestrator/orchestrator.go:123). That is the exact drift shape coding-rules.md TEST-006 records (\"a user-visible rule stated in more than one place is ONE constant... then pin the wirings, not just the producer\"): the day `PlannableStatus` gains a clause - e.g. also refusing `waiting-for-user` while a re-plan lock is held - the cockpit door silently keeps the old rule and the shell door gets the new one, with a green suite. The refusal string differs too (`\"<slug> is <status> - nothing to plan\"` vs `\"gogo plan: feature %q is %q - already shipped; nothing to plan.\"`), which is fine, but the PREDICATE should be one. --- VERIFIED (round 2) for the site this issue named: cli/internal/tui/session_ops.go:165 now reads `if !orchestrator.PlannableStatus(f.Status)`, the same named producer cli/go.go:318 calls, with a comment recording why. adoptFeature correctly kept `orchestrator.TerminalStatus` (session_ops.go:281) - \"nothing to DRIVE\" stays a separate rule, as asked. The optional structural pin was not added; the remaining un-pinned call site of the SAME rule is tracked separately as REV-006.",
+      "proposed_solution": "AGENT-FIXABLE, one line: in `planFeature` use `if !orchestrator.PlannableStatus(f.Status) { ... }`, the named producer both doors then share. Leave `adoptFeature`'s `TerminalStatus` check as-is - \"nothing to DRIVE\" is a genuinely different rule from \"nothing to plan\", and collapsing them would be the wrong kind of sharing. Optionally add the wiring assertion the repo's variant-8 rule asks for: a test that a `waiting-for-user`-style status flips together in both doors, or a structural check that session_ops.go does not re-inline `!TerminalStatus` for the plan gate.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "planFeature gates on orchestrator.PlannableStatus (the named producer gogo plan shares) instead of an inlined !TerminalStatus; adoptFeature keeps TerminalStatus (nothing-to-DRIVE is a different rule)."
+    },
+    {
+      "id": "REV-005",
+      "title": "SessionMeta.Attached is parsed, tested and carried, but read by no production code",
+      "description": "cli/internal/launch/launch.go:969 adds `Attached bool` to SessionMeta, `parseSessionMeta` fills it from `#{session_attached}` and session_binding_test.go asserts it three times - but `grep -rn Attached --include='*.go'` shows zero production readers: `adoptRow` (cli/internal/tui/session_ops.go:323) renders name / bound / repo / age only, and nothing else touches SessionMeta. It is plan-sanctioned (FR4 names the four fields) so this is not a plan deviation, but as shipped it is a field and a tmux format token that exist for a test. It also happens to be the single most useful missing fact in the adopt picker: a session with a live client attached is one a human is probably sitting in RIGHT NOW, and renaming it out from under them is exactly the mistake `R` should make hard. --- VERIFIED (round 2): adoptRow (cli/internal/tui/session_ops.go:342-344) appends `\" · attached\"` when `meta.Attached`, and TestAdoptRenamesToTheDerivedAction asserts the rendered picker carries it for an attached fixture. Mutation (deleting the two-line append) FAILS with `picker row does not mark the attached session`, so the assertion bites rather than passing on incidental text. It is a WORD, not a colour, so it survives a colourless TTY and is assertable in View() (NFR Diagnosability). The picker's OPTION VALUE is still the bare `meta.Name` (huh.NewOption(m.adoptRow(meta), meta.Name)) - checked, because a suffix leaking into the value would have made the rename target a non-existent session.",
+      "proposed_solution": "AGENT-FIXABLE. Prefer surfacing it: append `\" - attached\"` (word, not colour - the colourless-terminal rule) to the adopt row in `adoptRow` when `meta.Attached`, and add one assertion to TestAdoptRenamesToTheDerivedAction that the picker view carries it for an attached fixture session. If it is deliberately deferred instead, drop the field and the `#{session_attached}` token from ListSessionMeta so no reader is invited to trust data nothing maintains - but do not leave it as unread ballast.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "Surfaced: adoptRow appends the word attached when #{session_attached} is live (colourless-terminal rule), and the adopt-picker test asserts it for an attached fixture session."
+    },
+    {
+      "id": "REV-006",
+      "title": "The REV-004 producer fix stopped at one of the two `[P] plan` sites - the footer chip still re-derives `!TerminalStatus`",
+      "description": "The round-2 fix moved `planFeature` onto the named producer (`!orchestrator.PlannableStatus(f.Status)`, cli/internal/tui/session_ops.go:165), but the chip that ADVERTISES that same key still inlines the old predicate: cli/internal/tui/view.go:889 `if !orchestrator.TerminalStatus(f.Status) { c = append(c, chip(\"[P] plan\")) }`. Before the fix the two sites were at least consistently wrong; after it they derive the SAME user-visible rule (\"can this card be planned?\") from two different predicates, which is precisely the shape code-review-standards #12 / coding-rules TEST-006 ask reviewers to flag - \"a constant whose CALL SITES are unpinned, so a surface can stop calling the producer and hand-write fresh copy with the whole suite green\". Consequence if `PlannableStatus` ever gains a clause (the exact example REV-004 gave - also refusing `waiting-for-user` while a re-plan lock is held): the footer would keep offering `[P] plan` on a card where pressing P bounces, i.e. a chip that lies - the same defect class REV-003 was raised and fixed for, one file over. Verified as latent only: today `PlannableStatus(s) == !TerminalStatus(s)` (internal/orchestrator/orchestrator.go:123-125), so there is no user-visible bug right now, and `go test -race ./...` is green. Not a blocker; the pipeline can advance with this open.",
+      "proposed_solution": "AGENT-FIXABLE, one line: change cli/internal/tui/view.go:889 to `if orchestrator.PlannableStatus(f.Status) { c = append(c, chip(\"[P] plan\")) }` so the chip and its handler quote one producer. Optionally add the variant-8 wiring pin the repo's rules ask for and REV-004 left optional: a table test over a status set asserting `footerChips` offers `[P] plan` for exactly the statuses `planFeature` accepts (drive both through the same `orchestrator.PlannableStatus` cases), so a future site that re-inlines the predicate fails the suite instead of drifting quietly. Leave `adoptFeature`'s and the chip switch's `TerminalStatus`/`Shipped()` uses alone - those express \"nothing to DRIVE\" / \"is in the changelog\", genuinely different rules.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 3,
+      "fix_summary": "footerChips [P] arm now gates on orchestrator.PlannableStatus — the same named producer planFeature uses (one predicate for chip + handler)."
+    },
+    {
+      "id": "REV-007",
+      "title": "A `(REV-004)` comment tag in session_ops.go points at the wrong finding - the audit link is broken",
+      "description": "cli/internal/tui/session_ops.go:224 reads `// Never launch relative to the process cwd (REV-004) — bounce, launching nothing.` on the `if in.Root == \"\"` guard inside `finishPlanSession`. REV-004 in this feature's living review/issues.json is the PlannableStatus/producer finding, which has nothing to do with the launch root; the correctly-tagged REV-004 comment is 60 lines above at session_ops.go:163. This repo uses `REV-NNN` comment tags as a first-class audit convention (~20 of them across cli/, e.g. cli/go.go:275, cli/plan.go:434, cli/internal/tui/view.go:857), so a wrong id sends the next reader - and the phase-⑤ report writer - to an unrelated finding. Confirmed the tag matches nothing: no round-1 finding mentions the launch root or the process cwd, and `grep -rl \"relative to the process cwd\" .gogo/changelog/` returns no other feature's review that could own the number. Cosmetic only - the guard itself is correct and desirable behaviour (refusing to launch relative to the process cwd rather than guessing is exactly the NFR's \"degrade to MISSING over WRONG\"), it is simply defensive: `m.rootFor(f)` falls back to `m.root` (cli/internal/tui/model.go:724-729), so an empty root is unreachable in normal cockpit use and the branch has no test - which is fine for a belt-and-braces bounce, but worth knowing when reading it.",
+      "proposed_solution": "AGENT-FIXABLE, one word. Either drop the `(REV-004)` from cli/internal/tui/session_ops.go:224 (leaving `// Never launch relative to the process cwd — bounce, launching nothing.`, which explains itself), or replace it with the marker that actually applies (e.g. the NFR it implements: `degrade to MISSING over WRONG`). Do not renumber anything else - REV-004's real tag at session_ops.go:163 is correct and must stay.",
+      "severity": "nit",
+      "priority": "P3",
+      "status": "fixed",
+      "origin": "review",
+      "found_in_round": 2,
+      "fixed_in_round": 3,
+      "fix_summary": "Comment no longer cites this feature's REV-004: it names the rule by reference (doLaunch's no-cwd-launch rule in move.go)."
+    }
+  ]
+}

@@ -380,10 +380,26 @@ cd cli && go build -o gogo .
   is the real signal. And **`· stalled`**
   for a working status whose session died (still resumable with `m`).
   The **changelog** is a collapsed `✓ slug … MM-DD` list carrying a `●` on any
-  shipped item that still holds a session (drill in to kill it). `gogo status`
+  shipped item that still holds a session (`K` kills it right from the board; `R`
+  on the card it should *drive* adopts it). `gogo status`
   carries the ⏸ signal in a dedicated **WAIT** column, plus a **LIVE** column
   (`building` / `authoring` / `live`) whenever sessions are running. `/` filters live;
   **fsnotify** refreshes the board while the pipeline runs.
+- **Session-binding ops (`P` / `K` / `R`, board + drill — 0.32.0)** - a session's
+  binding to a work item is its tmux **name** (`gogo-<action>-<slug>`), so the
+  cockpit makes it editable. `P` starts a `/gogo:plan <slug>` session anchored at
+  the card's own repo and **attaches** you in (a live plan session is joined, never
+  duplicated); `K` (promoted from the drill) kills a **chosen** session behind the
+  confirm / one-all-cancel picker; `R` opens a picker of **every** live `gogo-*`
+  session (`name · bound item | unbound · repo · age`) and **renames** the chosen one
+  onto the focused card (`tmux rename-session`) — the action component is derived
+  from the target's status (runnable → `gogo-go-`, else `gogo-plan-`), so the cap
+  stays honest, and every reader (dot, agent chip, cues, cap, lock, sweep) corrects
+  itself on the next tick. Refusals are named (terminal target, foreign
+  `session_path` anchor, already bound); the status line **counts unbound
+  sessions** (live `gogo-*` in a board repo matching no card) so a retasked or
+  title-named session is visible instead of lost. No pipeline state is written —
+  renaming/killing a tmux session is a CLI-owned tmux act.
 - **Drill-in** (`enter`) - a **rich card**: a detail panel (short description,
   work-folder name, status) over the feature's **session(s)** (registry ⨯
   live-tmux, each flagged live/stale, plus any untracked-live racer), a
@@ -392,7 +408,8 @@ cd cli && go build -o gogo .
   ASCII (flowchart-family) or source. `a` **attaches** the card's live session -
   a **picker** to choose which one when the card has several; `K` **kills** a
   session behind a confirm - a **picker** offering one / all N / cancel when there
-  are several (pipeline state untouched); `w` builds the
+  are several (pipeline state untouched); `P` starts + attaches the card's plan
+  session and `R` re-assigns a live session onto it (both as on the board); `w` builds the
   interactive HTML page natively (goldmark, before/after compare) and opens the
   browser; `G` opens the file in `glow` when installed.
 - **Moves launch Claude** - `m` on an `awaiting-plan-acceptance` card **whose plan is

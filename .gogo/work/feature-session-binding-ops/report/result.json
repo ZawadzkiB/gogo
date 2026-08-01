@@ -1,0 +1,32 @@
+{
+  "slug": "session-binding-ops",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-session-binding-ops/plan.md",
+    ".gogo/work/feature-session-binding-ops/state.md",
+    ".gogo/work/feature-session-binding-ops/review/issues.json",
+    ".gogo/work/feature-session-binding-ops/test/issues.json",
+    ".gogo/work/feature-session-binding-ops/charts/manifest.json",
+    ".gogo/work/feature-session-binding-ops/charts/before/manifest.json",
+    ".gogo/work/feature-session-binding-ops/decisions.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-session-binding-ops/report/report.md",
+    ".gogo/work/feature-session-binding-ops/report/flow.mmd",
+    ".gogo/work/feature-session-binding-ops/report/sequence.mmd",
+    ".gogo/work/feature-session-binding-ops/report/activity.mmd",
+    ".gogo/work/feature-session-binding-ops/report/manifest.json",
+    ".gogo/work/feature-session-binding-ops/report/layouts.json",
+    ".gogo/work/feature-session-binding-ops/report/before/flow.mmd",
+    ".gogo/work/feature-session-binding-ops/report/before/sequence.mmd",
+    ".gogo/work/feature-session-binding-ops/report/before/manifest.json",
+    ".gogo/knowledge/project-knowledge.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/work/feature-session-binding-ops/plan.md",
+    ".gogo/work/feature-session-binding-ops/state.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Report complete for a clean green run: as-built report.md (planned-vs-shipped incl. the FR4/REV-003 correction, decisions D1-D7+REV-003 with reasons, review clean in 2 rounds / test green incl. real-tmux hands-on), as-built flow/sequence/activity set + prebuilt layouts + the before/ compare copied in, knowledge updated (project-knowledge overrides 0.32.0 entry, tech-stack test count). state.md -> awaiting-uat."
+}
