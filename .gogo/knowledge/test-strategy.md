@@ -54,54 +54,12 @@ TUI — see the 0.9.0 section below):
   manual steps instead of running the TUI is only the **tmux-absent** fallback —
   when tmux is present, drive the real TUI (below).
 
-### Live TUI testing via tmux (since 0.9.0) — the interactive path is AUTOMATABLE
-When `tmux` is present (it is on this dev host), the curses TUI is **not**
-manual-test-only: drive it for real with `tmux send-keys` / `capture-pane`
-(proven in the 0.9.0 board-cockpit round — guards, filter, per-action intents,
-cancel, all asserted live):
-- **Launch detached** into a throwaway session on a fixture work-index:
-  `tmux new-session -d -s "gogo-test-board-$$" "<the TUI under test>"` (today
-  that is the Go `gogo` board; the retired board.py was driven the same way).
-  Use a unique per-run session name; NEVER a real session name like `gogo-done`.
-- **Send keystrokes** with `tmux send-keys -t <sess>` (keys like `v`, `s`, `m`,
-  `g`, `/text`, `Space`, `C-m`, `Escape`, `q`) and **assert the rendered screen**
-  with `tmux capture-pane -pt <sess>` (headers, hints, counters, filter line).
-  Allow for curses `ESCDELAY` (~1.5 s) after `Escape`.
-- **Assert the contract, not just pixels** — after exit check the exit code and
-  the emitted intent file (or its documented absence on cancel).
-- **Clean up**: kill every test session; write fixtures to the scratchpad only;
-  remove `__pycache__` (it's gitignored, but keep runs tidy).
-
-### Go TUI (the `gogo` CLI) — unit tests are NOT enough (since 0.10.0)
-The 0.10.0 lesson (TEST-001): the CLI shipped a green 50-test `-race` suite and
-two review approvals, yet **every launch form was unsubmittable live** — the
-model's Update() dropped huh's async messages, a class of bug no model-level
-unit test had exercised. The strategy therefore has two mandatory layers:
-- **Model unit tests for logic** — drive `Update()` directly for guards,
-  classification, badges, filters; for forms/dialogs, **pump the full command
-  graph** (execute returned `tea.Cmd`s, expand `tea.Batch`, re-feed each msg)
-  to the terminal state (`huh.StateCompleted`/aborted) and assert an injected
-  fake launcher fires exactly once/never.
-- **Live tmux driving for integration** — same send-keys/capture-pane method as
-  above, against a fixture `.gogo/` tree with a PATH-stubbed `claude`: real
-  keystrokes to real completion (submit AND cancel paths), then assert the stub's
-  recorded argv + call count and the board's rendered state. **Only this layer
-  catches message-routing/focus/lifecycle integration bugs** — never sign off an
-  interactive flow that has not been driven to completion with real keystrokes.
-
-- **TTY-dependent behaviour is invisible to `go test`** (no TTY in CI): glamour's
-  `WithAutoStyle()` froze the live TUI for 5s per render (termenv OSC query swallowed
-  by Bubble Tea's stdin reader) while every unit test passed in ~4ms. Detect terminal
-  properties ONCE before the TUI starts; never query the terminal from a render path;
-  always include one live tmux drive before shipping a TUI change (TEST-003, 0.10.0).
-- **A model-level status assertion is NOT a render assertion (0.16.0 drill-card
-  finding).** The rich drill-in shipped with unit tests asserting `Model.status`
-  after `a`/`K` — all green — yet `viewDrill()` never rendered that status, so the
-  hints/confirmations were **silent no-ops in the live TUI** (a `View()` path the
-  unit tests never exercised; the live tmux drive caught it). Rule: whenever a key
-  handler sets `m.status` (or any user-visible field), add a test that asserts the
-  string appears in the relevant `View()` **output**, not just on the model — and
-  new mode/panel must render the status line the way `viewBoard` already does.
+### Live TUI testing (tmux) + the Go-TUI two-layer strategy — since 0.9.0/0.10.0
+The interactive path is AUTOMATABLE (tmux send-keys / capture-pane) and unit
+tests alone are NOT enough for the TUI — never sign off an interactive flow that
+has not been driven to completion with real keystrokes; TTY-only defects are
+invisible to `go test`.
+**Load when:** hands-on testing / reviewing the gogo TUI or any interactive flow → `../skills/tui-tmux-testing/SKILL.md`
 
 ### State-machine / UAT-loop testing (since 0.11.0)
 The 0.11.0 UAT gate was verified by **spec-executing the state machine
@@ -164,89 +122,11 @@ hard way in that same round:
 - **Report the sweep, with counts.** e.g. "24 mutations, compile-checked first, all fail,
   each in the expected test" is a claim a reader can audit; "tests added" is not.
 
-### The FOURTEEN variants of "an assertion that looks like a check and isn't" (0.28.0 + 0.29.0)
-Two releases produced **fourteen distinct** ways for a test to look like a check while checking
-nothing - **or for the mutation sweep itself to report a false result**. Two were the
-reviewer's own harness mistakes, which is exactly why they are here: *a mutation count
-produced by a broken harness is not trustworthy in either direction.* Walk this list before
-signing off a guard.
-
-**The four harness rules (a wrong sweep is worse than no sweep):**
-1. **Compile-check every mutation FIRST, with `go vet ./...` - not `go build`.** A mutation
-   that does not compile is `BUILD-FAIL`, not a result. And **`go build` does not type-check
-   `_test.go`**, so a mutation to a test file passes `go build` and then fails at test time
-   for the wrong reason. `go vet` type-checks tests.
-2. **Assert the edit landed via a marker unique to the NEW text**, never via "the anchor is
-   gone" - an **insertion whose replacement contains its anchor** trips a naive check and
-   reports `EDIT-DID-NOT-LAND` for a perfectly applied mutation.
-9. **A nameless CAUGHT is UNSCORED.** A failure with no test name attached is usually a
-   compile error in the mutation, not a catch. Re-run it compile-clean before scoring.
-10. **Never `&&` after a pipe when the pipe's exit code is the result** - the `&&` sees the
-    last stage's status, so a broken mutation reports success. Check the compile step's
-    status directly, or `set -o pipefail`.
-
-**The six ways an assertion misses its target:**
-3. **A structural guard that matches its own comment.** Grepping source text is satisfied by
-   the doc comment *describing* the rule, so deleting the code passes. **Strip `//` comments
-   before a structural grep** (`tuiFuncBody`) and pair the structural half with a
-   **behavioural** half.
-4. **Two styles that render identically under a TTY-less terminal.** A "these differ"
-   assertion comparing *rendered* lipgloss strings passes for the right AND the wrong style,
-   because colour is flattened. Compare style **properties**
-   (`GetForeground()`/`GetBackground()`/`GetBold()`), and make every user-visible cue
-   **glyph + word** so `View()` substring matching works without colour.
-5. **A fixture whose removal changes no assertion** - decoration masquerading as an input.
-   **Mutate the fixture, not only the code**: if deleting a fixture element leaves the suite
-   green, that element is not under test.
-6. **An exclusivity/invariant assertion that is true VACUOUSLY** - "no two arms overlap"
-   passes trivially if the matrix never reaches an arm. **Pair it with a reachability
-   guard**; shrinking the matrix must FAIL.
-7. **A guard-only mutation can never fail while the production code is correct**, so scoring
-   it SURVIVED is meaningless. Use a **two-part mutation**: weaken the guard **and**
-   introduce the defect it exists to catch, then check something else still bites.
-8. **A guard satisfied by its own producer's body.** Extracting a decision into a producer
-   and asserting the producer leaves the **call sites** unguarded - either surface can stop
-   calling it and hand-write fresh copy with the whole suite green. **Assert the wiring**:
-   the rendered output where the surface is readable, and a structural call-site check where
-   the value cannot be read back (a huh field's `Description`, for instance).
-
-**The four found by applying this list to the guards written for it (0.29.0 rounds 04-07):**
-
-11. **A guard that is unreachable because an earlier branch always returns.** A message arm
-    was aligned to another surface's terminal case - which that surface never reaches, because
-    it returns earlier. Aligning to dead code propagates a falsehood (an `aborted` feature was
-    told it had "already shipped"). Check the arm you are matching can actually execute.
-12. **A guard matched a substring that its own subject also contains.** `Contains(exit,
-    "reviewing")` passed against the regression because the section also carries a
-    `phase-done` JSON event with `"status":"reviewing"`. Match the shape of the instruction
-    (`status: reviewing`), not a word that appears in the neighbourhood.
-13. **An anchor written from memory never lands.** A mutation whose anchor was recalled
-    rather than read did not match; the edit silently did nothing and the run reported a
-    PASS. Always re-read the bytes you are about to mutate, and verify the edit landed.
-14. **A test that pins ONE surface of a shared predicate.** A fix unified three call sites
-    behind one predicate; the test asserted only the action path, so reverting the renderer
-    or the toggle left the suite green. Mutate EVERY surface the fix claims to unify.
-
-**The shape that recurs:** the thing asserted was **one level away from the thing that
-matters** - the producer instead of the wiring (8), the comment instead of the code (3), the
-arm instead of its reachability (6, 11), one surface instead of all of them (14). When you
-cannot write the test you want, say so instead of writing one that passes for a weaker
-reason: 0.29.0's review asked for a test that fails when two disjoint predicates are swapped,
-and **no such test can exist** - the honest answer was a disjointness proof plus a
-reachability guard.
-
-**Corollary for a guard over a SHIPPED template or asset:** read the shipped file itself, not
-a copy, and **first assert the file still contains the hazard** - otherwise the guard passes
-because someone deleted the hazard instead of handling it. 0.29.0's TEST-001 guard caught a
-literal comment closer in the template's own new warning note within minutes of it being
-written.
-
-**Corollary for scoring a GUARD-HARDENING change (the control pair).** Variant 7 says a
-guard-only mutation cannot fail while the defect is absent; the practical form is a **control
-pair**. Reintroduce the defect in the shape the hardening targets (0.29.0: the forbidden
-phrase *wrapped across a line break*), then assert the **hardened** guard fails **and** the
-old raw-matching one passes. One run, two data points, and it distinguishes "the guard is
-stronger" from "nothing changed". Restore both files byte-for-byte and md5-verify afterwards.
+### Assertion vacuity — the fourteen-variant catalog (0.28.0 + 0.29.0)
+Fourteen distinct ways an assertion (or the mutation sweep itself) looks like a
+check while checking nothing. The standing rule stays above (mutation IS the
+coverage check); the catalog is the on-demand reference.
+**Load when:** writing/reviewing test assertions or auditing a mutation sweep → `../skills/assertion-vacuity-catalog/SKILL.md`
 
 ## Custom
 <!-- Yours. gogo never rewrites this section: `/gogo:build` re-runs and the report-phase
