@@ -194,8 +194,8 @@ func cmdGo(args []string) int {
 	// the launched /gogo:go carries --skip-acceptance / --skip-uat (the skills honor
 	// them). Explicit + visible: every fire prints a line so an auto-skip is never
 	// silent. Default false / unregistered source → today's gated command byte-for-byte.
-	planSkip, uatSkip, label := resolveSourceSkip(root)
-	sess.SkipAcceptance, sess.SkipUAT = planSkip, uatSkip
+	planSkip, uatSkip, fast, label := resolveSourceSkip(root)
+	sess.SkipAcceptance, sess.SkipUAT, sess.Fast = planSkip, uatSkip, fast
 	if planSkip {
 		// Announce the source's opt-in, conditionally: a `gogo go` is only runnable at
 		// plan-accepted or later (the plan gate is already behind on a resume/mid-pipeline
@@ -206,18 +206,23 @@ func cmdGo(args []string) int {
 	if uatSkip {
 		fmt.Printf("gogo go: UAT auto-skipped for source %s (uatAcceptanceSkip)\n", label)
 	}
+	if fast {
+		fmt.Printf("gogo go: fast mode for source %s (fastMode) — /gogo:go runs the token-lean gogo-fast path\n", label)
+	}
 	fmt.Printf("gogo go %s - launch-or-resume the persistent /gogo:go session (implement in-context + Task review/test + report)\n", slug)
 	return runSession(sess, "gogo go")
 }
 
-// resolveSourceSkip resolves the per-source gate-skip flags (FR4) for the repo at
-// root plus its display label (for the printed note), reading the projects store
-// through the same flattened source set the cap guard uses (projects.AllSources /
-// SkipForSource). An unregistered root → (false, false, "") — no skip, no note.
-func resolveSourceSkip(root string) (planSkip, uatSkip bool, label string) {
+// resolveSourceSkip resolves the per-source gate-skip flags (FR4) plus the
+// fast-mode opt-in for the repo at root, and its display label (for the printed
+// notes), reading the projects store through the same flattened source set the cap
+// guard uses (projects.AllSources / SkipForSource / FastForSource). An unregistered
+// root → (false, false, false, "") — no skip, no fast, no note.
+func resolveSourceSkip(root string) (planSkip, uatSkip, fast bool, label string) {
 	projs, _ := projects.List()
 	sources := projects.AllSources(projs)
 	planSkip, uatSkip = projects.SkipForSource(sources, root)
+	fast = projects.FastForSource(sources, root)
 	for _, s := range sources {
 		if s.Path == root {
 			label = s.Name
@@ -227,7 +232,7 @@ func resolveSourceSkip(root string) (planSkip, uatSkip bool, label string) {
 			break
 		}
 	}
-	return planSkip, uatSkip, label
+	return planSkip, uatSkip, fast, label
 }
 
 // capBlock returns a refusal message when a go-launch for slug in root would

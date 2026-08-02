@@ -80,8 +80,8 @@
         },
         "status": {
           "type": "string",
-          "description": "Lifecycle: new (just raised this round) / open (awaiting a fix) / fixed (implement applied a fix, not yet re-verified) / verified (a later review/test confirmed the fix) / wontfix (intentionally not fixed).",
-          "enum": ["open", "fixed", "verified", "wontfix", "new"]
+          "description": "Lifecycle: new (just raised this round) / open (awaiting a fix) / fixed (implement applied a fix, not yet re-verified) / verified (a later review/test confirmed the fix) / wontfix (intentionally not fixed) / accepted (the user accepted it open at the UAT gate - stamped by /gogo:done when shipping with open findings, e.g. a fast-mode run's non-criticals).",
+          "enum": ["open", "fixed", "verified", "wontfix", "new", "accepted"]
         },
         "origin": {
           "type": "string",

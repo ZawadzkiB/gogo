@@ -34,6 +34,9 @@
 - **created:** <YYYY-MM-DD>
 - **branch:** <git branch | n/a>
 - **iterations:** plan=0 · implement=0 · review=0 · test=0   <!-- add · uat=N once a UAT round loops back to planning -->
+<!-- optional, additive - a fast-mode run (/gogo:go --fast, the gogo-fast skill) stamps
+     `- **mode:** fast` at its first write; readers that don't know the key ignore it
+     (the CLI shows a display-only fast chip). Absent = the full pipeline, byte-for-byte. -->
 - **resume:** none           <!-- <phase to re-enter> — <next action> | none -->
 - **open-decision:** none    <!-- <decisions.md anchor> | none -->
 <!-- optional, additive — include ONLY when this work item belongs to one or more cross-source plans (a LIST; stamped by /gogo:plan --correlation). Absent = today's behaviour, byte-for-byte.

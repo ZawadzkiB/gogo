@@ -986,6 +986,9 @@ func (m Model) viewDrill() string {
 	if r := f.RoundFor(f.Phase); r > 0 {
 		statusLine += fmt.Sprintf(" r%d", r)
 	}
+	if f.FastMode() {
+		statusLine += " · ⚡fast"
+	}
 	b = append(b,
 		dimStyle.Render("description  ")+desc,
 		dimStyle.Render("folder       ")+filepath.Base(f.Dir)+"/",

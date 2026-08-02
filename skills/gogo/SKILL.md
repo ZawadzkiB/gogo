@@ -113,6 +113,14 @@ The **UAT gate** is the plan-gate symmetry at the exit: ⑤ ends at `status: awa
 (not `done`); running `/gogo:done` **is** the acceptance, or the user's issues/questions
 loop back into planning on the **same work item** (see *The UAT gate* below).
 
+**Fast mode.** When the `/gogo:go` invocation carries **`--fast`** (typed, or
+appended by the gogo CLI for a `fastMode` source), phases ②→⑤ run on the
+token-lean path instead: one warm build+verify context (implement + self-review +
+self-test, no per-round artifacts), **ONE** fresh `gogo-reviewer` pass (2-round
+bound), an in-context final suite run, and a short report — same gates, same
+events/state contract, still landing at `awaiting-uat`.
+**Load when:** the run carries `--fast` → `skills/gogo-fast`.
+
 ## Who runs each phase
 
 **Commands invoke the orchestrator; it runs ② implement in-context and delegates

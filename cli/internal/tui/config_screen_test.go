@@ -276,6 +276,45 @@ func TestConfigTabSkipFlagsEditPersist(t *testing.T) {
 	}
 }
 
+// TestConfigTabFastModeEditPersist: the source detail shows the fast-mode flag
+// (default `no`), the `e` edit form exposes it, and a completed edit that toggles it
+// on persists FastMode to config.json — the same round-trip the gate-skip flags pin.
+func TestConfigTabFastModeEditPersist(t *testing.T) {
+	seedDataHome(t)
+	repo := gogoRepoDir(t)
+	p := projects.Project{Name: "app", Sources: []projects.Source{{Name: "svc", Path: repo}}}
+	if err := projects.Save(&p); err != nil {
+		t.Fatal(err)
+	}
+
+	m := configTab(sizedWorkspace(t, &contract.Repo{}, p))
+	if out := m.viewConfigRight(); !strings.Contains(out, "fast mode") {
+		t.Errorf("source detail missing the fast-mode label:\n%s", out)
+	}
+	if got, _ := projects.Load("app"); got.Sources[0].FastMode {
+		t.Fatalf("fresh source already has fast mode set: %+v", got.Sources[0])
+	}
+
+	m = send(m, runes("e"))
+	if m.pendingSource == nil || m.pendingSource.op != "edit" {
+		t.Fatalf("e did not open an edit form (pending=%v)", m.pendingSource)
+	}
+	if m.binding.srcFastMode {
+		t.Fatalf("edit form seeded fast mode ON for a plain source: %+v", m.binding)
+	}
+	m.binding.srcFastMode = true
+	nm, _ := m.finishSourceForm()
+	m = nm.(Model)
+
+	got, _ := projects.Load("app")
+	if len(got.Sources) != 1 || !got.Sources[0].FastMode {
+		t.Fatalf("fast mode not persisted: %+v", got.Sources)
+	}
+	if out := m.viewConfigRight(); !strings.Contains(out, "fast mode         yes") {
+		t.Errorf("source detail did not reflect the toggled fast mode:\n%s", out)
+	}
+}
+
 // TestConfigTabProjectSwitcher: `p` cycles the focused home project across the store.
 func TestConfigTabProjectSwitcher(t *testing.T) {
 	seedDataHome(t)

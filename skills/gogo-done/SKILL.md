@@ -155,6 +155,13 @@ approval.
    at `status: done` that never had a UAT gate gets the same one-line accept round, noted
    as pre-0.11.) This is a plain **Write/append** — no script, auto-mode-safe.
 
+   **Open findings ship as accepted, never silently (fast mode especially).** If the
+   member's `review/issues.json` or `test/issues.json` carries `open`/`new` findings
+   (a fast-mode run surfaces its non-criticals at this gate on purpose), list each in
+   the accept round — `- REV-004 <title> — accepted-by-user (shipped open)` — and set
+   its `status` to `accepted` in the json. The acceptance covers them; the record says
+   so.
+
 2. **Derive the entry date + name — do not hardcode.**
    - **Date** = the **newest** member's `- **completed:** <YYYY-MM-DD>` field (the value
      is markdown-bolded, so extract the ISO date itself — never a naive

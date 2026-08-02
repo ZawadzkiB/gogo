@@ -82,6 +82,18 @@ func TestSkipParams(t *testing.T) {
 	}
 }
 
+// TestFastParam pins the fast-mode param rendering: the same injection-safe
+// single-fixed-token shape as SkipParams — true → " --fast", false → ""
+// (the full pipeline byte-for-byte).
+func TestFastParam(t *testing.T) {
+	if got := FastParam(true); got != " --fast" {
+		t.Errorf("FastParam(true) = %q, want %q", got, " --fast")
+	}
+	if got := FastParam(false); got != "" {
+		t.Errorf("FastParam(false) = %q, want \"\"", got)
+	}
+}
+
 // TestSessionMatchesSlug pins TEST-005: session ↔ slug matching is an exact
 // boundary match on the sanitized-slug component, never a substring search.
 func TestSessionMatchesSlug(t *testing.T) {

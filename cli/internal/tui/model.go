@@ -108,6 +108,9 @@ type formBinding struct {
 	// UAT gate. Bools bound heap-stably to two huh Confirm fields (TEST-001).
 	srcPlanSkip bool
 	srcUatSkip  bool
+	// Per-source fast-mode toggle: opt this source's go-launches INTO the token-lean
+	// gogo-fast pipeline (--fast). Bound heap-stably like the gate-skip bools (TEST-001).
+	srcFastMode bool
 	// Plans-tab new-plan form field (FR10 `n`): the plan title as a STRING the huh
 	// input binds heap-stably (TEST-001).
 	planTitle string
@@ -1366,6 +1369,18 @@ func isChangelogCol(i int) bool { return columnOrder[i] == contract.ColChangelog
 // reads "re-planning · UAT N" instead of the generic "decision", so the card says
 // what the analyst is doing rather than looking like a stuck decision gate.
 func pillLabel(f *contract.Feature) string {
+	label := basePillLabel(f)
+	// Fast-mode marker (display-only): a `mode: fast` item carries a ⚡ suffix on
+	// every chip state, so a token-lean run is visibly different from a full one.
+	// Absent/unknown mode → the chip is byte-for-byte today's.
+	if f.FastMode() {
+		label += " ⚡fast"
+	}
+	return label
+}
+
+// basePillLabel is pillLabel's chip wording before the fast-mode suffix.
+func basePillLabel(f *contract.Feature) string {
 	switch b := badge(f); b {
 	case "authoring":
 		// Glyph + word (FR14b): a dim `✎ authoring` where an acceptable plan shows the

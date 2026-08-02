@@ -57,7 +57,7 @@ Runs **phase ① (plan) only**. Acts as the orchestrator, delegating ① to the
   mermaid chart.
 - **Stops for acceptance** — no code is written until you accept. Hard gate.
 
-### `/gogo:go [feature-slug]`
+### `/gogo:go [feature-slug] [--fast]`
 
 Runs **phases ② -> ③ -> ④ -> ⑤** for an accepted plan. Acts as the orchestrator
 in chat, so it can pause at gates.
@@ -72,6 +72,14 @@ in chat, so it can pause at gates.
   findings through the loop (fixable -> re-implement in-context; decision -> ask the
   user; clean/green -> advance) and keeps `state.md` current. Bounds
   implement<->review at ~3 rounds.
+- **`--fast`** (0.34.0, or auto-appended by the CLI for a `fastMode` source): loads
+  the `gogo-fast` skill instead of the full loop — ② implement + self-review +
+  self-test in ONE warm context (no per-round artifacts, objective green bar),
+  ③ ONE fresh `gogo-reviewer` pass (2-round bound), ④ an in-context final suite
+  run, ⑤ a short report. Non-critical findings surface at the UAT gate for the
+  user to accept (`/gogo:done` records them `accepted-by-user`) or bounce. Same
+  gates, events, and statuses; the run stamps an additive `mode: fast` state.md
+  line (a `⚡fast` chip on the board).
 - The four phase commands below are the same steps it chains.
 
 ### `/gogo:status`

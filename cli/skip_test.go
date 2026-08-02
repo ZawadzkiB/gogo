@@ -10,25 +10,29 @@ import (
 )
 
 // TestResolveSourceSkip (FR4, REV-001): resolveSourceSkip reads the projects store and
-// returns a flagged source's (planSkip, uatSkip, label) for a matching root, and
-// (false,false,"") for an unflagged or an UNREGISTERED root — the byte-for-byte fallback
-// that keeps an unregistered / single repo's gates intact.
+// returns a flagged source's (planSkip, uatSkip, fast, label) for a matching root, and
+// (false,false,false,"") for an unflagged or an UNREGISTERED root — the byte-for-byte
+// fallback that keeps an unregistered / single repo's gates and pipeline intact.
 func TestResolveSourceSkip(t *testing.T) {
 	t.Setenv("GOGO_DATA_HOME", t.TempDir())
 	if _, err := projects.Add(projects.Project{Name: "app", Sources: []projects.Source{
 		{Path: "/repos/flagged", Name: "flagged", PlanAcceptanceSkip: true, UatAcceptanceSkip: true},
+		{Path: "/repos/speedy", Name: "speedy", FastMode: true},
 		{Path: "/repos/plain", Name: "plain"},
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if p, u, label := resolveSourceSkip("/repos/flagged"); !p || !u || label != "flagged" {
-		t.Errorf("flagged resolveSourceSkip = (%v,%v,%q), want (true,true,flagged)", p, u, label)
+	if p, u, f, label := resolveSourceSkip("/repos/flagged"); !p || !u || f || label != "flagged" {
+		t.Errorf("flagged resolveSourceSkip = (%v,%v,%v,%q), want (true,true,false,flagged)", p, u, f, label)
 	}
-	if p, u, _ := resolveSourceSkip("/repos/plain"); p || u {
-		t.Errorf("plain resolveSourceSkip = (%v,%v), want (false,false)", p, u)
+	if p, u, f, label := resolveSourceSkip("/repos/speedy"); p || u || !f || label != "speedy" {
+		t.Errorf("speedy resolveSourceSkip = (%v,%v,%v,%q), want (false,false,true,speedy)", p, u, f, label)
 	}
-	if p, u, label := resolveSourceSkip("/repos/ghost"); p || u || label != "" {
-		t.Errorf("unregistered resolveSourceSkip = (%v,%v,%q), want (false,false,\"\")", p, u, label)
+	if p, u, f, _ := resolveSourceSkip("/repos/plain"); p || u || f {
+		t.Errorf("plain resolveSourceSkip = (%v,%v,%v), want (false,false,false)", p, u, f)
+	}
+	if p, u, f, label := resolveSourceSkip("/repos/ghost"); p || u || f || label != "" {
+		t.Errorf("unregistered resolveSourceSkip = (%v,%v,%v,%q), want (false,false,false,\"\")", p, u, f, label)
 	}
 }
 
@@ -85,6 +89,24 @@ func TestGoPathCarriesSkipParams(t *testing.T) {
 		}
 	})
 
+	t.Run("fastMode source → --fast appended + visible note", func(t *testing.T) {
+		root, slug := setupScratchFeature(t, "fastsource")
+		register(t, root, projects.Source{Name: "speedy", FastMode: true})
+		stateDir := t.TempDir()
+		wireStub(t, binDir, stateDir, slug, "happy")
+
+		out, code := captureStdout(t, func() int { return cmdGo([]string{slug}) })
+		if code != 0 {
+			t.Fatalf("cmdGo = %d, want 0", code)
+		}
+		if got := launchedCommand(t, stateDir); got != "/gogo:go "+slug+" --fast" {
+			t.Errorf("launched command = %q, want the --fast param", got)
+		}
+		if !strings.Contains(out, "fastMode") {
+			t.Errorf("fast note should announce the source opt-in (fastMode):\n%s", out)
+		}
+	})
+
 	t.Run("unflagged source → byte-for-byte today's command (no params, no note)", func(t *testing.T) {
 		root, slug := setupScratchFeature(t, "skipplain")
 		register(t, root, projects.Source{Name: "plain"})
@@ -98,8 +120,8 @@ func TestGoPathCarriesSkipParams(t *testing.T) {
 		if got := launchedCommand(t, stateDir); got != "/gogo:go "+slug {
 			t.Errorf("launched command = %q, want no skip params", got)
 		}
-		if strings.Contains(out, "planAcceptanceSkip") || strings.Contains(out, "uatAcceptanceSkip") {
-			t.Errorf("an unflagged source must print no skip note:\n%s", out)
+		if strings.Contains(out, "planAcceptanceSkip") || strings.Contains(out, "uatAcceptanceSkip") || strings.Contains(out, "fastMode") {
+			t.Errorf("an unflagged source must print no skip/fast note:\n%s", out)
 		}
 	})
 

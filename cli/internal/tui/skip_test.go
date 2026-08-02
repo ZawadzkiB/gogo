@@ -37,3 +37,28 @@ func TestBoardGoIntentCarriesSkipParams(t *testing.T) {
 		t.Errorf("done command = %q, must never carry gate-skip params", in.Command)
 	}
 }
+
+// TestBoardGoIntentCarriesFastParam: the board's go-launch intent carries a fastMode
+// source's --fast param — resolved by the card's OWN root through projects.FastForSource,
+// the SAME resolver `gogo go` uses (so the board and the CLI never drift). A non-fast
+// source's go stays byte-for-byte, and a non-go action never carries the param.
+func TestBoardGoIntentCarriesFastParam(t *testing.T) {
+	seedDataHome(t)
+	speedy := projects.Source{Name: "web", Path: "/repos/web", FastMode: true}
+	plain := projects.Source{Name: "api", Path: "/repos/api"}
+	repo := &contract.Repo{Features: []*contract.Feature{
+		{Slug: "wf", Source: "web", Root: "/repos/web", Class: contract.ClassUnfinished, Status: "plan-accepted"},
+		{Slug: "af", Source: "api", Root: "/repos/api", Class: contract.ClassUnfinished, Status: "plan-accepted"},
+	}}
+	m := sizedWorkspace(t, repo, proj("app", speedy, plain))
+
+	if in := m.intentFor(launch.ActionGo, m.repo.Feature("wf")); in.Command != "/gogo:go wf --fast" {
+		t.Errorf("fastMode go command = %q, want the --fast token appended", in.Command)
+	}
+	if in := m.intentFor(launch.ActionGo, m.repo.Feature("af")); in.Command != "/gogo:go af" {
+		t.Errorf("non-fast go command = %q, want no --fast param", in.Command)
+	}
+	if in := m.intentFor(launch.ActionDone, m.repo.Feature("wf")); strings.Contains(in.Command, "--fast") {
+		t.Errorf("done command = %q, must never carry the fast param", in.Command)
+	}
+}

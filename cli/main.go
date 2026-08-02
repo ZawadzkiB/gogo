@@ -20,7 +20,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.33.0"
+const Version = "0.34.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -203,6 +203,7 @@ plans tab keys (a 4-column KANBAN: drafts · ready · active · done):
   multi-line entry: in a goal/description textarea, enter inserts a new line · tab advances · ctrl+e opens $EDITOR; an optional attachments field takes one local path or http(s) URL per line (stored in the plan's front matter + named to the launched session)
   in a plan: ↑↓ work items · c create work item (spawn /gogo:plan --correlation) · + add source · v view · w web · m move · e edit · esc back
   auto-pickup: a work item spawned into a source with planAcceptanceSkip auto-runs /gogo:go on reload when its source is under cap; at cap it shows "trigger manually"
+  fast mode (fastMode, per SOURCE - config tab): every go-launch appends --fast, running the token-lean gogo-fast pipeline (one warm build+verify context + one fresh review); the card shows a fast chip
 
 concurrency cap (concurrentWorkItems, per SOURCE - config tab):
   0 = unlimited; N caps THAT source only - the cap ` + orchestrator.CapRuleClause + `.

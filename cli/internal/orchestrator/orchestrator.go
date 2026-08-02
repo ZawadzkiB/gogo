@@ -93,16 +93,22 @@ type Session struct {
 	// the `go` leg carries them. Both false → the command is byte-for-byte today's.
 	SkipAcceptance bool
 	SkipUAT        bool
+	// Fast appends the per-source fast-mode param (--fast) to the launched /gogo:go
+	// command — the gogo-fast token-lean pipeline. Set by `gogo go` from the SOURCE's
+	// config (projects.FastForSource); only the `go` leg carries it. False → the full
+	// pipeline byte-for-byte.
+	Fast bool
 }
 
-// goSkipSuffix is the FR4 gate-skip param suffix appended to this session's /gogo:go
-// command (only the `go` leg; the `plan` leg never carries them). "" when neither flag
-// is set — the byte-for-byte fallback.
+// goSkipSuffix is the per-source param suffix appended to this session's /gogo:go
+// command (only the `go` leg; the `plan` leg never carries them): the FR4 gate-skip
+// params plus the fast-mode param. "" when no flag is set — the byte-for-byte
+// fallback.
 func (s *Session) goSkipSuffix() string {
 	if s.Kind == "plan" {
 		return ""
 	}
-	return launch.SkipParams(s.SkipAcceptance, s.SkipUAT)
+	return launch.SkipParams(s.SkipAcceptance, s.SkipUAT) + launch.FastParam(s.Fast)
 }
 
 // RunnableStatus reports whether a feature's state.md status permits `gogo go` —

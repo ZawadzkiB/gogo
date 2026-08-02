@@ -120,6 +120,7 @@ gogo/
 │   ├── gogo-review/          #   ③ review
 │   ├── gogo-test/            #   ④ test
 │   ├── gogo-knowledge/       #   ⑤ report + knowledge update (strict + lenient)
+│   ├── gogo-fast/            #   ②→⑤ token-lean path for /gogo:go --fast (one warm context + one fresh review)
 │   ├── gogo-done/            #   ship: synthesize high-level entry (single or merged) → .gogo/changelog/ + build/print viewer link; no-slug = the in-chat ship table (never an interactive board)
 │   ├── gogo-view/            #   interactive viewer for plans + reports (rich draggable nodes + before/after compare)
 │   ├── gogo-status/          #   read-only overview + the shared work-index classifier (shipped/ready/in-progress/unfinished)

@@ -80,6 +80,7 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		b.srcCap = strconv.Itoa(s.ConcurrentWorkItems)
 		b.srcPlanSkip = s.PlanAcceptanceSkip
 		b.srcUatSkip = s.UatAcceptanceSkip
+		b.srcFastMode = s.FastMode
 	}
 	m.pendingSource = edit
 	m.binding = b
@@ -121,6 +122,10 @@ func (m *Model) startSourceForm(op string, s *projects.Source) {
 		// today's hard gate byte-for-byte.
 		huh.NewConfirm().Title("Skip plan-acceptance gate").Description("auto-accept this source's plans (planAcceptanceSkip)").Affirmative("Yes").Negative("No").Value(&b.srcPlanSkip),
 		huh.NewConfirm().Title("Skip UAT gate").Description("auto-pass this source's per-item UAT (uatAcceptanceSkip)").Affirmative("Yes").Negative("No").Value(&b.srcUatSkip),
+		// Fast-mode opt-in: go-launches append --fast and run the token-lean gogo-fast
+		// pipeline (one warm build+verify context + one fresh review). Default off →
+		// the full pipeline byte-for-byte.
+		huh.NewConfirm().Title("Fast mode").Description("token-lean pipeline for this source's go-launches (fastMode)").Affirmative("Yes").Negative("No").Value(&b.srcFastMode),
 	))
 	m.mode = modeForm
 }
@@ -250,6 +255,7 @@ func (m Model) finishSourceForm() (tea.Model, tea.Cmd) {
 		ConcurrentWorkItems: cap,
 		PlanAcceptanceSkip:  b.srcPlanSkip,
 		UatAcceptanceSkip:   b.srcUatSkip,
+		FastMode:            b.srcFastMode,
 	}
 	if _, err := projects.AddSource(edit.project, src); err != nil {
 		m.status = "save failed: " + err.Error()
@@ -425,6 +431,7 @@ func (m Model) viewConfigRight() string {
 		// byte-for-byte; when on, the gate auto-advances (--skip-acceptance / --skip-uat).
 		dimStyle.Render("plan-accept skip  ")+yesNo(s.PlanAcceptanceSkip),
 		dimStyle.Render("uat skip          ")+yesNo(s.UatAcceptanceSkip),
+		dimStyle.Render("fast mode         ")+yesNo(s.FastMode),
 	)
 
 	// Knowledge explorer (FR2): split the PROJECT-level cross-repo knowledge

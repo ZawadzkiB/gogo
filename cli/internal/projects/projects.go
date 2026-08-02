@@ -76,6 +76,13 @@ type Source struct {
 	// orthogonality: this removes the per-WORK-ITEM UAT; the project-UAT still gates
 	// the whole plan.
 	UatAcceptanceSkip bool `json:"uatAcceptanceSkip,omitempty"`
+	// FastMode, when true, opts this source's go-launches INTO the token-lean pipeline:
+	// the CLI appends `--fast` to the launched `/gogo:go` and the gogo-fast skill runs
+	// ②→⑤ as one warm build+verify context plus ONE fresh review pass (no per-round
+	// artifacts). Additive + optional (omitempty, schema stays 1), default false — an
+	// absent field keeps the full pipeline byte-for-byte. Gates are orthogonal: fast
+	// mode changes the phases, never the plan-acceptance/UAT gates.
+	FastMode bool `json:"fastMode,omitempty"`
 }
 
 // Project is a home-folder entity linking many sources. It is written to
@@ -425,6 +432,20 @@ func SkipForSource(sources []Source, root string) (planSkip, uatSkip bool) {
 		}
 	}
 	return false, false
+}
+
+// FastForSource resolves the per-source fast-mode opt-in of the SOURCE whose Path ==
+// root, or false when root is not a registered source — the fallback that keeps an
+// unregistered / single repo on the full pipeline byte-for-byte. A sibling of
+// SkipForSource (same lookup, same both-launch-paths sharing) kept separate so the
+// gate-skip resolver's signature and call sites stay untouched.
+func FastForSource(sources []Source, root string) bool {
+	for _, s := range sources {
+		if s.Path == root {
+			return s.FastMode
+		}
+	}
+	return false
 }
 
 // AllSources flattens every project's sources into one slice — what the

@@ -408,6 +408,19 @@ func SkipParams(planSkip, uatSkip bool) string {
 	return s
 }
 
+// FastParam returns the per-source fast-mode param to append to a `/gogo:go`
+// command for a source that opted into the token-lean pipeline (fastMode):
+// ` --fast`. Same injection-safety shape as SkipParams — a single fixed [a-z-]
+// token appended INSIDE the one trailing argv element, never reaching a shell.
+// The gogo skills honor it (the gogo-fast path); false → "" (the full pipeline
+// byte-for-byte).
+func FastParam(fast bool) string {
+	if fast {
+		return " --fast"
+	}
+	return ""
+}
+
 // ClaudePrintArgs builds the argv for a backgrounded `claude -p <command>` run
 // (the no-tmux fallback), with the permission flag spliced in as separate argv
 // elements ahead of -p.

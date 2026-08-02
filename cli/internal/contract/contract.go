@@ -127,6 +127,14 @@ func (f *Feature) WaitingForUser() bool { return f.Status == "waiting-for-user" 
 // its badge takes waiting-for-user priority (docs/cli-contract.md §2/§3).
 func (f *Feature) AwaitingUAT() bool { return f.Status == "awaiting-uat" }
 
+// FastMode reports whether this work item is being driven by the token-lean
+// gogo-fast pipeline — the additive `- **mode:** fast` state.md marker the fast
+// path stamps at its first write. It rides the lenient Extra map (unknown bolded
+// keys land there), so an absent/unknown value is simply false: a full-pipeline
+// or pre-0.34 item reads byte-for-byte as before, and this feeds DISPLAY only
+// (the ⚡ chip), never classification.
+func (f *Feature) FastMode() bool { return f.Extra["mode"] == "fast" }
+
 // Shipped reports whether the work item has reached its terminal shipped state,
 // keyed on the state.md STATUS (`shipped`, or the legacy `done`) — NOT on artifact
 // presence (a changelog entry outlives a mid-UAT re-plan, so gating on it would lie;

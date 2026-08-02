@@ -74,6 +74,15 @@ today's hard stops byte-for-byte. Orthogonal to the FR3 **project-UAT** (`gogo p
 done`): `uatAcceptanceSkip` drops the per-work-item UAT; the project-UAT still gates the
 whole cross-repo plan.
 
+**Per-source fast mode (since 0.34.0).** A source can opt INTO the token-lean pipeline
+via `fastMode` in its `config.json` (default false; edited in the config tab, shown in
+the source detail). When set, every go-launch path (headless `gogo go`, the board `g`,
+auto-pickup) appends **`--fast`** to the launched `/gogo:go` and prints a note; the
+skills run the `gogo-fast` path (one warm build+verify context + ONE fresh review pass +
+a short report) instead of the full per-round loop. Same gates, same events/state
+contract; the run's card carries a display-only `⚡fast` chip (the `mode: fast` state.md
+marker). Orthogonal to the gate-skips - any combination is valid.
+
 **Board keys:** `←→`/`h` columns · `↑↓`/`jk` cards · `space` select (ready) ·
 `enter` drill-in · `v` quick-view · `w` web page · `m` move/launch · `d` ship ·
 `a` attach session · `l` peek log · `P` **plan session** (since 0.32.0 - starts
@@ -150,7 +159,8 @@ the focused project's **sources** (`a` add · `x` remove · `e` edit a source's
 (since 0.24.0) splits **project knowledge** (`~/.gogo/projects/<name>/.knowledge/` - the
 cross-repo domain) from **source knowledge** (the focused source's `.gogo/knowledge/`)
 into two labelled groups. The source detail shows the two gate-skip flags
-(`plan-accept skip` / `uat skip`, both `no` by default). All writes land under `~/.gogo/`
+(`plan-accept skip` / `uat skip`, both `no` by default) plus the `fast mode` toggle
+(since 0.34.0, `no` by default). All writes land under `~/.gogo/`
 only - never a source's `.gogo/`. A capped source refuses a `gogo go` (or board
 `m`→go) that would start an `(N+1)`th live in-progress feature in it (so two build
 sessions can't clobber one working tree); `--force` overrides. `0` = unlimited; an

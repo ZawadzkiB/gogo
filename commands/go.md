@@ -1,6 +1,6 @@
 ---
 description: Implement an accepted plan through the implement → review → test → report loop, pausing only at real decisions.
-argument-hint: "[feature-slug]"
+argument-hint: "[feature-slug] [--fast]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Skill, Task, TodoWrite, AskUserQuestion
 model: opus
 ---
@@ -14,6 +14,15 @@ the fresh-eyes phases** to specialist agents (① `gogo-analyst` · ③ `gogo-re
 Target: $ARGUMENTS  (if empty, pick the most recent `.gogo/work/feature-*/` whose
 `state.md` is `plan-accepted` or a resumable mid-pipeline state
 (`implementing` / `reviewing` / `testing`); if several are candidates, ask which.)
+
+**`--fast`** (flag in $ARGUMENTS — typed by the user, or appended by the gogo CLI
+when this work item's SOURCE opted in via `fastMode`): run the token-lean path —
+load the **`gogo-fast`** skill and follow it INSTEAD of the full ③/④ delegation
+loop below (one warm build+verify context, ONE fresh `gogo-reviewer` pass, an
+in-context final suite run, a short report). The acceptance gate, resume rules,
+decision gates, and the UAT loop are identical either way. When the flag came
+from source config, print a visible `fast mode (source opted in via fastMode)`
+line. Absent the flag → the full pipeline below, byte-for-byte.
 
 Load the `gogo` skill and follow it:
 

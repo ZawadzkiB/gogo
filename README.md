@@ -203,12 +203,33 @@ Runs the plan phase only. Writes an accept-pending plan to
 checklist, and a mermaid chart) and **stops for your acceptance** - no code is
 written until you accept.
 
-**`/gogo:go [feature-slug]`**
+**`/gogo:go [feature-slug] [--fast]`**
 
 Implements the accepted plan through the implement → review → test → report loop -
 the orchestrator **runs ② implement in-context** (warm across the fix loop) and
 **delegates the fresh-eyes phases** (③ review, ④ test) to the specialist agents,
 pausing only at real decisions. Refuses to start until a plan is accepted.
+
+**`--fast` - the token-lean pipeline (0.34.0).** Fast mode trades the per-round
+fresh reviewer/tester spawns and their artifacts for **one warm build+verify
+context plus ONE fresh-eyes review before UAT**:
+
+```
+② implement + self-review + self-test (one warm context, no per-round artifacts)
+   → objective green bar (build/typecheck/unit/e2e via real exit codes)
+③ ONE fresh gogo-reviewer pass (2-round bound; criticals → one warm fix + delta re-review)
+④ final suite run in-context (no tester spawn)
+⑤ short report → awaiting-uat (non-critical findings surface for YOUR accept-or-bounce)
+```
+
+No `review-NN.md` / `test-NN.md` / mid-loop `issues.json` churn / mid-loop charts;
+the one `review/issues.json` plus a 1-2 page `report/report.md` remain. Same
+gates, same events/state contract, same UAT loop; `/gogo:done` records any
+findings you ship open as `accepted-by-user`. Use it for small/medium features
+where round-trips dominate cost; prefer the full pipeline for high-risk work. A
+source can opt in permanently via the CLI's per-source `fastMode` config (the
+cockpit then appends `--fast` to every go-launch and the board marks the run with
+a `⚡fast` chip).
 
 The implement → review → test → report phases are **also runnable on their own**
 - each is a thin, idempotent entry point to its phase skill that **validates its
@@ -505,7 +526,10 @@ cd cli && go build -o gogo .
   of its own per-work-item gates: `planAcceptanceSkip` / `uatAcceptanceSkip` (config-tab toggles) make
   `gogo go` append `--skip-acceptance` / `--skip-uat` to the launched `/gogo:go`, which the gogo skills
   honor as **pre-declared consent** (auto-record the plan acceptance / auto-pass UAT, exactly as a human
-  accept - never a silent bypass). All project data writes land under `~/.gogo/` only.
+  accept - never a silent bypass). Since **0.34.0** a source can also opt INTO the token-lean pipeline:
+  the `fastMode` toggle makes every go-launch append **`--fast`** (the `gogo-fast` skill: one warm
+  build+verify context + one fresh review pass - see `/gogo:go --fast` above), with the run marked by a
+  `⚡fast` chip on its card. All project data writes land under `~/.gogo/` only.
 - **Plans tab + spawn (since 0.21.0)** - a **plan** is a project-scoped, hand-editable markdown file
   at `~/.gogo/projects/<name>/.gogo/plans/<plan-id>.md` with a status lifecycle **draft → ready →
   active → done** (a "draft" is a plan in the draft status; an "epic" is a plan that owns members).
