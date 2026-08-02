@@ -25,16 +25,17 @@
 -->
 
 - **feature:** A modal launch confirmation with a per-launch --fast toggle
-- **phase:** plan            <!-- plan | implement | review | test | knowledge | done -->
-- **status:** plan-accepted   <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
+- **phase:** done            <!-- plan | implement | review | test | knowledge | done -->
+- **status:** shipped        <!-- awaiting-plan-acceptance | plan-accepted | implementing | reviewing | testing | waiting-for-user | awaiting-uat | done | shipped | aborted -->
 <!-- `awaiting-plan-acceptance` is only meaningful once plan.md EXISTS and is written (>= 2 `## ` sections):
      write this file AFTER plan.md. Until then every reader shows the item as `✎ authoring`, leaves it out of
      the "need you" gate count, and `m`/`M`/`gogo go`/`/gogo:accept` all refuse it (there is nothing to accept).
      Likewise fill in every `<...>` placeholder below - a placeholder reads as an EMPTY value. -->
 - **created:** 2026-08-02
 - **branch:** main
-- **iterations:** plan=1 · implement=0 · review=0 · test=0   <!-- add · uat=N once a UAT round loops back to planning -->
-- **resume:** implement — run /gogo:go launch-confirm-modal-and-fast-toggle AFTER card-selection-border ships (0.36.0; D1=B, D2=B, D3=A, D4=A)
+- **iterations:** plan=1 · implement=4 · review=2 · test=1   <!-- add · uat=N once a UAT round loops back to planning -->
+- **completed:** 2026-08-02
+- **resume:** none — shipped to .gogo/changelog/2026-08-02-launch-confirm-modal-and-fast-toggle/
 - **open-decision:** none
 <!-- optional, additive — include ONLY when this work item belongs to one or more cross-source plans (a LIST; stamped by /gogo:plan --correlation). Absent = today's behaviour, byte-for-byte.
      The example line below sits INSIDE this comment block, so readers skip it (a reader tracks

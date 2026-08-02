@@ -194,6 +194,27 @@ func TestConfirmDefaultsAreAlwaysExplicit(t *testing.T) {
 				fn, file, seeded)
 		}
 	}
+
+	// The go confirm's D1=B shape (0.36.0, REV-003): the Select's REAL default is
+	// binding.launchMode, not binding.confirm (launchConfirmed never reads confirm
+	// when launchMode is set) - so the convention's structural pin must bite on the
+	// field that actually decides. startFormOverriding must seed a NON-cancel
+	// launchMode: the full-pipeline base, optionally upgraded to fast by the
+	// source's config - and never Cancel, which would make a bare Enter silently
+	// abort the confirmation the user deliberately opened.
+	body, file := funcBody(t, []string{"move.go"}, "startFormOverriding")
+	if body == "" {
+		t.Fatal("could not find startFormOverriding in move.go")
+	}
+	if !strings.Contains(body, "m.binding.launchMode = goLaunchFull") {
+		t.Errorf("startFormOverriding (%s) does not seed the go Select's launchMode to goLaunchFull\n"+
+			"  the D1=B half of the confirm-default convention: the seeded option IS a launch,\n"+
+			"  so a bare Enter still submits the confirmation the user deliberately opened", file)
+	}
+	if strings.Contains(body, "m.binding.launchMode = goLaunchCancel") {
+		t.Errorf("startFormOverriding (%s) seeds the go Select's launchMode to goLaunchCancel\n"+
+			"  - a bare Enter would silently cancel a forward pipeline move (the TEST-001 shape)", file)
+	}
 }
 
 // funcBody returns the source text of function fn from the first of files that

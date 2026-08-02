@@ -1,0 +1,13 @@
+{
+  "slug": "launch-confirm-modal-and-fast-toggle",
+  "updated": "2026-08-02",
+  "members": ["launch-confirm-modal-and-fast-toggle"],
+  "note": "Single-member entry synthesized from the work report (0.36.0): the m/M/d launch confirm renders as a strip+dim modal over the recorded origin, and the go confirm is a three-option Select with a live one-producer command title; before/ holds the plan-time full-screen + config-only baseline.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "launch-confirm-modal-and-fast-toggle-flow.mmd",
+      "title": "launch-confirm-modal-and-fast-toggle: the launch confirm as a three-option Select rendered as a modal over its recorded origin; SetFastParam is the one producer of the shown AND launched command"
+    }
+  ]
+}

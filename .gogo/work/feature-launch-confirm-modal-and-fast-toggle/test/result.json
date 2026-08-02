@@ -1,0 +1,28 @@
+{
+  "slug": "launch-confirm-modal-and-fast-toggle",
+  "phase": "test",
+  "status": "ok",
+  "round": 1,
+  "inputs": [
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/plan.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/decisions.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/adjustments.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/review/issues.json",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/testing-tools.md",
+    ".gogo/knowledge/tech-stack.md",
+    ".gogo/knowledge/non-functional-requirements.md",
+    ".gogo/skills/tui-tmux-testing/SKILL.md"
+  ],
+  "outputs": [
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/test/issues.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/test-01.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/review/issues.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/state.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/events.jsonl"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 1,
+  "summary": "Go suite green (build+vet+test -race), live tmux drive of the real 0.36.0 binary at 200x50/120x30/80x24/60x15/60x14/46x9 plus a NO_COLOR pass confirmed the modal/fast-toggle behaviour and independently verified REV-006 and REV-007 (now verified); found one new minor issue (TEST-001, merged-ship modal hides Launch/Cancel at the 60x15 minimum until one Enter/Tab) - routes back to implement."
+}

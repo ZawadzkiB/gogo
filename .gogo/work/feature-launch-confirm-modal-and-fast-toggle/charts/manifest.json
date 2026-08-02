@@ -1,12 +1,12 @@
 {
   "slug": "launch-confirm-modal-and-fast-toggle",
   "updated": "2026-08-02",
-  "note": "INTENDED DESIGN (plan ①). One flow diagram: the two changes meet on one path - the launch intent's command is now decided by a bound toggle (binding.fast, applied by the single launch.SetFastParam producer at both the render and the launch end), and the modeForm render becomes a composite (background by recorded formOrigin + a bordered box spliced over it) with a named small-terminal fallback. No sequence/class/state diagram: no new types beyond two fields and two pure helpers, no new runtime interaction with another process, and no new pipeline states (mode/status/classifier are untouched).",
+  "note": "AS-BUILT (implement ②, 0.36.0). One flow diagram: the go confirm is the accepted D1=B three-option Select (Launch / Launch --fast / Cancel, seeded from HasFastParam over the command intentFor resolved, labels built by the same launch.SetFastParam producer doLaunch applies), and the modeForm render composites ONLY the launch-confirm site (D2=B) - background by recorded formOrigin (D4=A, replacing pickerOrigin), ansi-stripped + dimmed (D3=A), bordered box spliced over it, with the named small-terminal/unsized full-screen fallback. No sequence/class/state diagram: no new types beyond two binding fields and three pure helpers, no new runtime interaction with another process, and no new pipeline states (mode/status/classifier untouched).",
   "diagrams": [
     {
       "kind": "flow",
       "file": "flow.mmd",
-      "title": "Intended: the launch confirm renders as a modal composited over its recorded origin, and its per-launch fast toggle drives the exact command doLaunch runs"
+      "title": "As-built: the launch confirm is a three-option Select rendered as a modal over its recorded origin; SetFastParam is the one producer of the shown AND launched command"
     }
   ]
 }

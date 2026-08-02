@@ -1,0 +1,12 @@
+{
+  "slug": "launch-confirm-modal-and-fast-toggle",
+  "updated": "2026-08-02",
+  "note": "AS-BUILT (report ⑤, 0.36.0). One flow diagram: the go confirm is the accepted D1=B three-option Select (one-line labels; the exact command lives in the TITLE, re-evaluated live via TitleFunc through the same launch.SetFastParam producer doLaunch applies), rendered as a strip+dim modal (D3=A) over the recorded formOrigin (D4=A) at the one m/M/d launch-confirm site (D2=B, ship/accept included), with the 60x15 minimum + byte-for-byte full-screen fallback. No sequence/class/state diagram: no new types beyond two binding fields and four pure helpers, no new runtime interaction with another process, no new pipeline states.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-built: the launch confirm is a three-option Select rendered as a modal over its recorded origin; SetFastParam is the one producer of the shown AND launched command"
+    }
+  ]
+}

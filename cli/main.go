@@ -20,7 +20,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.35.0"
+const Version = "0.36.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry
@@ -191,6 +191,7 @@ view flags:
 board keys:
   ←→/h columns · ↑↓/jk cards · space select (ready) · enter drill-in · v quick-view
   w web page · m move/launch (accepts a plan-pending card) · M force past the source cap · d ship · a attach session
+  the m/M go confirm is a modal select over the board: Launch / Launch --fast / Cancel (seeded from the source's fastMode; per-launch only, config.json never written)
   l peek log · P plan session (starts /gogo:plan in tmux + attaches; joins a live one) · K kill a session (confirm; one/all picker if ≥2) · R re-assign a live session onto the focused card (renames it; every reader follows)
   S sessions panel (every live gogo-* session: re-assign or close) · x delete→trash · p project chip (unified board) · tab board/plans/config · @name / #plan-<id> filter · / filter · G glow · q quit
   ⏸ marks a card waiting on you (plan-acceptance / decision / UAT gate) · the status line counts sessions bound to no card here (unbound)

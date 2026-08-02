@@ -514,6 +514,17 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = modeBoard
 		return m, nil
 	}
+	// The launch-confirm modal lays its form out at the MODAL's inner size (FR10):
+	// rewrite an incoming terminal resize through the one size producer before
+	// forwarding, so the boxed form re-fits the new terminal. ok == false (small or
+	// unsized) → forward the RAW size — the same one rule that makes View() fall
+	// back to the full-screen form (FR12). Every other form keeps the raw size
+	// (D2=B: full-screen takeover unchanged).
+	if ws, ok := msg.(tea.WindowSizeMsg); ok && m.modalLaunchConfirm() {
+		if w, h, sized := modalFormSize(ws.Width, ws.Height); sized {
+			msg = tea.WindowSizeMsg{Width: w, Height: h}
+		}
+	}
 	// Esc aborts. huh binds only ctrl+c to Quit, so without this Esc would do
 	// nothing and a launch could feel un-escapable; ctrl+c still flows through
 	// the form and lands in StateAborted below.
@@ -589,22 +600,27 @@ func (m Model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.pendingPlanSpawn != nil {
 			return m.finishPlanSpawn()
 		}
-		if m.binding == nil || !m.binding.confirm {
-			// Completed on "Cancel" — same as an abort. Only a SHIP form reaches
-			// here (delete/kill forms are handled above), so the pending targets are
-			// nil and the ready-ship selection is (correctly) cleared.
+		if !m.binding.launchConfirmed() {
+			// Completed on "Cancel" — same as an abort. Only a LAUNCH-site form
+			// reaches here (delete/kill forms are handled above): a Confirm's Cancel
+			// (binding.confirm false), or the go Select's Cancel option (D1=B —
+			// launchConfirmed folds both discriminators into one rule). The
+			// ready-ship selection is (correctly) cleared.
 			return m.cancelForm(m.formPreservesSelection()), nil
 		}
 		// Build the launch command NOW (it captures pending + the edited release
-		// name), then clear the consumed launch state on the model we return so a
-		// later m/d can never re-ship this selection (TEST-002).
+		// name + the chosen launch mode), then clear the consumed launch state on
+		// the model we return so a later m/d can never re-ship this selection
+		// (TEST-002).
 		launchCmd := m.doLaunch()
 		m.selected = map[string]bool{}
 		m.pending = launch.Intent{}
 		m.pendingShip = false
 		m.binding = nil
 		m.form = nil
-		m.mode = modeBoard
+		// Finish returns to the RECORDED origin (FR15) — today always the board for
+		// this form, but recorded, never inferred.
+		m.mode = m.formOrigin
 		return m, launchCmd
 	case huh.StateAborted:
 		return m.cancelForm(m.formPreservesSelection()), nil
@@ -631,13 +647,16 @@ func (m Model) cancelForm(preserveSelection bool) Model {
 	// A kill/attach/adopt picker (or a P confirm) can be opened from the board OR
 	// the drill; cancelling one (Esc / abort) returns to the picker's ORIGIN mode —
 	// matching the Cancel-option paths (finishKill / finishAttach / finishAdopt),
-	// not bouncing the user somewhere they never were (REV-001). pickerOrigin is
+	// not bouncing the user somewhere they never were (REV-001). formOrigin is
 	// recorded where each picker starts — inferring it from `m.drill != nil` was
 	// stale for a board-originated picker after an earlier drill visit (the FR2
 	// in-passing fix). Every other form (ship / delete) cancels to the board.
 	returnMode := modeBoard
-	if m.pendingKill != nil || m.pendingAttach != nil || m.pendingAdopt != nil || m.pendingPlanSession != nil || m.pendingReassign != "" || m.pendingKillSession != "" {
-		returnMode = m.pickerOrigin
+	if m.pendingKill != nil || m.pendingAttach != nil || m.pendingAdopt != nil || m.pendingPlanSession != nil || m.pendingReassign != "" || m.pendingKillSession != "" ||
+		(m.binding != nil && m.binding.launchSite) {
+		// The launch confirm records its origin too (FR15) — cancel lands exactly
+		// where the modal was opened from, matching the picker rule.
+		returnMode = m.formOrigin
 	}
 	// A config-tab per-source form was opened while the config TAB was active;
 	// cancelling it returns to the tab's normal state (modeBoard renders the active
@@ -736,12 +755,12 @@ func attachOutcome(session string, err error) launchDoneMsg {
 
 // startAttachPicker opens the FR-2 attach picker (≥2 live sessions): one option
 // per session (value = session name) plus a Cancel option (attachCancel sentinel).
-// It records the ORIGIN mode (pickerOrigin) so a cancel restores exactly where the
+// It records the ORIGIN mode (formOrigin) so a cancel restores exactly where the
 // picker started, and binds the choice through the heap-stable
 // *formBinding.selected (TEST-001), exactly like the ship/kill forms.
 func (m *Model) startAttachPicker(f *contract.Feature, sessions []string) {
 	m.pendingAttach = sessions
-	m.pickerOrigin = m.mode
+	m.formOrigin = m.mode
 	m.binding = &formBinding{}
 	opts := make([]huh.Option[string], 0, len(sessions)+1)
 	for _, s := range sessions {
@@ -769,7 +788,7 @@ func (m Model) finishAttach() (tea.Model, tea.Cmd) {
 	m.pendingAttach = nil
 	m.binding = nil
 	m.form = nil
-	m.mode = m.pickerOrigin
+	m.mode = m.formOrigin
 	if sel == "" || sel == attachCancel {
 		m.status = "cancelled"
 		return m, nil
@@ -795,7 +814,7 @@ func (m Model) killDrill() (tea.Model, tea.Cmd) {
 // consistency with them.
 func (m *Model) startKillForm(f *contract.Feature, sessions []string) {
 	m.pendingKill = sessions
-	m.pickerOrigin = m.mode
+	m.formOrigin = m.mode
 	m.binding = &formBinding{confirm: false}
 	noun := "session"
 	if len(sessions) != 1 {
@@ -823,7 +842,7 @@ func (m *Model) startKillForm(f *contract.Feature, sessions []string) {
 // sibling — TEST-005), because the option value IS that exact session string.
 func (m *Model) startKillPicker(f *contract.Feature, sessions []string) {
 	m.pendingKill = sessions
-	m.pickerOrigin = m.mode
+	m.formOrigin = m.mode
 	m.binding = &formBinding{}
 	opts := make([]huh.Option[string], 0, len(sessions)+2)
 	for _, s := range sessions {
@@ -879,7 +898,7 @@ func (m Model) finishKill() (tea.Model, tea.Cmd) {
 	m.form = nil
 	// Return to the picker's ORIGIN (board `K` exists now, FR2) — modeDrill was
 	// correct only while the drill was the sole kill surface.
-	m.mode = m.pickerOrigin
+	m.mode = m.formOrigin
 	if len(targets) == 0 {
 		m.status = "cancelled"
 		return m, nil

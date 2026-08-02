@@ -462,7 +462,13 @@ cd cli && go build -o gogo .
   plan/in-progress card `m` runs `claude "/gogo:go <slug>"`; selecting ready cards
   (`space`) and pressing `m`/`d` runs `claude "/gogo:done a+b+c"` (multiple = ONE
   merged entry) - always behind a confirmation, in an attachable **tmux** session
-  (`a` attaches; gates stay answerable). Launches run in claude's **auto (classifier) permission mode** so
+  (`a` attaches; gates stay answerable). Since **0.36.0** that confirmation is a
+  **modal over the still-visible board** (dimmed backdrop; full-screen fallback on
+  a tiny terminal), and the go confirm is a **three-option select** - `Launch` /
+  `Launch --fast` / `Cancel` - seeded from the source's `fastMode` config, with the
+  exact command it will run shown in the confirm's title and **updated live** as
+  the selection moves; the choice is per-launch only and **never written back** to
+  the source's config. Launches run in claude's **auto (classifier) permission mode** so
   the skills' safe file steps don't nag inside an unwatched session (NOT a full
   bypass); set `GOGO_CLAUDE_PERMISSION_MODE` to override the value (any
   `claude --permission-mode` value; empty string omits the flag → claude prompts),

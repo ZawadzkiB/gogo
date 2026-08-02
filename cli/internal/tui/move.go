@@ -404,21 +404,27 @@ func (m Model) launchActionForce(ship, force bool) (tea.Model, tea.Cmd) {
 			override = unforced
 		}
 	}
-	m.startFormOverriding(intent, isShip, override)
-	return m, m.form.Init()
+	return m, m.startFormOverriding(intent, isShip, override)
 }
 
-// startForm builds the huh confirmation (a release-name input first, for a
-// merged ship of ≥2) and switches to form mode.
-func (m *Model) startForm(intent launch.Intent, isShip bool) {
-	m.startFormOverriding(intent, isShip, "")
-}
-
-// startFormOverriding is startForm plus the FR3.3 override note: when `M` is
-// skipping a cap bounce, the confirm carries that bounce verbatim (it already
-// names the cap and the blocking slugs) so the user sees exactly what they are
-// overriding. An empty note renders today's confirm byte-for-byte.
-func (m *Model) startFormOverriding(intent launch.Intent, isShip bool, override string) {
+// startFormOverriding builds the launch-site confirmation (a release-name input
+// first, for a merged ship of >=2) plus the FR3.3 override note: when `M` is
+// skipping a cap bounce, the confirm names the cap and the blocking slugs
+// (compressed by forcingNote) so the user sees exactly what they are
+// overriding. An empty note renders the unforced confirm byte-for-byte.
+//
+// A `go` intent gets the THREE-OPTION SELECT (D1=B) — Launch / Launch --fast /
+// Cancel — pre-highlighted on whichever mode the source's fastMode config
+// implies (the seed reads the command intentFor already resolved, so config and
+// seed agree by construction, FR1), with the EXACT command shown in the TITLE
+// and re-evaluated live as the selection moves (REV-001: labels stay one line).
+// Ship/accept intents keep the Launch/Cancel Confirm byte-for-byte (FR6: no
+// fast option where it does not apply).
+//
+// It returns the command to hand back to Update: the form's Init batched with
+// the modal layout (enterLaunchModal) — huh's protocol is async, so a caller
+// must never discard it (TEST-001).
+func (m *Model) startFormOverriding(intent launch.Intent, isShip bool, override string) tea.Cmd {
 	m.pending = intent
 	m.pendingShip = isShip
 	// A fresh, heap-stable binding for this form's fields (see formBinding).
@@ -431,6 +437,8 @@ func (m *Model) startFormOverriding(intent launch.Intent, isShip bool, override 
 	//     startPlanSpawnForm / startPlanDoneForm on the plans tab) seeds `true`, so the
 	//     affirmative starts highlighted and a bare **Enter submits** the confirmation
 	//     the user deliberately opened. Esc/Ctrl+C, or toggling to Cancel (n), aborts.
+	//     The go Select is this same rule in its D1=B shape: the seeded option IS a
+	//     launch, so a bare Enter still launches exactly the command shown.
 	//   - a DESTRUCTIVE or irreversible action (startDeleteForm in delete.go,
 	//     startKillForm in update.go) seeds `false`, so **Enter is safe** and the user
 	//     must arrow over to pick Delete/Kill on purpose.
@@ -439,7 +447,7 @@ func (m *Model) startFormOverriding(intent launch.Intent, isShip bool, override 
 	// unseeded binding on a plans-tab spawn made the same keystroke that launches on the
 	// board silently cancel there (TEST-001), and seeding `true` on a delete would make
 	// a stray Enter destructive.
-	m.binding = &formBinding{confirm: true}
+	m.binding = &formBinding{confirm: true, launchSite: true}
 
 	var fields []huh.Field
 	merged := isShip && len(intent.Slugs) >= 2
@@ -450,21 +458,114 @@ func (m *Model) startFormOverriding(intent launch.Intent, isShip bool, override 
 			Description(strings.Join(intent.Slugs, " + ")).
 			Value(&m.binding.release))
 	}
-	confirm := huh.NewConfirm().
-		Title(m.confirmSummary(intent)).
-		Affirmative("Launch").
-		Negative("Cancel").
-		Value(&m.binding.confirm)
-	if override != "" {
-		confirm = confirm.Description("FORCING past the source cap - " + override)
+	if intent.Action == launch.ActionGo {
+		// Every option label is ONE line (REV-001): huh sizes the group one row per
+		// option pre-wrap, then clamps the Select's viewport to those rows — so a
+		// wrapped label pushes the TAIL option (Cancel) out of view at realistic
+		// slugs/widths. The EXACT command lives in the TITLE instead, re-evaluated
+		// live via TitleFunc as the selection moves (Select commits the bound value
+		// on every cursor move; probe P3). Title and doLaunch build the command
+		// through the SAME producer (launch.SetFastParam), so what launches is what
+		// was shown (FR4) by construction. Options BEFORE Value: huh pre-selects by
+		// scanning the options already set when Value binds. The title closure
+		// captures the heap-stable binding, never the value-copied Model (TEST-001).
+		m.binding.launchMode = goLaunchFull
+		if launch.HasFastParam(intent.Command) {
+			m.binding.launchMode = goLaunchFast
+		}
+		b, cmd, tail := m.binding, intent.Command, m.confirmWhere(intent)
+		title := func() string {
+			return "will run: claude \"" + launch.SetFastParam(cmd, b.launchMode == goLaunchFast) + "\"  " + tail
+		}
+		sel := huh.NewSelect[string]().
+			Title(title()). // Title first, so title.val is never empty (no flicker)
+			TitleFunc(title, &b.launchMode).
+			Options(
+				huh.NewOption("Launch", goLaunchFull),
+				huh.NewOption("Launch --fast  (token-lean gogo-fast)", goLaunchFast),
+				huh.NewOption("Cancel", goLaunchCancel),
+			).
+			Value(&b.launchMode)
+		if override != "" {
+			sel = sel.Description("FORCING past the source cap - " + forcingNote(override))
+		}
+		fields = append(fields, sel)
+	} else {
+		confirm := huh.NewConfirm().
+			Title(m.confirmSummary(intent)).
+			Affirmative("Launch").
+			Negative("Cancel").
+			Value(&m.binding.confirm)
+		if override != "" {
+			confirm = confirm.Description("FORCING past the source cap - " + override)
+		}
+		fields = append(fields, confirm)
 	}
-	fields = append(fields, confirm)
 
-	m.form = newForm(huh.NewGroup(fields...))
+	return m.enterLaunchModal(newForm(huh.NewGroup(fields...)))
+}
+
+// enterLaunchModal is the launch confirm's form-entry step (FR9/FR10): it
+// records the ORIGIN view the modal composites over and every cancel/finish
+// returns to (recorded, never inferred — the formOrigin rule, D4=A), switches to
+// form mode, and lays the form out at the MODAL's inner size by feeding it a
+// WindowSizeMsg (P2 — the one path huh recomputes width AND height together;
+// Form.WithWidth is measured-broken, P1). On a too-small or unsized terminal
+// (modalFormSize ok == false) no size is fed, so the form lays out exactly as
+// every full-screen form does today — the same one rule View()'s FR12 render
+// fallback uses.
+func (m *Model) enterLaunchModal(f *huh.Form) tea.Cmd {
+	m.formOrigin = m.mode
+	m.form = f
 	m.mode = modeForm
+	cmds := []tea.Cmd{f.Init()}
+	if w, h, ok := modalFormSize(m.width, m.height); ok {
+		fm, cmd := m.form.Update(tea.WindowSizeMsg{Width: w, Height: h})
+		if ff, ok2 := fm.(*huh.Form); ok2 {
+			m.form = ff
+		}
+		// huh's protocol is async — dropping a form's own command is the TEST-001
+		// failure this codebase already paid for once. Batch, never discard.
+		cmds = append(cmds, cmd)
+	}
+	return tea.Batch(cmds...)
+}
+
+// forcingNote compresses the full cap bounce into the confirm's FORCING line
+// (REV-001, round 2): the bounce's remedy tail ("press M to force, ship one, …")
+// advises a gate the user has ALREADY passed by pressing M, and the rule clause
+// restates CapRuleClause — inside the confirm they only cost the rows the three
+// Select options need at small terminals (at 60x12 the full note left ZERO rows
+// for the options). What must survive is what is being OVERRIDDEN: the cap and
+// the blocking slugs (the 0.28.0 value, pinned by the force-confirm tests). The
+// full sentence still appears where it originated — the `m` bounce on the
+// status line.
+func forcingNote(override string) string {
+	if i := strings.Index(override, " (the cap "); i >= 0 {
+		return override[:i]
+	}
+	if i := strings.Index(override, "; press M to force"); i >= 0 {
+		return override[:i]
+	}
+	return override
+}
+
+// modalLaunchConfirm reports whether the ACTIVE form is the board launch confirm
+// (the startFormOverriding site) — the one form rendered as a centered modal
+// over its origin view (D2=B; the other form sites keep the full-screen
+// takeover for now). The marker lives on the heap-stable binding, so it dies
+// with the form on every close path.
+func (m Model) modalLaunchConfirm() bool {
+	return m.mode == modeForm && m.form != nil && m.binding != nil && m.binding.launchSite
 }
 
 func (m *Model) confirmSummary(intent launch.Intent) string {
+	return "will run: claude \"" + intent.Command + "\"  " + m.confirmWhere(intent)
+}
+
+// confirmWhere is the shared context tail of the launch confirms: where the
+// command runs, at which repo root, under which permission mode.
+func (m *Model) confirmWhere(intent launch.Intent) string {
 	where := "tmux session " + intent.Session
 	if !m.hasTmux {
 		where = "background (claude -p + log)"
@@ -478,7 +579,7 @@ func (m *Model) confirmSummary(intent launch.Intent) string {
 		at = "  at " + intent.Root
 	}
 	// FR8: state the effective permission mode the launch runs under.
-	return "will run: claude \"" + intent.Command + "\"  in " + where + at + "  · " + launch.PermissionSummary()
+	return "in " + where + at + "  · " + launch.PermissionSummary()
 }
 
 // doLaunch rebuilds the intent with the (possibly edited) release name and
@@ -497,6 +598,13 @@ func (m Model) doLaunch() tea.Cmd {
 		rebuilt := launch.BuildIntent(launch.ActionDone, intent.Slugs, m.binding.release)
 		rebuilt.Root = root // preserve the captured root across the release-name rebuild
 		intent = rebuilt
+	}
+	if m.binding != nil && m.binding.launchMode != "" {
+		// D1=B/FR4: apply the chosen launch mode through the SAME producer the option
+		// labels were built from (SetFastParam), so what launched is what was shown by
+		// construction. Command only — Session/Root/Slugs are untouched (FR4), and the
+		// toggle is per-launch only: the source's config.json is never written (FR5).
+		intent.Command = launch.SetFastParam(intent.Command, m.binding.launchMode == goLaunchFast)
 	}
 	if root == "" {
 		// No target root captured (the feature vanished between confirm and launch, or a

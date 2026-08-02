@@ -1,6 +1,32 @@
 # Plan — launch-confirm-modal-and-fast-toggle
 
-Status: **accepted** (user, 2026-08-02 — D1=B three-option select, D2=B launch-confirm only, D3=A dimmed backdrop, D4=A formOrigin)
+Status: **as-built** (shipped as 0.36.0, 2026-08-02; accepted with D1=B three-option select, D2=B launch-confirm only, D3=A dimmed backdrop, D4=A formOrigin — see *As built* below for the deltas the review/test rounds drove)
+
+## As built (0.36.0) — deltas from the drafted approach
+
+The plan below is the accepted contract; four things shipped differently, all logged
+in [adjustments.md](./adjustments.md) and the issues lists:
+
+- **D1=B, refined by REV-001:** the go confirm is the three-option Select (`Launch` /
+  `Launch --fast  (token-lean gogo-fast)` / `Cancel`) — but the exact command lives in
+  the **title**, re-evaluated **live** via `TitleFunc` as the selection moves (huh sizes
+  a Select one *pre-wrap* row per option, so a command-carrying label pushed `Cancel`
+  out of view at realistic slugs/widths). One producer holds: title and `doLaunch` both
+  build the command through `launch.SetFastParam`.
+- **D2=B is the form SITE:** the modal composites the one `m`/`M`/`d` launch-confirm
+  site — ship and accept confirms included; `P` and the other 14 sites stay
+  full-screen (REV-002, documented in docs/cli-contract.md).
+- **The modal minimum is 60x15, not 60x12** (REV-006 — measured with a real-length
+  repo root wrapping the title); below it, or unsized, the render is the old
+  full-screen form byte-for-byte, and huh's default-width truncation there is
+  pre-existing 0.35.0 behaviour.
+- **The `M` FORCING note is compressed** to the cap + blocking slugs (`forcingNote`) —
+  the bounce's remedy tail advises a gate already passed and cost the options their
+  rows at small sizes. The merged-ship modal at exactly 60x15 shows its Launch/Cancel
+  row after one Enter (focus-follow; pinned by test, TEST-001 accepted as-designed).
+
+The f-toggle prose in FR2/FR3 below reads as drafted (D1=A); the accepted D1=B Select
+supersedes it — FR2's "f flips it" became "the selection flips it, title updates live".
 
 **In one sentence:** the cockpit's launch confirmation **replaces the whole screen** with a
 bare huh form (which is why it reads as "a new window opened"), and it can only launch at

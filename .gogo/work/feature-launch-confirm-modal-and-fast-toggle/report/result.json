@@ -1,0 +1,31 @@
+{
+  "slug": "launch-confirm-modal-and-fast-toggle",
+  "phase": "report",
+  "status": "ok",
+  "inputs": [
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/plan.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/state.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/decisions.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/adjustments.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/review/issues.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/test/issues.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/charts/manifest.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/charts/before/manifest.json"
+  ],
+  "outputs": [
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/report/report.md",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/report/flow.mmd",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/report/manifest.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/report/layouts.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/report/before/flow.mmd",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/report/before/manifest.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/report/before/layouts.json",
+    ".gogo/work/feature-launch-confirm-modal-and-fast-toggle/plan.md",
+    ".gogo/knowledge/coding-rules.md",
+    ".gogo/knowledge/test-strategy.md",
+    ".gogo/knowledge/tech-stack.md"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Clean green run reported: 0.36.0 launch-confirm modal + per-launch fast select. Plan finalized to as-built (4 documented deltas), before/after flow set bundled, 3 owned knowledge docs updated (huh one-line-label gotcha, fixture-realism rule, test count 598). Feature parked at the UAT gate (awaiting-uat)."
+}

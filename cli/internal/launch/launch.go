@@ -408,6 +408,11 @@ func SkipParams(planSkip, uatSkip bool) string {
 	return s
 }
 
+// FastToken is the exact `--fast` token — the single spelling every producer
+// and consumer of the fast-mode param shares (FastParam, HasFastParam,
+// SetFastParam), so the flag can never drift into two spellings.
+const FastToken = "--fast"
+
 // FastParam returns the per-source fast-mode param to append to a `/gogo:go`
 // command for a source that opted into the token-lean pipeline (fastMode):
 // ` --fast`. Same injection-safety shape as SkipParams — a single fixed [a-z-]
@@ -416,9 +421,45 @@ func SkipParams(planSkip, uatSkip bool) string {
 // byte-for-byte).
 func FastParam(fast bool) string {
 	if fast {
-		return " --fast"
+		return " " + FastToken
 	}
 	return ""
+}
+
+// HasFastParam reports whether cmd carries the --fast token, compared
+// FIELD-EXACTLY (whitespace-split, never a substring — the TEST-005 rule
+// applied to a token: a slug like `fast-path`, or `--fastest`, must never read
+// as fast mode).
+func HasFastParam(cmd string) bool {
+	for _, f := range strings.Fields(cmd) {
+		if f == FastToken {
+			return true
+		}
+	}
+	return false
+}
+
+// SetFastParam returns cmd with the --fast token present (fast=true) or absent
+// (fast=false): idempotent in both directions, a no-op when cmd already
+// matches, appending at the end when adding. This is the ONE producer of a
+// per-launch fast override — the launch confirm's option labels and doLaunch's
+// spawned command are both built here, so what launched is what was shown by
+// construction, never by agreement.
+func SetFastParam(cmd string, fast bool) string {
+	if fast == HasFastParam(cmd) {
+		return cmd
+	}
+	if fast {
+		return cmd + " " + FastToken
+	}
+	fields := strings.Fields(cmd)
+	out := fields[:0]
+	for _, f := range fields {
+		if f != FastToken {
+			out = append(out, f)
+		}
+	}
+	return strings.Join(out, " ")
 }
 
 // ClaudePrintArgs builds the argv for a backgrounded `claude -p <command>` run

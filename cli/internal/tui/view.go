@@ -25,19 +25,50 @@ func (m Model) View() string {
 		return m.viewViewer()
 	case modeForm:
 		if m.form != nil {
+			// D2=B: ONLY the board launch confirm composites as a modal over its
+			// origin view; every other form keeps the full-screen takeover. On a
+			// too-small or unsized terminal the modal is not attempted at all
+			// (FR12) — the fallback below is today's full-screen form
+			// byte-for-byte, by the same one rule the layout side uses.
+			if m.modalLaunchConfirm() {
+				if _, _, ok := modalFormSize(m.width, m.height); ok {
+					return overlayCenter(m.viewBehindForm(), modalBoxStyle.Render(m.form.View()), m.width, m.height)
+				}
+			}
 			return "\n" + m.form.View() + "\n"
 		}
 		return ""
 	default:
-		if m.global() {
-			switch m.tab {
-			case tabPlans:
-				return m.viewTabBar() + "\n\n" + m.viewPlans()
-			case tabConfig:
-				return m.viewTabBar() + "\n\n" + m.viewConfig()
-			}
+		return m.viewTab()
+	}
+}
+
+// viewTab renders the active TAB's normal body — View()'s default (no
+// within-tab mode) render, and the tab half of the modal's background
+// (viewBehindForm). One producer for both, so they can never disagree.
+func (m Model) viewTab() string {
+	if m.global() {
+		switch m.tab {
+		case tabPlans:
+			return m.viewTabBar() + "\n\n" + m.viewPlans()
+		case tabConfig:
+			return m.viewTabBar() + "\n\n" + m.viewConfig()
 		}
-		return m.viewBoard()
+	}
+	return m.viewBoard()
+}
+
+// viewBehindForm renders the view the modal composites over (FR9): the RECORDED
+// formOrigin — board/plans/config tab (the default), the drill, or the sessions
+// panel — never inferred from other state (the pickerFromDrill lesson).
+func (m Model) viewBehindForm() string {
+	switch m.formOrigin {
+	case modeDrill:
+		return m.viewDrill()
+	case modeSessions:
+		return m.viewSessions()
+	default:
+		return m.viewTab()
 	}
 }
 

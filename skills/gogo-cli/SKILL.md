@@ -82,6 +82,14 @@ skills run the `gogo-fast` path (one warm build+verify context + ONE fresh revie
 a short report) instead of the full per-round loop. Same gates, same events/state
 contract; the run's card carries a display-only `⚡fast` chip (the `mode: fast` state.md
 marker). Orthogonal to the gate-skips - any combination is valid.
+**Per-launch override (since 0.36.0):** the board's `m`/`M` confirm is a three-option
+select - `Launch` / `Launch --fast` / `Cancel` - pre-highlighted on whichever mode the
+source's `fastMode` implies, with the exact command it will run shown live in the
+confirm's title, so any single run can go fast (or full) regardless of the config
+default. The choice is per-launch only: `config.json` is never written, and the next
+launch re-seeds from the config. (The headless `gogo go` still follows the config
+alone.) The confirm renders as a **modal over the still-visible board** (dimmed
+backdrop; full-screen fallback below 60x15).
 
 **Board keys:** `←→`/`h` columns · `↑↓`/`jk` cards · `space` select (ready) ·
 `enter` drill-in · `v` quick-view · `w` web page · `m` move/launch · `d` ship ·

@@ -203,7 +203,7 @@ func TestSessionsPanelReassign(t *testing.T) {
 		}
 	})
 
-	// The Cancel OPTION is the picker's second cancel door (the plan: pickerOrigin
+	// The Cancel OPTION is the picker's second cancel door (the plan: formOrigin
 	// on Cancel *and* Esc) — drive it too, so neither leg is unpinned (REV-005).
 	t.Run("the Cancel option returns to the panel", func(t *testing.T) {
 		m, rr, _ := panelModel(t)

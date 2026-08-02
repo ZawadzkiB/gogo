@@ -122,6 +122,17 @@ hard way in that same round:
 - **Report the sweep, with counts.** e.g. "24 mutations, compile-checked first, all fail,
   each in the expected test" is a claim a reader can audit; "tests added" is not.
 
+### Fixture realism: vary slug/root LENGTHS in View() assertions (since 0.36.0)
+A View() assertion is only as strong as the widest content the fixture feeds it. In
+0.36.0 review measured the go confirm's Cancel option **invisible for any slug over
+34 chars at any width** - and the suite green, because the only fixture slug was
+4 chars at 200x40 (REV-001); the round-2 re-probe then found the modal's minimum
+optimistic because no fixture ever varied the **repo root** length wrapping the
+title (REV-006). Rule: any test asserting rendered layout/content must include at
+least one **realistic-length** slug (use the feature's own 36-char slug) and one
+realistic root, and exercise the SMALL end of the size range, not just the
+comfortable one.
+
 ### Assertion vacuity — the fourteen-variant catalog (0.28.0 + 0.29.0)
 Fourteen distinct ways an assertion (or the mutation sweep itself) looks like a
 check while checking nothing. The standing rule stays above (mutation IS the

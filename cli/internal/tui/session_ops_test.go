@@ -1,7 +1,7 @@
 package tui
 
 // Session-binding ops (0.32.0): board/drill P (plan in an attached session),
-// board K (the promoted kill picker + the pickerOrigin cancel fix), R (re-assign
+// board K (the promoted kill picker + the formOrigin cancel fix), R (re-assign
 // a live session onto the item it is really driving), the unbound-session count,
 // and the footer chips that follow the symptom. Driven through Update with the
 // launcher/killer/renamer seams — fire-exactly-once assertions, no real tmux.
@@ -180,8 +180,8 @@ func TestBoardKill(t *testing.T) {
 
 		nm, _ := m.Update(runes("K"))
 		m = nm.(Model)
-		if m.mode != modeForm || m.pendingKill == nil || m.pickerOrigin != modeBoard {
-			t.Fatalf("board K did not open a board-origin kill picker (mode=%d origin=%d)", m.mode, m.pickerOrigin)
+		if m.mode != modeForm || m.pendingKill == nil || m.formOrigin != modeBoard {
+			t.Fatalf("board K did not open a board-origin kill picker (mode=%d origin=%d)", m.mode, m.formOrigin)
 		}
 		m = keyPress(t, m, runes("j"))                     // 2nd option
 		m = keyPress(t, m, tea.KeyMsg{Type: tea.KeyEnter}) // select + submit
@@ -245,7 +245,7 @@ func TestBoardKill(t *testing.T) {
 		m = nm.(Model)
 		m = keyPress(t, m, tea.KeyMsg{Type: tea.KeyEsc})
 		if m.mode != modeBoard {
-			t.Errorf("board-origin kill cancel left mode=%d, want the board (pickerOrigin fix)", m.mode)
+			t.Errorf("board-origin kill cancel left mode=%d, want the board (formOrigin fix)", m.mode)
 		}
 	})
 }

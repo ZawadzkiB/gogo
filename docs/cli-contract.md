@@ -380,6 +380,29 @@ only truthful live-session state sooner.
   / `-`) when sessions are present; with tmux absent or nothing running the table is
   byte-for-byte the pre-0.29.0 one.
 
+### Changed in 0.36.0 (presentation/interaction only - no `.gogo/` key, no command surface, no classifier input)
+
+- **The board launch confirm renders as a MODAL over the view it was opened from**
+  (a bordered box composited over the ANSI-stripped, dimmed board) instead of a
+  full-screen form takeover - on a terminal at least 60x15; below that (or before
+  the first resize event) it falls back to the old full-screen form byte-for-byte.
+  The modal's scope is the ONE launch-confirm form site serving `m`/`M`/`d`: the
+  **ship (`d`) and accept confirms share it and render as modals too** (incl. the
+  merged-ship release-name input). Every other cockpit form (delete, kill, the
+  pickers, config/plans-tab forms, and the `P` plan-session confirm - a launch
+  confirm at a different site) keeps the full-screen takeover.
+- **The `m`/`M` go confirm is a three-option select** - `Launch` / `Launch --fast`
+  / `Cancel` - pre-highlighted on whichever mode the source's `fastMode` config
+  implies, with the exact command it will run shown in the confirm's TITLE and
+  re-evaluated live as the selection moves; a bare
+  Enter still launches exactly the command shown, once. The choice is
+  **per-launch only**: the source's `config.json` is never written, and the next
+  launch re-seeds from the config. Ship/accept/plan confirms keep the
+  Launch/Cancel shape (`y`/`n` still work there; the go select drops them).
+- Nothing a headless consumer reads changed: `intentFor`'s resolved command, the
+  session-name convention, §2's enum, §3's classes and the class→column mapping
+  are all byte-for-byte 0.35.0's.
+
 ### Changed in 0.33.0 (all additive - CLI-owned tmux acts + a retired external board; no `.gogo/` key added or changed)
 
 - **`S` opens the sessions panel** (board + drill): every live `gogo-*` session as a

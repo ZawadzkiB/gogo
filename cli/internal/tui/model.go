@@ -128,6 +128,40 @@ type formBinding struct {
 	// Config-tab project label-color form field (cockpit-colors FR4): the project's
 	// origin color (hex or a swatch name) as a STRING bound heap-stably (TEST-001).
 	projColor string
+	// Launch-confirm fields (launch-confirm-modal-and-fast-toggle). launchSite marks
+	// the binding as the board launch confirm's (the startFormOverriding site) — the
+	// ONE form rendered as a modal over its origin view (D2=B; every other form site
+	// keeps the full-screen takeover for now). launchMode is the go confirm's
+	// three-option Select value (D1=B: goLaunchFull / goLaunchFast / goLaunchCancel),
+	// "" on every non-go confirm — ship/accept keep binding.confirm as their
+	// discriminator. Living on the heap-stable binding means every existing close
+	// path (binding = nil) clears both — no new pending* contract entries (TEST-001).
+	launchSite bool
+	launchMode string
+}
+
+// The go confirm's Select values (D1=B): the board launch confirm lists both
+// launch modes plus Cancel instead of a Launch/Cancel Confirm, pre-highlighted
+// on whichever the source's fastMode config implies. Plain ASCII; they live
+// only in binding.launchMode.
+const (
+	goLaunchFull   = "launch"
+	goLaunchFast   = "launch-fast"
+	goLaunchCancel = "launch-cancel"
+)
+
+// launchConfirmed reports whether a completed launch-site form chose to LAUNCH:
+// the go Select (launchMode set, D1=B) launches unless Cancel was picked; every
+// other confirm keeps the binding.confirm discriminator. nil-safe (nil binding
+// = cancel), so updateForm's completion branch reads as one rule.
+func (b *formBinding) launchConfirmed() bool {
+	if b == nil {
+		return false
+	}
+	if b.launchMode != "" {
+		return b.launchMode != goLaunchCancel
+	}
+	return b.confirm
 }
 
 // gogoKeyMap is huh's default keymap with ONLY the Text group rebound
@@ -357,16 +391,20 @@ type Model struct {
 	// pendingReassign marks the sessions panel's in-flight `R` target picker
 	// (0.33.0 FR4): the live session name the chosen work item is renamed FOR.
 	// pendingKillSession is the panel's `K` confirm target. "" when no such form
-	// is open. Both route back to the panel via pickerOrigin.
+	// is open. Both route back to the panel via formOrigin.
 	pendingReassign    string
 	pendingKillSession string
-	// pickerOrigin is the mode a kill/attach/adopt picker (or a P confirm) was opened
-	// FROM — set where each picker starts, so cancel/finish restore exactly that mode.
-	// It replaces the pickerFromDrill bool, which inferred the origin from
-	// `m.drill != nil` — stale for a board-originated picker after an earlier drill
-	// visit, landing the user in a drill they never opened (FR2's in-passing fix).
-	pickerOrigin mode
-	binding      *formBinding // heap-stable targets for the live huh fields
+	// formOrigin is the mode a form that RECORDS an origin was opened FROM — the
+	// kill/attach/adopt pickers, the P confirm, and the board launch confirm (which
+	// also composites its modal over this view, FR9) — set where each form starts,
+	// so cancel/finish restore exactly that mode and the modal's background can
+	// never disagree with the return mode (D4=A: one field for one question,
+	// TEST-006). It subsumes pickerOrigin, which itself replaced the pickerFromDrill
+	// bool that INFERRED the origin from `m.drill != nil` — stale for a
+	// board-originated picker after an earlier drill visit, landing the user in a
+	// drill they never opened. Origin is recorded, never inferred.
+	formOrigin mode
+	binding    *formBinding // heap-stable targets for the live huh fields
 
 	// peek (FR7): a read-only session-log viewer reusing the async viewer.
 	peeking     bool   // the open viewer is a session-log peek (r re-captures)

@@ -190,7 +190,7 @@ func (m *Model) startPlanSessionForm(f *contract.Feature) {
 	in.Root = m.rootFor(f)
 	m.pending = in
 	m.pendingPlanSession = f
-	m.pickerOrigin = m.mode
+	m.formOrigin = m.mode
 	m.binding = &formBinding{confirm: true}
 	m.form = newForm(huh.NewGroup(
 		huh.NewConfirm().
@@ -215,7 +215,7 @@ func (m Model) finishPlanSession() (tea.Model, tea.Cmd) {
 	m.pending = launch.Intent{}
 	m.binding = nil
 	m.form = nil
-	m.mode = m.pickerOrigin
+	m.mode = m.formOrigin
 	if !confirmed || f == nil {
 		m.status = "cancelled"
 		return m, nil
@@ -303,7 +303,7 @@ func (m Model) adoptFeature(f *contract.Feature) (tea.Model, tea.Cmd) {
 // building item mints a BUILD session — which counts against the source cap.
 func (m *Model) startAdoptPicker(f *contract.Feature) {
 	m.pendingAdopt = f
-	m.pickerOrigin = m.mode
+	m.formOrigin = m.mode
 	m.binding = &formBinding{}
 	newName := launch.SessionNameFor(bindAction(f), f.Slug)
 	opts := make([]huh.Option[string], 0, len(m.sessionMeta)+1)
@@ -357,7 +357,7 @@ func (m Model) finishAdopt() (tea.Model, tea.Cmd) {
 	m.pendingAdopt = nil
 	m.binding = nil
 	m.form = nil
-	m.mode = m.pickerOrigin
+	m.mode = m.formOrigin
 	if sel == "" || sel == adoptCancel || target == nil {
 		m.status = "cancelled"
 		return m, nil
@@ -448,7 +448,7 @@ func (m Model) hasDrivableFeature() bool {
 // explains, a missing row puzzles.
 func (m *Model) startReassignPicker(session string) {
 	m.pendingReassign = session
-	m.pickerOrigin = m.mode
+	m.formOrigin = m.mode
 	m.binding = &formBinding{}
 	var opts []huh.Option[string]
 	for _, f := range m.repo.Features {
@@ -475,7 +475,7 @@ func (m *Model) startReassignPicker(session string) {
 
 // finishReassignSession runs after the panel's `R` picker completes: resolve the
 // chosen feature by its workspace-unique key, then hand (session, target) to the
-// shared reassign core. The user stays in the panel (pickerOrigin).
+// shared reassign core. The user stays in the panel (formOrigin).
 func (m Model) finishReassignSession() (tea.Model, tea.Cmd) {
 	session := m.pendingReassign
 	sel := ""
@@ -485,7 +485,7 @@ func (m Model) finishReassignSession() (tea.Model, tea.Cmd) {
 	m.pendingReassign = ""
 	m.binding = nil
 	m.form = nil
-	m.mode = m.pickerOrigin
+	m.mode = m.formOrigin
 	if sel == "" || sel == adoptCancel || session == "" {
 		m.status = "cancelled"
 		return m, nil
@@ -509,7 +509,7 @@ func (m Model) finishReassignSession() (tea.Model, tea.Cmd) {
 // actions must not submit on a bare Enter).
 func (m *Model) startKillSessionForm(session string) {
 	m.pendingKillSession = session
-	m.pickerOrigin = m.mode
+	m.formOrigin = m.mode
 	m.binding = &formBinding{confirm: false}
 	m.form = newForm(huh.NewGroup(
 		huh.NewConfirm().
@@ -531,7 +531,7 @@ func (m Model) finishKillSession() (tea.Model, tea.Cmd) {
 	m.pendingKillSession = ""
 	m.binding = nil
 	m.form = nil
-	m.mode = m.pickerOrigin
+	m.mode = m.formOrigin
 	if !confirmed || session == "" {
 		m.status = "cancelled"
 		return m, nil

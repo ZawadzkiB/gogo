@@ -132,6 +132,14 @@ Generated-by: /gogo:build
   `awaiting-card`). Parse the `gogo-<action>-<sanitized-slug>` convention (plus
   the numeric collision suffix) where it is OWNED — the launch package — and
   compare the slug component exactly (`launch.SessionMatchesSlug`).
+- **huh Select option labels stay ONE line (REV-001, 0.36.0, measured):** huh
+  sizes a group one PRE-WRAP row per option, then clamps the field to that
+  height on every WindowSizeMsg — a wrapped multi-line label silently pushes the
+  TAIL options out of the viewport (Cancel vanished at realistic slug lengths).
+  Put variable text (commands, paths) in `TitleFunc`/`DescriptionFunc` bound to
+  the heap-stable binding instead — huh re-evaluates them live as the bound
+  value changes. `Select.Height()` won't hold: `Group.WithHeight` re-applies
+  field heights on every resize.
 
 ## Style
 - Plain ASCII where practical; the phase glyphs `①②③④⑤` are an intentional exception.
