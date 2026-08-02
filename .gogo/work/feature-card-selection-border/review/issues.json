@@ -1,0 +1,60 @@
+{
+  "slug": "card-selection-border",
+  "track": "review",
+  "round": 2,
+  "updated": "2026-08-02",
+  "issues": [
+    {
+      "id": "REV-001",
+      "title": "FR3 (focused+selected keeps the select accent) has no test that bites - TestSelectedAndFocusedBothVisible passes with the wiring deleted",
+      "description": "cli/internal/tui/card_selection_test.go:135-159. The test's own comment claims it pins that \"the focused+selected frame style stays on the select accent\", and the plan's Tests table names it as FR3's guard. Its render-level assertions are only `strings.Contains(out, \"\\u2713\")` and `strings.Contains(out, \"\\u2551\")`; the select-accent claim is asserted against `columnStyles[i].cardFocusedSelected.GetBorderTopForeground()`, i.e. against the STYLE VALUE, never against what renderCard picks. Both render assertions still hold if renderCard falls back to `cardFocused` (the column accent): the ✓ comes from `selMarkStyle.Render(\"✓ \")` in the body regardless of the frame, and ║ comes from any double-border style. Mutation verified: deleting `case focused && selected: style = columnStyles[colIdx].cardFocusedSelected` from cli/internal/tui/view.go:770-771 leaves the ENTIRE cli/internal/tui suite green (only the unrelated, path-dependent TestTemplateScaffoldRendersNoCorrelationChip fails in the out-of-tree copy). This is exactly code-review-standards.md #11(b) - \"a wiring was named in the plan, shipped, and had no test that bites\" - and #11's \"a test whose comment claims coverage its assertions do not provide\". The production code is correct today; nothing stops it from silently regressing.\n\n[Round 2 verification] VERIFIED. Re-ran the exact mutation (deleted the `case focused && selected:` arm from renderCard in view.go): `go test ./ -run TestSelectedAndFocusedBothVisible` now FAILS at card_selection_test.go:168 - \"focused+selected card renders the focused-only frame — the select accent was swallowed: \\x1b[38;5;111m╔…\" (the blue column-0 accent). Restored; suite green (`go test ./internal/tui/` ok, 7.8s) and `git diff` byte-identical to pre-check. The column-0 choice is sound: columnAccent[2] Dark #5db97a == selectAccent Dark #5db97a (styles.go:46-57), so column 2 could not separate the two arms, while column 0 (#2f6fe0/#7aa8ff blue) differs from the select green under BOTH light and dark adaptive resolutions.",
+      "proposed_solution": "AGENT-FIXABLE. Make the assertion name the exact reason. Cheapest honest form: inside TestSelectedAndFocusedBothVisible call `forceColors(t)` and compare renders - assert that the focused+selected card's border SGR run equals the one produced by `lipgloss.NewStyle().Foreground(selectAccent).Render(\"║\")` and that the focused-only card of the SAME column renders a DIFFERENT border colour (so the two arms cannot collapse). Alternative, per code-review-standards #11(a): extract the frame decision into a package-level pure func `cardFrame(colIdx int, focused, selected bool) lipgloss.Style` used by renderCard, and assert `cardFrame(2,true,true)` == `columnStyles[2].cardFocusedSelected` and `cardFrame(2,true,false)` == `columnStyles[2].cardFocused`. Re-run the mutation (delete the focused&&selected branch) and prove at least one test fails.",
+      "severity": "major",
+      "priority": "P1",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "TestSelectedAndFocusedBothVisible now forces colours and compares rendered TOP BORDERS on column 0 (blue - ready col 2 shares selectAccent by palette design): deleting the focused&&selected arm makes both renders equal and the test fail."
+    },
+    {
+      "id": "REV-002",
+      "title": "FR5's plans-tab focus cue is unguarded - renderPlanCard can stop marking focus entirely with the suite green",
+      "description": "cli/internal/tui/plans_tab.go:1375-1379 is the only thing that makes a focused plan card distinguishable (`if focused { style = columnStyles[colIdx].cardFocused }`). The plan's mirror test TestFocusedPlanCardKeepsInnerColors (card_selection_test.go:204-222) compares the focused vs unfocused INNER body only - and since the change made the body focus-independent by construction, that comparison can only ever catch a fill regression on the frame, never the loss of the cue itself. Mutation verified: replacing that block with `style := columnStyles[colIdx].card; _ = focused` leaves the whole cli/internal/tui suite green. renderPlanCard has no other test reference in the package (grep: only card_selection_test.go:209-210). The work board has TestFocusedCardMarkedByBorderGlyph for exactly this; the plans board, which FR5 says gets \"the identical treatment\", has no equivalent - and the cue is the NFR Diagnosability bar (it must be a glyph, assertable in View()).\n\n[Round 2 verification] VERIFIED. Re-ran the exact mutation (`style := columnStyles[colIdx].card` + `_ = focused` in renderPlanCard): `go test ./ -run TestFocusedPlanCardKeepsInnerColors` now FAILS at card_selection_test.go:242 - \"focused plan card missing the double focus border\" (the render shows the rounded ╭─╮ set). The mirrored negative assertion (an unfocused card must NOT carry ║) is present too, so the inverse regression (always-focused frame) is covered as well. Restored; tree byte-identical.",
+      "proposed_solution": "AGENT-FIXABLE. Add a small guard next to TestFocusedPlanCardKeepsInnerColors, e.g. TestFocusedPlanCardMarkedByBorderGlyph: with the default (colourless) go-test render, `m.renderPlanCard(2, p, true, 40)` must contain \"║\", \"═\" and \"╔\", and `m.renderPlanCard(2, p, false, 40)` must contain \"│\" and neither \"║\" nor \"═\" - the exact shape TestFocusedCardMarkedByBorderGlyph already uses for the work board. Confirm it bites by re-running the `_ = focused` mutation.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "TestFocusedPlanCardKeepsInnerColors now also asserts the focused plan card render contains the double-border glyphs and the unfocused one does not - a renderPlanCard ignoring `focused` fails."
+    },
+    {
+      "id": "REV-003",
+      "title": "FR6's config-tab rows are unguarded - re-adding a focus fill to the project/source rows keeps the suite green",
+      "description": "cli/internal/tui/config_tab.go:320-346 (project rows) and :353-376 (source rows) are the D2 half of this change: the focus fill was dropped so the origin dots keep their tint, and focus is now carried by the `▸ ` cursor + a slugStyle name. Nothing pins that. Mutation verified: restoring `dot := \"●\"` for the focused source row and wrapping the row in `Foreground(focusFg).Background(focusBg).Bold(true)` leaves the whole cli/internal/tui suite green. The only test that touches viewConfigLeft is TestConfigSwitcherRowTruncatedToPane (config_screen_test.go:437-459), which asserts row WIDTH only. The changelog half of FR6 does have a guard (TestFocusedChangelogRowKeepsColors) - the config half does not, so half of the accepted D2 fork ships uncovered.\n\n[Round 2 verification] VERIFIED for the finding's named mutation. The new TestFocusedConfigRowsKeepColors (card_selection_test.go:254-278) bites: re-adding `dot := \"●\"` + the `Foreground(focusFg).Background(focusBg).Bold(true)` row fill on the focused source row FAILS at :272 (\"focused config row lost its styled origin dot\"), printing the de-tinted row `\\x1b[1;38;5;231;48;5;17m▸ ● svc …`. Restored; tree byte-identical.\n\n[Residual, recorded not re-opened - nit] The guard is one notch weaker than the title's broadest reading: a fill-ONLY regression (the row wrapped in Foreground(focusFg).Background(focusBg) while projectOriginDots/sourceDot keep their own tint) still PASSES on both the project and the source row - checked by mutation this round. The rendered row in that case is `\\x1b[1;38;5;231;48;5;17m▸ \\x1b[38;5;179m●\\x1b[0m …`, i.e. exactly the torn background the colStyleSet comment in styles.go warns about (the fill dies at the first inner reset). Closing it is the one line the round-1 proposal marked optional: assert no `▸` row carries a background SGR (`\\x1b\\[[0-9;]*48;`). Left as a note for a future round rather than a new issue, per this round's delta scope.",
+      "proposed_solution": "AGENT-FIXABLE. Add one test in the FR6 shape of TestFocusedChangelogRowKeepsColors: with forceColors(t) and a project whose focused source has a registry colour, render viewConfigLeft() and assert (a) the focused source row still contains the ANSI-styled `●` fragment that m.sourceDot(name) produces (i.e. the tint survives focus), and (b) the focused row carries the `▸ ` cursor. Optionally assert no row contains the focusBg background sequence. Prove it bites with the fill mutation above.",
+      "severity": "minor",
+      "priority": "P2",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "New TestFocusedConfigRowsKeepColors: seeded config tab, forced colours; every focused (▸) row must carry an individually-SGR-styled ● - a restored row fill (one sequence for the whole row) fails the regexp."
+    },
+    {
+      "id": "REV-004",
+      "title": "Two comments still describe constructs this change deleted (gateBorder, the changelog \"selection bar\")",
+      "description": "cli/internal/tui/model.go:1469 - stripeAccent's doc comment says \"The renderer recolors the heavy-`┃` gateBorder with it.\" `gateBorder` was deleted from styles.go by this change; the renderer now composes the stripe over the focus/selection border via GetBorderStyle() (view.go:779-783). A comment naming a symbol that no longer exists is the exact drift code-review-standards.md #1 says to grep for. cli/internal/tui/view.go:333-335 - renderChangelogColumn's comment still says the focused row \"gets the ▸ cursor + selection bar\"; the selection bar (changelogFocusStyle) is gone and the row is now cursor + bright slug only, which is what changelogRow's own updated comment (view.go:365-368) correctly states. Both were missed by the otherwise thorough comment sweep in this diff.\n\n[Round 2 verification] VERIFIED. model.go:1467-1470 now reads \"The renderer overrides the chosen border set's Left edge with the heavy `┃` and recolors it with this\" (no `gateBorder`); view.go:333-335 now reads \"gets the ▸ cursor + a bright slug\". `grep -rn gateBorder cli/` returns nothing at all. `grep -rn \"selection bar\" cli/` has exactly one survivor and it is a TEST comment - cli/internal/tui/redesign_test.go:191, TestChangelogFocusCursor's header \"(▸ cursor + selection bar)\" - so the non-test bar set for this round is met. That line is the same class of stale drift (its test body only asserts the ▸ cursor, so the comment over-claims); nit-level, outside this finding's named scope, recorded here rather than raised as a new issue.",
+      "proposed_solution": "AGENT-FIXABLE. model.go:1469 -> \"The renderer overrides just the chosen border's Left edge with the heavy `┃` gateStripe and recolors it with this accent (view.go), so the stripe composes over the focus/selection frame.\" view.go:334 -> drop \"+ selection bar\", e.g. \"gets the ▸ cursor (and a bright slug), so navigating the list has an in-list indicator, not just the footer text.\" Then re-grep `gateBorder` and `selection bar` across cli/ to confirm nothing else survives.",
+      "severity": "minor",
+      "priority": "P3",
+      "status": "verified",
+      "origin": "review",
+      "found_in_round": 1,
+      "fixed_in_round": 2,
+      "fix_summary": "model.go stripeAccent comment now describes the Left-edge override composition; view.go renderChangelogColumn comment now says \"▸ cursor + a bright slug\". Re-grepped gateBorder + \"selection bar\" across cli/ - no survivors."
+    }
+  ]
+}

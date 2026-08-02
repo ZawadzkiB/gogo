@@ -1,0 +1,12 @@
+{
+  "slug": "card-selection-border",
+  "updated": "2026-08-02",
+  "note": "INTENDED DESIGN (plan ①). One diagram only - this is a small, purely visual change with a single decision point: the card body is built ONCE (styled, focus-independent) and `focused`/`selected` choose the FRAME, never the content. The gate stripe is composed OVER the chosen border set (Left = ┃) instead of replacing it, so a focused gate card keeps both cues. No sequence/class/state diagram: no new types, no new runtime interaction, no new states.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Intended: one styled card body for every state; focus and ship-selection change only the border set/colour, and the gate stripe composes over it"
+    }
+  ]
+}

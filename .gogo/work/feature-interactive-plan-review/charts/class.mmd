@@ -1,0 +1,66 @@
+classDiagram
+  class PlanComments {
+    +int schema
+    +string slug
+    +string updated
+    +Thread[] threads
+    +Question[] questions
+  }
+  class Thread {
+    +string id
+    +string doc
+    +string status
+    +string author
+    +string body
+    +string created
+    +Reply[] replies
+  }
+  class Anchor {
+    +int line
+    +string hash
+    +string quote
+    +string node
+  }
+  class Reply {
+    +string author
+    +string body
+    +string created
+  }
+  class Question {
+    +string id
+    +string doc
+    +string question
+    +string recommend
+    +string answer
+    +string answerText
+    +Option[] options
+  }
+  class Option {
+    +string key
+    +string label
+  }
+  PlanComments "1" --> "*" Thread
+  PlanComments "1" --> "*" Question
+  Thread "1" --> "1" Anchor
+  Thread "1" --> "*" Reply
+  Question "1" --> "*" Option
+
+  class Bundle {
+    +string Name
+    +string Title
+    +string MarkdownPath
+    +string DetailPath
+    +string CommentsPath
+    +string DiagramDir
+    +string BeforeDir
+    +string ManifestPath
+  }
+  class BuildHTML {
+    +renderSummary(path)
+    +renderDetail(path)
+    +buildFigures(dirs)
+    +readLayouts(dirs)
+    +readComments(path)
+  }
+  Bundle --> BuildHTML : rendered by
+  BuildHTML ..> PlanComments : inlines

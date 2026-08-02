@@ -1,0 +1,12 @@
+{
+  "phase": "review",
+  "status": "ok",
+  "slug": "card-selection-border",
+  "mode": "fast",
+  "inputs": ["working-tree diff (cli/internal/tui/* + version files)", "plan.md (accepted)", "code-review-standards.md", "coding-rules.md", "non-functional-requirements.md"],
+  "outputs": ["review/issues.json (round 2, 4 issues all verified)"],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Fast-mode single review pass + one delta re-review. Round 1: 0 blockers, 1 major, 3 minors - all mechanical (mutation-survivable tests, stale comments); fixed warm. Round 2 delta: all 4 VERIFIED by re-running the exact mutations; verdict APPROVE. Two nit residuals (fill-only config-row gap, stale test comment) closed post-approve; full race suite re-run green."
+}

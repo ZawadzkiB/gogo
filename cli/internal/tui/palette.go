@@ -49,13 +49,12 @@ func (m Model) projectColor(name string) lipgloss.TerminalColor {
 
 // originDots renders the D5 origin cue: a project dot then a source dot (`● ●`) for a
 // multi-project surface (the config switcher / the future unified board), or a single
-// dot when projectColor is nil (single-project surface). `plain` drops the tint for a
-// focus-filled row (whose one fg/bg fill would otherwise punch a hole through a colored
-// dot). No TTY under `go test` → lipgloss emits plain text, so the dots stay
-// substring-assertable.
-func originDots(projectColor, sourceColor lipgloss.TerminalColor, plain bool) string {
+// dot when projectColor is nil (single-project surface). Always tinted — the focused
+// rows carry no fill anymore (FR6), so there is no `plain` variant left. No TTY under
+// `go test` → lipgloss emits plain text, so the dots stay substring-assertable.
+func originDots(projectColor, sourceColor lipgloss.TerminalColor) string {
 	dot := func(c lipgloss.TerminalColor) string {
-		if plain || c == nil {
+		if c == nil {
 			return "●"
 		}
 		return lipgloss.NewStyle().Foreground(c).Render("●")

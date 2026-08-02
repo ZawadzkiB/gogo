@@ -138,11 +138,11 @@ func changelogRowText(colRender, slug string) string {
 // TestOriginDotsTwoVsOne (cockpit-colors D5): originDots renders TWO dots (project +
 // source) for a multi-project surface and a SINGLE dot when projectColor is nil.
 func TestOriginDotsTwoVsOne(t *testing.T) {
-	two := originDots(lipgloss.Color("#111111"), lipgloss.Color("#222222"), false)
+	two := originDots(lipgloss.Color("#111111"), lipgloss.Color("#222222"))
 	if n := strings.Count(two, "●"); n != 2 {
 		t.Errorf("originDots(project, source) = %q, want 2 dots", two)
 	}
-	one := originDots(nil, lipgloss.Color("#222222"), false)
+	one := originDots(nil, lipgloss.Color("#222222"))
 	if n := strings.Count(one, "●"); n != 1 {
 		t.Errorf("originDots(nil, source) = %q, want 1 dot", one)
 	}

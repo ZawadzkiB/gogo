@@ -1,0 +1,12 @@
+{
+  "slug": "card-selection-border",
+  "updated": "2026-08-02",
+  "note": "AS-IS BASELINE (captured at plan ①, before any code change) of exactly what this change touches: renderCard's two-branch body. The focused branch builds a COLOURLESS body because cardFocused paints one fg/bg fill over the whole card, and a lipgloss block fill tears at every inner ESC[0m reset (measured with the pinned lipgloss v1.1.1-0.20250404203927 at ANSI256) - so the plain branch exists to hide the per-segment holes. The gate stripe REPLACES the whole border set here. Same shape in plans_tab.go renderPlanCard, and in the changelog/config rows via changelogFocusStyle.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Before: renderCard's focused branch strips every colour because cardFocused's fg/bg fill would tear at each inner ANSI reset"
+    }
+  ]
+}

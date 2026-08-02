@@ -1,0 +1,12 @@
+{
+  "slug": "launch-confirm-modal-and-fast-toggle",
+  "updated": "2026-08-02",
+  "note": "INTENDED DESIGN (plan ①). One flow diagram: the two changes meet on one path - the launch intent's command is now decided by a bound toggle (binding.fast, applied by the single launch.SetFastParam producer at both the render and the launch end), and the modeForm render becomes a composite (background by recorded formOrigin + a bordered box spliced over it) with a named small-terminal fallback. No sequence/class/state diagram: no new types beyond two fields and two pure helpers, no new runtime interaction with another process, and no new pipeline states (mode/status/classifier are untouched).",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Intended: the launch confirm renders as a modal composited over its recorded origin, and its per-launch fast toggle drives the exact command doLaunch runs"
+    }
+  ]
+}

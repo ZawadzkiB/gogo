@@ -145,9 +145,9 @@ func autoPickupLaunch(launcher func(string, launch.Intent) (launch.Result, error
 // planPickupCue returns the "needs manual trigger" cue for a PLAN card (plans-board FR6)
 // when ANY of the plan's member work items is auto-pickup-blocked by its source's cap — the
 // plan-level mirror of the work-board card cue, so a busy-blocked member is visible on both
-// surfaces. "" when nothing is blocked. `plain` drops the tint for the focused card's single
-// fg/bg fill.
-func (m Model) planPickupCue(p plans.Plan, plain bool) string {
+// surfaces. "" when nothing is blocked. Always tinted — the focused card keeps its
+// colours now (card-selection-border FR5).
+func (m Model) planPickupCue(p plans.Plan) string {
 	blocked := false
 	for _, t := range p.Targets {
 		if f := m.spawnedFeature(t, p.ID); f != nil && m.autoPickupBlocked(f) {
@@ -158,9 +158,5 @@ func (m Model) planPickupCue(p plans.Plan, plain bool) string {
 	if !blocked {
 		return ""
 	}
-	label := waitingMarker + " trigger manually"
-	if plain {
-		return label
-	}
-	return pillRed.Render(label)
+	return pillRed.Render(waitingMarker + " trigger manually")
 }

@@ -1,0 +1,27 @@
+sequenceDiagram
+  autonumber
+  actor U as User (reviewer)
+  participant P as review page (file://)
+  participant LS as localStorage
+  participant J as plan-comments.json
+  participant A as gogo-analyst
+  participant D as plan.md / plan-detail.md
+
+  Note over P: built by gogo-view or cli/internal/pages<br/>with the comments JSON inlined
+  P->>P: resolve anchors (hash at line, else search, else orphan)
+  U->>P: click line 42 in plan-detail.md
+  P->>U: composer at that line
+  U->>P: save comment
+  P->>LS: draft state (gogo-view:comments:&lt;slug&gt;)
+  U->>P: click a flowchart node (div.vnm-node[data-id])
+  P->>LS: thread doc=diagram:flow node=xplan
+  U->>P: answer question D1 (option + free text)
+  P->>LS: questions[].answer / answerText
+  U->>P: Send review
+  P->>J: save into .gogo/work/feature-&lt;slug&gt;/ (FS Access grant)
+  Note over P,J: no API -> Blob download fallback + printed destination
+  U->>A: /gogo:plan &lt;slug&gt; (re-entry)
+  A->>J: read open threads + answered questions
+  A->>J: append ai replies, mark resolved
+  A->>D: revise the plan (delta logged in adjustments.md)
+  A->>U: rebuilt page shows replies - unmatched threads in global comments

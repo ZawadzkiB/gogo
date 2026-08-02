@@ -1,0 +1,16 @@
+flowchart TD
+  rc["renderCard(colIdx, feature, focused, width)<br/>view.go:656"]
+  br{"focused ?"}
+  plainBody["PLAIN body - view.go:681-723<br/>no slugStyle - no pill tint - no origin colours<br/>no session ● - plain ⛓ / cue / trigger chips"]
+  styledBody["STYLED body - view.go:724-761<br/>pillStyleFor tint - originTag colours<br/>sessionStyle ● - tinted ⛓ / cue chips"]
+  fill["cardFocused - styles.go:165<br/>border + Background(focusBg) + Foreground(focusFg) + Bold"]
+  norm["card / cardSelected - styles.go:165-166<br/>border colour only"]
+  gate["stripeAccent -&gt; style.Border(gateBorder)<br/>REPLACES the whole set with rounded + ┃"]
+  out["style.Width(width).Render(body)"]
+  why["MEASURED: a block fg/bg fill dies at every inner ESC[0m<br/>-&gt; per-segment holes -&gt; the plain branch exists to hide them"]
+  rc --> br
+  br -->|"yes"| plainBody --> fill --> gate
+  br -->|"no"| styledBody --> norm --> gate
+  gate --> out
+  fill -.->|"forces"| why
+  why -.->|"strips"| plainBody

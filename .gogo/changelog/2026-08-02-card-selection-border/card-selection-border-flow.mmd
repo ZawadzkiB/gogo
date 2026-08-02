@@ -1,0 +1,23 @@
+flowchart TD
+  col["renderColumn / cardHeights<br/>focused = the cursor is on this card"]
+  rc["renderCard(colIdx, feature, focused, width)"]
+  body["ONE styled body - focus-independent<br/>slugStyle - dimStyle title - originTag colours<br/>pillStyleFor tint - sessionStyle ● - ⛓ chips - cue chips"]
+  frame{"frame style only"}
+  normal["card: rounded ╭─│ + subtleBorder"]
+  sel["cardSelected: rounded + selectAccent (✓ mark)"]
+  foc["cardFocused: DOUBLE ╔═║ + columnAccent"]
+  both["cardFocusedSelected: DOUBLE ╔═║ + selectAccent (✓ mark)"]
+  gate{"stripeAccent(feature)"}
+  stripe["border.Left = ┃ recoloured<br/>red gate / purple uat - over the chosen set"]
+  out["style.Width(width).Render(body)"]
+  col --> rc --> body --> frame
+  frame -->|"cursor off, not selected"| normal
+  frame -->|"space-selected"| sel
+  frame -->|"cursor on"| foc
+  frame -->|"cursor on + selected"| both
+  normal --> gate
+  sel --> gate
+  foc --> gate
+  both --> gate
+  gate -->|"user gate"| stripe --> out
+  gate -->|"flowing"| out

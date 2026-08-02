@@ -1,0 +1,16 @@
+{"ts":"2026-08-02T06:38:46Z","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"card-selection-border"}
+{"ts":"2026-08-02T06:41:45Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","note":"accepted with D1=A (double border + accent), D2=A (rows included)","slug":"card-selection-border"}
+{"ts":"2026-08-02T06:46:19Z","event":"phase-started","phase":"implement","status":"implementing","slug":"card-selection-border"}
+{"ts":"2026-08-02T06:55:44Z","event":"phase-done","phase":"implement","status":"implementing","slug":"card-selection-border"}
+{"ts":"2026-08-02T06:55:57Z","event":"phase-started","phase":"review","status":"reviewing","slug":"card-selection-border"}
+{"ts":"2026-08-02T06:55:57Z","event":"round-opened","phase":"review","status":"reviewing","round":1,"slug":"card-selection-border"}
+{"ts":"2026-08-02T07:05:44Z","event":"issues-found","phase":"review","status":"reviewing","round":1,"note":"1 major, 3 minor - all mechanical (test bite + comments)","slug":"card-selection-border"}
+{"ts":"2026-08-02T07:05:44Z","event":"fix-round","phase":"implement","status":"implementing","round":2,"slug":"card-selection-border"}
+{"ts":"2026-08-02T07:08:34Z","event":"round-opened","phase":"review","status":"reviewing","round":2,"slug":"card-selection-border"}
+{"ts":"2026-08-02T07:16:39Z","event":"phase-done","phase":"review","status":"reviewing","slug":"card-selection-border"}
+{"ts":"2026-08-02T07:16:39Z","event":"phase-started","phase":"test","status":"testing","slug":"card-selection-border"}
+{"ts":"2026-08-02T07:18:04Z","event":"phase-done","phase":"test","status":"testing","slug":"card-selection-border"}
+{"ts":"2026-08-02T07:18:04Z","event":"phase-started","phase":"report","status":"testing","slug":"card-selection-border"}
+{"ts":"2026-08-02T07:18:52Z","event":"phase-done","phase":"report","status":"awaiting-uat","slug":"card-selection-border"}
+{"ts":"2026-08-02T07:23:18Z","event":"uat-passed","phase":"done","status":"awaiting-uat","note":"accepted via /gogo:done","slug":"card-selection-border"}
+{"ts":"2026-08-02T07:23:18Z","event":"shipped","phase":"done","status":"shipped","note":".gogo/changelog/2026-08-02-card-selection-border/","slug":"card-selection-border"}

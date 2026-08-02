@@ -1,0 +1,12 @@
+{
+  "phase": "test",
+  "status": "ok",
+  "slug": "card-selection-border",
+  "mode": "fast",
+  "inputs": ["plan.md Tests section", "test-strategy.md done-bar", "working tree @ 0.35.0"],
+  "outputs": ["suite results (in-context)", "hands-on tmux captures (scratchpad board-focus1..3.ans)"],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Suites: gofmt -l clean, go vet clean, go test -race ./... green (all packages, incl. the 9 new card-selection guards and every pinned regression suite). Hands-on: built the working-tree binary (gogo 0.35.0) and drove the real cockpit in tmux (200x45, xterm-256color); captured ANSI at three focus positions. Verified: exactly one double-framed (focused) card per capture; focused card's inner content fully styled (bold slug, dim title, pill WITH its background tint - the previously-stripped case); a focused GATE card carries the red ┃ stripe composed with the blue double frame (FR4); unfocused cards keep rounded borders; pill tints render identically focused vs unfocused; no frame-level fills anywhere. No open issues; no test/issues.json needed."
+}

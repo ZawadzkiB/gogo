@@ -105,11 +105,7 @@ var (
 	// chip stays substring-assertable.
 	correlationChipStyle = lipgloss.NewStyle().Foreground(uatAccent)
 
-	// changelogFocusStyle is the selection bar for the focused collapsed-changelog
-	// row: one focus fg+bg fill across the row (accent bg + bright fg), the analog
-	// of the focused work card's highlight for a borderless list row.
-	changelogFocusStyle = lipgloss.NewStyle().Foreground(focusFg).Background(focusBg).Bold(true)
-	keyChipStyle        = lipgloss.NewStyle().Foreground(secondaryText).Background(focusBg).Padding(0, 1) // footer key-chips
+	keyChipStyle = lipgloss.NewStyle().Foreground(secondaryText).Background(focusBg).Padding(0, 1) // footer key-chips
 
 	// Tab bar (FR8): the active tab is a bold accent chip, the others dim. Plain
 	// text under `go test` (no TTY), so the tab LABELS stay substring-assertable.
@@ -122,26 +118,29 @@ var (
 	chipStyle       = lipgloss.NewStyle().Foreground(dimText).Padding(0, 1)
 )
 
-// gateBorder is the card border for a card that needs the user: a heavy `┃` left
-// edge (the mockup's left-accent stripe) recolored red (plan/decision) or purple
-// (uat) via BorderLeftForeground. The heavy glyph is what makes the stripe
-// substring-assertable (a flowing card keeps the plain `│`), independent of focus.
-var gateBorder = func() lipgloss.Border {
-	b := lipgloss.RoundedBorder()
-	b.Left = "┃"
-	return b
-}()
-
 // gateStripe is the left-stripe glyph a gate card carries (used by the test +
-// the assertable-element check); "" for a flowing card.
+// the assertable-element check); "" for a flowing card. The stripe is COMPOSED
+// over whichever border set focus/selection chose (renderCard overrides just the
+// border's Left edge), so a focused gate card keeps both cues.
 const gateStripe = "┃"
 
-// colStyleSet is the precomputed card/header frame styles for one column.
+// focusBorder is the focused card's frame: a double-line set (╔ ═ ║) in place of
+// the rounded one. The glyph change itself is the focus cue, so it survives a
+// no-colour terminal and TTY-less `go test`. Deliberately NOT ThickBorder(): its
+// sides are the exact `┃` gate-stripe glyph, so every focused card would read as
+// a user gate (and break TestGateCardStripeGlyph).
+var focusBorder = lipgloss.DoubleBorder()
+
+// colStyleSet is the precomputed card/header frame styles for one column. Every
+// card style is FRAME-ONLY (border set + border colour, never a fg/bg fill over
+// the content): a fill tears at every inner ANSI reset, which is what used to
+// force the focused card's body to render with all colours stripped.
 type colStyleSet struct {
-	header       lipgloss.Style
-	card         lipgloss.Style // normal (subtle border)
-	cardFocused  lipgloss.Style // full-card highlight: accent border + subtle bg
-	cardSelected lipgloss.Style // selected-for-ship: accent border
+	header              lipgloss.Style
+	card                lipgloss.Style // normal (subtle rounded border)
+	cardFocused         lipgloss.Style // cursor here: double border, column accent
+	cardSelected        lipgloss.Style // selected-for-ship: rounded border, select accent
+	cardFocusedSelected lipgloss.Style // both: double border, select accent
 }
 
 var (
@@ -160,10 +159,11 @@ func init() {
 	for i := 0; i < 4; i++ {
 		accent := columnAccent[i]
 		columnStyles[i] = colStyleSet{
-			header:       lipgloss.NewStyle().Bold(true).Foreground(accent),
-			card:         base.BorderForeground(subtleBorder),
-			cardFocused:  base.BorderForeground(accent).Background(focusBg).Foreground(focusFg).Bold(true),
-			cardSelected: base.BorderForeground(selectAccent),
+			header:              lipgloss.NewStyle().Bold(true).Foreground(accent),
+			card:                base.BorderForeground(subtleBorder),
+			cardFocused:         base.Border(focusBorder).BorderForeground(accent),
+			cardSelected:        base.BorderForeground(selectAccent),
+			cardFocusedSelected: base.Border(focusBorder).BorderForeground(selectAccent),
 		}
 	}
 }

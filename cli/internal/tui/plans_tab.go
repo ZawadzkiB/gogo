@@ -1348,9 +1348,9 @@ func (m Model) planColumnHeader(i int, hint string) string {
 // board's per-column card box styles: the plan title + its ⛓ plan-XXXX chip on the name
 // row, and the status-specific meta (draft → `draft · edited <ago>`; ready/active/done →
 // `K of M work items` + the per-source dot strip, or the `awaiting-project-uat` cue) on
-// the second row. The focused card gets the full-card highlight (plain inner text under
-// the single fg/bg focus fill). A member work item blocked by its source's cap surfaces
-// the "needs manual trigger" cue (plans-board FR6).
+// the second row. ONE styled body for every state (FR5, mirroring the work board): the
+// focused card changes only its FRAME (the double-line focus border). A member work item
+// blocked by its source's cap surfaces the "needs manual trigger" cue (plans-board FR6).
 func (m Model) renderPlanCard(colIdx int, p plans.Plan, focused bool, width int) string {
 	title := p.Title
 	if title == "" {
@@ -1362,21 +1362,13 @@ func (m Model) renderPlanCard(colIdx int, p plans.Plan, focused bool, width int)
 	// narrow to keep the title readable.
 	var head string
 	titleBudget := textW - lipgloss.Width(chipPlain) - 1
-	if focused {
-		if titleBudget >= 8 {
-			head = placeApart(truncate(title, titleBudget), chipPlain, textW)
-		} else {
-			head = truncate(title, textW)
-		}
+	if titleBudget >= 8 {
+		head = placeApart(slugStyle.Render(truncate(title, titleBudget)), correlationChipStyle.Render(chipPlain), textW)
 	} else {
-		if titleBudget >= 8 {
-			head = placeApart(slugStyle.Render(truncate(title, titleBudget)), correlationChipStyle.Render(chipPlain), textW)
-		} else {
-			head = slugStyle.Render(truncate(title, textW))
-		}
+		head = slugStyle.Render(truncate(title, textW))
 	}
-	meta := m.planCardMeta(p, focused)
-	if cue := m.planPickupCue(p, focused); cue != "" {
+	meta := m.planCardMeta(p)
+	if cue := m.planPickupCue(p); cue != "" {
 		meta += "  " + cue
 	}
 	body := strings.Join([]string{head, meta}, "\n")
@@ -1389,16 +1381,13 @@ func (m Model) renderPlanCard(colIdx int, p plans.Plan, focused bool, width int)
 
 // planCardMeta is the plan card's trailing metadata (FR10): a DRAFT shows the
 // `draft · edited <ago>` nicety; a ready/active plan shows `K of M work items` plus the
-// per-source dot strip (colored ● once a source is spawned, dim `·` until then). `plain`
-// drops the tints for the focused row's single fg/bg fill.
-func (m Model) planCardMeta(p plans.Plan, plain bool) string {
+// per-source dot strip (colored ● once a source is spawned, dim `·` until then).
+// Always styled — the focused card changes only its frame now (FR5).
+func (m Model) planCardMeta(p plans.Plan) string {
 	if p.Status == plans.StatusDraft {
 		s := "draft"
 		if ago := relAgo(p.Created); ago != "" {
 			s += " · edited " + ago
-		}
-		if plain {
-			return s
 		}
 		return dimStyle.Render(s)
 	}
@@ -1406,11 +1395,7 @@ func (m Model) planCardMeta(p plans.Plan, plain bool) string {
 	// it `awaiting-project-uat` on the card (distinct from a still-building `active`),
 	// so the ACTIVE section makes the ready-to-accept plan visible at a glance (FR3).
 	if m.planDerivedStatus(p) == plans.StatusAwaitingProjectUAT {
-		label := plans.StatusAwaitingProjectUAT + " · press m"
-		if plain {
-			return label
-		}
-		return statusStyle(label)
+		return statusStyle(plans.StatusAwaitingProjectUAT + " · press m")
 	}
 	created := 0
 	for _, t := range p.Targets {
@@ -1418,12 +1403,8 @@ func (m Model) planCardMeta(p plans.Plan, plain bool) string {
 			created++
 		}
 	}
-	count := fmt.Sprintf("%d of %d work items", created, len(p.Targets))
-	dots := m.planSourceDots(p, plain)
-	if !plain {
-		count = dimStyle.Render(count)
-	}
-	if dots != "" {
+	count := dimStyle.Render(fmt.Sprintf("%d of %d work items", created, len(p.Targets)))
+	if dots := m.planSourceDots(p); dots != "" {
 		return count + "   " + dots
 	}
 	return count
@@ -1432,22 +1413,17 @@ func (m Model) planCardMeta(p plans.Plan, plain bool) string {
 // planSourceDots renders the plan card's per-source dot strip (FR10/FR11): one dot per
 // target source — the source's colored ● once a work item carrying the plan id is
 // spawned into it, else a dim `·` ("not created" yet, spelled out in the plan detail).
-// Empty when the plan has no targets. `plain` renders untinted for the focused row.
-func (m Model) planSourceDots(p plans.Plan, plain bool) string {
+// Empty when the plan has no targets. Always tinted — the focused card keeps its
+// colours now (FR5).
+func (m Model) planSourceDots(p plans.Plan) string {
 	if len(p.Targets) == 0 {
 		return ""
 	}
 	dots := make([]string, len(p.Targets))
 	for i, t := range p.Targets {
-		switch {
-		case m.spawnedFeature(t, p.ID) == nil:
-			dots[i] = "·"
-			if !plain {
-				dots[i] = dimStyle.Render("·")
-			}
-		case plain:
-			dots[i] = "●"
-		default:
+		if m.spawnedFeature(t, p.ID) == nil {
+			dots[i] = dimStyle.Render("·")
+		} else {
 			dots[i] = m.sourceDot(t) // source-colored ●
 		}
 	}

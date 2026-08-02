@@ -331,7 +331,7 @@ func (m Model) renderChangelogColumn(i, colWidth int) string {
 		hint = fmt.Sprintf("%d–%d", start+1, end)
 	}
 	// The focused row (only when the changelog column itself holds board focus) gets
-	// the ▸ cursor + selection bar, so navigating the list has an in-list indicator,
+	// the ▸ cursor + a bright slug, so navigating the list has an in-list indicator,
 	// not just the footer text.
 	focusedRow := -1
 	if i == m.colIdx {
@@ -362,8 +362,10 @@ func (m Model) renderChangelogColumn(i, colWidth int) string {
 // dot (`● ✓ slug`, byte-for-byte with the pre-0.23 project board); a SINGLE-REPO row (no
 // source) keeps today's leading session dot — byte-for-byte unchanged (changelogRowSingle).
 //
-// A focused row renders as a full-width selection bar: plain inner text under a single
-// focus fg+bg fill so the bar has no per-segment background holes.
+// A focused row keeps every colour and is marked by the `▸ ` cursor it already
+// carries plus a bright slug (FR6) — the cursor-only idiom the sessions panel,
+// drill list and plans list already use; no fg/bg fill (a fill would strip the
+// dot colours).
 func (m Model) changelogRow(f *contract.Feature, width int, focused, hasSession bool) string {
 	date := shortDate(f.Completed)
 	if date == "" {
@@ -383,7 +385,7 @@ func (m Model) changelogRow(f *contract.Feature, width int, focused, hasSession 
 		projColor = m.projectColor(f.Project)
 		originPlain = "● ●"
 	}
-	originStyled := originDots(projColor, m.sourceColor(f.Source), false)
+	originStyled := originDots(projColor, m.sourceColor(f.Source))
 	originW := len([]rune(originPlain))
 
 	// Project board: origin dots + ✓ + slug, trailing green session dot + date.
@@ -403,17 +405,17 @@ func (m Model) changelogRow(f *contract.Feature, width int, focused, hasSession 
 	if gap < 1 {
 		gap = 1
 	}
+	cursor, slugStyled := "  ", secondaryStyle.Render(slug)
 	if focused {
-		row := "▸ " + leftPlain + strings.Repeat(" ", gap) + rightPlain
-		return changelogFocusStyle.Width(width).Render(row)
+		cursor, slugStyled = "▸ ", slugStyle.Render(slug) // cursor + bright slug, colours intact (FR6)
 	}
-	styledLeft := originStyled + " " + secondaryStyle.Render("✓ ") + secondaryStyle.Render(slug)
+	styledLeft := originStyled + " " + secondaryStyle.Render("✓ ") + slugStyled
 	styledRight := ""
 	if hasSession {
 		styledRight = sessionStyle.Render("●") + " "
 	}
 	styledRight += faintStyle.Render(date)
-	return "  " + styledLeft + strings.Repeat(" ", gap) + styledRight
+	return cursor + styledLeft + strings.Repeat(" ", gap) + styledRight
 }
 
 // changelogRowSingle is the SINGLE-REPO changelog row (no source label) — byte-for-byte
@@ -434,16 +436,16 @@ func changelogRowSingle(f *contract.Feature, width int, focused, hasSession bool
 	if gap < 1 {
 		gap = 1
 	}
+	cursor, slugStyled := "  ", secondaryStyle.Render(slug)
 	if focused {
-		row := "▸ " + leftPlain + strings.Repeat(" ", gap) + date
-		return changelogFocusStyle.Width(width).Render(row)
+		cursor, slugStyled = "▸ ", slugStyle.Render(slug) // cursor + bright slug, colours intact (FR6)
 	}
 	styledLeft := secondaryStyle.Render("✓ ")
 	if hasSession {
 		styledLeft += sessionStyle.Render("●") + " "
 	}
-	styledLeft += secondaryStyle.Render(slug)
-	return "  " + styledLeft + strings.Repeat(" ", gap) + faintStyle.Render(date)
+	styledLeft += slugStyled
+	return cursor + styledLeft + strings.Repeat(" ", gap) + faintStyle.Render(date)
 }
 
 // shortDate reduces a YYYY-MM-DD date to MM-DD (the changelog's compact form);
@@ -649,10 +651,14 @@ func correlationCountFallback(n int) string {
 	return fmt.Sprintf("⛓ ×%d", n)
 }
 
-// renderCard draws one feature as a bordered card. The focused card gets a
-// full-card highlight (accent border + subtle background, TEST-007); a
-// selected-for-ship card gets the select accent border + a ✓; a card with a
-// live tmux session shows an unmissable green ● session marker (TEST-006).
+// renderCard draws one feature as a bordered card. The body is ONE styled render
+// for every state (FR1): focus/selection choose only the FRAME — the focused card
+// gets the double-line border in the column accent (FR2), a selected-for-ship
+// card the select accent border + a ✓, both at once the double border in the
+// select accent (FR3); a card with a live tmux session shows an unmissable green
+// ● session marker (TEST-006). No card style carries a fg/bg fill: a fill tears
+// at every inner ANSI reset, which is what used to force a colour-stripped body
+// on the focused card.
 func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width int) string {
 	selected := selectableForShip(f) && m.selected[featureKey(f)]
 	hasSession := hasLiveSession(f.Slug, m.sessions)
@@ -677,87 +683,42 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	// Three rows: name (+ mark, + live ● dot, + right-aligned SOURCE tag) · one-line
 	// desc · status pill [+ agent chip]. Per the design (TURN-3a) the source tag rides
 	// the NAME row, right-aligned — the description gets its own row below.
-	var head, titleLine, badgeLine string
-	if focused {
-		// Plain inner text — the frame carries one foreground + background so the
-		// highlight fills cleanly (no per-segment holes, incl. the pill's tint).
-		mark := ""
-		if selected {
-			mark = "✓ "
-		} else if f.Class == contract.ClassReadyToShip {
-			mark = "○ "
-		}
-		dot := ""
-		if hasSession {
-			dot = " ●"
-		}
-		// The tag rides the name row right-aligned; it is plain here (the focus fill
-		// carries one fg/bg), and its width is reserved from the slug's budget. Right-
-		// alignment pads to the card's TEXT area (width minus the style's Padding(0,1)),
-		// so the padded line never overruns the frame and wraps.
-		_, tag := m.originTag(f)
-		textW := width - 2
-		mw, dw := lipgloss.Width(mark), lipgloss.Width(dot)
-		// Truncate the tag if a long ●project ●source pair at a narrow width would wrap
-		// the row (REV-006). The focused card renders the tag plain (focus fill owns fg/bg).
-		_, tag = m.fitOriginTag(f, tag, tag, textW, mw, dw)
-		slugBudget := textW - mw - dw
-		if tag != "" {
-			slugBudget -= lipgloss.Width(tag) + 1
-		}
-		nameLeft := mark + truncate(f.Slug, slugBudget) + dot
-		if tag != "" {
-			head = placeApart(nameLeft, tag, textW)
-		} else {
-			head = nameLeft
-		}
-		titleLine = truncate(title, width)
-		// The frame carries one fg+bg fill, so a colored chip would punch a hole —
-		// render it plain and reserve its rune width from the pill's truncation budget
-		// (the pill gets the full width when there is no chip).
-		if agent != "" {
-			chip := "  ● " + agent
-			badgeLine = truncate(pillLabel(f), width-len([]rune(chip))) + chip
-		} else {
-			badgeLine = truncate(pillLabel(f), width)
-		}
-	} else {
-		mark := ""
-		if selected {
-			mark = selMarkStyle.Render("✓ ")
-		} else if f.Class == contract.ClassReadyToShip {
-			mark = dimStyle.Render("○ ")
-		}
-		dot := ""
-		if hasSession {
-			dot = " " + sessionStyle.Render("●")
-		}
-		// Name row: mark + slug + live ● dot, with the (styled) ORIGIN tag right-
-		// aligned; its width is reserved from the slug's budget so nothing overruns.
-		// Right-alignment pads to the card TEXT area (width minus the Padding(0,1)) so
-		// the padded line stays inside the frame (no wrap).
-		styled, plain := m.originTag(f)
-		textW := width - 2
-		mw, dw := lipgloss.Width(mark), lipgloss.Width(dot)
-		// Truncate the tag if a long ●project ●source pair at a narrow width would wrap
-		// the row (REV-006) — the composed name row must never exceed textW (the window
-		// height math depends on it). Lone-repo (empty tag) is a no-op.
-		styled, plain = m.fitOriginTag(f, styled, plain, textW, mw, dw)
-		slugBudget := textW - mw - dw
-		if plain != "" {
-			slugBudget -= lipgloss.Width(plain) + 1
-		}
-		nameLeft := mark + slugStyle.Render(truncate(f.Slug, slugBudget)) + dot
-		if plain != "" {
-			head = placeApart(nameLeft, styled, textW)
-		} else {
-			head = nameLeft
-		}
-		titleLine = dimStyle.Render(truncate(title, width))
-		badgeLine = pillStyleFor(f).Render(pillLabel(f))
-		if agent != "" {
-			badgeLine += "  " + sessionStyle.Render("● "+agent)
-		}
+	// ONE styled body whatever the focus state (FR1): the frame styles carry no
+	// fill, so the styled spans render hole-free inside every border set.
+	mark := ""
+	if selected {
+		mark = selMarkStyle.Render("✓ ")
+	} else if f.Class == contract.ClassReadyToShip {
+		mark = dimStyle.Render("○ ")
+	}
+	dot := ""
+	if hasSession {
+		dot = " " + sessionStyle.Render("●")
+	}
+	// Name row: mark + slug + live ● dot, with the (styled) ORIGIN tag right-
+	// aligned; its width is reserved from the slug's budget so nothing overruns.
+	// Right-alignment pads to the card TEXT area (width minus the Padding(0,1)) so
+	// the padded line stays inside the frame (no wrap).
+	styled, plain := m.originTag(f)
+	textW := width - 2
+	mw, dw := lipgloss.Width(mark), lipgloss.Width(dot)
+	// Truncate the tag if a long ●project ●source pair at a narrow width would wrap
+	// the row (REV-006) — the composed name row must never exceed textW (the window
+	// height math depends on it). Lone-repo (empty tag) is a no-op.
+	styled, plain = m.fitOriginTag(f, styled, plain, textW, mw, dw)
+	slugBudget := textW - mw - dw
+	if plain != "" {
+		slugBudget -= lipgloss.Width(plain) + 1
+	}
+	nameLeft := mark + slugStyle.Render(truncate(f.Slug, slugBudget)) + dot
+	head := nameLeft
+	if plain != "" {
+		head = placeApart(nameLeft, styled, textW)
+	}
+	titleLine := dimStyle.Render(truncate(title, width))
+	badgeLine := pillStyleFor(f).Render(pillLabel(f))
+	if agent != "" {
+		badgeLine += "  " + sessionStyle.Render("● "+agent)
 	}
 
 	// Correlation chip(s) (FR14): a member ticket paints its ⛓ plan-… chip(s) after
@@ -776,11 +737,7 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 				shown = correlationCountFallback(len(f.Correlations))
 			}
 			shown = truncate(shown, room)
-			if focused {
-				badgeLine += " " + shown // plain — the focus fill carries one fg/bg
-			} else {
-				badgeLine += " " + correlationChipStyle.Render(shown)
-			}
+			badgeLine += " " + correlationChipStyle.Render(shown)
 		}
 	}
 
@@ -791,12 +748,9 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	// the correlation chip, so it can never wrap the line and desync the window height math.
 	if cue := cardStateCue(f, m.sessions); cue != "" {
 		if room := width - lipgloss.Width(badgeLine) - 2; room >= lipgloss.Width(cue) {
-			switch {
-			case focused:
-				badgeLine += "  " + cue // plain - the focus fill carries one fg/bg
-			case strings.HasPrefix(cue, buildingMarker):
+			if strings.HasPrefix(cue, buildingMarker) {
 				badgeLine += "  " + pillBuilding.Render(cue)
-			default:
+			} else {
 				badgeLine += "  " + dimStyle.Render(cue)
 			}
 		}
@@ -806,27 +760,28 @@ func (m Model) renderCard(colIdx int, f *contract.Feature, focused bool, width i
 	// busy) shows a "needs manual trigger" cue — the user starts it with a manual go once a
 	// slot frees. Transient (cleared the moment a slot opens and it auto-fires).
 	if m.autoPickupBlocked(f) {
-		cue := waitingMarker + " trigger manually"
-		if focused {
-			badgeLine += "  " + cue // plain — the focus fill carries one fg/bg
-		} else {
-			badgeLine += "  " + pillRed.Render(cue)
-		}
+		badgeLine += "  " + pillRed.Render(waitingMarker+" trigger manually")
 	}
 
 	body := strings.Join([]string{head, titleLine, badgeLine}, "\n")
 
 	style := columnStyles[colIdx].card
 	switch {
+	case focused && selected:
+		style = columnStyles[colIdx].cardFocusedSelected
 	case focused:
 		style = columnStyles[colIdx].cardFocused
 	case selected:
 		style = columnStyles[colIdx].cardSelected
 	}
-	// FR-5 left accent stripe: recolor the heavy-┃ gate border, independent of
-	// focus (a focused gate card keeps both the focus accent and the stripe).
+	// FR-5 left accent stripe, composed OVER whichever border set focus/selection
+	// chose (FR4): override just the border's Left edge with the heavy ┃ and
+	// recolor it — a focused gate card keeps both the double focus frame and the
+	// stripe, independent of focus.
 	if col, ok := stripeAccent(f); ok {
-		style = style.Border(gateBorder).BorderLeftForeground(col)
+		b := style.GetBorderStyle()
+		b.Left = gateStripe
+		style = style.Border(b).BorderLeftForeground(col)
 	}
 	return style.Width(width).Render(body)
 }

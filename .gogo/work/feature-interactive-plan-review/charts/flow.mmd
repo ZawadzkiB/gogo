@@ -1,0 +1,52 @@
+flowchart TD
+  analyst["gogo-analyst<br/>skills/gogo-plan"]
+  xplan["skills/xplan<br/>templates + contracts + assets"]
+  overview["plan.md<br/>(overview - contract path)"]
+  detail["plan-detail.md<br/>(optional sibling)"]
+  charts["charts/*.mmd + layouts.json"]
+  decisions["decisions.md"]
+
+  analyst -->|calls| xplan
+  xplan --> overview
+  xplan --> detail
+  xplan --> charts
+  analyst --> decisions
+
+  skillbuild["skills/gogo-view<br/>(LLM pre-render)"]
+  gobuild["cli/internal/pages<br/>BuildHTML (goldmark)"]
+  overview --> skillbuild
+  overview --> gobuild
+  detail --> skillbuild
+  detail --> gobuild
+  charts --> skillbuild
+  charts --> gobuild
+
+  tmpl["assets/vnm/viewer.template.html<br/>+ GOGO_VIEW_DETAIL / _COMMENTS / _QUESTIONS"]
+  skillbuild --> tmpl
+  gobuild --> tmpl
+  tmpl --> page[".gogo/resources/view/&lt;slug&gt;-plan.html"]
+
+  vnm["vnm-browser.js + viewer.js<br/>(mounts figure.diagram)"]
+  review["xplan/assets/review.js<br/>anchors - threads - questions"]
+  page --> vnm
+  page --> review
+  vnm -->|"div.vnm-node[data-id]"| review
+
+  comments["plan-comments.json<br/>threads[] + questions[]"]
+  comments -->|inlined at build| page
+  review -->|"resolve: hash -&gt; line | moved | orphan"| gutter["line markers +<br/>global comments section"]
+  review -->|"Send review (Blob download)"| comments
+  comments -->|read on re-entry| analyst
+  analyst -->|"ai replies + resolve"| comments
+  analyst -->|revise| overview
+  analyst -->|revise| detail
+  analyst -->|"RESOLVED blocks"| decisions
+
+  terminal["gogo view / drill-in glamour<br/>(UNCHANGED)"]
+  overview --> terminal
+  detail --> terminal
+
+  classDef tool fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef data fill:#fff3d6,stroke:#caa54a,color:#111
+  class xplan,review tool
+  class comments,overview,detail data

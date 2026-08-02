@@ -1,0 +1,27 @@
+{
+  "slug": "interactive-plan-review",
+  "updated": "2026-07-31",
+  "note": "INTENDED DESIGN (plan ①). The change splits a plan into plan.md (overview, unchanged contract path) + an optional plan-detail.md sibling, renders both plus their diagrams into ONE interactive page through the two existing page builders (skills/gogo-view and cli/internal/pages), and adds a review layer (skills/xplan/assets/review.js) that anchors PR-style line comments, threaded replies, open/resolved status, per-diagram and per-node diagram comments (using the vendored runtime's existing div.vnm-node[data-id]), and Claude's open questions as options + free text. Review state persists in ONE plan-comments.json the analyst reads and answers on re-entry; anchors resolve hash-at-line -> unique-hash search -> orphan into a global comments section, so an edited plan never loses a comment. The round trip is an offline Blob download + drop-in (a local server is a named follow-up, D1). The terminal view is untouched.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Control/data flow: xplan authors plan.md + plan-detail.md + charts; both page builders fill the extended viewer template; review.js resolves anchors and owns threads/questions; Send review writes plan-comments.json, which the analyst reads and answers"
+    },
+    {
+      "kind": "sequence",
+      "file": "sequence.mmd",
+      "title": "The review round trip: line/node/question interactions in the file:// page -> localStorage draft -> Blob download -> drop-in -> analyst replies and revises -> rebuilt page shows replies and orphans"
+    },
+    {
+      "kind": "class",
+      "file": "class.mmd",
+      "title": "The new plan-comments contract (PlanComments -> Thread -> Anchor/Reply, Question -> Option) and the extended pages.Bundle/BuildHTML that inlines it"
+    },
+    {
+      "kind": "use-case",
+      "file": "use-case.mmd",
+      "title": "New capabilities: the reviewer comments on lines, diagrams and nodes, replies, resolves, answers questions and sends the review; the analyst answers threads, revises both plan docs and records answers in decisions.md"
+    }
+  ]
+}

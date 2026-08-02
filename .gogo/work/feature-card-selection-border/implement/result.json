@@ -1,0 +1,19 @@
+{
+  "phase": "implement",
+  "status": "ok",
+  "slug": "card-selection-border",
+  "mode": "fast",
+  "inputs": ["plan.md (accepted, D1=A, D2=A)", "coding-rules.md", "tech-stack.md", "code-review-standards.md (self-review)"],
+  "outputs": [
+    "cli/internal/tui/styles.go (frame-only card styles: focusBorder=DoubleBorder, cardFocusedSelected added, gateBorder + changelogFocusStyle removed)",
+    "cli/internal/tui/view.go (renderCard one styled body + composed gate stripe; changelog rows cursor-only focus)",
+    "cli/internal/tui/plans_tab.go + pickup.go (plan card one body; plain params dropped)",
+    "cli/internal/tui/config_tab.go + palette.go (rows keep colours; originDots/projectOriginDots plain param dropped)",
+    "cli/internal/tui/card_selection_test.go (8 new guards, FR1-FR7)",
+    "cli/internal/tui/{colors_test,pickup_test}.go (signature updates)",
+    "version 0.35.0 (.claude-plugin/plugin.json + cli/main.go + version_test.go); cli/go.mod (termenv direct)"
+  ],
+  "validated_in": true,
+  "validated_out": true,
+  "summary": "Fast-mode warm loop: all 7 checklist steps built in one context, no per-round artifacts. Objective green bar met: gofmt -l clean, go vet clean, go test -race ./... fully green (incl. the pinned gate-stripe, workspace, waiting and pickup suites unchanged)."
+}

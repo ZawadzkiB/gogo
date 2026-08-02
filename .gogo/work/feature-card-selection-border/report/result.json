@@ -1,0 +1,12 @@
+{
+  "phase": "report",
+  "status": "ok",
+  "slug": "card-selection-border",
+  "mode": "fast",
+  "inputs": ["plan.md", "review/issues.json (4 verified)", "implement/result.json", "test/result.json", "decisions.md"],
+  "outputs": ["report/report.md (short, fast-mode)", "state.md -> awaiting-uat"],
+  "validated_in": true,
+  "validated_out": true,
+  "open_issues": 0,
+  "summary": "Fast-mode short report: planned-vs-shipped delta, findings table (4 verified + 2 post-approve nits), suite + hands-on tmux verification. No new charts (plan-time flow still exact). Knowledge docs: no material drift, skipped per fast-mode default."
+}

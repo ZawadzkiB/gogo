@@ -188,7 +188,7 @@ func TestRunningIsNotAStatus(t *testing.T) {
 }
 
 // TestChangelogFocusCursor: the collapsed changelog list carries an in-list focus
-// indicator (▸ cursor + selection bar) on the focused row — but only when the
+// indicator (the ▸ cursor + a bright slug) on the focused row — but only when the
 // changelog column itself holds board focus, and only on that one row.
 func TestChangelogFocusCursor(t *testing.T) {
 	m := newModel(t)

@@ -1,0 +1,25 @@
+flowchart TD
+  key["board key m / M / d  (update.go updateBoard)"]
+  guard["attemptActionForce - decision gate, plan readiness,<br/>accept, runnable, cap"]
+  intent["intentFor - BuildIntent + SkipParams + FastParam<br/>(projects.FastForSource by the card's own Root)"]
+  start["startFormOverriding<br/>binding.fast = launch.HasFastParam(intent.Command)"]
+  form["huh Confirm - Launch / Cancel<br/>TitleFunc + DescriptionFunc bound to &amp;binding.fast"]
+  enter["enterForm(form)<br/>records formOrigin - feeds modalFormSize as a WindowSizeMsg"]
+  upd{"updateForm key"}
+  toggle["f / F - flip binding.fast, forward the key<br/>(huh re-evaluates Title + Description)"]
+  done["Enter - StateCompleted"]
+  launchit["doLaunch - SetFastParam(intent.Command, binding.fast)<br/>then launcher(root, intent)"]
+  view{"View() mode == modeForm"}
+  fits{"modalFormSize(termW, termH) ok?"}
+  bg["viewBehindForm() by formOrigin:<br/>board/plans/config tab - drill - sessions panel"]
+  box["modalBox: bordered box around form.View()"]
+  over["overlayCenter: ansi.Strip + dimStyle background,<br/>ansi.Truncate / TruncateLeft column splice"]
+  full["fallback: the full-screen form (today, byte-for-byte)"]
+
+  key --> guard --> intent --> start --> form --> enter --> upd
+  upd -->|f| toggle --> upd
+  upd -->|enter| done --> launchit
+  enter -.-> view
+  view --> fits
+  fits -->|yes| bg --> box --> over
+  fits -->|"no - small or unsized terminal"| full

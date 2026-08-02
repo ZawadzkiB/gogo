@@ -1,0 +1,42 @@
+flowchart TD
+  analyst["gogo-analyst<br/>skills/gogo-plan"]
+  mermaid["skills/gogo-mermaid"]
+  plan["plan.md<br/>(ONE file - the contract path)"]
+  charts["charts/*.mmd + charts/before/*"]
+  layouts["charts/layouts.json<br/>(assets/vnm/layout.mjs, optional)"]
+  decisions["decisions.md<br/>(prose only)"]
+
+  analyst --> plan
+  analyst --> decisions
+  analyst --> mermaid
+  mermaid --> charts
+  mermaid --> layouts
+
+  skillbuild["skills/gogo-view<br/>(LLM pre-render)"]
+  gobuild["cli/internal/pages BuildHTML<br/>(goldmark)"]
+  plan --> skillbuild
+  plan --> gobuild
+  charts --> skillbuild
+  charts --> gobuild
+  layouts --> skillbuild
+  layouts --> gobuild
+
+  tmpl["assets/vnm/viewer.template.html<br/>SUMMARY / DIAGRAMS / LAYOUTS / LAYOUT"]
+  skillbuild --> tmpl
+  gobuild --> tmpl
+  tmpl --> page[".gogo/resources/view/&lt;slug&gt;-plan.html<br/>READ-ONLY"]
+
+  vnm["vnm-browser.js"]
+  viewer["assets/vnm/viewer.js<br/>mount + expand-to-modal"]
+  page --> vnm
+  page --> viewer
+  viewer -->|"drag positions only"| ls["localStorage<br/>gogo-view:layout:&lt;key&gt;"]
+  viewer -->|"export button"| sidecar["&lt;name&gt;.layout.json download"]
+
+  chat["user feedback in CHAT<br/>(no per-line target)"]
+  page --> chat
+  chat --> analyst
+  analyst -->|"adjustments.md + revise"| plan
+
+  readers["gogo-implement / review / test / knowledge / accept<br/>contract.PlanSections + Artifacts"]
+  plan --> readers

@@ -1,0 +1,12 @@
+{
+  "slug": "launch-confirm-modal-and-fast-toggle",
+  "updated": "2026-08-02",
+  "note": "AS-IS BASELINE (plan ①, captured before any code change), scoped to what this change touches: the m/M/d launch path and the modeForm render. It shows the two defects structurally - `--fast` is decided ONCE in intentFor from the source config (no per-launch override exists anywhere), and `case modeForm` returns the form as the WHOLE view, so no background is drawn; the mode is assigned at 16 separate sites and only the pickers record where they came from.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "Before: a static confirm whose command is fixed by the source config, rendered as a full-screen replacement with no background and no recorded origin"
+    }
+  ]
+}

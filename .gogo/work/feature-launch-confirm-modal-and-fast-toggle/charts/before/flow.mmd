@@ -1,0 +1,18 @@
+flowchart TD
+  key["board key m / M / d  (update.go updateBoard)"]
+  guard["attemptActionForce - decision gate, plan readiness,<br/>accept, runnable, cap"]
+  intent["intentFor - BuildIntent + SkipParams<br/>+ FastParam(projects.FastForSource) - the ONLY fast decision"]
+  start["startFormOverriding<br/>binding = &amp;formBinding{confirm: true}"]
+  form["huh Confirm - Launch / Cancel<br/>Title = confirmSummary(intent), a STATIC string"]
+  mode["m.form = newForm(...) ; m.mode = modeForm<br/>(16 sites each assign the mode themselves)"]
+  upd{"updateForm key"}
+  done["Enter - StateCompleted"]
+  launchit["doLaunch - launcher(root, intent.Command as built)"]
+  view["View() case modeForm:<br/>return newline + m.form.View() + newline"]
+  blank["the WHOLE screen is the form -<br/>board, drill and sessions panel are not drawn"]
+  po["pickerOrigin - set only by the pickers,<br/>every other form cancels to modeBoard"]
+
+  key --> guard --> intent --> start --> form --> mode --> upd
+  upd -->|enter| done --> launchit
+  mode -.-> view --> blank
+  mode -.-> po

@@ -1466,7 +1466,8 @@ func pillStyleFor(f *contract.Feature) lipgloss.Style {
 
 // stripeAccent is the FR-5 left-stripe decision, independent of focus: purple for
 // the uat gate, red for any other gate (plan-acceptance / decision), (nil,false)
-// for a flowing card. The renderer recolors the heavy-`┃` gateBorder with it.
+// for a flowing card. The renderer overrides the chosen border set's Left edge
+// with the heavy `┃` and recolors it with this.
 func stripeAccent(f *contract.Feature) (lipgloss.TerminalColor, bool) {
 	switch {
 	case f.AwaitingUAT():

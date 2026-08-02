@@ -191,7 +191,7 @@ func TestAutoPickupAtCapShowsCue(t *testing.T) {
 	}
 	// The cue renders on the plan card (a plan targeting web with this member spawned).
 	p := plans.Plan{ID: "plan-x", Title: "Rollout", Status: plans.StatusActive, Targets: []string{"web"}}
-	if pc := m.planPickupCue(p, false); pc == "" || !strings.Contains(pc, "trigger manually") {
+	if pc := m.planPickupCue(p); pc == "" || !strings.Contains(pc, "trigger manually") {
 		t.Errorf("planPickupCue = %q, want the manual-trigger cue", pc)
 	}
 	// A cap-skip is NOT recorded, so once a slot frees it can still fire.

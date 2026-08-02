@@ -1,0 +1,2 @@
+{"ts":"2026-08-02T09:10:00+02:00","event":"phase-started","phase":"plan","status":"awaiting-plan-acceptance","slug":"launch-confirm-modal-and-fast-toggle"}
+{"ts":"2026-08-02T07:13:04Z","event":"plan-accepted","phase":"plan","status":"plan-accepted","note":"accepted with D1=B select, D2=B confirm-only, D3=A dim, D4=A","slug":"launch-confirm-modal-and-fast-toggle"}

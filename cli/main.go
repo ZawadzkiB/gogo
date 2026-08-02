@@ -20,7 +20,7 @@ import (
 
 // Version mirrors the plugin version (.claude-plugin/plugin.json). A breaking
 // change to the CLI contract bumps both together.
-const Version = "0.34.0"
+const Version = "0.35.0"
 
 func main() {
 	// One-shot, best-effort, non-destructive migration of the legacy flat registry

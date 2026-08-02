@@ -1,0 +1,12 @@
+{
+  "slug": "interactive-plan-review",
+  "updated": "2026-07-31",
+  "note": "AS-IS BASELINE (plan ①, before any change). Today gogo-analyst writes ONE plan.md plus charts/ via gogo-mermaid; two independent page builders (skills/gogo-view's LLM pre-render and cli/internal/pages' goldmark BuildHTML) fill the same assets/vnm/viewer.template.html with four tokens and produce a READ-ONLY page. The only thing the page persists is dragged node positions (localStorage + an export sidecar). All plan feedback happens in chat with no per-line or per-diagram target, and decisions.md is prose the page cannot render as a form. Scoped to what this change touches.",
+  "diagrams": [
+    {
+      "kind": "flow",
+      "file": "flow.mmd",
+      "title": "As-is: one plan.md authored by gogo-analyst, rendered read-only by two page builders into the viewer template; feedback returns only through chat"
+    }
+  ]
+}

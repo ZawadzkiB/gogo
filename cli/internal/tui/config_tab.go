@@ -321,10 +321,11 @@ func (m Model) viewConfigLeft() string {
 		cursor := "  "
 		focused := i == m.projIdx
 		// Origin dots (D5): a project dot + its first source's dot (`●P ●S`) — the
-		// multi-project combo that reads "project P, source S" at a glance. A focused row
-		// renders the dots plain (the focus fill owns fg/bg). A live-session ● trails the
-		// focused project's row when it has running sessions (they aggregate to it).
-		dots := m.projectOriginDots(p, focused)
+		// multi-project combo that reads "project P, source S" at a glance. The dots keep
+		// their colours on the focused row too (FR6 — no fill; the ▸ cursor + a bright
+		// name carry the focus). A live-session ● trails the focused project's row when
+		// it has running sessions (they aggregate to it).
+		dots := m.projectOriginDots(p)
 		meta := dimStyle.Render(fmt.Sprintf("  %d %s", len(p.Sources), plural(len(p.Sources), "source")))
 		live := ""
 		if focused && len(m.sessions) > 0 {
@@ -339,8 +340,7 @@ func (m Model) viewConfigLeft() string {
 		nameBudget := pane - lipgloss.Width(cursor+dots+" ") - lipgloss.Width(meta) - lipgloss.Width(live)
 		name := truncate(p.Name, nameBudget)
 		if focused {
-			b = append(b, changelogFocusStyle.Render(cursor+dots+" "+name)+meta+live)
-			continue
+			name = slugStyle.Render(name)
 		}
 		b = append(b, cursor+dots+" "+name+meta+live)
 	}
@@ -364,29 +364,26 @@ func (m Model) viewConfigLeft() string {
 		if branch == "" {
 			branch = "main"
 		}
-		// The source's colored origin dot (cockpit-colors FR4); a focused row renders it
-		// plain so the single focus fg/bg fill has no per-segment hole.
-		dot := "●"
-		if !focused {
-			dot = m.sourceDot(name)
-		}
-		row := fmt.Sprintf("%s%s %-16s %-28s %-8s %s", cursor, dot, truncate(name, 16), truncate(s.Path, 28), branch, capText(s.ConcurrentWorkItems))
+		// The source's colored origin dot (cockpit-colors FR4) keeps its colour on the
+		// focused row too (FR6 — no fill; the ▸ cursor + a bright name carry the focus).
+		dot := m.sourceDot(name)
+		shownName := fmt.Sprintf("%-16s", truncate(name, 16))
 		if focused {
-			b = append(b, changelogFocusStyle.Render(row))
-		} else {
-			b = append(b, row)
+			shownName = slugStyle.Render(shownName)
 		}
+		row := fmt.Sprintf("%s%s %s %-28s %-8s %s", cursor, dot, shownName, truncate(s.Path, 28), branch, capText(s.ConcurrentWorkItems))
+		b = append(b, row)
 	}
 	return strings.Join(b, "\n")
 }
 
 // projectOriginDots renders a config-switcher project row's origin dots (D5): a project
 // dot + the project's FIRST source's dot (`●P ●S`), or a lone project dot when the
-// project has no sources yet. `plain` drops the tint for the focused (fill-owned) row.
-func (m Model) projectOriginDots(p projects.Project, plain bool) string {
+// project has no sources yet. Always tinted — no caller fills the row anymore (FR6).
+func (m Model) projectOriginDots(p projects.Project) string {
 	pc := m.projectColor(p.Name)
 	if len(p.Sources) == 0 {
-		return originDots(nil, pc, plain) // a single project dot
+		return originDots(nil, pc) // a single project dot
 	}
 	first := p.Sources[0]
 	label := first.Name
@@ -394,7 +391,7 @@ func (m Model) projectOriginDots(p projects.Project, plain bool) string {
 		label = filepath.Base(first.Path)
 	}
 	sc := colorFor(first.Color, label)
-	return originDots(pc, sc, plain)
+	return originDots(pc, sc)
 }
 
 // viewConfigRight is the config tab's right column: the focused source's detail + the

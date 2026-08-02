@@ -1,0 +1,22 @@
+flowchart LR
+  user([Reviewer]):::actor
+  ai([gogo-analyst]):::actor
+
+  user --> uc1(["Read the high-level overview"]):::uc
+  user --> uc2(["Open the detailed plan"]):::uc
+  user --> uc3(["Comment on a plan line"]):::uc
+  user --> uc4(["Reply in a thread"]):::uc
+  user --> uc5(["Resolve a thread"]):::uc
+  user --> uc6(["Comment on a diagram / node"]):::uc
+  user --> uc7(["Answer an open question"]):::uc
+  user --> uc8(["Send review"]):::uc
+
+  uc8 --> uc9(["Write plan-comments.json"]):::uc
+  uc9 --> ai
+  ai --> uc10(["Answer open threads"]):::uc
+  ai --> uc11(["Revise plan.md / plan-detail.md"]):::uc
+  ai --> uc12(["Record answers in decisions.md"]):::uc
+  uc3 --> uc13(["Keep unmatched comments<br/>in global comments"]):::uc
+
+  classDef actor fill:#e8ecff,stroke:#7c8bd9,color:#111
+  classDef uc fill:#fff3d6,stroke:#caa54a,color:#111
